@@ -1,10 +1,25 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
 import { useState, useCallback, useEffect } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useTheme } from '../../lib/theme';
+import { LinearGradient } from 'expo-linear-gradient';
+import Animated, {
+  FadeIn,
+  FadeInDown,
+  FadeInUp,
+  FadeInRight,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+  withDelay,
+} from 'react-native-reanimated';
+import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS } from '../../lib/theme';
 import { useAuthStore } from '../../lib/auth';
 import { proposalsApi, userApi } from '../../lib/api';
+import { Button, Card, Badge, CountBadge, SectionHeader } from '../../components/ui';
+import { SkeletonStats, SkeletonListItem } from '../../components/ui/Skeleton';
+
+const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
 type Community = {
   id: string;
@@ -31,13 +46,108 @@ type ActivityItem = {
   color: string;
 };
 
+// Animated Stat Card Component
+function StatCard({
+  icon,
+  value,
+  label,
+  color,
+  delay = 0,
+}: {
+  icon: string;
+  value: string;
+  label: string;
+  color: string;
+  delay?: number;
+}) {
+  const { colors } = useTheme();
+  const scale = useSharedValue(0.9);
+
+  useEffect(() => {
+    scale.value = withDelay(delay, withSpring(1, { damping: 12, stiffness: 100 }));
+  }, []);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+    opacity: scale.value,
+  }));
+
+  return (
+    <Animated.View style={[styles.statCard, { backgroundColor: colors.cardBg, borderColor: colors.border }, animatedStyle]}>
+      <View style={[styles.statIconBg, { backgroundColor: `${color}15` }]}>
+        <Ionicons name={icon as any} size={20} color={color} />
+      </View>
+      <Text style={[styles.statValue, { color: colors.text }]}>{value}</Text>
+      <Text style={[styles.statLabel, { color: colors.textSecondary }]}>{label}</Text>
+    </Animated.View>
+  );
+}
+
+// Premium Welcome Header
+function WelcomeHeader({
+  name,
+  isVerified,
+  onAvatarPress,
+}: {
+  name?: string;
+  isVerified: boolean;
+  onAvatarPress: () => void;
+}) {
+  const { colors } = useTheme();
+  const displayName = name ? name.split(' ')[0] : 'there';
+  const letter = name ? name.charAt(0).toUpperCase() : 'U';
+
+  return (
+    <Animated.View
+      entering={FadeInDown.duration(500)}
+      style={[styles.welcomeContainer, { backgroundColor: colors.cardBg, borderColor: colors.gold }]}
+    >
+      <LinearGradient
+        colors={[`${colors.gold}08`, 'transparent']}
+        style={StyleSheet.absoluteFill}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+      />
+      <View style={styles.welcomeContent}>
+        <View style={styles.welcomeTextSection}>
+          <Text style={[styles.welcomeGreeting, { color: colors.gold }]}>Welcome back,</Text>
+          <Text style={[styles.welcomeName, { color: colors.text }]}>{displayName}!</Text>
+          <Text style={[styles.welcomeSubtitle, { color: colors.textSecondary }]}>
+            Your voice matters in civic governance
+          </Text>
+        </View>
+        <TouchableOpacity onPress={onAvatarPress} style={styles.avatarContainer}>
+          <View style={[styles.avatar, { backgroundColor: colors.gold, ...SHADOWS.glow }]}>
+            <Text style={[styles.avatarText, { color: colors.background }]}>{letter}</Text>
+          </View>
+          {isVerified && (
+            <View style={[styles.verifiedBadge, { backgroundColor: colors.success }]}>
+              <Ionicons name="checkmark" size={10} color="#fff" />
+            </View>
+          )}
+        </TouchableOpacity>
+      </View>
+      <View style={[styles.citizenBadge, { backgroundColor: isVerified ? colors.gold : colors.goldLight }]}>
+        <Ionicons
+          name={isVerified ? 'shield-checkmark' : 'shield-outline'}
+          size={14}
+          color={isVerified ? colors.background : colors.gold}
+        />
+        <Text style={[styles.citizenText, { color: isVerified ? colors.background : colors.gold }]}>
+          {isVerified ? 'Verified Citizen' : 'Active Citizen'}
+        </Text>
+      </View>
+    </Animated.View>
+  );
+}
+
 export default function HomeScreen() {
   const { colors } = useTheme();
   const router = useRouter();
   const { user, isAuthenticated } = useAuthStore();
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
-  
+
   const [stats, setStats] = useState({ pending: 0, voted: 0, passed: 0 });
   const [communities, setCommunities] = useState<Community[]>([]);
   const [urgentProposals, setUrgentProposals] = useState<UrgentProposal[]>([]);
@@ -95,78 +205,38 @@ export default function HomeScreen() {
       const userCity = profile?.city || user?.city || '';
 
       const countryFlags: Record<string, string> = {
-        'Canada': '🇨🇦',
-        'United States': '🇺🇸',
-        'United Kingdom': '🇬🇧',
-        'Australia': '🇦🇺',
-        'Germany': '🇩🇪',
-        'France': '🇫🇷',
-        'Japan': '🇯🇵',
-        'India': '🇮🇳',
-        'Brazil': '🇧🇷',
-        'Mexico': '🇲🇽',
-        'Spain': '🇪🇸',
-        'Italy': '🇮🇹',
-        'Netherlands': '🇳🇱',
-        'Sweden': '🇸🇪',
-        'Norway': '🇳🇴',
-        'Denmark': '🇩🇰',
-        'Finland': '🇫🇮',
-        'Ireland': '🇮🇪',
-        'New Zealand': '🇳🇿',
-        'South Korea': '🇰🇷',
-        'Singapore': '🇸🇬',
+        'Canada': '🇨🇦', 'United States': '🇺🇸', 'United Kingdom': '🇬🇧', 'Australia': '🇦🇺',
+        'Germany': '🇩🇪', 'France': '🇫🇷', 'Japan': '🇯🇵', 'India': '🇮🇳',
+        'Brazil': '🇧🇷', 'Mexico': '🇲🇽', 'Spain': '🇪🇸', 'Italy': '🇮🇹',
       };
 
       const communityMap: Record<string, Community> = {};
-      
+
       if (userCountry) {
-        communityMap['country'] = { 
-          id: 'country', 
-          name: userCountry, 
-          type: 'country', 
-          icon: countryFlags[userCountry] || '🌍', 
-          proposalCount: 0, 
-          unvotedCount: 0 
-        };
+        communityMap['country'] = { id: 'country', name: userCountry, type: 'country', icon: countryFlags[userCountry] || '🌍', proposalCount: 0, unvotedCount: 0 };
       }
       if (userState) {
-        communityMap['state'] = { 
-          id: 'state', 
-          name: userState, 
-          type: 'state', 
-          icon: '🏛️', 
-          proposalCount: 0, 
-          unvotedCount: 0 
-        };
+        communityMap['state'] = { id: 'state', name: userState, type: 'state', icon: '🏛️', proposalCount: 0, unvotedCount: 0 };
       }
       if (userCity) {
-        communityMap['city'] = { 
-          id: 'city', 
-          name: userCity, 
-          type: 'city', 
-          icon: '🏙️', 
-          proposalCount: 0, 
-          unvotedCount: 0 
-        };
+        communityMap['city'] = { id: 'city', name: userCity, type: 'city', icon: '🏙️', proposalCount: 0, unvotedCount: 0 };
       }
 
       proposals.forEach((p: any) => {
         const geoRestrictions: string[] = p.geoRestrictions || [];
-        
         const isGlobal = geoRestrictions.length === 0;
         const matchesCountry = isGlobal || (geoRestrictions.length >= 1 && geoRestrictions[0] === userCountry);
-        
+
         if (userCountry && communityMap['country'] && matchesCountry && geoRestrictions.length <= 1) {
           communityMap['country'].proposalCount++;
           if (!votedIds.has(p.id)) communityMap['country'].unvotedCount++;
         }
-        
+
         if (userState && communityMap['state'] && geoRestrictions.length === 2 && geoRestrictions[0] === userCountry && geoRestrictions[1] === userState) {
           communityMap['state'].proposalCount++;
           if (!votedIds.has(p.id)) communityMap['state'].unvotedCount++;
         }
-        
+
         if (userCity && communityMap['city'] && geoRestrictions.length === 3 && geoRestrictions[0] === userCountry && geoRestrictions[1] === userState && geoRestrictions[2] === userCity) {
           communityMap['city'].proposalCount++;
           if (!votedIds.has(p.id)) communityMap['city'].unvotedCount++;
@@ -209,7 +279,6 @@ export default function HomeScreen() {
         });
       }
       setActivities(recentActivities);
-
     } catch (error) {
       console.error('Dashboard fetch error:', error);
     } finally {
@@ -227,130 +296,148 @@ export default function HomeScreen() {
     fetchDashboardData();
   }, [fetchDashboardData]);
 
-  const navigateToProposals = (filter?: string) => {
-    router.push('/(tabs)/proposals');
-  };
+  const navigateToProposals = () => router.push('/(tabs)/proposals');
 
+  // Loading State with Skeleton
   if (loading) {
     return (
-      <View style={[styles.container, styles.center, { backgroundColor: colors.background }]}>
-        <ActivityIndicator size="large" color={colors.gold} />
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <View style={styles.skeletonHeader}>
+          <View style={[styles.skeletonWelcome, { backgroundColor: colors.cardBg }]} />
+        </View>
+        <View style={styles.skeletonContent}>
+          <SkeletonStats count={3} />
+          <View style={{ marginTop: SPACING.xxl }}>
+            <SkeletonListItem />
+            <SkeletonListItem />
+          </View>
+        </View>
       </View>
     );
   }
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={[styles.header, { backgroundColor: colors.cardBg }]}>
-        <View style={[styles.welcomeCard, { backgroundColor: colors.cardBg, borderColor: colors.gold }]}>
-          <View style={styles.welcomeContent}>
-            <Text style={[styles.welcomeTitle, { color: colors.gold }]}>Welcome back{user?.name ? `, ${user.name.split(' ')[0]}` : ''}!</Text>
-            <Text style={[styles.welcomeSubtitle, { color: colors.textSecondary }]}>Your voice matters in civic governance</Text>
-            <View style={[styles.citizenBadge, { backgroundColor: isVerified ? colors.gold : colors.goldLight }]}>
-              <Ionicons name={isVerified ? "shield-checkmark" : "shield-outline"} size={14} color={isVerified ? colors.background : colors.gold} />
-              <Text style={[styles.citizenText, { color: isVerified ? colors.background : colors.gold }]}>{isVerified ? 'Verified Citizen' : 'Active Citizen'}</Text>
-            </View>
-          </View>
-        </View>
-      </View>
-
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.gold} />}
       >
+        {/* Welcome Header */}
+        <WelcomeHeader
+          name={user?.name}
+          isVerified={isVerified}
+          onAvatarPress={() => router.push('/(tabs)/profile')}
+        />
+
+        {/* Verification Banner */}
         {!isVerified && isAuthenticated && (
-          <TouchableOpacity 
-            style={[styles.verifyBanner, { backgroundColor: `${colors.warning}20`, borderColor: colors.warning }]}
+          <AnimatedTouchable
+            entering={FadeInUp.delay(200).duration(400)}
+            style={[styles.alertBanner, { backgroundColor: colors.warningLight, borderColor: colors.warning }]}
             onPress={() => router.push('/(tabs)/identity')}
+            activeOpacity={0.8}
           >
-            <Ionicons name="warning" size={24} color={colors.warning} />
-            <View style={styles.verifyBannerText}>
-              <Text style={[styles.verifyTitle, { color: colors.text }]}>Verify Your Identity</Text>
-              <Text style={[styles.verifySubtitle, { color: colors.textSecondary }]}>Complete verification to vote on proposals</Text>
+            <View style={[styles.alertIconBg, { backgroundColor: colors.warning }]}>
+              <Ionicons name="shield-outline" size={20} color="#fff" />
+            </View>
+            <View style={styles.alertContent}>
+              <Text style={[styles.alertTitle, { color: colors.text }]}>Verify Your Identity</Text>
+              <Text style={[styles.alertSubtitle, { color: colors.textSecondary }]}>
+                Complete verification to vote on proposals
+              </Text>
             </View>
             <Ionicons name="chevron-forward" size={20} color={colors.warning} />
-          </TouchableOpacity>
+          </AnimatedTouchable>
         )}
 
+        {/* Voting Streak */}
         {votingStreak > 0 && (
-          <View style={[styles.streakCard, { backgroundColor: colors.goldLight, borderColor: colors.gold }]}>
+          <Animated.View
+            entering={FadeInUp.delay(300).duration(400)}
+            style={[styles.streakCard, { backgroundColor: colors.goldLight, borderColor: colors.gold }]}
+          >
+            <LinearGradient
+              colors={[`${colors.gold}15`, 'transparent']}
+              style={StyleSheet.absoluteFill}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+            />
             <Text style={styles.streakEmoji}>🔥</Text>
             <View style={styles.streakInfo}>
               <Text style={[styles.streakTitle, { color: colors.gold }]}>{votingStreak} Day Voting Streak!</Text>
               <Text style={[styles.streakSubtitle, { color: colors.text }]}>Keep voting to maintain your streak</Text>
             </View>
-          </View>
+          </Animated.View>
         )}
 
+        {/* Unclaimed Tokens */}
         {unclaimedTokens > 0 && (
-          <TouchableOpacity 
-            style={[styles.tokensBanner, { backgroundColor: `${colors.success}15`, borderColor: colors.success }]}
-            onPress={() => router.push('/(tabs)/proposals')}
+          <AnimatedTouchable
+            entering={FadeInUp.delay(400).duration(400)}
+            style={[styles.alertBanner, { backgroundColor: colors.successLight, borderColor: colors.success }]}
+            onPress={navigateToProposals}
+            activeOpacity={0.8}
           >
-            <View style={[styles.tokenIcon, { backgroundColor: colors.success }]}>
+            <View style={[styles.alertIconBg, { backgroundColor: colors.success }]}>
               <Ionicons name="ticket" size={20} color="#fff" />
             </View>
-            <View style={styles.tokenInfo}>
-              <Text style={[styles.tokenTitle, { color: colors.text }]}>{unclaimedTokens} Vote Token{unclaimedTokens > 1 ? 's' : ''} Available</Text>
-              <Text style={[styles.tokenSubtitle, { color: colors.textSecondary }]}>Claim now to participate</Text>
+            <View style={styles.alertContent}>
+              <Text style={[styles.alertTitle, { color: colors.text }]}>
+                {unclaimedTokens} Vote Token{unclaimedTokens > 1 ? 's' : ''} Available
+              </Text>
+              <Text style={[styles.alertSubtitle, { color: colors.textSecondary }]}>Claim now to participate</Text>
             </View>
             <Ionicons name="arrow-forward" size={20} color={colors.success} />
-          </TouchableOpacity>
+          </AnimatedTouchable>
         )}
 
-        <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>YOUR STATS</Text>
+        {/* Stats */}
+        <SectionHeader title="YOUR STATS" style={{ marginTop: SPACING.lg }} />
         <View style={styles.statsGrid}>
-          {[
-            { icon: 'time-outline', value: stats.pending.toString(), label: 'Pending', color: colors.warning },
-            { icon: 'checkmark-done-outline', value: stats.voted.toString(), label: 'Voted', color: colors.success },
-            { icon: 'trophy-outline', value: stats.passed.toString(), label: 'Passed', color: colors.gold },
-          ].map((stat, i) => (
-            <View key={i} style={[styles.statCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
-              <Ionicons name={stat.icon as any} size={22} color={stat.color} />
-              <Text style={[styles.statValue, { color: colors.gold }]}>{stat.value}</Text>
-              <Text style={[styles.statLabel, { color: colors.textSecondary }]}>{stat.label}</Text>
-            </View>
-          ))}
+          <StatCard icon="time-outline" value={stats.pending.toString()} label="Pending" color={colors.warning} delay={0} />
+          <StatCard icon="checkmark-done-outline" value={stats.voted.toString()} label="Voted" color={colors.success} delay={100} />
+          <StatCard icon="trophy-outline" value={stats.passed.toString()} label="Passed" color={colors.gold} delay={200} />
         </View>
 
+        {/* Urgent Proposals */}
         {urgentProposals.length > 0 && (
           <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <View style={styles.sectionTitleRow}>
-                <Ionicons name="alarm" size={18} color={colors.error} />
-                <Text style={[styles.sectionTitle, { color: colors.text, marginLeft: 8 }]}>Closing Soon</Text>
-              </View>
-            </View>
-            {urgentProposals.map((proposal) => (
-              <TouchableOpacity 
-                key={proposal.id} 
-                style={[styles.urgentCard, { backgroundColor: colors.cardBg, borderColor: colors.error }]}
-                onPress={() => router.push('/(tabs)/proposals')}
+            <SectionHeader title="CLOSING SOON" icon="alarm" iconColor={colors.error} />
+            {urgentProposals.map((proposal, index) => (
+              <AnimatedTouchable
+                key={proposal.id}
+                entering={FadeInRight.delay(index * 100).duration(300)}
+                style={[styles.urgentCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}
+                onPress={navigateToProposals}
+                activeOpacity={0.7}
               >
                 <View style={styles.urgentInfo}>
-                  <Text style={[styles.urgentTitle, { color: colors.text }]} numberOfLines={1}>{proposal.title}</Text>
-                  <Text style={[styles.urgentCategory, { color: colors.gold }]}>{proposal.category}</Text>
+                  <Text style={[styles.urgentTitle, { color: colors.text }]} numberOfLines={1}>
+                    {proposal.title}
+                  </Text>
+                  <Badge label={proposal.category} variant="gold" size="sm" />
                 </View>
-                <View style={[styles.urgentTime, { backgroundColor: `${colors.error}20` }]}>
+                <View style={[styles.urgentTime, { backgroundColor: colors.errorLight }]}>
                   <Ionicons name="time" size={14} color={colors.error} />
                   <Text style={[styles.urgentTimeText, { color: colors.error }]}>{proposal.hoursLeft}h</Text>
                 </View>
-              </TouchableOpacity>
+              </AnimatedTouchable>
             ))}
           </View>
         )}
 
+        {/* Communities */}
         {communities.length > 0 && (
           <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={[styles.sectionLabel, { color: colors.textSecondary, marginBottom: 0 }]}>YOUR COMMUNITIES</Text>
-            </View>
-            {communities.map((community) => (
-              <TouchableOpacity 
-                key={community.id} 
+            <SectionHeader title="YOUR COMMUNITIES" />
+            {communities.map((community, index) => (
+              <AnimatedTouchable
+                key={community.id}
+                entering={FadeInRight.delay(index * 100).duration(300)}
                 style={[styles.communityCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}
-                onPress={() => navigateToProposals(community.id)}
+                onPress={navigateToProposals}
+                activeOpacity={0.7}
               >
                 <Text style={styles.communityIcon}>{community.icon}</Text>
                 <View style={styles.communityInfo}>
@@ -359,46 +446,51 @@ export default function HomeScreen() {
                     {community.proposalCount} proposal{community.proposalCount !== 1 ? 's' : ''}
                   </Text>
                 </View>
-                {community.unvotedCount > 0 && (
-                  <View style={[styles.communityBadge, { backgroundColor: colors.gold }]}>
-                    <Text style={[styles.communityBadgeText, { color: colors.background }]}>{community.unvotedCount}</Text>
-                  </View>
-                )}
-                {community.unvotedCount === 0 && (
+                {community.unvotedCount > 0 ? (
+                  <CountBadge count={community.unvotedCount} />
+                ) : (
                   <Ionicons name="checkmark-circle" size={24} color={colors.success} />
                 )}
-                <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} style={{ marginLeft: 8 }} />
-              </TouchableOpacity>
+                <Ionicons name="chevron-forward" size={18} color={colors.textMuted} style={{ marginLeft: SPACING.sm }} />
+              </AnimatedTouchable>
             ))}
           </View>
         )}
 
+        {/* Recent Activity */}
         {activities.length > 0 && (
           <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={[styles.sectionLabel, { color: colors.textSecondary, marginBottom: 0 }]}>RECENT ACTIVITY</Text>
-            </View>
-            {activities.map((activity) => (
-              <View key={activity.id} style={[styles.activityCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
-                <View style={[styles.activityIcon, { backgroundColor: `${activity.color}20` }]}>
+            <SectionHeader title="RECENT ACTIVITY" />
+            {activities.map((activity, index) => (
+              <Animated.View
+                key={activity.id}
+                entering={FadeInRight.delay(index * 100).duration(300)}
+                style={[styles.activityCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}
+              >
+                <View style={[styles.activityIconBg, { backgroundColor: `${activity.color}15` }]}>
                   <Ionicons name={activity.icon as any} size={18} color={activity.color} />
                 </View>
                 <View style={styles.activityInfo}>
                   <Text style={[styles.activityMessage, { color: colors.text }]}>{activity.message}</Text>
-                  <Text style={[styles.activityTime, { color: colors.textSecondary }]}>{activity.time}</Text>
+                  <Text style={[styles.activityTime, { color: colors.textMuted }]}>{activity.time}</Text>
                 </View>
-              </View>
+              </Animated.View>
             ))}
           </View>
         )}
 
-        <TouchableOpacity 
-          style={[styles.exploreButton, { backgroundColor: colors.gold }]} 
-          onPress={() => router.push('/(tabs)/proposals')}
-        >
-          <Text style={[styles.exploreButtonText, { color: colors.background }]}>Explore All Proposals</Text>
-          <Ionicons name="arrow-forward" size={18} color={colors.background} />
-        </TouchableOpacity>
+        {/* CTA Button */}
+        <Animated.View entering={FadeInUp.delay(600).duration(400)} style={styles.ctaContainer}>
+          <Button
+            title="Explore All Proposals"
+            onPress={navigateToProposals}
+            variant="primary"
+            size="lg"
+            fullWidth
+            icon="arrow-forward"
+            iconPosition="right"
+          />
+        </Animated.View>
 
         <View style={styles.bottomPadding} />
       </ScrollView>
@@ -407,68 +499,261 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  center: { alignItems: 'center', justifyContent: 'center' },
-  header: { paddingHorizontal: 20, paddingTop: 60, paddingBottom: 16, borderBottomLeftRadius: 20, borderBottomRightRadius: 20 },
-  welcomeCard: { borderRadius: 16, padding: 20, borderWidth: 1 },
-  welcomeContent: { alignItems: 'flex-start' },
-  welcomeTitle: { fontSize: 24, fontWeight: 'bold', marginBottom: 4 },
-  welcomeSubtitle: { fontSize: 14, marginBottom: 16 },
-  citizenBadge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, gap: 6 },
-  citizenText: { fontSize: 12, fontWeight: '600' },
-  content: { padding: 16 },
-
-  verifyBanner: { flexDirection: 'row', alignItems: 'center', padding: 16, borderRadius: 12, borderWidth: 1, marginBottom: 16 },
-  verifyBannerText: { flex: 1, marginLeft: 12 },
-  verifyTitle: { fontSize: 15, fontWeight: '600' },
-  verifySubtitle: { fontSize: 12, marginTop: 2 },
-
-  streakCard: { flexDirection: 'row', alignItems: 'center', padding: 16, borderRadius: 12, borderWidth: 1, marginBottom: 16 },
-  streakEmoji: { fontSize: 28 },
-  streakInfo: { marginLeft: 12, flex: 1 },
-  streakTitle: { fontSize: 16, fontWeight: '700' },
-  streakSubtitle: { fontSize: 13, marginTop: 2 },
-
-  tokensBanner: { flexDirection: 'row', alignItems: 'center', padding: 16, borderRadius: 12, borderWidth: 1, marginBottom: 16 },
-  tokenIcon: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
-  tokenInfo: { flex: 1, marginLeft: 12 },
-  tokenTitle: { fontSize: 15, fontWeight: '600' },
-  tokenSubtitle: { fontSize: 12, marginTop: 2 },
-
-  sectionLabel: { fontSize: 12, fontWeight: '600', letterSpacing: 1, marginBottom: 12 },
-  statsGrid: { flexDirection: 'row', gap: 12, marginBottom: 24 },
-  statCard: { flex: 1, borderRadius: 12, padding: 14, alignItems: 'center', borderWidth: 1 },
-  statValue: { fontSize: 22, fontWeight: 'bold', marginTop: 6 },
-  statLabel: { fontSize: 11, marginTop: 2 },
-
-  section: { marginBottom: 20 },
-  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
-  sectionTitleRow: { flexDirection: 'row', alignItems: 'center' },
-  sectionTitle: { fontSize: 16, fontWeight: '600' },
-
-  urgentCard: { flexDirection: 'row', alignItems: 'center', padding: 14, borderRadius: 12, borderWidth: 1, marginBottom: 10 },
-  urgentInfo: { flex: 1 },
-  urgentTitle: { fontSize: 14, fontWeight: '500', marginBottom: 4 },
-  urgentCategory: { fontSize: 12 },
-  urgentTime: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 16, gap: 4 },
-  urgentTimeText: { fontSize: 13, fontWeight: '600' },
-
-  communityCard: { flexDirection: 'row', alignItems: 'center', padding: 16, borderRadius: 12, borderWidth: 1, marginBottom: 10 },
-  communityIcon: { fontSize: 24, marginRight: 12 },
-  communityInfo: { flex: 1 },
-  communityName: { fontSize: 16, fontWeight: '600' },
-  communityMeta: { fontSize: 12, marginTop: 2 },
-  communityBadge: { minWidth: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 8 },
-  communityBadgeText: { fontSize: 14, fontWeight: '700' },
-
-  activityCard: { flexDirection: 'row', alignItems: 'center', padding: 14, borderRadius: 12, borderWidth: 1, marginBottom: 10 },
-  activityIcon: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
-  activityInfo: { flex: 1, marginLeft: 12 },
-  activityMessage: { fontSize: 14, fontWeight: '500' },
-  activityTime: { fontSize: 12, marginTop: 2 },
-
-  exploreButton: { borderRadius: 30, paddingVertical: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 8 },
-  exploreButtonText: { fontSize: 16, fontWeight: '600' },
-
-  bottomPadding: { height: 100 },
+  container: {
+    flex: 1,
+  },
+  content: {
+    paddingTop: 60,
+  },
+  // Skeleton Loading
+  skeletonHeader: {
+    paddingHorizontal: SPACING.lg,
+    paddingTop: 60,
+  },
+  skeletonWelcome: {
+    height: 160,
+    borderRadius: BORDER_RADIUS.xxl,
+  },
+  skeletonContent: {
+    padding: SPACING.lg,
+  },
+  // Welcome Header
+  welcomeContainer: {
+    marginHorizontal: SPACING.lg,
+    padding: SPACING.xl,
+    borderRadius: BORDER_RADIUS.xxl,
+    borderWidth: 1.5,
+    overflow: 'hidden',
+    ...SHADOWS.md,
+  },
+  welcomeContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: SPACING.lg,
+  },
+  welcomeTextSection: {
+    flex: 1,
+  },
+  welcomeGreeting: {
+    ...TYPOGRAPHY.bodyMedium,
+    fontWeight: '500',
+  },
+  welcomeName: {
+    ...TYPOGRAPHY.headlineLarge,
+    marginTop: SPACING.xxs,
+  },
+  welcomeSubtitle: {
+    ...TYPOGRAPHY.bodySmall,
+    marginTop: SPACING.xs,
+  },
+  avatarContainer: {
+    position: 'relative',
+  },
+  avatar: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarText: {
+    fontSize: 22,
+    fontWeight: '700',
+  },
+  verifiedBadge: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#0F0F12',
+  },
+  citizenBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    borderRadius: BORDER_RADIUS.full,
+    gap: SPACING.sm,
+  },
+  citizenText: {
+    ...TYPOGRAPHY.labelMedium,
+  },
+  // Alert Banners
+  alertBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: SPACING.lg,
+    marginTop: SPACING.lg,
+    padding: SPACING.lg,
+    borderRadius: BORDER_RADIUS.xl,
+    borderWidth: 1,
+  },
+  alertIconBg: {
+    width: 40,
+    height: 40,
+    borderRadius: BORDER_RADIUS.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  alertContent: {
+    flex: 1,
+    marginLeft: SPACING.md,
+  },
+  alertTitle: {
+    ...TYPOGRAPHY.labelLarge,
+  },
+  alertSubtitle: {
+    ...TYPOGRAPHY.bodySmall,
+    marginTop: SPACING.xxs,
+  },
+  // Streak Card
+  streakCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: SPACING.lg,
+    marginTop: SPACING.lg,
+    padding: SPACING.lg,
+    borderRadius: BORDER_RADIUS.xl,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  streakEmoji: {
+    fontSize: 32,
+  },
+  streakInfo: {
+    marginLeft: SPACING.md,
+    flex: 1,
+  },
+  streakTitle: {
+    ...TYPOGRAPHY.headlineSmall,
+  },
+  streakSubtitle: {
+    ...TYPOGRAPHY.bodySmall,
+    marginTop: SPACING.xxs,
+  },
+  // Stats Grid
+  statsGrid: {
+    flexDirection: 'row',
+    paddingHorizontal: SPACING.lg,
+    gap: SPACING.md,
+  },
+  statCard: {
+    flex: 1,
+    alignItems: 'center',
+    padding: SPACING.lg,
+    borderRadius: BORDER_RADIUS.xl,
+    borderWidth: 1,
+  },
+  statIconBg: {
+    width: 40,
+    height: 40,
+    borderRadius: BORDER_RADIUS.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: SPACING.sm,
+  },
+  statValue: {
+    ...TYPOGRAPHY.headlineMedium,
+    fontWeight: '700',
+  },
+  statLabel: {
+    ...TYPOGRAPHY.labelSmall,
+    marginTop: SPACING.xxs,
+  },
+  // Sections
+  section: {
+    marginTop: SPACING.xl,
+    paddingHorizontal: SPACING.lg,
+  },
+  // Urgent Cards
+  urgentCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: SPACING.lg,
+    borderRadius: BORDER_RADIUS.xl,
+    borderWidth: 1,
+    marginBottom: SPACING.md,
+  },
+  urgentInfo: {
+    flex: 1,
+    gap: SPACING.sm,
+  },
+  urgentTitle: {
+    ...TYPOGRAPHY.labelLarge,
+  },
+  urgentTime: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    borderRadius: BORDER_RADIUS.full,
+    gap: SPACING.xs,
+  },
+  urgentTimeText: {
+    ...TYPOGRAPHY.labelMedium,
+  },
+  // Community Cards
+  communityCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: SPACING.lg,
+    borderRadius: BORDER_RADIUS.xl,
+    borderWidth: 1,
+    marginBottom: SPACING.md,
+  },
+  communityIcon: {
+    fontSize: 28,
+    marginRight: SPACING.md,
+  },
+  communityInfo: {
+    flex: 1,
+  },
+  communityName: {
+    ...TYPOGRAPHY.labelLarge,
+  },
+  communityMeta: {
+    ...TYPOGRAPHY.bodySmall,
+    marginTop: SPACING.xxs,
+  },
+  // Activity Cards
+  activityCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: SPACING.lg,
+    borderRadius: BORDER_RADIUS.xl,
+    borderWidth: 1,
+    marginBottom: SPACING.md,
+  },
+  activityIconBg: {
+    width: 40,
+    height: 40,
+    borderRadius: BORDER_RADIUS.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  activityInfo: {
+    flex: 1,
+    marginLeft: SPACING.md,
+  },
+  activityMessage: {
+    ...TYPOGRAPHY.labelLarge,
+  },
+  activityTime: {
+    ...TYPOGRAPHY.bodySmall,
+    marginTop: SPACING.xxs,
+  },
+  // CTA
+  ctaContainer: {
+    paddingHorizontal: SPACING.lg,
+    marginTop: SPACING.xl,
+  },
+  bottomPadding: {
+    height: 120,
+  },
 });
