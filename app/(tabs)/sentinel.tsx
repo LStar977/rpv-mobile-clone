@@ -24,6 +24,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useAuthStore } from '../../lib/auth';
 import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS } from '../../lib/theme';
+import { haptics } from '../../lib/haptics';
 
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
@@ -69,6 +70,7 @@ function TabButton({
   const scale = useSharedValue(1);
 
   const handlePressIn = () => {
+    haptics.selection();
     scale.value = withSpring(0.95, { damping: 15, stiffness: 300 });
   };
 
@@ -253,9 +255,11 @@ export default function SentinelScreen() {
 
   const handleAnalyze = async () => {
     if (!title.trim() || !text.trim()) {
+      haptics.warning();
       Alert.alert('Error', 'Please enter a title and text to analyze');
       return;
     }
+    haptics.medium();
     setAnalyzing(true);
     try {
       const response = await fetch(`${API_URL}/api/sentinel/analyze`, {
@@ -287,8 +291,10 @@ export default function SentinelScreen() {
       setActiveTab('summary');
       setTitle('');
       setText('');
+      haptics.success();
       Alert.alert('Analysis Complete', 'Swipe the tabs below to see Scores, Findings, Fixes, and Proposal!');
     } catch (error) {
+      haptics.error();
       Alert.alert('Error', 'Failed to analyze document.');
     } finally {
       setAnalyzing(false);
@@ -297,9 +303,11 @@ export default function SentinelScreen() {
 
   const handleCreateProposal = async () => {
     if (!selectedAnalysis || !user?.id) {
+      haptics.warning();
       Alert.alert('Error', 'Please sign in to create a proposal');
       return;
     }
+    haptics.medium();
     setCreatingProposal(true);
     try {
       const response = await fetch(`${API_URL}/api/proposals`, {
@@ -315,8 +323,10 @@ export default function SentinelScreen() {
       });
       if (!response.ok) throw new Error('Failed to create proposal');
       setProposalCreated(true);
+      haptics.success();
       Alert.alert('Success', 'Your proposal has been created!');
     } catch (error) {
+      haptics.error();
       Alert.alert('Error', 'Failed to create proposal.');
     } finally {
       setCreatingProposal(false);

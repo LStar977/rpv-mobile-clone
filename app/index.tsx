@@ -11,9 +11,11 @@ import {
   Image,
   Alert,
   Dimensions,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import Animated, {
   FadeIn,
   FadeInDown,
@@ -31,6 +33,8 @@ import { useAuthStore } from '../lib/auth';
 import { router } from 'expo-router';
 import { isBiometricAvailable, getBiometricType, authenticateWithBiometrics, isBiometricEnabled } from '../lib/biometrics';
 import { Button } from '../components/ui';
+import { haptics } from '../lib/haptics';
+import { ONBOARDING_KEY } from './onboarding';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -154,6 +158,7 @@ export default function HomeScreen() {
   const [appleAvailable, setAppleAvailable] = useState(false);
   const [biometricAvailable, setBiometricAvailable] = useState(false);
   const [biometricType, setBiometricType] = useState('Biometric');
+  const [checkingOnboarding, setCheckingOnboarding] = useState(true);
   const { login, isAuthenticated, checkAuth } = useAuthStore();
 
   // Logo animation
@@ -169,6 +174,25 @@ export default function HomeScreen() {
     opacity: logoOpacity.value,
     transform: [{ scale: logoScale.value }],
   }));
+
+  // Check if onboarding has been completed
+  useEffect(() => {
+    const checkOnboarding = async () => {
+      try {
+        const hasCompletedOnboarding = await AsyncStorage.getItem(ONBOARDING_KEY);
+        if (!hasCompletedOnboarding) {
+          // First time user - show onboarding
+          router.replace('/onboarding');
+          return;
+        }
+        setCheckingOnboarding(false);
+      } catch (error) {
+        console.error('Error checking onboarding status:', error);
+        setCheckingOnboarding(false);
+      }
+    };
+    checkOnboarding();
+  }, []);
 
   useEffect(() => {
     AppleAuthentication.isAvailableAsync().then(setAppleAvailable);
@@ -194,16 +218,37 @@ export default function HomeScreen() {
   }, []);
 
   const handleBiometricLogin = async () => {
+    haptics.medium();
     const result = await authenticateWithBiometrics(`Use ${biometricType} to sign in`);
     if (result.success) {
+      haptics.success();
       await checkAuth();
       if (useAuthStore.getState().isAuthenticated) {
         router.replace('/(tabs)/dashboard');
       } else {
+        haptics.error();
         Alert.alert('Session Expired', 'Please sign in again with Google or Apple.');
       }
     }
   };
+
+  // Show loading while checking onboarding status
+  if (checkingOnboarding) {
+    return (
+      <View style={[styles.container, styles.loadingContainer, { backgroundColor: colors.background }]}>
+        <LinearGradient
+          colors={[`${colors.gold}08`, 'transparent', `${colors.gold}05`]}
+          style={StyleSheet.absoluteFill}
+          start={{ x: 0.5, y: 0 }}
+          end={{ x: 0.5, y: 1 }}
+        />
+        <View style={[styles.loadingLogoBox, { backgroundColor: colors.goldLight }]}>
+          <Text style={styles.loadingLogoText}>R</Text>
+        </View>
+        <ActivityIndicator size="small" color={colors.gold} style={{ marginTop: SPACING.xl }} />
+      </View>
+    );
+  }
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -212,6 +257,7 @@ export default function HomeScreen() {
   }, [isAuthenticated]);
 
   const handleGoogleLogin = async () => {
+    haptics.medium();
     setIsLoading(true);
     try {
       await GoogleSignin.hasPlayServices();
@@ -225,18 +271,23 @@ export default function HomeScreen() {
       });
 
       if (success) {
+        haptics.success();
         router.replace('/(tabs)/dashboard');
       } else {
+        haptics.error();
         Alert.alert('Login Failed', 'Could not authenticate with the server. Please try again.');
       }
     } catch (err: any) {
       if (err.code === statusCodes.SIGN_IN_CANCELLED) {
         console.log('User cancelled');
       } else if (err.code === statusCodes.IN_PROGRESS) {
+        haptics.warning();
         Alert.alert('Please wait', 'Sign in is already in progress');
       } else if (err.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
+        haptics.error();
         Alert.alert('Error', 'Play services not available');
       } else {
+        haptics.error();
         Alert.alert('Error', err.message || 'Failed to sign in with Google');
       }
     } finally {
@@ -245,6 +296,7 @@ export default function HomeScreen() {
   };
 
   const handleAppleLogin = async () => {
+    haptics.medium();
     setIsLoading(true);
     try {
       const credential = await AppleAuthentication.signInAsync({
@@ -265,14 +317,17 @@ export default function HomeScreen() {
       });
 
       if (success) {
+        haptics.success();
         router.replace('/(tabs)/dashboard');
       } else {
+        haptics.error();
         Alert.alert('Login Failed', 'Could not authenticate with the server. Please try again.');
       }
     } catch (err: any) {
       if (err.code === 'ERR_REQUEST_CANCELED') {
         console.log('User canceled Apple sign in');
       } else {
+        haptics.error();
         Alert.alert('Error', 'An error occurred during Apple sign in');
       }
     } finally {
@@ -581,6 +636,22 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadingLogoBox: {
+    width: 80,
+    height: 80,
+    borderRadius: BORDER_RADIUS.xl,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadingLogoText: {
+    fontSize: 40,
+    fontWeight: '700',
+    color: '#D4AF37',
   },
   // Welcome Screen
   welcomeContent: {

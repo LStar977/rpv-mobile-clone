@@ -9,6 +9,7 @@ import Animated, {
   interpolate,
 } from 'react-native-reanimated';
 import { useTheme, SHADOWS, BORDER_RADIUS, SPACING } from '../../lib/theme';
+import { haptics } from '../../lib/haptics';
 
 // Custom Tab Bar Icon with animation
 function TabIcon({
@@ -62,6 +63,11 @@ export default function TabLayout() {
   return (
     <Tabs
       key={isDark ? 'dark' : 'light'}
+      screenListeners={{
+        tabPress: () => {
+          haptics.selection();
+        },
+      }}
       screenOptions={{
         headerShown: false,
         tabBarStyle: {

@@ -17,6 +17,7 @@ import Animated, {
   interpolate,
 } from 'react-native-reanimated';
 import { useTheme, SHADOWS, BORDER_RADIUS, SPACING, TYPOGRAPHY } from '../../lib/theme';
+import { haptics } from '../../lib/haptics';
 
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
@@ -57,6 +58,14 @@ export function Button({
   const opacity = useSharedValue(1);
 
   const handlePressIn = () => {
+    // Trigger haptic feedback based on variant
+    if (variant === 'danger') {
+      haptics.medium();
+    } else if (variant === 'primary') {
+      haptics.light();
+    } else {
+      haptics.light();
+    }
     scale.value = withSpring(0.97, { damping: 15, stiffness: 300 });
     opacity.value = withTiming(0.9, { duration: 100 });
   };
