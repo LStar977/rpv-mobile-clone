@@ -242,8 +242,12 @@ export default function HomeScreen() {
           start={{ x: 0.5, y: 0 }}
           end={{ x: 0.5, y: 1 }}
         />
-        <View style={[styles.loadingLogoBox, { backgroundColor: colors.goldLight }]}>
-          <Text style={styles.loadingLogoText}>R</Text>
+        <View style={[styles.loadingLogoBox, { backgroundColor: colors.goldLight, ...SHADOWS.glow }]}>
+          <Image
+            source={require('../assets/logo.png')}
+            style={styles.loadingLogoImage}
+            resizeMode="contain"
+          />
         </View>
         <ActivityIndicator size="small" color={colors.gold} style={{ marginTop: SPACING.xl }} />
       </View>
@@ -647,11 +651,11 @@ const styles = StyleSheet.create({
     borderRadius: BORDER_RADIUS.xl,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
   },
-  loadingLogoText: {
-    fontSize: 40,
-    fontWeight: '700',
-    color: '#D4AF37',
+  loadingLogoImage: {
+    width: 64,
+    height: 64,
   },
   // Welcome Screen
   welcomeContent: {

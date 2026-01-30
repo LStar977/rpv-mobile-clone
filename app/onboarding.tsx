@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   FlatList,
   ViewToken,
+  Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -29,12 +30,11 @@ import { haptics } from '../lib/haptics';
 const { width, height } = Dimensions.get('window');
 const ONBOARDING_KEY = '@represent_onboarding_complete';
 
-// Onboarding slide data
+// Onboarding slide data - ALL using gold brand color
 const slides = [
   {
     id: '1',
     icon: 'shield-checkmark',
-    iconColor: '#4ECDC4',
     title: 'Verify Your Identity',
     subtitle: 'Soulbound Passport',
     description:
@@ -44,7 +44,6 @@ const slides = [
   {
     id: '2',
     icon: 'document-text',
-    iconColor: '#FF6B6B',
     title: 'Vote on Proposals',
     subtitle: 'Your Voice Matters',
     description:
@@ -54,7 +53,6 @@ const slides = [
   {
     id: '3',
     icon: 'create',
-    iconColor: '#9B59B6',
     title: 'Create Proposals',
     subtitle: 'Lead the Change',
     description:
@@ -64,7 +62,6 @@ const slides = [
   {
     id: '4',
     icon: 'sparkles',
-    iconColor: '#F39C12',
     title: 'Sentinel AI',
     subtitle: 'Governance Analyzer',
     description:
@@ -98,16 +95,16 @@ function OnboardingSlide({
   return (
     <View style={styles.slide}>
       <Animated.View style={[styles.slideContent, animatedStyle]}>
-        {/* Icon */}
-        <View style={[styles.iconContainer, { shadowColor: item.iconColor }]}>
+        {/* Icon - using gold brand color */}
+        <View style={[styles.iconContainer, { shadowColor: colors.gold }]}>
           <LinearGradient
-            colors={[`${item.iconColor}30`, `${item.iconColor}10`]}
+            colors={[`${colors.gold}30`, `${colors.gold}10`]}
             style={styles.iconGradient}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
           />
-          <View style={[styles.iconInner, { backgroundColor: `${item.iconColor}20` }]}>
-            <Ionicons name={item.icon as any} size={48} color={item.iconColor} />
+          <View style={[styles.iconInner, { backgroundColor: colors.goldLight }]}>
+            <Ionicons name={item.icon as any} size={48} color={colors.gold} />
           </View>
         </View>
 
@@ -188,6 +185,7 @@ export default function OnboardingScreen() {
     try {
       await AsyncStorage.setItem(ONBOARDING_KEY, 'true');
       haptics.success();
+      // Navigate to the main app - replace clears the history
       router.replace('/');
     } catch (error) {
       console.error('Error saving onboarding status:', error);
@@ -231,10 +229,14 @@ export default function OnboardingScreen() {
         </TouchableOpacity>
       </Animated.View>
 
-      {/* Logo */}
+      {/* Logo - using actual logo image */}
       <Animated.View entering={FadeInDown.delay(200).duration(500)} style={styles.logoContainer}>
         <View style={[styles.logoBox, { backgroundColor: colors.goldLight, ...SHADOWS.glow }]}>
-          <Text style={styles.logoText}>R</Text>
+          <Image
+            source={require('../assets/logo.png')}
+            style={styles.logoImage}
+            resizeMode="contain"
+          />
         </View>
         <Text style={[styles.logoTitle, { color: colors.gold }]}>Represent</Text>
       </Animated.View>
@@ -322,17 +324,17 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.lg,
   },
   logoBox: {
-    width: 64,
-    height: 64,
+    width: 72,
+    height: 72,
     borderRadius: BORDER_RADIUS.xl,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: SPACING.md,
+    overflow: 'hidden',
   },
-  logoText: {
-    fontSize: 32,
-    fontWeight: '700',
-    color: '#D4AF37',
+  logoImage: {
+    width: 56,
+    height: 56,
   },
   logoTitle: {
     ...TYPOGRAPHY.headlineMedium,
