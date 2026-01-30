@@ -36,11 +36,15 @@ PODS:
     - ExpoModulesCore
   - ExpoFont (12.0.10):
     - ExpoModulesCore
+  - ExpoHaptics (13.0.1):
+    - ExpoModulesCore
   - ExpoHead (3.5.24):
     - ExpoModulesCore
   - ExpoImagePicker (15.1.0):
     - ExpoModulesCore
   - ExpoKeepAwake (13.0.2):
+    - ExpoModulesCore
+  - ExpoLinearGradient (13.0.2):
     - ExpoModulesCore
   - ExpoLocalAuthentication (14.0.1):
     - ExpoModulesCore
@@ -1287,6 +1291,8 @@ PODS:
     - React-logger (= 0.74.5)
     - React-perflogger (= 0.74.5)
     - React-utils (= 0.74.5)
+  - RNCAsyncStorage (1.23.1):
+    - React-Core
   - RNGestureHandler (2.16.2):
     - DoubleConversion
     - glog
@@ -1373,9 +1379,11 @@ DEPENDENCIES:
   - ExpoDevice (from `../node_modules/expo-device/ios`)
   - ExpoFileSystem (from `../node_modules/expo-file-system/ios`)
   - ExpoFont (from `../node_modules/expo-font/ios`)
+  - ExpoHaptics (from `../node_modules/expo-haptics/ios`)
   - ExpoHead (from `../node_modules/expo-router/ios`)
   - ExpoImagePicker (from `../node_modules/expo-image-picker/ios`)
   - ExpoKeepAwake (from `../node_modules/expo-keep-awake/ios`)
+  - ExpoLinearGradient (from `../node_modules/expo-linear-gradient/ios`)
   - ExpoLocalAuthentication (from `../node_modules/expo-local-authentication/ios`)
   - ExpoModulesCore (from `../node_modules/expo-modules-core`)
   - ExpoSecureStore (from `../node_modules/expo-secure-store/ios`)
@@ -1436,6 +1444,7 @@ DEPENDENCIES:
   - React-runtimescheduler (from `../node_modules/react-native/ReactCommon/react/renderer/runtimescheduler`)
   - React-utils (from `../node_modules/react-native/ReactCommon/react/utils`)
   - ReactCommon/turbomodule/core (from `../node_modules/react-native/ReactCommon`)
+  - "RNCAsyncStorage (from `../node_modules/@react-native-async-storage/async-storage`)"
   - RNGestureHandler (from `../node_modules/react-native-gesture-handler`)
   - "RNGoogleSignin (from `../node_modules/@react-native-google-signin/google-signin`)"
   - RNReanimated (from `../node_modules/react-native-reanimated`)
@@ -1481,12 +1490,16 @@ EXTERNAL SOURCES:
     :path: "../node_modules/expo-file-system/ios"
   ExpoFont:
     :path: "../node_modules/expo-font/ios"
+  ExpoHaptics:
+    :path: "../node_modules/expo-haptics/ios"
   ExpoHead:
     :path: "../node_modules/expo-router/ios"
   ExpoImagePicker:
     :path: "../node_modules/expo-image-picker/ios"
   ExpoKeepAwake:
     :path: "../node_modules/expo-keep-awake/ios"
+  ExpoLinearGradient:
+    :path: "../node_modules/expo-linear-gradient/ios"
   ExpoLocalAuthentication:
     :path: "../node_modules/expo-local-authentication/ios"
   ExpoModulesCore:
@@ -1604,6 +1617,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/react-native/ReactCommon/react/utils"
   ReactCommon:
     :path: "../node_modules/react-native/ReactCommon"
+  RNCAsyncStorage:
+    :path: "../node_modules/@react-native-async-storage/async-storage"
   RNGestureHandler:
     :path: "../node_modules/react-native-gesture-handler"
   RNGoogleSignin:
@@ -1632,9 +1647,11 @@ SPEC CHECKSUMS:
   ExpoDevice: 84b3ed79df1234c17edfbf335f6ecf3c636f74de
   ExpoFileSystem: 2988caaf68b7cb706e36d382829d99811d9d76a5
   ExpoFont: 38dddf823e32740c2a9f37c926a33aeca736b5c4
+  ExpoHaptics: 9f47be324f691b6291c17c216189ab832d1a4d69
   ExpoHead: 1a1b30c6c1d125e9b8a199ca305c16a1dc041624
   ExpoImagePicker: 7038c1740853c170002c491de63f9f9780c8139b
   ExpoKeepAwake: dd02e65d49f1cfd9194640028ae2857e536eb1c9
+  ExpoLinearGradient: 4c44b3803b441724874b232e6520b51ca6a50db1
   ExpoLocalAuthentication: b94db59f55df95350223200c746b4ddf0cb7cfc0
   ExpoModulesCore: 9ac73e2f60e0ea1d30137ca96cfc8c2aa34ef2b2
   ExpoSecureStore: 6506992a9f53c94ea716c54d4a63144965945c2c
@@ -1696,6 +1713,7 @@ SPEC CHECKSUMS:
   React-runtimescheduler: 2cbd0f3625b30bba08e8768776107f6f0203159b
   React-utils: 9fa4e5d0b5e6c6c85c958f19d6ef854337886417
   ReactCommon: 9f285823dbe955099978d9bff65a7653ca029256
+  RNCAsyncStorage: aa75595c1aefa18f868452091fa0c411a516ce11
   RNGestureHandler: 326e35460fb6c8c64a435d5d739bea90d7ed4e49
   RNGoogleSignin: 629df9e1ea81e2a17c4db5aae0e8a98309e4723a
   RNReanimated: def444e044c354f38bb0a5926a8583ba19d944c1
