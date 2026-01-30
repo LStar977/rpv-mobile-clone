@@ -31,6 +31,7 @@ import { useAuthStore } from '../../lib/auth';
 import { shareProposal } from '../../lib/share';
 import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS } from '../../lib/theme';
 import { SearchInput, Badge, SectionHeader } from '../../components/ui';
+import { haptics } from '../../lib/haptics';
 import * as ImagePicker from 'expo-image-picker';
 
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
@@ -65,6 +66,7 @@ function FilterChip({
   const scale = useSharedValue(1);
 
   const handlePressIn = () => {
+    haptics.selection();
     scale.value = withSpring(0.95, { damping: 15, stiffness: 300 });
   };
 
@@ -138,6 +140,7 @@ function ProposalCard({
   const geoTags = proposal.geoRestrictions || [];
 
   const handlePressIn = () => {
+    haptics.light();
     scale.value = withSpring(0.98, { damping: 15, stiffness: 300 });
   };
 
@@ -150,15 +153,20 @@ function ProposalCard({
   }));
 
   const handleClaimToken = async () => {
+    haptics.medium();
     setClaiming(true);
     try {
       await onClaimToken(proposal.id as number);
+      haptics.success();
+    } catch {
+      haptics.error();
     } finally {
       setClaiming(false);
     }
   };
 
   const handleShare = () => {
+    haptics.light();
     shareProposal({
       id: proposal.id as number,
       title: proposal.title,
@@ -317,6 +325,7 @@ function ProposalCard({
             ]}
             onPress={(e) => {
               e.stopPropagation();
+              haptics.medium();
               onVote(proposal.id as number, 'support');
             }}
             disabled={isVoting}
@@ -339,6 +348,7 @@ function ProposalCard({
             ]}
             onPress={(e) => {
               e.stopPropagation();
+              haptics.medium();
               onVote(proposal.id as number, 'oppose');
             }}
             disabled={isVoting}
