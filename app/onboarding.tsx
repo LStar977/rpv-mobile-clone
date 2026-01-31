@@ -1,12 +1,13 @@
-import React, { useState, useRef } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   Dimensions,
-  TouchableOpacity,
   FlatList,
+  TouchableOpacity,
   ViewToken,
+  StatusBar,
   Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -14,7 +15,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Animated, {
-  FadeIn,
   FadeInDown,
   FadeInUp,
   useAnimatedStyle,
@@ -24,423 +24,328 @@ import Animated, {
   interpolate,
   Extrapolation,
 } from 'react-native-reanimated';
+
 import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS } from '../lib/theme';
 import { haptics } from '../lib/haptics';
 
-const { width, height } = Dimensions.get('window');
-const ONBOARDING_KEY = '@represent_onboarding_complete';
+const { width } = Dimensions.get('window');
 
-// Onboarding slide data - ALL using gold brand color
-const slides = [
-  {
-    id: '1',
-    icon: 'shield-checkmark',
-    title: 'Verify Your Identity',
-    subtitle: 'Soulbound Passport',
-    description:
-      'Complete identity verification to receive your unique Soulbound Passport NFT. This proves you are a real person and unlocks full voting rights.',
-    features: ['One person, one vote', 'Privacy-preserving', 'Blockchain secured'],
-  },
-  {
-    id: '2',
-    icon: 'document-text',
-    title: 'Vote on Proposals',
-    subtitle: 'Your Voice Matters',
-    description:
-      'Browse and vote on proposals that affect your community. Filter by location, category, and demographics to find issues you care about.',
-    features: ['Transparent voting', 'Immutable records', 'Real impact'],
-  },
-  {
-    id: '3',
-    icon: 'create',
-    title: 'Create Proposals',
-    subtitle: 'Lead the Change',
-    description:
-      'Have an idea to improve your community? Create a proposal and let others vote on it. Set geographic and demographic restrictions for targeted feedback.',
-    features: ['Easy creation', 'Geo-targeting', 'Community reach'],
-  },
-  {
-    id: '4',
-    icon: 'sparkles',
-    title: 'Sentinel AI',
-    subtitle: 'Governance Analyzer',
-    description:
-      'Analyze government documents against 155 principles of proper governance. Get AI-powered insights on alignment, violations, and recommended corrections.',
-    features: ['155 principles', 'Instant analysis', 'Auto-proposals'],
-  },
-];
+// ✅ IMPORTANT: export this so app/index.tsx can import it
+export const ONBOARDING_KEY = '@represent_onboarding_complete';
 
-// Animated slide component
-function OnboardingSlide({
-  item,
-  index,
-  scrollX,
-}: {
-  item: typeof slides[0];
-  index: number;
-  scrollX: Animated.SharedValue<number>;
-}) {
+type Slide = {
+  id: string;
+  kicker: string;
+  title: string;
+  subtitle: string;
+  description: string;
+  bullets: string[];
+  icon: keyof typeof Ionicons.glyphMap;
+};
+
+export default function Onboarding() {
   const { colors } = useTheme();
+  const listRef = useRef<FlatList<Slide>>(null);
+  const [index, setIndex] = useState(0);
 
-  const animatedStyle = useAnimatedStyle(() => {
-    const inputRange = [(index - 1) * width, index * width, (index + 1) * width];
-    const scale = interpolate(scrollX.value, inputRange, [0.8, 1, 0.8], Extrapolation.CLAMP);
-    const opacity = interpolate(scrollX.value, inputRange, [0.5, 1, 0.5], Extrapolation.CLAMP);
-    return {
-      transform: [{ scale }],
-      opacity,
-    };
-  });
+  const progress = useSharedValue(0);
 
-  return (
-    <View style={styles.slide}>
-      <Animated.View style={[styles.slideContent, animatedStyle]}>
-        {/* Icon - using gold brand color */}
-        <View style={[styles.iconContainer, { shadowColor: colors.gold }]}>
-          <LinearGradient
-            colors={[`${colors.gold}30`, `${colors.gold}10`]}
-            style={styles.iconGradient}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-          />
-          <View style={[styles.iconInner, { backgroundColor: colors.goldLight }]}>
-            <Ionicons name={item.icon as any} size={48} color={colors.gold} />
-          </View>
-        </View>
-
-        {/* Text Content */}
-        <Text style={[styles.subtitle, { color: colors.gold }]}>{item.subtitle}</Text>
-        <Text style={[styles.title, { color: colors.text }]}>{item.title}</Text>
-        <Text style={[styles.description, { color: colors.textSecondary }]}>
-          {item.description}
-        </Text>
-
-        {/* Features */}
-        <View style={styles.featuresContainer}>
-          {item.features.map((feature, i) => (
-            <View
-              key={i}
-              style={[styles.featureItem, { backgroundColor: colors.cardBg, borderColor: colors.border }]}
-            >
-              <Ionicons name="checkmark-circle" size={16} color={colors.gold} />
-              <Text style={[styles.featureText, { color: colors.text }]}>{feature}</Text>
-            </View>
-          ))}
-        </View>
-      </Animated.View>
-    </View>
+  const slides: Slide[] = useMemo(
+    () => [
+      {
+        id: '1',
+        kicker: 'Trust Layer',
+        title: 'Verify once.',
+        subtitle: 'Own your voice everywhere.',
+        description:
+          'Complete identity verification and receive a Soulbound Passport that proves you’re a real person — without revealing more than necessary.',
+        bullets: ['Fast verification', 'One person, one voice', 'Privacy-first'],
+        icon: 'shield-checkmark',
+      },
+      {
+        id: '2',
+        kicker: 'Consent Layer',
+        title: 'Vote on',
+        subtitle: 'real proposals.',
+        description:
+          'See what verified residents actually think — by country, region, city, or community. Every vote is geo-gated to the right people.',
+        bullets: ['Geo-gated voting', 'Clear outcomes', 'Verified residents only'],
+        icon: 'checkmark-done',
+      },
+      {
+        id: '3',
+        kicker: 'Creation Layer',
+        title: 'Create',
+        subtitle: 'better decisions.',
+        description:
+          'Draft proposals in minutes. Share them to the right jurisdiction or organization and collect verified consent — not noise.',
+        bullets: ['Simple creation', 'Targeted distribution', 'Track results'],
+        icon: 'sparkles',
+      },
+      {
+        id: '4',
+        kicker: 'Intelligence Layer',
+        title: 'Sentinel',
+        subtitle: 'reads what others miss.',
+        description:
+          'Paste a policy or proposal. Sentinel scores it against core governance principles and helps you generate fixes or a stronger proposal.',
+        bullets: ['Instant analysis', 'Principle scoring', 'Generate improvements'],
+        icon: 'eye',
+      },
+    ],
+    []
   );
-}
 
-// Pagination dot
-function PaginationDot({
-  index,
-  currentIndex,
-}: {
-  index: number;
-  currentIndex: number;
-}) {
-  const { colors } = useTheme();
-  const isActive = index === currentIndex;
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    width: withSpring(isActive ? 24 : 8, { damping: 15, stiffness: 200 }),
-    opacity: withTiming(isActive ? 1 : 0.4, { duration: 200 }),
-  }));
-
-  return (
-    <Animated.View
-      style={[
-        styles.dot,
-        { backgroundColor: colors.gold },
-        animatedStyle,
-      ]}
-    />
-  );
-}
-
-export default function OnboardingScreen() {
-  const { colors, isDark } = useTheme();
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const flatListRef = useRef<FlatList>(null);
-  const scrollX = useSharedValue(0);
-
-  const isLastSlide = currentIndex === slides.length - 1;
-
-  const handleNext = () => {
-    haptics.medium();
-    if (isLastSlide) {
-      completeOnboarding();
-    } else {
-      flatListRef.current?.scrollToIndex({ index: currentIndex + 1, animated: true });
+  const onViewableItemsChanged = useRef(
+    ({ viewableItems }: { viewableItems: ViewToken[] }) => {
+      const current = viewableItems?.[0]?.index ?? 0;
+      setIndex(current);
+      progress.value = withTiming(current, { duration: 240 });
     }
+  ).current;
+
+  const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 70 }).current;
+
+  const handleSkip = async () => {
+    haptics.light();
+    await completeOnboarding();
   };
 
-  const handleSkip = () => {
+  const handleNext = () => {
     haptics.light();
-    completeOnboarding();
+    if (index < slides.length - 1) {
+      listRef.current?.scrollToIndex({ index: index + 1, animated: true });
+    } else {
+      completeOnboarding();
+    }
   };
 
   const completeOnboarding = async () => {
     try {
       await AsyncStorage.setItem(ONBOARDING_KEY, 'true');
       haptics.success();
-      // Navigate to the main app - replace clears the history
       router.replace('/');
-    } catch (error) {
-      console.error('Error saving onboarding status:', error);
+    } catch (e) {
+      // If storage fails, still move forward so user isn't stuck.
       router.replace('/');
     }
   };
 
-  const onViewableItemsChanged = useRef(
-    ({ viewableItems }: { viewableItems: ViewToken[] }) => {
-      if (viewableItems.length > 0 && viewableItems[0].index !== null) {
-        setCurrentIndex(viewableItems[0].index);
-        haptics.selection();
-      }
-    }
-  ).current;
-
-  const viewabilityConfig = useRef({
-    viewAreaCoveragePercentThreshold: 50,
-  }).current;
+  const headerGlowStyle = useAnimatedStyle(() => {
+    const t = interpolate(progress.value, [0, slides.length - 1], [0.25, 0.45], Extrapolation.CLAMP);
+    return { opacity: withSpring(t) };
+  });
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Background gradient */}
-      <LinearGradient
-        colors={isDark
-          ? ['rgba(212, 175, 55, 0.05)', 'transparent', 'rgba(212, 175, 55, 0.03)']
-          : ['rgba(212, 175, 55, 0.08)', 'transparent', 'rgba(212, 175, 55, 0.05)']}
-        style={StyleSheet.absoluteFill}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-      />
+      <StatusBar barStyle="light-content" />
 
-      {/* Skip button */}
-      <Animated.View entering={FadeIn.delay(500).duration(400)} style={styles.skipContainer}>
-        <TouchableOpacity
-          style={[styles.skipButton, { backgroundColor: colors.cardBg, borderColor: colors.border }]}
-          onPress={handleSkip}
-          activeOpacity={0.7}
-        >
+      {/* Background */}
+      <LinearGradient
+        colors={[colors.background, colors.backgroundSecondary, colors.background]}
+        start={{ x: 0.2, y: 0 }}
+        end={{ x: 0.8, y: 1 }}
+        style={StyleSheet.absoluteFill}
+      />
+      <Animated.View style={[styles.goldGlow, { backgroundColor: colors.goldLight }, headerGlowStyle]} />
+
+      {/* Top bar */}
+      <View style={styles.topBar}>
+        <View style={styles.brandRow}>
+          <Image source={require('../assets/logo.png')} style={styles.logo} resizeMode="contain" />
+          <Text style={[styles.brand, { color: colors.text }]}>Represent</Text>
+        </View>
+
+        <TouchableOpacity onPress={handleSkip} activeOpacity={0.85} style={styles.skipButton}>
           <Text style={[styles.skipText, { color: colors.textSecondary }]}>Skip</Text>
         </TouchableOpacity>
-      </Animated.View>
-
-      {/* Logo - using actual logo image */}
-      <Animated.View entering={FadeInDown.delay(200).duration(500)} style={styles.logoContainer}>
-        <View style={[styles.logoBox, { backgroundColor: colors.goldLight, ...SHADOWS.glow }]}>
-          <Image
-            source={require('../assets/logo.png')}
-            style={styles.logoImage}
-            resizeMode="contain"
-          />
-        </View>
-        <Text style={[styles.logoTitle, { color: colors.gold }]}>Represent</Text>
-      </Animated.View>
+      </View>
 
       {/* Slides */}
       <FlatList
-        ref={flatListRef}
+        ref={listRef}
         data={slides}
-        renderItem={({ item, index }) => (
-          <OnboardingSlide item={item} index={index} scrollX={scrollX} />
-        )}
         keyExtractor={(item) => item.id}
         horizontal
         pagingEnabled
         showsHorizontalScrollIndicator={false}
-        bounces={false}
-        onScroll={(event) => {
-          scrollX.value = event.nativeEvent.contentOffset.x;
-        }}
-        scrollEventThrottle={16}
+        contentContainerStyle={{ paddingBottom: 160 }}
         onViewableItemsChanged={onViewableItemsChanged}
         viewabilityConfig={viewabilityConfig}
-        style={styles.flatList}
+        renderItem={({ item }) => (
+          <View style={[styles.slide, { width }]}>
+            <Animated.View entering={FadeInUp.duration(420)} style={styles.heroWrap}>
+              <View
+                style={[
+                  styles.iconPill,
+                  { borderColor: colors.borderLight, backgroundColor: colors.cardBgElevated },
+                  SHADOWS.medium,
+                ]}
+              >
+                <Ionicons name={item.icon} size={18} color={colors.gold} />
+                <Text style={[styles.kicker, { color: colors.textSecondary }]}>{item.kicker}</Text>
+              </View>
+
+              <Text style={[styles.title, { color: colors.text }]}>{item.title}</Text>
+              <Text style={[styles.subtitle, { color: colors.text }]}>{item.subtitle}</Text>
+
+              <Text style={[styles.desc, { color: colors.textSecondary }]}>{item.description}</Text>
+
+              <View style={[styles.card, { backgroundColor: colors.cardBg, borderColor: colors.border }, SHADOWS.soft]}>
+                {item.bullets.map((b) => (
+                  <View key={b} style={styles.bulletRow}>
+                    <View style={[styles.bulletDot, { backgroundColor: colors.goldMedium }]} />
+                    <Text style={[styles.bulletText, { color: colors.text }]}>{b}</Text>
+                  </View>
+                ))}
+              </View>
+            </Animated.View>
+          </View>
+        )}
       />
 
-      {/* Bottom section */}
-      <Animated.View
-        entering={FadeInUp.delay(600).duration(400)}
-        style={styles.bottomSection}
-      >
-        {/* Pagination */}
-        <View style={styles.pagination}>
-          {slides.map((_, index) => (
-            <PaginationDot key={index} index={index} currentIndex={currentIndex} />
-          ))}
+      {/* Bottom controls */}
+      <View style={styles.bottom}>
+        <View style={styles.dots}>
+          {slides.map((_, i) => {
+            const dotStyle = useAnimatedStyle(() => {
+              const w = interpolate(progress.value, [i - 1, i, i + 1], [8, 18, 8], Extrapolation.CLAMP);
+              const o = interpolate(progress.value, [i - 1, i, i + 1], [0.35, 1, 0.35], Extrapolation.CLAMP);
+              return { width: withSpring(w), opacity: withSpring(o) };
+            });
+
+            return (
+              <Animated.View key={i} style={[styles.dot, { backgroundColor: colors.gold }, dotStyle]} />
+            );
+          })}
         </View>
 
-        {/* Next/Get Started button */}
-        <TouchableOpacity
-          style={[styles.nextButton, { backgroundColor: colors.gold, ...SHADOWS.glow }]}
-          onPress={handleNext}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.nextButtonText}>
-            {isLastSlide ? 'Get Started' : 'Next'}
-          </Text>
-          <Ionicons
-            name={isLastSlide ? 'checkmark-circle' : 'arrow-forward'}
-            size={20}
-            color="#000"
-          />
-        </TouchableOpacity>
+        <Animated.View entering={FadeInDown.duration(380)} style={styles.ctaRow}>
+          <View style={styles.ctaMeta}>
+            <Text style={[styles.stepText, { color: colors.textSecondary }]}>
+              {index + 1} / {slides.length}
+            </Text>
+            <Text style={[styles.stepHint, { color: colors.text }]}>
+              {index === slides.length - 1 ? 'Ready to begin' : 'Continue'}
+            </Text>
+          </View>
 
-        {/* Progress text */}
-        <Text style={[styles.progressText, { color: colors.textMuted }]}>
-          {currentIndex + 1} of {slides.length}
-        </Text>
-      </Animated.View>
+          <TouchableOpacity
+            activeOpacity={0.9}
+            onPress={handleNext}
+            style={[styles.primaryButton, { backgroundColor: colors.gold }]}
+          >
+            <Text style={[styles.primaryText, { color: colors.black }]}>
+              {index === slides.length - 1 ? 'Get Started' : 'Next'}
+            </Text>
+            <Ionicons
+              name={index === slides.length - 1 ? 'arrow-forward' : 'chevron-forward'}
+              size={18}
+              color={colors.black}
+            />
+          </TouchableOpacity>
+        </Animated.View>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  skipContainer: {
+  container: { flex: 1 },
+  goldGlow: {
     position: 'absolute',
-    top: 60,
-    right: SPACING.lg,
-    zIndex: 10,
+    top: -120,
+    left: -120,
+    width: 280,
+    height: 280,
+    borderRadius: 999,
   },
-  skipButton: {
+
+  topBar: {
+    paddingTop: 14,
     paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.sm,
-    borderRadius: BORDER_RADIUS.full,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  brandRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  logo: { width: 26, height: 26 },
+  brand: { ...TYPOGRAPHY.titleMedium },
+
+  skipButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderRadius: 999,
+  },
+  skipText: { ...TYPOGRAPHY.labelLarge },
+
+  slide: { paddingHorizontal: SPACING.lg, paddingTop: 26 },
+  heroWrap: { flex: 1 },
+
+  iconPill: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 999,
     borderWidth: 1,
+    marginBottom: 18,
   },
-  skipText: {
-    ...TYPOGRAPHY.labelMedium,
-  },
-  logoContainer: {
-    alignItems: 'center',
-    paddingTop: 100,
-    marginBottom: SPACING.lg,
-  },
-  logoBox: {
-    width: 72,
-    height: 72,
-    borderRadius: BORDER_RADIUS.xl,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: SPACING.md,
-    overflow: 'hidden',
-  },
-  logoImage: {
-    width: 56,
-    height: 56,
-  },
-  logoTitle: {
-    ...TYPOGRAPHY.headlineMedium,
-  },
-  flatList: {
-    flex: 1,
-  },
-  slide: {
-    width,
-    paddingHorizontal: SPACING.xl,
-    justifyContent: 'center',
-  },
-  slideContent: {
-    alignItems: 'center',
-  },
-  iconContainer: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: SPACING.xl,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 16,
-    elevation: 8,
-  },
-  iconGradient: {
-    ...StyleSheet.absoluteFillObject,
-    borderRadius: 60,
-  },
-  iconInner: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  subtitle: {
-    ...TYPOGRAPHY.overline,
-    marginBottom: SPACING.xs,
-  },
-  title: {
-    ...TYPOGRAPHY.displaySmall,
-    textAlign: 'center',
-    marginBottom: SPACING.md,
-  },
-  description: {
-    ...TYPOGRAPHY.bodyLarge,
-    textAlign: 'center',
-    lineHeight: 26,
-    paddingHorizontal: SPACING.md,
-    marginBottom: SPACING.xl,
-  },
-  featuresContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-    gap: SPACING.sm,
-  },
-  featureItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
-    borderRadius: BORDER_RADIUS.full,
+  kicker: { ...TYPOGRAPHY.labelMedium },
+
+  title: { ...TYPOGRAPHY.displaySmall, marginTop: 6 },
+  subtitle: { ...TYPOGRAPHY.displaySmall, marginTop: 2 },
+  desc: { ...TYPOGRAPHY.bodyLarge, marginTop: 14, maxWidth: 520 },
+
+  card: {
+    marginTop: 20,
     borderWidth: 1,
-    gap: SPACING.xs,
+    borderRadius: BORDER_RADIUS.lg,
+    padding: SPACING.lg,
   },
-  featureText: {
-    ...TYPOGRAPHY.labelSmall,
+  bulletRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 },
+  bulletDot: { width: 8, height: 8, borderRadius: 999 },
+  bulletText: { ...TYPOGRAPHY.bodyMedium, flex: 1 },
+
+  bottom: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingHorizontal: SPACING.lg,
+    paddingBottom: 18,
+    paddingTop: 12,
   },
-  bottomSection: {
-    paddingHorizontal: SPACING.xl,
-    paddingBottom: 50,
-    alignItems: 'center',
-  },
-  pagination: {
+  dots: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: SPACING.sm,
-    marginBottom: SPACING.xl,
+    gap: 8,
+    marginBottom: 14,
   },
   dot: {
     height: 8,
-    borderRadius: 4,
+    borderRadius: 999,
   },
-  nextButton: {
+
+  ctaRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: SPACING.lg,
-    paddingHorizontal: SPACING.xxxl,
-    borderRadius: BORDER_RADIUS.full,
-    gap: SPACING.sm,
-    marginBottom: SPACING.md,
+    justifyContent: 'space-between',
+    gap: 14,
   },
-  nextButtonText: {
-    ...TYPOGRAPHY.labelLarge,
-    color: '#000',
-    fontWeight: '600',
-  },
-  progressText: {
-    ...TYPOGRAPHY.bodySmall,
-  },
-});
+  ctaMeta: { flex: 1 },
+  stepText: { ...TYPOGRAPHY.labelMedium },
+  stepHint: { ...TYPOGRAPHY.titleSmall, marginTop: 2 },
 
-// Export the key for checking onboarding status
-export { ONBOARDING_KEY };
+  primaryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 14,
+    paddingHorizontal: 18,
+    borderRadius: 999,
+  },
+  primaryText: { ...TYPOGRAPHY.labelLarge },
+});

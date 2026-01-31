@@ -11,7 +11,7 @@ import Animated, {
   withSpring,
 } from 'react-native-reanimated';
 import { useAuthStore } from '../../lib/auth';
-import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS } from '../../lib/theme';
+import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS, ThemePreference } from '../../lib/theme';
 import { Button } from '../../components/ui';
 
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
@@ -67,26 +67,70 @@ function MenuItem({
   );
 }
 
+function ThemeChip({
+  label,
+  value,
+  selected,
+  onPress,
+}: {
+  label: string;
+  value: ThemePreference;
+  selected: boolean;
+  onPress: (v: ThemePreference) => void;
+}) {
+  const { colors } = useTheme();
+  const scale = useSharedValue(1);
+
+  const handlePressIn = () => {
+    scale.value = withSpring(0.98, { damping: 16, stiffness: 300 });
+  };
+
+  const handlePressOut = () => {
+    scale.value = withSpring(1, { damping: 16, stiffness: 300 });
+  };
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+
+  return (
+    <AnimatedTouchable
+      style={[
+        styles.themeChip,
+        {
+          backgroundColor: selected ? colors.gold : colors.cardBg,
+          borderColor: selected ? colors.gold : colors.border,
+        },
+        animatedStyle,
+      ]}
+      onPress={() => onPress(value)}
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
+      activeOpacity={1}
+    >
+      <Text style={[styles.themeChipText, { color: selected ? '#000' : colors.text }]}>
+        {label}
+      </Text>
+    </AnimatedTouchable>
+  );
+}
+
 export default function ProfileScreen() {
-  const { colors, isDark } = useTheme();
+  const { colors, themePreference, setThemePreference, isDark } = useTheme();
   const { user, logout } = useAuthStore();
 
   const handleLogout = () => {
-    Alert.alert(
-      'Log Out',
-      'Are you sure you want to log out?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Log Out',
-          style: 'destructive',
-          onPress: async () => {
-            await logout();
-            router.replace('/');
-          },
+    Alert.alert('Log Out', 'Are you sure you want to log out?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Log Out',
+        style: 'destructive',
+        onPress: async () => {
+          await logout();
+          router.replace('/');
         },
-      ]
-    );
+      },
+    ]);
   };
 
   const navigateTo = (screen: string) => router.push(screen as any);
@@ -98,6 +142,10 @@ export default function ProfileScreen() {
     const parts = [user?.city, user?.state, user?.country].filter(Boolean);
     return parts.length > 0 ? parts.join(', ') : null;
   };
+
+  const themeLabel =
+    themePreference === 'system' ? `System (${isDark ? 'Dark' : 'Light'})` :
+    themePreference === 'dark' ? 'Dark' : 'Light';
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -134,37 +182,35 @@ export default function ProfileScreen() {
           entering={FadeInUp.delay(200).duration(400)}
           style={[styles.menuCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}
         >
-          <MenuItem
-            icon="card-outline"
-            label="Subscription"
-            onPress={() => navigateTo('/modals/subscription')}
-            delay={300}
-          />
-          <MenuItem
-            icon="wallet-outline"
-            label="Connected Wallet"
-            onPress={() => navigateTo('/modals/wallet')}
-            delay={350}
-          />
-          <MenuItem
-            icon="time-outline"
-            label="Voting History"
-            onPress={() => navigateTo('/modals/voting-history')}
-            delay={400}
-          />
-          <MenuItem
-            icon="trophy-outline"
-            label="Badges & Achievements"
-            onPress={() => navigateTo('/modals/badges')}
-            delay={450}
-          />
-          <MenuItem
-            icon="settings-outline"
-            label="Settings & Privacy"
-            onPress={() => navigateTo('/modals/privacy')}
-            delay={500}
-            showBorder={false}
-          />
+          <MenuItem icon="card-outline" label="Subscription" onPress={() => navigateTo('/modals/subscription')} delay={300} />
+          <MenuItem icon="wallet-outline" label="Connected Wallet" onPress={() => navigateTo('/modals/wallet')} delay={350} />
+          <MenuItem icon="time-outline" label="Voting History" onPress={() => navigateTo('/modals/voting-history')} delay={400} />
+          <MenuItem icon="trophy-outline" label="Badges & Achievements" onPress={() => navigateTo('/modals/badges')} delay={450} />
+          <MenuItem icon="settings-outline" label="Settings & Privacy" onPress={() => navigateTo('/modals/privacy')} delay={500} showBorder={false} />
+        </Animated.View>
+
+        {/* Theme Card */}
+        <Animated.View
+          entering={FadeInUp.delay(350).duration(400)}
+          style={[styles.themeCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}
+        >
+          <View style={styles.themeHeader}>
+            <View style={[styles.themeIconBg, { backgroundColor: colors.goldLight }]}>
+              <Ionicons name="color-palette-outline" size={18} color={colors.gold} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.themeTitle, { color: colors.text }]}>Appearance</Text>
+              <Text style={[styles.themeSubtitle, { color: colors.textSecondary }]}>
+                Current: {themeLabel}
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.themeRow}>
+            <ThemeChip label="System" value="system" selected={themePreference === 'system'} onPress={setThemePreference} />
+            <ThemeChip label="Dark" value="dark" selected={themePreference === 'dark'} onPress={setThemePreference} />
+            <ThemeChip label="Light" value="light" selected={themePreference === 'light'} onPress={setThemePreference} />
+          </View>
         </Animated.View>
 
         {/* Logout Button */}
@@ -194,14 +240,13 @@ export default function ProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
+  container: { flex: 1 },
   content: {
     paddingHorizontal: SPACING.lg,
     paddingTop: 80,
     paddingBottom: 40,
   },
+
   // Profile Card
   profileCard: {
     alignItems: 'center',
@@ -220,18 +265,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: SPACING.lg,
   },
-  avatarText: {
-    fontSize: 36,
-    fontWeight: '700',
-  },
-  userName: {
-    ...TYPOGRAPHY.headlineLarge,
-    marginBottom: SPACING.xs,
-  },
-  userEmail: {
-    ...TYPOGRAPHY.bodyMedium,
-    marginBottom: SPACING.lg,
-  },
+  avatarText: { fontSize: 36, fontWeight: '700' },
+  userName: { ...TYPOGRAPHY.headlineLarge, marginBottom: SPACING.xs },
+  userEmail: { ...TYPOGRAPHY.bodyMedium, marginBottom: SPACING.lg },
+
   locationBadge: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -240,9 +277,8 @@ const styles = StyleSheet.create({
     borderRadius: BORDER_RADIUS.full,
     gap: SPACING.sm,
   },
-  locationText: {
-    ...TYPOGRAPHY.labelMedium,
-  },
+  locationText: { ...TYPOGRAPHY.labelMedium },
+
   // Menu Card
   menuCard: {
     borderRadius: BORDER_RADIUS.xxl,
@@ -269,15 +305,55 @@ const styles = StyleSheet.create({
     flex: 1,
     fontWeight: '500',
   },
-  // Logout
-  logoutContainer: {
+
+  // Theme Card
+  themeCard: {
+    borderRadius: BORDER_RADIUS.xxl,
+    borderWidth: 1,
+    padding: SPACING.lg,
     marginBottom: SPACING.xl,
+    ...SHADOWS.sm,
   },
-  versionText: {
+  themeHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.md,
+    marginBottom: SPACING.lg,
+  },
+  themeIconBg: {
+    width: 40,
+    height: 40,
+    borderRadius: BORDER_RADIUS.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  themeTitle: {
+    ...TYPOGRAPHY.labelLarge,
+    fontWeight: '700',
+  },
+  themeSubtitle: {
     ...TYPOGRAPHY.bodySmall,
-    textAlign: 'center',
+    marginTop: SPACING.xxs,
   },
-  bottomPadding: {
-    height: 100,
+  themeRow: {
+    flexDirection: 'row',
+    gap: SPACING.sm,
   },
+  themeChip: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: SPACING.md,
+    borderRadius: BORDER_RADIUS.full,
+    borderWidth: 1,
+  },
+  themeChipText: {
+    ...TYPOGRAPHY.labelMedium,
+    fontWeight: '700',
+  },
+
+  // Logout
+  logoutContainer: { marginBottom: SPACING.xl },
+  versionText: { ...TYPOGRAPHY.bodySmall, textAlign: 'center' },
+  bottomPadding: { height: 100 },
 });

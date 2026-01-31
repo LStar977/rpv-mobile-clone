@@ -181,7 +181,6 @@ export default function HomeScreen() {
       try {
         const hasCompletedOnboarding = await AsyncStorage.getItem(ONBOARDING_KEY);
         if (!hasCompletedOnboarding) {
-          // First time user - show onboarding
           router.replace('/onboarding');
           return;
         }
@@ -217,7 +216,7 @@ export default function HomeScreen() {
     checkBiometric();
   }, []);
 
-  // Handle authenticated state - redirect to dashboard
+  // MOVED: This useEffect must be before any early returns
   useEffect(() => {
     if (isAuthenticated) {
       router.replace('/(tabs)/dashboard');
@@ -345,7 +344,6 @@ export default function HomeScreen() {
   if (view === 'welcome') {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
-        {/* Background gradient overlay */}
         <LinearGradient
           colors={[`${colors.gold}08`, 'transparent', `${colors.gold}05`]}
           style={StyleSheet.absoluteFill}
@@ -354,7 +352,6 @@ export default function HomeScreen() {
         />
 
         <View style={styles.welcomeContent}>
-          {/* Logo */}
           <Animated.View style={[styles.logoContainer, logoAnimatedStyle]}>
             <LinearGradient
               colors={[colors.cardBgElevated, colors.cardBg]}
@@ -366,11 +363,9 @@ export default function HomeScreen() {
                 resizeMode="contain"
               />
             </LinearGradient>
-            {/* Glow effect */}
             <View style={[styles.logoGlow, { shadowColor: colors.gold }]} />
           </Animated.View>
 
-          {/* Brand Title */}
           <Animated.Text
             entering={FadeInDown.delay(200).duration(500)}
             style={[styles.brandTitle, { color: colors.text }]}
@@ -385,7 +380,6 @@ export default function HomeScreen() {
             Your civic platform for identity, voting, and community.
           </Animated.Text>
 
-          {/* Feature Icons */}
           <View style={styles.featuresRow}>
             <FeatureIcon icon="shield-outline" label="Identity" delay={400} />
             <FeatureIcon
@@ -397,7 +391,6 @@ export default function HomeScreen() {
             <FeatureIcon icon="people-outline" label="Community" delay={600} />
           </View>
 
-          {/* Buttons */}
           <Animated.View
             entering={FadeInUp.delay(700).duration(500)}
             style={styles.buttonContainer}
@@ -439,7 +432,6 @@ export default function HomeScreen() {
           </Animated.View>
         </View>
 
-        {/* Bottom decoration */}
         <View style={[styles.bottomDecoration, { backgroundColor: colors.gold }]} />
       </View>
     );
@@ -465,7 +457,6 @@ export default function HomeScreen() {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        {/* Back Button */}
         <Animated.View entering={FadeIn.duration(300)}>
           <TouchableOpacity
             style={[styles.backButton, { backgroundColor: colors.cardBg }]}
@@ -476,7 +467,6 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </Animated.View>
 
-        {/* Auth Card */}
         <Animated.View
           entering={FadeInUp.delay(100).duration(400).springify()}
           style={[
@@ -488,7 +478,6 @@ export default function HomeScreen() {
             },
           ]}
         >
-          {/* Header */}
           <View style={styles.authHeader}>
             <Animated.View
               entering={FadeInDown.delay(200).duration(400)}
@@ -518,7 +507,6 @@ export default function HomeScreen() {
             </Animated.Text>
           </View>
 
-          {/* Error */}
           {error ? (
             <Animated.View
               entering={FadeIn.duration(200)}
@@ -529,7 +517,6 @@ export default function HomeScreen() {
             </Animated.View>
           ) : null}
 
-          {/* Form */}
           {!isLogin && (
             <AnimatedInput
               label="Full Name"
@@ -561,7 +548,6 @@ export default function HomeScreen() {
             delay={isLogin ? 400 : 450}
           />
 
-          {/* Submit Button */}
           <Animated.View entering={FadeInUp.delay(500).duration(400)}>
             <Button
               title={isLoading ? (isLogin ? 'Signing in...' : 'Creating account...') : (isLogin ? 'Sign In' : 'Create Account')}
@@ -582,7 +568,6 @@ export default function HomeScreen() {
             />
           </Animated.View>
 
-          {/* Divider */}
           <Animated.View
             entering={FadeIn.delay(550).duration(400)}
             style={styles.orDivider}
@@ -592,7 +577,6 @@ export default function HomeScreen() {
             <View style={[styles.orLine, { backgroundColor: colors.border }]} />
           </Animated.View>
 
-          {/* Social Login */}
           <Animated.View entering={FadeInUp.delay(600).duration(400)}>
             <TouchableOpacity
               style={[styles.socialButton, styles.googleButton, isLoading && styles.socialButtonDisabled]}
@@ -619,7 +603,6 @@ export default function HomeScreen() {
             )}
           </Animated.View>
 
-          {/* Switch Auth */}
           <Animated.View entering={FadeIn.delay(700).duration(400)}>
             <TouchableOpacity
               style={styles.switchAuth}
@@ -659,7 +642,6 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
   },
-  // Welcome Screen
   welcomeContent: {
     flex: 1,
     paddingHorizontal: SPACING.xxl,
@@ -696,31 +678,30 @@ const styles = StyleSheet.create({
   brandTitle: {
     fontSize: 44,
     fontWeight: '700',
-    letterSpacing: -0.5,
-    marginBottom: SPACING.md,
+    letterSpacing: -1,
+    marginBottom: SPACING.sm,
   },
   tagline: {
     ...TYPOGRAPHY.bodyLarge,
     textAlign: 'center',
-    lineHeight: 26,
-    maxWidth: 300,
-    marginBottom: SPACING.huge,
+    marginBottom: SPACING.xxxl,
+    paddingHorizontal: SPACING.lg,
   },
   featuresRow: {
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: SPACING.huge,
-    marginBottom: SPACING.huge,
+    gap: SPACING.xxl,
+    marginBottom: SPACING.xxxl,
   },
   featureItem: {
     alignItems: 'center',
+    gap: SPACING.sm,
   },
   featureIconContainer: {
-    width: 72,
-    height: 72,
-    borderRadius: BORDER_RADIUS.full,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     borderWidth: 1.5,
-    marginBottom: SPACING.md,
     overflow: 'hidden',
   },
   featureIconGradient: {
@@ -729,61 +710,59 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   featureLabel: {
-    ...TYPOGRAPHY.labelMedium,
+    ...TYPOGRAPHY.labelSmall,
   },
   buttonContainer: {
     width: '100%',
     gap: SPACING.md,
-    paddingHorizontal: SPACING.md,
   },
   biometricButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'transparent',
-    borderWidth: 1.5,
-    paddingVertical: SPACING.lg,
+    gap: SPACING.sm,
+    paddingVertical: SPACING.md,
     borderRadius: BORDER_RADIUS.full,
-    gap: SPACING.md,
+    borderWidth: 1,
     marginTop: SPACING.sm,
   },
   biometricButtonText: {
-    ...TYPOGRAPHY.labelLarge,
+    ...TYPOGRAPHY.labelMedium,
   },
   bottomDecoration: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    height: 3,
+    height: 4,
     opacity: 0.3,
   },
-  // Auth Screen
   authContent: {
     flexGrow: 1,
-    padding: SPACING.xl,
+    paddingHorizontal: SPACING.lg,
     paddingTop: 60,
+    paddingBottom: SPACING.xxl,
   },
   backButton: {
     width: 44,
     height: 44,
-    borderRadius: BORDER_RADIUS.full,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: SPACING.xl,
+    marginBottom: SPACING.lg,
   },
   authCard: {
     borderRadius: BORDER_RADIUS.xxl,
-    padding: SPACING.xxl,
+    padding: SPACING.xl,
     borderWidth: 1,
   },
   authHeader: {
     alignItems: 'center',
-    marginBottom: SPACING.xxl,
+    marginBottom: SPACING.xl,
   },
   authLogoContainer: {
-    width: 80,
-    height: 80,
+    width: 64,
+    height: 64,
     borderRadius: BORDER_RADIUS.xl,
     alignItems: 'center',
     justifyContent: 'center',
@@ -791,93 +770,92 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   authLogoImage: {
-    width: 64,
-    height: 64,
+    width: 48,
+    height: 48,
   },
   authTitle: {
     ...TYPOGRAPHY.headlineLarge,
-    marginBottom: SPACING.sm,
+    marginBottom: SPACING.xs,
   },
   authSubtitle: {
     ...TYPOGRAPHY.bodyMedium,
     textAlign: 'center',
-    lineHeight: 22,
-    maxWidth: 280,
   },
   errorContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: SPACING.md,
-    borderRadius: BORDER_RADIUS.lg,
-    marginBottom: SPACING.lg,
-    borderLeftWidth: 3,
     gap: SPACING.sm,
+    padding: SPACING.md,
+    borderRadius: BORDER_RADIUS.md,
+    borderLeftWidth: 3,
+    marginBottom: SPACING.md,
   },
   errorText: {
-    ...TYPOGRAPHY.bodyMedium,
+    ...TYPOGRAPHY.bodySmall,
     flex: 1,
   },
   inputGroup: {
-    marginBottom: SPACING.lg,
+    marginBottom: SPACING.md,
   },
   inputLabel: {
-    ...TYPOGRAPHY.labelMedium,
-    marginBottom: SPACING.sm,
+    ...TYPOGRAPHY.labelSmall,
+    marginBottom: SPACING.xs,
+    marginLeft: SPACING.xs,
   },
   inputContainer: {
-    borderWidth: 1.5,
     borderRadius: BORDER_RADIUS.lg,
+    borderWidth: 1.5,
     overflow: 'hidden',
   },
   input: {
-    ...TYPOGRAPHY.bodyLarge,
+    ...TYPOGRAPHY.bodyMedium,
     paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.md + 2,
+    paddingVertical: SPACING.md,
   },
   orDivider: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginVertical: SPACING.xl,
+    marginVertical: SPACING.lg,
   },
   orLine: {
     flex: 1,
     height: 1,
   },
   orText: {
-    ...TYPOGRAPHY.labelMedium,
-    marginHorizontal: SPACING.lg,
+    ...TYPOGRAPHY.labelSmall,
+    marginHorizontal: SPACING.md,
   },
   socialButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: SPACING.lg,
-    borderRadius: BORDER_RADIUS.full,
-    gap: SPACING.md,
-    marginBottom: SPACING.md,
+    paddingVertical: SPACING.md,
+    borderRadius: BORDER_RADIUS.lg,
+    gap: SPACING.sm,
+    marginBottom: SPACING.sm,
   },
   socialButtonDisabled: {
-    opacity: 0.5,
+    opacity: 0.6,
   },
   googleButton: {
     backgroundColor: '#4285F4',
   },
   googleButtonText: {
-    ...TYPOGRAPHY.labelLarge,
+    ...TYPOGRAPHY.labelMedium,
     color: '#fff',
   },
   appleButton: {
     backgroundColor: '#fff',
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: '#000',
   },
   appleButtonText: {
-    ...TYPOGRAPHY.labelLarge,
+    ...TYPOGRAPHY.labelMedium,
     color: '#000',
   },
   switchAuth: {
     alignItems: 'center',
-    paddingTop: SPACING.md,
+    paddingTop: SPACING.lg,
   },
   switchAuthText: {
     ...TYPOGRAPHY.bodyMedium,
