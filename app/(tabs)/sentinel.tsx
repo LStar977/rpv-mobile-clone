@@ -357,10 +357,14 @@ export default function SentinelScreen() {
             <Ionicons name="sparkles" size={28} color={colors.gold} />
           </View>
           <View style={styles.headerText}>
-            <Text style={[styles.headerTitle, { color: colors.gold }]}>Sentinel AI</Text>
+            <Text style={[styles.headerTitle, { color: colors.text }]}>Sentinel</Text>
             <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>
-              Governance Analyzer
+              Governance analysis for verified policy decisions.
             </Text>
+            <View style={[styles.headerBadge, { backgroundColor: colors.cardBgLight, borderColor: colors.border }]}>
+              <Ionicons name="shield-checkmark" size={12} color={colors.textSecondary} />
+              <Text style={[styles.headerBadgeText, { color: colors.textSecondary }]}>Institutional AI</Text>
+            </View>
           </View>
         </View>
       </Animated.View>
@@ -808,6 +812,20 @@ const styles = StyleSheet.create({
   headerSubtitle: {
     ...TYPOGRAPHY.bodyMedium,
     marginTop: SPACING.xxs,
+  },
+  headerBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.xs,
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: 4,
+    borderRadius: BORDER_RADIUS.full,
+    borderWidth: 1,
+    marginTop: SPACING.sm,
+    alignSelf: 'flex-start',
+  },
+  headerBadgeText: {
+    ...TYPOGRAPHY.labelSmall,
   },
   // Scroll
   scrollView: {

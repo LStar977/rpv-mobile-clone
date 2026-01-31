@@ -707,6 +707,7 @@ export default function ProposalsScreen() {
   const detailHasClaimed = detail ? claimedTokens.has(detail.id as number) : false;
   const detailHasVoted = detail ? votedProposals.has(detail.id as number) : false;
   const detailIsVoting = detail ? votingProposalId === (detail.id as number) : false;
+  const locationLabel = [userCity, userState, userCountry].filter(Boolean).join(', ');
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -714,10 +715,41 @@ export default function ProposalsScreen() {
       <Animated.View entering={FadeInDown.duration(400)} style={[styles.header, { borderBottomColor: colors.border }]}>
         <View style={styles.headerContent}>
           <View>
-            <Text style={[styles.headerTitle, { color: colors.text }]}>Proposals</Text>
+            <Text style={[styles.headerTitle, { color: colors.text }]}>Voting Queue</Text>
             <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>
-              {activeCount} active
+              {locationLabel ? `Jurisdiction: ${locationLabel}` : 'Jurisdiction: Not verified'}
             </Text>
+            <View style={styles.headerMetaRow}>
+              <View style={[styles.metaPill, { backgroundColor: colors.cardBgLight, borderColor: colors.border }]}>
+                <Ionicons name="time-outline" size={12} color={colors.textSecondary} />
+                <Text style={[styles.metaPillText, { color: colors.textSecondary }]}>
+                  {activeCount} active
+                </Text>
+              </View>
+              <View
+                style={[
+                  styles.metaPill,
+                  {
+                    backgroundColor: isVerified ? colors.successLight : colors.warningLight,
+                    borderColor: isVerified ? colors.success : colors.warning,
+                  },
+                ]}
+              >
+                <Ionicons
+                  name={isVerified ? 'shield-checkmark' : 'shield-outline'}
+                  size={12}
+                  color={isVerified ? colors.success : colors.warning}
+                />
+                <Text
+                  style={[
+                    styles.metaPillText,
+                    { color: isVerified ? colors.success : colors.warning },
+                  ]}
+                >
+                  {isVerified ? 'Verified' : 'Unverified'}
+                </Text>
+              </View>
+            </View>
           </View>
 
           <View style={styles.headerButtons}>
@@ -1304,6 +1336,24 @@ const styles = StyleSheet.create({
   },
   headerTitle: { ...TYPOGRAPHY.headlineLarge },
   headerSubtitle: { ...TYPOGRAPHY.bodySmall, marginTop: SPACING.xxs },
+  headerMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+    marginTop: SPACING.sm,
+  },
+  metaPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.xs,
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: 4,
+    borderRadius: BORDER_RADIUS.full,
+    borderWidth: 1,
+  },
+  metaPillText: {
+    ...TYPOGRAPHY.labelSmall,
+  },
   headerButtons: { flexDirection: 'row', gap: SPACING.sm },
 
   iconButton: {
