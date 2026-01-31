@@ -1,7 +1,6 @@
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { LinearGradient } from 'expo-linear-gradient';
 import Animated, {
   FadeIn,
   FadeInDown,
@@ -118,6 +117,7 @@ function ThemeChip({
 export default function ProfileScreen() {
   const { colors, themePreference, setThemePreference, isDark } = useTheme();
   const { user, logout } = useAuthStore();
+  const isVerified = Boolean(user?.verified);
 
   const handleLogout = () => {
     Alert.alert('Log Out', 'Are you sure you want to log out?', [
@@ -150,29 +150,55 @@ export default function ProfileScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <View style={styles.pageHeader}>
+          <Text style={[styles.pageTitle, { color: colors.text }]}>Account</Text>
+          <Text style={[styles.pageSubtitle, { color: colors.textSecondary }]}>
+            Manage your credentials, privacy, and preferences.
+          </Text>
+        </View>
+
         {/* Profile Header */}
         <Animated.View
           entering={FadeInDown.duration(500)}
-          style={[styles.profileCard, { backgroundColor: colors.cardBg, borderColor: colors.gold }]}
+          style={[styles.profileCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}
         >
-          <LinearGradient
-            colors={[`${colors.gold}10`, 'transparent']}
-            style={StyleSheet.absoluteFill}
-            start={{ x: 0.5, y: 0 }}
-            end={{ x: 0.5, y: 1 }}
-          />
-
-          <View style={[styles.avatar, { backgroundColor: colors.gold, ...SHADOWS.glow }]}>
-            <Text style={[styles.avatarText, { color: colors.background }]}>{getInitial()}</Text>
+          <View style={styles.profileTopRow}>
+            <View style={[styles.avatar, { backgroundColor: colors.cardBgLight, borderColor: colors.border }]}>
+              <Text style={[styles.avatarText, { color: colors.text }]}>{getInitial()}</Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <View
+                style={[
+                  styles.verificationPill,
+                  {
+                    backgroundColor: isVerified ? colors.successLight : colors.warningLight,
+                    borderColor: isVerified ? colors.success : colors.warning,
+                  },
+                ]}
+              >
+                <Ionicons
+                  name={isVerified ? 'shield-checkmark' : 'shield-outline'}
+                  size={12}
+                  color={isVerified ? colors.success : colors.warning}
+                />
+                <Text
+                  style={[
+                    styles.verificationText,
+                    { color: isVerified ? colors.success : colors.warning },
+                  ]}
+                >
+                  {isVerified ? 'Verified Identity' : 'Verification Pending'}
+                </Text>
+              </View>
+              <Text style={[styles.userName, { color: colors.text }]}>{user?.name || 'Citizen'}</Text>
+              <Text style={[styles.userEmail, { color: colors.textSecondary }]}>{user?.email || ''}</Text>
+            </View>
           </View>
 
-          <Text style={[styles.userName, { color: colors.text }]}>{user?.name || 'Citizen'}</Text>
-          <Text style={[styles.userEmail, { color: colors.textSecondary }]}>{user?.email || ''}</Text>
-
           {getLocationString() && (
-            <View style={[styles.locationBadge, { backgroundColor: colors.goldLight }]}>
-              <Ionicons name="location" size={14} color={colors.gold} />
-              <Text style={[styles.locationText, { color: colors.gold }]}>{getLocationString()}</Text>
+            <View style={[styles.locationBadge, { backgroundColor: colors.cardBgLight, borderColor: colors.border }]}>
+              <Ionicons name="location" size={14} color={colors.textSecondary} />
+              <Text style={[styles.locationText, { color: colors.textSecondary }]}>{getLocationString()}</Text>
             </View>
           )}
         </Animated.View>
@@ -242,42 +268,67 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   content: {
-    paddingHorizontal: SPACING.lg,
-    paddingTop: 80,
     paddingBottom: 40,
   },
 
+  // Page Header
+  pageHeader: {
+    paddingHorizontal: SPACING.lg,
+    paddingTop: 56,
+    paddingBottom: SPACING.md,
+  },
+  pageTitle: { ...TYPOGRAPHY.headlineLarge },
+  pageSubtitle: { ...TYPOGRAPHY.bodySmall, marginTop: SPACING.xxs },
+
   // Profile Card
   profileCard: {
-    alignItems: 'center',
-    padding: SPACING.xxxl,
-    borderRadius: BORDER_RADIUS.xxl,
-    borderWidth: 1.5,
+    marginHorizontal: SPACING.lg,
     marginBottom: SPACING.xl,
-    overflow: 'hidden',
+    borderRadius: BORDER_RADIUS.xl,
+    borderWidth: 1,
+    padding: SPACING.xl,
     ...SHADOWS.md,
   },
+  profileTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.lg,
+    width: '100%',
+  },
   avatar: {
-    width: 88,
-    height: 88,
-    borderRadius: 44,
+    width: 72,
+    height: 72,
+    borderRadius: 36,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: SPACING.lg,
+    borderWidth: 1,
   },
-  avatarText: { fontSize: 36, fontWeight: '700' },
-  userName: { ...TYPOGRAPHY.headlineLarge, marginBottom: SPACING.xs },
-  userEmail: { ...TYPOGRAPHY.bodyMedium, marginBottom: SPACING.lg },
+  avatarText: { fontSize: 28, fontWeight: '700' },
+  verificationPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.xs,
+    borderWidth: 1,
+    borderRadius: BORDER_RADIUS.full,
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: 4,
+    alignSelf: 'flex-start',
+  },
+  verificationText: { ...TYPOGRAPHY.labelSmall },
+  userName: { ...TYPOGRAPHY.headlineSmall, marginTop: SPACING.md },
+  userEmail: { ...TYPOGRAPHY.bodySmall, marginTop: SPACING.xxs },
 
   locationBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.sm,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.xs,
     borderRadius: BORDER_RADIUS.full,
-    gap: SPACING.sm,
+    gap: SPACING.xs,
+    marginTop: SPACING.md,
+    borderWidth: 1,
   },
-  locationText: { ...TYPOGRAPHY.labelMedium },
+  locationText: { ...TYPOGRAPHY.labelSmall },
 
   // Menu Card
   menuCard: {
@@ -285,6 +336,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     overflow: 'hidden',
     marginBottom: SPACING.xl,
+    marginHorizontal: SPACING.lg,
   },
   menuItem: {
     flexDirection: 'row',
@@ -312,6 +364,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     padding: SPACING.lg,
     marginBottom: SPACING.xl,
+    marginHorizontal: SPACING.lg,
     ...SHADOWS.sm,
   },
   themeHeader: {
@@ -353,7 +406,7 @@ const styles = StyleSheet.create({
   },
 
   // Logout
-  logoutContainer: { marginBottom: SPACING.xl },
-  versionText: { ...TYPOGRAPHY.bodySmall, textAlign: 'center' },
+  logoutContainer: { marginBottom: SPACING.xl, marginHorizontal: SPACING.lg },
+  versionText: { ...TYPOGRAPHY.bodySmall, textAlign: 'center', marginHorizontal: SPACING.lg },
   bottomPadding: { height: 100 },
 });

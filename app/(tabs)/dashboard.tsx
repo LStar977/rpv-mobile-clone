@@ -10,7 +10,6 @@ import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withSpring,
-  withDelay,
   withTiming,
 } from 'react-native-reanimated';
 import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS } from '../../lib/theme';
@@ -46,56 +45,7 @@ type ActivityItem = {
   color: string;
 };
 
-// --- Small animated stat pill (demoted visually) ---
-function MiniStat({
-  icon,
-  value,
-  label,
-  tone,
-  delay = 0,
-}: {
-  icon: string;
-  value: string;
-  label: string;
-  tone: 'gold' | 'success' | 'warning';
-  delay?: number;
-}) {
-  const { colors } = useTheme();
-  const scale = useSharedValue(0.95);
-
-  useEffect(() => {
-    scale.value = withDelay(delay, withSpring(1, { damping: 14, stiffness: 120 }));
-  }, []);
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-    opacity: scale.value,
-  }));
-
-  const toneColor =
-    tone === 'success' ? colors.success : tone === 'warning' ? colors.warning : colors.gold;
-
-  return (
-    <Animated.View
-      style={[
-        styles.miniStat,
-        { backgroundColor: colors.cardBg, borderColor: colors.border },
-        animatedStyle,
-      ]}
-    >
-      <View style={[styles.miniStatIcon, { backgroundColor: `${toneColor}18` }]}>
-        <Ionicons name={icon as any} size={14} color={toneColor} />
-      </View>
-      <View style={{ flex: 1 }}>
-        <Text style={[styles.miniStatValue, { color: colors.text }]}>{value}</Text>
-        <Text style={[styles.miniStatLabel, { color: colors.textMuted }]}>{label}</Text>
-      </View>
-    </Animated.View>
-  );
-}
-
-// --- Premium Welcome (kept but visually secondary) ---
-function WelcomeHeader({
+function InstitutionalHeader({
   name,
   isVerified,
   onAvatarPress,
@@ -105,29 +55,162 @@ function WelcomeHeader({
   onAvatarPress: () => void;
 }) {
   const { colors } = useTheme();
-  const displayName = name ? name.split(' ')[0] : 'there';
-  const letter = name ? name.charAt(0).toUpperCase() : 'U';
+  const displayName = name ? name.split(' ')[0] : 'Citizen';
+  const letter = name ? name.charAt(0).toUpperCase() : 'C';
 
   return (
-    <Animated.View entering={FadeInDown.duration(420)} style={styles.welcomeRow}>
+    <Animated.View entering={FadeInDown.duration(380)} style={styles.institutionHeader}>
       <View style={{ flex: 1 }}>
-        <Text style={[styles.welcomeKicker, { color: colors.textMuted }]}>Good to see you</Text>
-        <Text style={[styles.welcomeName, { color: colors.text }]} numberOfLines={1}>
-          {displayName}
+        <Text style={[styles.institutionTitle, { color: colors.text }]}>Represent</Text>
+        <Text style={[styles.institutionSubtitle, { color: colors.textSecondary }]}>
+          Civic infrastructure for verified governance
         </Text>
+        <View style={styles.identityRow}>
+          <View
+            style={[
+              styles.identityPill,
+              {
+                backgroundColor: isVerified ? colors.successLight : colors.warningLight,
+                borderColor: isVerified ? colors.success : colors.warning,
+              },
+            ]}
+          >
+            <Ionicons
+              name={isVerified ? 'shield-checkmark' : 'shield-outline'}
+              size={12}
+              color={isVerified ? colors.success : colors.warning}
+            />
+            <Text
+              style={[
+                styles.identityPillText,
+                { color: isVerified ? colors.success : colors.warning },
+              ]}
+            >
+              {isVerified ? 'Verified Identity' : 'Verification Required'}
+            </Text>
+          </View>
+          <Text style={[styles.identityName, { color: colors.textMuted }]}>
+            {displayName}
+          </Text>
+        </View>
       </View>
 
       <TouchableOpacity onPress={onAvatarPress} style={styles.avatarContainer} activeOpacity={0.8}>
-        <View style={[styles.avatar, { backgroundColor: colors.gold, ...SHADOWS.glow }]}>
-          <Text style={[styles.avatarText, { color: colors.background }]}>{letter}</Text>
+        <View style={[styles.avatar, { backgroundColor: colors.cardBgElevated, borderColor: colors.border }]}>
+          <Text style={[styles.avatarText, { color: colors.text }]}>{letter}</Text>
         </View>
-        {isVerified && (
-          <View style={[styles.verifiedBadge, { backgroundColor: colors.success }]}>
-            <Ionicons name="checkmark" size={10} color="#fff" />
-          </View>
-        )}
       </TouchableOpacity>
     </Animated.View>
+  );
+}
+
+function GovernancePulse({
+  pending,
+  voted,
+  passed,
+  tokens,
+  participationRate,
+}: {
+  pending: number;
+  voted: number;
+  passed: number;
+  tokens: number;
+  participationRate: number;
+}) {
+  const { colors } = useTheme();
+  const tokenLabel =
+    tokens > 0
+      ? `${tokens} unclaimed vote token${tokens === 1 ? '' : 's'}`
+      : 'All vote tokens claimed';
+
+  return (
+    <Animated.View entering={FadeInUp.delay(120).duration(320)} style={[styles.pulseCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
+      <View style={styles.pulseHeader}>
+        <Text style={[styles.pulseTitle, { color: colors.text }]}>Governance Pulse</Text>
+        <View style={[styles.pulseTag, { backgroundColor: colors.goldLight }]}>
+          <Ionicons name="stats-chart" size={12} color={colors.gold} />
+          <Text style={[styles.pulseTagText, { color: colors.gold }]}>Live</Text>
+        </View>
+      </View>
+      <Text style={[styles.pulseSubtitle, { color: colors.textSecondary }]}>
+        Track your jurisdictional voting posture and verified participation.
+      </Text>
+      <View style={styles.pulseGrid}>
+        <View style={styles.pulseStat}>
+          <Text style={[styles.pulseValue, { color: colors.text }]}>{pending}</Text>
+          <Text style={[styles.pulseLabel, { color: colors.textMuted }]}>Open votes</Text>
+        </View>
+        <View style={styles.pulseStat}>
+          <Text style={[styles.pulseValue, { color: colors.text }]}>{voted}</Text>
+          <Text style={[styles.pulseLabel, { color: colors.textMuted }]}>Votes cast</Text>
+        </View>
+        <View style={styles.pulseStat}>
+          <Text style={[styles.pulseValue, { color: colors.text }]}>{passed}</Text>
+          <Text style={[styles.pulseLabel, { color: colors.textMuted }]}>Passed</Text>
+        </View>
+        <View style={styles.pulseStat}>
+          <Text style={[styles.pulseValue, { color: colors.text }]}>{participationRate}%</Text>
+          <Text style={[styles.pulseLabel, { color: colors.textMuted }]}>Participation</Text>
+        </View>
+      </View>
+      <View style={styles.pulseFooter}>
+        <View style={[styles.pulseTokenBadge, { backgroundColor: colors.cardBgLight, borderColor: colors.border }]}>
+          <Ionicons name="ticket-outline" size={14} color={colors.textSecondary} />
+          <Text style={[styles.pulseTokenText, { color: colors.textSecondary }]}>
+            {tokenLabel}
+          </Text>
+        </View>
+        <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+      </View>
+    </Animated.View>
+  );
+}
+
+function JurisdictionCard({
+  country,
+  state,
+  city,
+  isVerified,
+  onPress,
+}: {
+  country?: string;
+  state?: string;
+  city?: string;
+  isVerified: boolean;
+  onPress: () => void;
+}) {
+  const { colors } = useTheme();
+  const locationLabel = [city, state, country].filter(Boolean).join(', ');
+  const statusTone = isVerified ? colors.success : colors.warning;
+
+  return (
+    <AnimatedTouchable
+      entering={FadeInUp.delay(180).duration(320)}
+      style={[styles.jurisdictionCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}
+      onPress={onPress}
+      activeOpacity={0.8}
+    >
+      <View style={[styles.jurisdictionIcon, { backgroundColor: colors.cardBgElevated }]}>
+        <Ionicons name="location-outline" size={18} color={colors.gold} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={[styles.jurisdictionTitle, { color: colors.text }]}>Jurisdiction</Text>
+        <Text style={[styles.jurisdictionValue, { color: colors.textSecondary }]} numberOfLines={1}>
+          {locationLabel || 'Add your verified location'}
+        </Text>
+        <View style={[styles.jurisdictionStatus, { borderColor: statusTone }]}>
+          <Ionicons
+            name={isVerified ? 'shield-checkmark' : 'shield-outline'}
+            size={12}
+            color={statusTone}
+          />
+          <Text style={[styles.jurisdictionStatusText, { color: statusTone }]}>
+            {isVerified ? 'Geo-verified' : 'Verification pending'}
+          </Text>
+        </View>
+      </View>
+      <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+    </AnimatedTouchable>
   );
 }
 
@@ -171,22 +254,22 @@ function PriorityCard({
 
   const title =
     mode === 'verify'
-      ? 'Verify to unlock voting'
+      ? 'Verification required'
       : mode === 'urgent'
-      ? 'Closing soon'
-      : 'What’s next';
+      ? 'Action required'
+      : 'Voting queue';
 
   const subtitle =
     mode === 'verify'
-      ? 'Identity verification is required to vote on proposals.'
+      ? 'Complete identity verification to access jurisdictional voting.'
       : mode === 'urgent'
-      ? `${urgentCount} proposal${urgentCount === 1 ? '' : 's'} need your vote within 48 hours.`
+      ? `${urgentCount} proposal${urgentCount === 1 ? '' : 's'} close within 48 hours.`
       : pendingCount > 0
-      ? `${pendingCount} proposal${pendingCount === 1 ? '' : 's'} waiting for your vote.`
-      : 'Explore new proposals and see what your community thinks.';
+      ? `${pendingCount} proposal${pendingCount === 1 ? '' : 's'} pending your verified vote.`
+      : 'Review the latest proposals for your jurisdiction.';
 
   const cta =
-    mode === 'verify' ? 'Start verification' : mode === 'urgent' ? 'Review now' : 'Explore proposals';
+    mode === 'verify' ? 'Begin verification' : mode === 'urgent' ? 'Review queue' : 'Open votes';
 
   const onPress = mode === 'verify' ? onVerify : mode === 'urgent' ? onSeeUrgent : onExplore;
 
@@ -199,7 +282,7 @@ function PriorityCard({
       : mode === 'verify'
       ? 'Required'
       : pendingCount > 0
-      ? `${pendingCount} pending`
+      ? `${pendingCount} open`
       : 'New';
 
   return (
@@ -261,9 +344,12 @@ export default function HomeScreen() {
   const [communities, setCommunities] = useState<Community[]>([]);
   const [urgentProposals, setUrgentProposals] = useState<UrgentProposal[]>([]);
   const [unclaimedTokens, setUnclaimedTokens] = useState(0);
-  const [votingStreak, setVotingStreak] = useState(0);
   const [activities, setActivities] = useState<ActivityItem[]>([]);
   const [isVerified, setIsVerified] = useState(false);
+  const [profileLocation, setProfileLocation] = useState<{ country?: string; state?: string; city?: string }>({});
+  const participationRate = stats.pending + stats.voted > 0
+    ? Math.round((stats.voted / (stats.pending + stats.voted)) * 100)
+    : 0;
 
   const fetchDashboardData = useCallback(async () => {
     try {
@@ -411,8 +497,12 @@ export default function HomeScreen() {
       setCommunities(Object.values(communityMap).filter((c) => c.proposalCount > 0));
       setUrgentProposals(urgent.slice(0, 3));
       setUnclaimedTokens(unclaimed);
-      setVotingStreak(Math.min(votedIds.size, 7));
       setIsVerified(verificationRes.data?.verified || false);
+      setProfileLocation({
+        country: userCountry || undefined,
+        state: userState || undefined,
+        city: userCity || undefined,
+      });
 
       const recentActivities: ActivityItem[] = [];
       if (proposals.length > 0) {
@@ -483,14 +573,28 @@ export default function HomeScreen() {
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.gold} />}
       >
-        {/* Subtle welcome */}
-        <WelcomeHeader
+        <InstitutionalHeader
           name={user?.name ?? undefined}
           isVerified={isVerified}
           onAvatarPress={() => router.push('/(tabs)/profile')}
         />
 
-        {/* HERO: single priority moment */}
+        <GovernancePulse
+          pending={stats.pending}
+          voted={stats.voted}
+          passed={stats.passed}
+          tokens={unclaimedTokens}
+          participationRate={participationRate}
+        />
+
+        <JurisdictionCard
+          country={profileLocation.country}
+          state={profileLocation.state}
+          city={profileLocation.city}
+          isVerified={isVerified}
+          onPress={() => router.push('/(tabs)/identity')}
+        />
+
         <PriorityCard
           isAuthenticated={isAuthenticated}
           isVerified={isVerified}
@@ -502,39 +606,10 @@ export default function HomeScreen() {
           onExplore={navigateToProposals}
         />
 
-        {/* Optional: Unclaimed tokens (kept, but subordinate) */}
-        {unclaimedTokens > 0 && (
-          <AnimatedTouchable
-            entering={FadeInUp.delay(180).duration(350)}
-            style={[styles.subAlert, { backgroundColor: colors.cardBg, borderColor: colors.border }]}
-            onPress={navigateToProposals}
-            activeOpacity={0.8}
-          >
-            <View style={[styles.subAlertIcon, { backgroundColor: `${colors.success}18` }]}>
-              <Ionicons name="ticket" size={18} color={colors.success} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.subAlertTitle, { color: colors.text }]}>
-                {unclaimedTokens} token{unclaimedTokens > 1 ? 's' : ''} available
-              </Text>
-              <Text style={[styles.subAlertSub, { color: colors.textMuted }]}>Claim and vote</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
-          </AnimatedTouchable>
-        )}
-
-        {/* Demoted stats */}
-        <SectionHeader title="AT A GLANCE" style={{ marginTop: SPACING.lg, paddingHorizontal: SPACING.lg }} />
-        <View style={styles.miniStatsRow}>
-          <MiniStat icon="time-outline" value={stats.pending.toString()} label="Pending" tone="warning" delay={0} />
-          <MiniStat icon="checkmark-done-outline" value={stats.voted.toString()} label="Voted" tone="success" delay={80} />
-          <MiniStat icon="trophy-outline" value={stats.passed.toString()} label="Passed" tone="gold" delay={160} />
-        </View>
-
-        {/* Closing soon section stays, but feels urgent */}
+        {/* Voting queue */}
         {urgentProposals.length > 0 && (
           <View style={styles.section}>
-            <SectionHeader title="CLOSING SOON" icon="alarm" iconColor={colors.error} />
+            <SectionHeader title="VOTING QUEUE" icon="alarm" iconColor={colors.error} />
             {urgentProposals.map((proposal, idx) => (
               <AnimatedTouchable
                 key={proposal.id}
@@ -633,22 +708,35 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  content: { paddingTop: 60 },
+  content: { paddingTop: 52 },
 
   // Skeleton
   skeletonHeader: { paddingHorizontal: SPACING.lg, paddingTop: 60 },
   skeletonHero: { height: 190, borderRadius: BORDER_RADIUS.xxl },
   skeletonContent: { padding: SPACING.lg },
 
-  // Welcome row (subtle)
-  welcomeRow: {
+  // Institutional header
+  institutionalHeader: {
+    paddingHorizontal: SPACING.lg,
+    gap: SPACING.md,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: SPACING.lg,
-    marginBottom: SPACING.md,
+    marginBottom: SPACING.lg,
   },
-  welcomeKicker: { ...TYPOGRAPHY.labelSmall },
-  welcomeName: { ...TYPOGRAPHY.headlineLarge, marginTop: SPACING.xxs },
+  institutionTitle: { ...TYPOGRAPHY.headlineLarge, letterSpacing: -0.3 },
+  institutionSubtitle: { ...TYPOGRAPHY.bodySmall, marginTop: SPACING.xxs },
+  identityRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm, marginTop: SPACING.sm },
+  identityPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.xs,
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: SPACING.xs,
+    borderRadius: BORDER_RADIUS.full,
+    borderWidth: 1,
+  },
+  identityPillText: { ...TYPOGRAPHY.labelSmall },
+  identityName: { ...TYPOGRAPHY.bodySmall },
 
   avatarContainer: { position: 'relative' },
   avatar: {
@@ -657,20 +745,87 @@ const styles = StyleSheet.create({
     borderRadius: 23,
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
   },
-  avatarText: { fontSize: 18, fontWeight: '800' },
-  verifiedBadge: {
-    position: 'absolute',
-    bottom: -1,
-    right: -1,
-    width: 16,
-    height: 16,
-    borderRadius: 8,
+  avatarText: { fontSize: 18, fontWeight: '700' },
+
+  // Governance pulse
+  pulseCard: {
+    marginHorizontal: SPACING.lg,
+    borderRadius: BORDER_RADIUS.xl,
+    borderWidth: 1,
+    padding: SPACING.lg,
+  },
+  pulseHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  pulseTitle: { ...TYPOGRAPHY.labelLarge },
+  pulseTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.xs,
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: 4,
+    borderRadius: BORDER_RADIUS.full,
+  },
+  pulseTagText: { ...TYPOGRAPHY.labelSmall },
+  pulseSubtitle: { ...TYPOGRAPHY.bodySmall, marginTop: SPACING.sm },
+  pulseGrid: {
+    marginTop: SPACING.lg,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    rowGap: SPACING.md,
+  },
+  pulseStat: { width: '50%', alignItems: 'center' },
+  pulseValue: { ...TYPOGRAPHY.headlineSmall },
+  pulseLabel: { ...TYPOGRAPHY.bodySmall, marginTop: SPACING.xxs },
+  pulseFooter: {
+    marginTop: SPACING.lg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  pulseTokenBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.xs,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    borderRadius: BORDER_RADIUS.full,
+    borderWidth: 1,
+  },
+  pulseTokenText: { ...TYPOGRAPHY.bodySmall },
+
+  // Jurisdiction card
+  jurisdictionCard: {
+    marginHorizontal: SPACING.lg,
+    marginTop: SPACING.md,
+    borderRadius: BORDER_RADIUS.xl,
+    borderWidth: 1,
+    padding: SPACING.lg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.md,
+  },
+  jurisdictionIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: BORDER_RADIUS.lg,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: '#0F0F12',
   },
+  jurisdictionTitle: { ...TYPOGRAPHY.labelLarge },
+  jurisdictionValue: { ...TYPOGRAPHY.bodySmall, marginTop: SPACING.xxs },
+  jurisdictionStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.xs,
+    marginTop: SPACING.sm,
+    borderWidth: 1,
+    borderRadius: BORDER_RADIUS.full,
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: 4,
+    alignSelf: 'flex-start',
+  },
+  jurisdictionStatusText: { ...TYPOGRAPHY.labelSmall },
 
   // HERO priority card
   hero: {
@@ -726,52 +881,6 @@ const styles = StyleSheet.create({
     borderRadius: BORDER_RADIUS.full,
   },
   heroCtaText: { ...TYPOGRAPHY.labelLarge },
-
-  // Sub alert (tokens)
-  subAlert: {
-    marginHorizontal: SPACING.lg,
-    marginTop: SPACING.md,
-    borderRadius: BORDER_RADIUS.xl,
-    borderWidth: 1,
-    padding: SPACING.lg,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.md,
-  },
-  subAlertIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: BORDER_RADIUS.lg,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  subAlertTitle: { ...TYPOGRAPHY.labelLarge },
-  subAlertSub: { ...TYPOGRAPHY.bodySmall, marginTop: SPACING.xxs },
-
-  // Mini stats
-  miniStatsRow: {
-    paddingHorizontal: SPACING.lg,
-    flexDirection: 'row',
-    gap: SPACING.md,
-  },
-  miniStat: {
-    flex: 1,
-    borderRadius: BORDER_RADIUS.xl,
-    borderWidth: 1,
-    padding: SPACING.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.sm,
-  },
-  miniStatIcon: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  miniStatValue: { ...TYPOGRAPHY.labelLarge, fontWeight: '800' },
-  miniStatLabel: { ...TYPOGRAPHY.labelSmall },
 
   // Sections
   section: {

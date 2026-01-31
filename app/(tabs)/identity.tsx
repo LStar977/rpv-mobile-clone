@@ -238,9 +238,12 @@ export default function IdentityScreen() {
             >
               <Ionicons name="chevron-back" size={22} color={colors.text} />
             </TouchableOpacity>
-            <Text style={[styles.headerTitle, { color: colors.text }]}>Identity</Text>
+            <Text style={[styles.headerTitle, { color: colors.text }]}>Identity & Credentials</Text>
             <View style={{ width: 44 }} />
           </View>
+          <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>
+            Verified identity and jurisdictional status for civic voting.
+          </Text>
 
           {/* Status Banner */}
           <View style={[styles.statusBanner, { backgroundColor: toneColors.bg, borderColor: toneColors.border }]}>
@@ -403,6 +406,11 @@ const styles = StyleSheet.create({
   headerTitle: {
     ...TYPOGRAPHY.headlineMedium,
     fontWeight: '700',
+  },
+  headerSubtitle: {
+    ...TYPOGRAPHY.bodySmall,
+    marginTop: -SPACING.sm,
+    marginBottom: SPACING.md,
   },
 
   statusBanner: {
