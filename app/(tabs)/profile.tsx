@@ -2,68 +2,37 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'rea
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import Animated, {
-  FadeIn,
-  FadeInDown,
-  FadeInUp,
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
-} from 'react-native-reanimated';
 import { useAuthStore } from '../../lib/auth';
 import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS, ThemePreference } from '../../lib/theme';
 import { Button } from '../../components/ui';
 
-const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
-
-// Menu Item Component
 function MenuItem({
   icon,
   label,
   onPress,
-  delay = 0,
-  showBorder = true,
+  description,
 }: {
   icon: keyof typeof Ionicons.glyphMap;
   label: string;
+  description: string;
   onPress: () => void;
-  delay?: number;
-  showBorder?: boolean;
 }) {
   const { colors } = useTheme();
-  const scale = useSharedValue(1);
-
-  const handlePressIn = () => {
-    scale.value = withSpring(0.98, { damping: 15, stiffness: 300 });
-  };
-
-  const handlePressOut = () => {
-    scale.value = withSpring(1, { damping: 15, stiffness: 300 });
-  };
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-  }));
-
   return (
-    <AnimatedTouchable
-      entering={FadeInUp.delay(delay).duration(300)}
-      style={[
-        styles.menuItem,
-        { borderBottomColor: showBorder ? colors.border : 'transparent' },
-        animatedStyle,
-      ]}
+    <TouchableOpacity
+      style={[styles.menuItem, { borderColor: colors.border, backgroundColor: colors.cardBg }]}
       onPress={onPress}
-      onPressIn={handlePressIn}
-      onPressOut={handlePressOut}
-      activeOpacity={1}
     >
-      <View style={[styles.menuIconBg, { backgroundColor: colors.goldLight }]}>
+      <View style={[styles.menuIconBg, { backgroundColor: colors.goldLight }]}
+      >
         <Ionicons name={icon} size={20} color={colors.gold} />
       </View>
-      <Text style={[styles.menuLabel, { color: colors.text }]}>{label}</Text>
+      <View style={{ flex: 1 }}>
+        <Text style={[styles.menuLabel, { color: colors.text }]}>{label}</Text>
+        <Text style={[styles.menuDesc, { color: colors.textMuted }]}>{description}</Text>
+      </View>
       <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
-    </AnimatedTouchable>
+    </TouchableOpacity>
   );
 }
 
@@ -79,51 +48,31 @@ function ThemeChip({
   onPress: (v: ThemePreference) => void;
 }) {
   const { colors } = useTheme();
-  const scale = useSharedValue(1);
-
-  const handlePressIn = () => {
-    scale.value = withSpring(0.98, { damping: 16, stiffness: 300 });
-  };
-
-  const handlePressOut = () => {
-    scale.value = withSpring(1, { damping: 16, stiffness: 300 });
-  };
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-  }));
-
   return (
-    <AnimatedTouchable
+    <TouchableOpacity
       style={[
         styles.themeChip,
         {
           backgroundColor: selected ? colors.gold : colors.cardBg,
           borderColor: selected ? colors.gold : colors.border,
         },
-        animatedStyle,
       ]}
       onPress={() => onPress(value)}
-      onPressIn={handlePressIn}
-      onPressOut={handlePressOut}
-      activeOpacity={1}
     >
-      <Text style={[styles.themeChipText, { color: selected ? '#000' : colors.text }]}>
-        {label}
-      </Text>
-    </AnimatedTouchable>
+      <Text style={[styles.themeChipText, { color: selected ? colors.background : colors.text }]}>{label}</Text>
+    </TouchableOpacity>
   );
 }
 
 export default function ProfileScreen() {
-  const { colors, themePreference, setThemePreference, isDark } = useTheme();
+  const { colors, themePreference, setThemePreference } = useTheme();
   const { user, logout } = useAuthStore();
 
   const handleLogout = () => {
-    Alert.alert('Log Out', 'Are you sure you want to log out?', [
+    Alert.alert('Sign out', 'Are you sure you want to sign out?', [
       { text: 'Cancel', style: 'cancel' },
       {
-        text: 'Log Out',
+        text: 'Sign out',
         style: 'destructive',
         onPress: async () => {
           await logout();
@@ -133,207 +82,152 @@ export default function ProfileScreen() {
     ]);
   };
 
-  const navigateTo = (screen: string) => router.push(screen as any);
-
-  const getInitial = () =>
-    user?.name?.charAt(0).toUpperCase() || user?.email?.charAt(0).toUpperCase() || 'U';
-
-  const getLocationString = () => {
-    const parts = [user?.city, user?.state, user?.country].filter(Boolean);
-    return parts.length > 0 ? parts.join(', ') : null;
-  };
-
-  const themeLabel =
-    themePreference === 'system' ? `System (${isDark ? 'Dark' : 'Light'})` :
-    themePreference === 'dark' ? 'Dark' : 'Light';
-
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Profile Header */}
-        <Animated.View
-          entering={FadeInDown.duration(500)}
-          style={[styles.profileCard, { backgroundColor: colors.cardBg, borderColor: colors.gold }]}
-        >
-          <LinearGradient
-            colors={[`${colors.gold}10`, 'transparent']}
-            style={StyleSheet.absoluteFill}
-            start={{ x: 0.5, y: 0 }}
-            end={{ x: 0.5, y: 1 }}
+    <ScrollView style={[styles.container, { backgroundColor: colors.background }]} contentContainerStyle={styles.content}>
+      <LinearGradient colors={[colors.backgroundSecondary, colors.background]} style={styles.hero}>
+        <Text style={[styles.heroTitle, { color: colors.text }]}>{user?.name || 'Citizen'}</Text>
+        <Text style={[styles.heroSubtitle, { color: colors.textSecondary }]}>{user?.email || 'No email on file'}</Text>
+        <View style={styles.heroMeta}>
+          <View style={[styles.heroChip, { backgroundColor: colors.cardBg }]}
+          >
+            <Ionicons name="location" size={14} color={colors.gold} />
+            <Text style={[styles.heroChipText, { color: colors.text }]}
+            >{user?.city || user?.state || user?.country || 'Location not set'}</Text>
+          </View>
+          <View style={[styles.heroChip, { backgroundColor: colors.cardBg }]}
+          >
+            <Ionicons name={user?.verified ? 'shield-checkmark' : 'alert-circle'} size={14} color={colors.gold} />
+            <Text style={[styles.heroChipText, { color: colors.text }]}
+            >{user?.verified ? 'Verified' : 'Not verified'}</Text>
+          </View>
+        </View>
+      </LinearGradient>
+
+      <View style={styles.section}>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>Account</Text>
+        <View style={styles.menuList}>
+          <MenuItem
+            icon="shield-checkmark"
+            label="Identity verification"
+            description="Manage documents and passport status."
+            onPress={() => router.push('/(tabs)/identity')}
           />
-
-          <View style={[styles.avatar, { backgroundColor: colors.gold, ...SHADOWS.glow }]}>
-            <Text style={[styles.avatarText, { color: colors.background }]}>{getInitial()}</Text>
-          </View>
-
-          <Text style={[styles.userName, { color: colors.text }]}>{user?.name || 'Citizen'}</Text>
-          <Text style={[styles.userEmail, { color: colors.textSecondary }]}>{user?.email || ''}</Text>
-
-          {getLocationString() && (
-            <View style={[styles.locationBadge, { backgroundColor: colors.goldLight }]}>
-              <Ionicons name="location" size={14} color={colors.gold} />
-              <Text style={[styles.locationText, { color: colors.gold }]}>{getLocationString()}</Text>
-            </View>
-          )}
-        </Animated.View>
-
-        {/* Menu Card */}
-        <Animated.View
-          entering={FadeInUp.delay(200).duration(400)}
-          style={[styles.menuCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}
-        >
-          <MenuItem icon="card-outline" label="Subscription" onPress={() => navigateTo('/modals/subscription')} delay={300} />
-          <MenuItem icon="wallet-outline" label="Connected Wallet" onPress={() => navigateTo('/modals/wallet')} delay={350} />
-          <MenuItem icon="time-outline" label="Voting History" onPress={() => navigateTo('/modals/voting-history')} delay={400} />
-          <MenuItem icon="trophy-outline" label="Badges & Achievements" onPress={() => navigateTo('/modals/badges')} delay={450} />
-          <MenuItem icon="settings-outline" label="Settings & Privacy" onPress={() => navigateTo('/modals/privacy')} delay={500} showBorder={false} />
-        </Animated.View>
-
-        {/* Theme Card */}
-        <Animated.View
-          entering={FadeInUp.delay(350).duration(400)}
-          style={[styles.themeCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}
-        >
-          <View style={styles.themeHeader}>
-            <View style={[styles.themeIconBg, { backgroundColor: colors.goldLight }]}>
-              <Ionicons name="color-palette-outline" size={18} color={colors.gold} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.themeTitle, { color: colors.text }]}>Appearance</Text>
-              <Text style={[styles.themeSubtitle, { color: colors.textSecondary }]}>
-                Current: {themeLabel}
-              </Text>
-            </View>
-          </View>
-
-          <View style={styles.themeRow}>
-            <ThemeChip label="System" value="system" selected={themePreference === 'system'} onPress={setThemePreference} />
-            <ThemeChip label="Dark" value="dark" selected={themePreference === 'dark'} onPress={setThemePreference} />
-            <ThemeChip label="Light" value="light" selected={themePreference === 'light'} onPress={setThemePreference} />
-          </View>
-        </Animated.View>
-
-        {/* Logout Button */}
-        <Animated.View entering={FadeInUp.delay(600).duration(400)} style={styles.logoutContainer}>
-          <Button
-            title="Log Out"
-            onPress={handleLogout}
-            variant="danger"
-            size="lg"
-            fullWidth
-            icon="log-out-outline"
+          <MenuItem
+            icon="notifications"
+            label="Notifications"
+            description="Customize how you get updates."
+            onPress={() => Alert.alert('Coming soon', 'Notification settings are coming soon.')}
           />
-        </Animated.View>
+          <MenuItem
+            icon="document-text"
+            label="My proposals"
+            description="Track drafts and submitted proposals."
+            onPress={() => router.push('/(tabs)/proposals')}
+          />
+        </View>
+      </View>
 
-        {/* App Version */}
-        <Animated.Text
-          entering={FadeIn.delay(700).duration(400)}
-          style={[styles.versionText, { color: colors.textMuted }]}
-        >
-          Represent Wallet v1.0.0
-        </Animated.Text>
+      <View style={styles.section}>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>Theme</Text>
+        <View style={styles.themeRow}>
+          <ThemeChip label="System" value="system" selected={themePreference === 'system'} onPress={setThemePreference} />
+          <ThemeChip label="Light" value="light" selected={themePreference === 'light'} onPress={setThemePreference} />
+          <ThemeChip label="Dark" value="dark" selected={themePreference === 'dark'} onPress={setThemePreference} />
+        </View>
+      </View>
 
-        <View style={styles.bottomPadding} />
-      </ScrollView>
-    </View>
+      <View style={styles.section}>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>Support</Text>
+        <View style={styles.menuList}>
+          <MenuItem
+            icon="help-circle"
+            label="Help center"
+            description="Read guides and FAQs."
+            onPress={() => Alert.alert('Help center', 'Help center is coming soon.')}
+          />
+          <MenuItem
+            icon="lock-closed"
+            label="Privacy"
+            description="Review data policies."
+            onPress={() => Alert.alert('Privacy', 'Privacy details will be available soon.')}
+          />
+        </View>
+      </View>
+
+      <Button title="Sign out" onPress={handleLogout} variant="secondary" style={styles.logoutButton} />
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
+  container: {
+    flex: 1,
+  },
   content: {
-    paddingHorizontal: SPACING.lg,
-    paddingTop: 80,
-    paddingBottom: 40,
+    padding: SPACING.xl,
+    paddingBottom: SPACING.xxl,
   },
-
-  // Profile Card
-  profileCard: {
-    alignItems: 'center',
-    padding: SPACING.xxxl,
-    borderRadius: BORDER_RADIUS.xxl,
-    borderWidth: 1.5,
-    marginBottom: SPACING.xl,
-    overflow: 'hidden',
-    ...SHADOWS.md,
-  },
-  avatar: {
-    width: 88,
-    height: 88,
-    borderRadius: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
+  hero: {
+    borderRadius: BORDER_RADIUS.xl,
+    padding: SPACING.xl,
     marginBottom: SPACING.lg,
+    ...SHADOWS.soft,
   },
-  avatarText: { fontSize: 36, fontWeight: '700' },
-  userName: { ...TYPOGRAPHY.headlineLarge, marginBottom: SPACING.xs },
-  userEmail: { ...TYPOGRAPHY.bodyMedium, marginBottom: SPACING.lg },
-
-  locationBadge: {
+  heroTitle: {
+    ...TYPOGRAPHY.displaySmall,
+  },
+  heroSubtitle: {
+    ...TYPOGRAPHY.bodyMedium,
+    marginTop: SPACING.xs,
+  },
+  heroMeta: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: SPACING.sm,
+    marginTop: SPACING.md,
+  },
+  heroChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.sm,
+    gap: SPACING.xs,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.xs,
     borderRadius: BORDER_RADIUS.full,
-    gap: SPACING.sm,
   },
-  locationText: { ...TYPOGRAPHY.labelMedium },
-
-  // Menu Card
-  menuCard: {
-    borderRadius: BORDER_RADIUS.xxl,
-    borderWidth: 1,
-    overflow: 'hidden',
-    marginBottom: SPACING.xl,
+  heroChipText: {
+    ...TYPOGRAPHY.bodySmall,
+  },
+  section: {
+    marginBottom: SPACING.lg,
+  },
+  sectionTitle: {
+    ...TYPOGRAPHY.headlineSmall,
+    marginBottom: SPACING.sm,
+  },
+  menuList: {
+    gap: SPACING.sm,
   },
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: SPACING.lg,
-    borderBottomWidth: 1,
+    gap: SPACING.md,
+    padding: SPACING.md,
+    borderRadius: BORDER_RADIUS.lg,
+    borderWidth: 1,
+    ...SHADOWS.soft,
   },
   menuIconBg: {
     width: 40,
     height: 40,
-    borderRadius: BORDER_RADIUS.lg,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: SPACING.md,
   },
   menuLabel: {
     ...TYPOGRAPHY.bodyLarge,
-    flex: 1,
-    fontWeight: '500',
   },
-
-  // Theme Card
-  themeCard: {
-    borderRadius: BORDER_RADIUS.xxl,
-    borderWidth: 1,
-    padding: SPACING.lg,
-    marginBottom: SPACING.xl,
-    ...SHADOWS.sm,
-  },
-  themeHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.md,
-    marginBottom: SPACING.lg,
-  },
-  themeIconBg: {
-    width: 40,
-    height: 40,
-    borderRadius: BORDER_RADIUS.lg,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  themeTitle: {
-    ...TYPOGRAPHY.labelLarge,
-    fontWeight: '700',
-  },
-  themeSubtitle: {
+  menuDesc: {
     ...TYPOGRAPHY.bodySmall,
-    marginTop: SPACING.xxs,
   },
   themeRow: {
     flexDirection: 'row',
@@ -341,19 +235,15 @@ const styles = StyleSheet.create({
   },
   themeChip: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: SPACING.md,
     borderRadius: BORDER_RADIUS.full,
     borderWidth: 1,
+    paddingVertical: SPACING.sm,
+    alignItems: 'center',
   },
   themeChipText: {
-    ...TYPOGRAPHY.labelMedium,
-    fontWeight: '700',
+    ...TYPOGRAPHY.labelLarge,
   },
-
-  // Logout
-  logoutContainer: { marginBottom: SPACING.xl },
-  versionText: { ...TYPOGRAPHY.bodySmall, textAlign: 'center' },
-  bottomPadding: { height: 100 },
+  logoutButton: {
+    marginTop: SPACING.md,
+  },
 });

@@ -14,23 +14,13 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import Animated, {
-  FadeInDown,
-  FadeInUp,
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
-  withTiming,
-  interpolate,
-  Extrapolation,
-} from 'react-native-reanimated';
+import Animated, { FadeInUp, useSharedValue, withTiming } from 'react-native-reanimated';
 
 import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS } from '../lib/theme';
 import { haptics } from '../lib/haptics';
 
 const { width } = Dimensions.get('window');
 
-// ✅ IMPORTANT: export this so app/index.tsx can import it
 export const ONBOARDING_KEY = '@represent_onboarding_complete';
 
 type Slide = {
@@ -47,49 +37,48 @@ export default function Onboarding() {
   const { colors } = useTheme();
   const listRef = useRef<FlatList<Slide>>(null);
   const [index, setIndex] = useState(0);
-
   const progress = useSharedValue(0);
 
   const slides: Slide[] = useMemo(
     () => [
       {
         id: '1',
-        kicker: 'Trust Layer',
-        title: 'Verify once.',
-        subtitle: 'Own your voice everywhere.',
+        kicker: 'Trust layer',
+        title: 'Verify once',
+        subtitle: 'Carry your civic passport everywhere.',
         description:
-          'Complete identity verification and receive a Soulbound Passport that proves you’re a real person — without revealing more than necessary.',
-        bullets: ['Fast verification', 'One person, one voice', 'Privacy-first'],
+          'Receive a verified ID that proves you are real — without revealing more than necessary.',
+        bullets: ['Fast verification', 'Privacy-first proof', 'One person, one voice'],
         icon: 'shield-checkmark',
       },
       {
         id: '2',
-        kicker: 'Consent Layer',
-        title: 'Vote on',
-        subtitle: 'real proposals.',
+        kicker: 'Consent layer',
+        title: 'Vote with clarity',
+        subtitle: 'Know who is eligible and why.',
         description:
-          'See what verified residents actually think — by country, region, city, or community. Every vote is geo-gated to the right people.',
-        bullets: ['Geo-gated voting', 'Clear outcomes', 'Verified residents only'],
+          'Every proposal is geo-gated to the right community so outcomes represent real residents.',
+        bullets: ['Geo-gated voting', 'Transparent totals', 'Verified residents only'],
         icon: 'checkmark-done',
       },
       {
         id: '3',
-        kicker: 'Creation Layer',
-        title: 'Create',
-        subtitle: 'better decisions.',
+        kicker: 'Creation layer',
+        title: 'Shape proposals',
+        subtitle: 'Draft, share, and measure consensus.',
         description:
-          'Draft proposals in minutes. Share them to the right jurisdiction or organization and collect verified consent — not noise.',
-        bullets: ['Simple creation', 'Targeted distribution', 'Track results'],
+          'Create proposals in minutes and share them with the right jurisdiction or organization.',
+        bullets: ['Guided creation', 'Targeted distribution', 'Track outcomes'],
         icon: 'sparkles',
       },
       {
         id: '4',
-        kicker: 'Intelligence Layer',
-        title: 'Sentinel',
-        subtitle: 'reads what others miss.',
+        kicker: 'Intelligence layer',
+        title: 'Sentinel assists',
+        subtitle: 'Spot risks before they spread.',
         description:
-          'Paste a policy or proposal. Sentinel scores it against core governance principles and helps you generate fixes or a stronger proposal.',
-        bullets: ['Instant analysis', 'Principle scoring', 'Generate improvements'],
+          'Paste any policy and get a plain-language analysis with suggested fixes.',
+        bullets: ['Instant analysis', 'Principle scoring', 'Actionable improvements'],
         icon: 'eye',
       },
     ],
@@ -106,6 +95,16 @@ export default function Onboarding() {
 
   const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 70 }).current;
 
+  const completeOnboarding = async () => {
+    try {
+      await AsyncStorage.setItem(ONBOARDING_KEY, 'true');
+      haptics.success();
+      router.replace('/');
+    } catch (e) {
+      router.replace('/');
+    }
+  };
+
   const handleSkip = async () => {
     haptics.light();
     await completeOnboarding();
@@ -120,48 +119,30 @@ export default function Onboarding() {
     }
   };
 
-  const completeOnboarding = async () => {
-    try {
-      await AsyncStorage.setItem(ONBOARDING_KEY, 'true');
-      haptics.success();
-      router.replace('/');
-    } catch (e) {
-      // If storage fails, still move forward so user isn't stuck.
-      router.replace('/');
-    }
-  };
-
-  const headerGlowStyle = useAnimatedStyle(() => {
-    const t = interpolate(progress.value, [0, slides.length - 1], [0.25, 0.45], Extrapolation.CLAMP);
-    return { opacity: withSpring(t) };
-  });
-
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}
+    >
       <StatusBar barStyle="light-content" />
-
-      {/* Background */}
       <LinearGradient
         colors={[colors.background, colors.backgroundSecondary, colors.background]}
-        start={{ x: 0.2, y: 0 }}
-        end={{ x: 0.8, y: 1 }}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
         style={StyleSheet.absoluteFill}
       />
-      <Animated.View style={[styles.goldGlow, { backgroundColor: colors.goldLight }, headerGlowStyle]} />
 
-      {/* Top bar */}
       <View style={styles.topBar}>
         <View style={styles.brandRow}>
           <Image source={require('../assets/logo.png')} style={styles.logo} resizeMode="contain" />
-          <Text style={[styles.brand, { color: colors.text }]}>Represent</Text>
+          <View>
+            <Text style={[styles.brandTitle, { color: colors.text }]}>Represent</Text>
+            <Text style={[styles.brandSubtitle, { color: colors.textMuted }]}>Onboarding</Text>
+          </View>
         </View>
-
-        <TouchableOpacity onPress={handleSkip} activeOpacity={0.85} style={styles.skipButton}>
+        <TouchableOpacity onPress={handleSkip} style={styles.skipButton}>
           <Text style={[styles.skipText, { color: colors.textSecondary }]}>Skip</Text>
         </TouchableOpacity>
       </View>
 
-      {/* Slides */}
       <FlatList
         ref={listRef}
         data={slides}
@@ -169,183 +150,164 @@ export default function Onboarding() {
         horizontal
         pagingEnabled
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 160 }}
         onViewableItemsChanged={onViewableItemsChanged}
         viewabilityConfig={viewabilityConfig}
         renderItem={({ item }) => (
-          <View style={[styles.slide, { width }]}>
-            <Animated.View entering={FadeInUp.duration(420)} style={styles.heroWrap}>
-              <View
-                style={[
-                  styles.iconPill,
-                  { borderColor: colors.borderLight, backgroundColor: colors.cardBgElevated },
-                  SHADOWS.medium,
-                ]}
+          <Animated.View style={[styles.slide, { width }]} entering={FadeInUp.duration(400)}>
+            <View style={[styles.slideCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
+              <View style={[styles.iconWrap, { backgroundColor: colors.goldLight }]}
               >
-                <Ionicons name={item.icon} size={18} color={colors.gold} />
-                <Text style={[styles.kicker, { color: colors.textSecondary }]}>{item.kicker}</Text>
+                <Ionicons name={item.icon} size={32} color={colors.gold} />
               </View>
-
+              <Text style={[styles.kicker, { color: colors.textMuted }]}>{item.kicker}</Text>
               <Text style={[styles.title, { color: colors.text }]}>{item.title}</Text>
-              <Text style={[styles.subtitle, { color: colors.text }]}>{item.subtitle}</Text>
-
-              <Text style={[styles.desc, { color: colors.textSecondary }]}>{item.description}</Text>
-
-              <View style={[styles.card, { backgroundColor: colors.cardBg, borderColor: colors.border }, SHADOWS.soft]}>
-                {item.bullets.map((b) => (
-                  <View key={b} style={styles.bulletRow}>
-                    <View style={[styles.bulletDot, { backgroundColor: colors.goldMedium }]} />
-                    <Text style={[styles.bulletText, { color: colors.text }]}>{b}</Text>
+              <Text style={[styles.subtitle, { color: colors.textSecondary }]}>{item.subtitle}</Text>
+              <Text style={[styles.description, { color: colors.textSecondary }]}>{item.description}</Text>
+              <View style={styles.bulletList}>
+                {item.bullets.map((bullet) => (
+                  <View key={bullet} style={styles.bulletRow}>
+                    <View style={[styles.bulletDot, { backgroundColor: colors.gold }]} />
+                    <Text style={[styles.bulletText, { color: colors.textSecondary }]}>{bullet}</Text>
                   </View>
                 ))}
               </View>
-            </Animated.View>
-          </View>
+            </View>
+          </Animated.View>
         )}
       />
 
-      {/* Bottom controls */}
-      <View style={styles.bottom}>
-        <View style={styles.dots}>
-          {slides.map((_, i) => {
-            const dotStyle = useAnimatedStyle(() => {
-              const w = interpolate(progress.value, [i - 1, i, i + 1], [8, 18, 8], Extrapolation.CLAMP);
-              const o = interpolate(progress.value, [i - 1, i, i + 1], [0.35, 1, 0.35], Extrapolation.CLAMP);
-              return { width: withSpring(w), opacity: withSpring(o) };
-            });
-
-            return (
-              <Animated.View key={i} style={[styles.dot, { backgroundColor: colors.gold }, dotStyle]} />
-            );
-          })}
-        </View>
-
-        <Animated.View entering={FadeInDown.duration(380)} style={styles.ctaRow}>
-          <View style={styles.ctaMeta}>
-            <Text style={[styles.stepText, { color: colors.textSecondary }]}>
-              {index + 1} / {slides.length}
-            </Text>
-            <Text style={[styles.stepHint, { color: colors.text }]}>
-              {index === slides.length - 1 ? 'Ready to begin' : 'Continue'}
-            </Text>
-          </View>
-
-          <TouchableOpacity
-            activeOpacity={0.9}
-            onPress={handleNext}
-            style={[styles.primaryButton, { backgroundColor: colors.gold }]}
-          >
-            <Text style={[styles.primaryText, { color: colors.black }]}>
-              {index === slides.length - 1 ? 'Get Started' : 'Next'}
-            </Text>
-            <Ionicons
-              name={index === slides.length - 1 ? 'arrow-forward' : 'chevron-forward'}
-              size={18}
-              color={colors.black}
+      <View style={styles.footer}>
+        <View style={styles.dotsRow}>
+          {slides.map((slide, dotIndex) => (
+            <View
+              key={slide.id}
+              style={[
+                styles.dot,
+                {
+                  backgroundColor: dotIndex === index ? colors.gold : colors.border,
+                  width: dotIndex === index ? 24 : 8,
+                },
+              ]}
             />
-          </TouchableOpacity>
-        </Animated.View>
+          ))}
+        </View>
+        <TouchableOpacity
+          onPress={handleNext}
+          style={[styles.nextButton, { backgroundColor: colors.gold }]}
+        >
+          <Text style={[styles.nextText, { color: colors.background }]}
+          >
+            {index === slides.length - 1 ? 'Enter Represent' : 'Next'}
+          </Text>
+        </TouchableOpacity>
       </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  goldGlow: {
-    position: 'absolute',
-    top: -120,
-    left: -120,
-    width: 280,
-    height: 280,
-    borderRadius: 999,
+  container: {
+    flex: 1,
+    paddingTop: SPACING.xl,
   },
-
   topBar: {
-    paddingTop: 14,
-    paddingHorizontal: SPACING.lg,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    paddingHorizontal: SPACING.xl,
+    marginBottom: SPACING.lg,
   },
-  brandRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  logo: { width: 26, height: 26 },
-  brand: { ...TYPOGRAPHY.titleMedium },
-
+  brandRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+  },
+  logo: {
+    width: 32,
+    height: 32,
+  },
+  brandTitle: {
+    ...TYPOGRAPHY.headlineSmall,
+  },
+  brandSubtitle: {
+    ...TYPOGRAPHY.bodySmall,
+  },
   skipButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 10,
-    borderRadius: 999,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.xs,
   },
-  skipText: { ...TYPOGRAPHY.labelLarge },
-
-  slide: { paddingHorizontal: SPACING.lg, paddingTop: 26 },
-  heroWrap: { flex: 1 },
-
-  iconPill: {
-    alignSelf: 'flex-start',
+  skipText: {
+    ...TYPOGRAPHY.bodyMedium,
+  },
+  slide: {
+    paddingHorizontal: SPACING.xl,
+  },
+  slideCard: {
+    borderRadius: BORDER_RADIUS.xl,
+    borderWidth: 1,
+    padding: SPACING.xl,
+    gap: SPACING.sm,
+    ...SHADOWS.soft,
+  },
+  iconWrap: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: SPACING.sm,
+  },
+  kicker: {
+    ...TYPOGRAPHY.labelMedium,
+    textTransform: 'uppercase',
+    letterSpacing: 1.2,
+  },
+  title: {
+    ...TYPOGRAPHY.displaySmall,
+  },
+  subtitle: {
+    ...TYPOGRAPHY.bodyLarge,
+  },
+  description: {
+    ...TYPOGRAPHY.bodyMedium,
+  },
+  bulletList: {
+    marginTop: SPACING.md,
+    gap: SPACING.sm,
+  },
+  bulletRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 999,
-    borderWidth: 1,
-    marginBottom: 18,
+    gap: SPACING.sm,
   },
-  kicker: { ...TYPOGRAPHY.labelMedium },
-
-  title: { ...TYPOGRAPHY.displaySmall, marginTop: 6 },
-  subtitle: { ...TYPOGRAPHY.displaySmall, marginTop: 2 },
-  desc: { ...TYPOGRAPHY.bodyLarge, marginTop: 14, maxWidth: 520 },
-
-  card: {
-    marginTop: 20,
-    borderWidth: 1,
-    borderRadius: BORDER_RADIUS.lg,
-    padding: SPACING.lg,
+  bulletDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
   },
-  bulletRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 },
-  bulletDot: { width: 8, height: 8, borderRadius: 999 },
-  bulletText: { ...TYPOGRAPHY.bodyMedium, flex: 1 },
-
-  bottom: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    paddingHorizontal: SPACING.lg,
-    paddingBottom: 18,
-    paddingTop: 12,
+  bulletText: {
+    ...TYPOGRAPHY.bodyMedium,
   },
-  dots: {
+  footer: {
+    paddingHorizontal: SPACING.xl,
+    paddingBottom: SPACING.xl,
+    gap: SPACING.md,
+  },
+  dotsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    marginBottom: 14,
+    gap: SPACING.xs,
   },
   dot: {
     height: 8,
-    borderRadius: 999,
+    borderRadius: 4,
   },
-
-  ctaRow: {
-    flexDirection: 'row',
+  nextButton: {
+    paddingVertical: SPACING.md,
+    borderRadius: BORDER_RADIUS.lg,
     alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 14,
   },
-  ctaMeta: { flex: 1 },
-  stepText: { ...TYPOGRAPHY.labelMedium },
-  stepHint: { ...TYPOGRAPHY.titleSmall, marginTop: 2 },
-
-  primaryButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingVertical: 14,
-    paddingHorizontal: 18,
-    borderRadius: 999,
+  nextText: {
+    ...TYPOGRAPHY.labelLarge,
   },
-  primaryText: { ...TYPOGRAPHY.labelLarge },
 });
