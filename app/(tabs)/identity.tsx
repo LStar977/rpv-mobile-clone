@@ -17,7 +17,7 @@ import { router } from 'expo-router';
 
 import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS } from '../../lib/theme';
 import { useAuthStore } from '../../lib/auth';
-import { userApi } from '../../lib/api';
+import { userApi, veriffApi } from '../../lib/api';
 import { Button } from '../../components/ui';
 import { haptics } from '../../lib/haptics';
 
@@ -25,7 +25,7 @@ type VerificationState = {
   verified: boolean;
   status?: 'unverified' | 'pending' | 'verified' | 'failed';
   provider?: 'veriff' | string;
-  verifiedAt?: string | null; // ISO date from backend
+  verifiedAt?: string | null;
 };
 
 type ProfileState = {
@@ -34,7 +34,6 @@ type ProfileState = {
   country?: string;
   state?: string;
   city?: string;
-  // any other fields your backend returns, but we will display only
 };
 
 function formatDate(iso?: string | null) {
@@ -133,7 +132,7 @@ export default function IdentityScreen() {
     if (verification.status === 'pending') {
       return {
         title: 'Verification pending',
-        subtitle: 'We’re confirming your verification status with the provider.',
+        subtitle: 'We're confirming your verification status with the provider.',
         icon: 'time-outline' as const,
         tone: 'info' as const,
       };
@@ -164,28 +163,48 @@ export default function IdentityScreen() {
     return { bg: colors.warningLight, border: colors.warning, fg: colors.warning };
   }, [statusUI.tone, colors]);
 
-  const handleStartKyc = () => {
+  const [startingKyc, setStartingKyc] = useState(false);
+
+  const handleStartKyc = async () => {
     if (!isAuthenticated) {
       Alert.alert('Sign In Required', 'Please sign in to begin verification.');
       return;
     }
 
     haptics.medium();
+    setStartingKyc(true);
 
-    // Hook this to your actual Veriff/KYC flow.
-    // Examples:
-    // - router.push('/modals/kyc')
-    // - Linking.openURL(verificationSessionUrlFromBackend)
-    // - open a WebView modal
-    Alert.alert(
-      'Start Verification',
-      'Connect this button to your Veriff session start endpoint / flow.',
-      [{ text: 'OK' }]
-    );
+    try {
+      const response = await veriffApi.createSession();
+      
+      if (response.data?.sessionUrl && response.data?.verificationId) {
+        router.push({
+          pathname: '/modals/veriff',
+          params: {
+            sessionUrl: response.data.sessionUrl,
+            verificationId: response.data.verificationId,
+          },
+        });
+      } else {
+        haptics.error();
+        Alert.alert(
+          'Verification Error',
+          response.data?.error || 'Could not start verification session. Please try again.'
+        );
+      }
+    } catch (error: any) {
+      haptics.error();
+      console.error('Veriff session error:', error);
+      Alert.alert(
+        'Connection Error',
+        'Unable to connect to the verification service. Please check your internet connection and try again.'
+      );
+    } finally {
+      setStartingKyc(false);
+    }
   };
 
   const handleRefreshStatus = async () => {
-    // Only allowed while NOT verified
     if (verification.verified) return;
 
     haptics.selection();
@@ -221,7 +240,6 @@ export default function IdentityScreen() {
           />
         }
       >
-        {/* Header */}
         <Animated.View entering={FadeInDown.duration(400)} style={[styles.headerCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
           <LinearGradient
             colors={[`${colors.gold}10`, 'transparent']}
@@ -242,7 +260,6 @@ export default function IdentityScreen() {
             <View style={{ width: 44 }} />
           </View>
 
-          {/* Status Banner */}
           <View style={[styles.statusBanner, { backgroundColor: toneColors.bg, borderColor: toneColors.border }]}>
             <View style={[styles.statusIconBg, { backgroundColor: `${toneColors.fg}20` }]}>
               <Ionicons name={statusUI.icon} size={22} color={toneColors.fg} />
@@ -253,7 +270,6 @@ export default function IdentityScreen() {
             </View>
           </View>
 
-          {/* Verified Lock Note */}
           {verification.verified && (
             <View style={[styles.lockNote, { borderTopColor: colors.border }]}>
               <Ionicons name="lock-closed-outline" size={16} color={colors.textSecondary} />
@@ -264,7 +280,6 @@ export default function IdentityScreen() {
           )}
         </Animated.View>
 
-        {/* Identity Details (Read-only) */}
         <Animated.View entering={FadeInUp.delay(100).duration(350)} style={[styles.card, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
           <Text style={[styles.cardTitle, { color: colors.text }]}>Your Details</Text>
 
@@ -284,7 +299,6 @@ export default function IdentityScreen() {
           />
         </Animated.View>
 
-        {/* Actions */}
         {!isAuthenticated ? (
           <Animated.View entering={FadeInUp.delay(180).duration(350)} style={styles.actions}>
             <Button
@@ -297,12 +311,11 @@ export default function IdentityScreen() {
             />
           </Animated.View>
         ) : verification.verified ? (
-          // VERIFIED: no refresh, no edit, no “update” controls
           <Animated.View entering={FadeInUp.delay(180).duration(350)} style={styles.actions}>
             <View style={[styles.verifiedCard, { backgroundColor: colors.goldLight, borderColor: colors.gold }]}>
               <Ionicons name="checkmark-circle" size={20} color={colors.gold} />
               <Text style={[styles.verifiedText, { color: colors.gold }]}>
-                You’re verified. You can now vote and create geo-gated proposals.
+                You're verified. You can now vote and create geo-gated proposals.
               </Text>
             </View>
 
@@ -317,18 +330,18 @@ export default function IdentityScreen() {
             />
           </Animated.View>
         ) : (
-          // NOT VERIFIED: allow start + refresh
           <Animated.View entering={FadeInUp.delay(180).duration(350)} style={styles.actions}>
             <Button
-              title="Start Verification"
+              title={startingKyc ? "Starting Verification..." : "Start Verification"}
               onPress={handleStartKyc}
               variant="primary"
               size="lg"
               fullWidth
               icon="shield-checkmark-outline"
+              loading={startingKyc}
+              disabled={startingKyc}
             />
 
-            {/* Only show refresh while NOT verified */}
             <TouchableOpacity
               style={[styles.refreshRow, { borderColor: colors.border, backgroundColor: colors.cardBg }]}
               onPress={handleRefreshStatus}
@@ -354,7 +367,7 @@ export default function IdentityScreen() {
             <View style={[styles.noteBox, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
               <Ionicons name="information-circle-outline" size={18} color={colors.textSecondary} />
               <Text style={[styles.noteText, { color: colors.textSecondary }]}>
-                Verification details are determined by your identity document and the verification provider. You can’t edit them manually.
+                Verification details are determined by your identity document and the verification provider. You can't edit them manually.
               </Text>
             </View>
           </Animated.View>
