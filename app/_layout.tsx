@@ -1,15 +1,14 @@
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { View, useColorScheme } from 'react-native';
-import { DARK_COLORS, LIGHT_COLORS } from '../lib/theme';
+import { View } from 'react-native';
+import { ThemeProvider, useTheme } from '../lib/theme';
 
-export default function RootLayout() {
-  const colorScheme = useColorScheme();
-  const colors = colorScheme === 'dark' ? DARK_COLORS : LIGHT_COLORS;
+function ThemedStack() {
+  const { colors, isDark } = useTheme();
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
+      <StatusBar style={isDark ? 'light' : 'dark'} />
       <Stack
         screenOptions={{
           headerShown: false,
@@ -22,5 +21,13 @@ export default function RootLayout() {
         <Stack.Screen name="modals" />
       </Stack>
     </View>
+  );
+}
+
+export default function RootLayout() {
+  return (
+    <ThemeProvider>
+      <ThemedStack />
+    </ThemeProvider>
   );
 }

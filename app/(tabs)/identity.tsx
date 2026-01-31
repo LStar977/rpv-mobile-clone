@@ -1,166 +1,101 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl, Alert } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  RefreshControl,
+  Alert,
+  ActivityIndicator,
+  Platform,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { router, useLocalSearchParams } from 'expo-router';
-import Animated, {
-  FadeIn,
-  FadeInDown,
-  FadeInUp,
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
-  withRepeat,
-  withTiming,
-  Easing,
-} from 'react-native-reanimated';
-import { useAuthStore } from '../../lib/auth';
-import { veriffApi, passportApi, userApi } from '../../lib/api';
+import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
+import { router } from 'expo-router';
+
 import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS } from '../../lib/theme';
-import { Button, SectionHeader } from '../../components/ui';
+import { useAuthStore } from '../../lib/auth';
+import { userApi } from '../../lib/api';
+import { Button } from '../../components/ui';
+import { haptics } from '../../lib/haptics';
 
-const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
+type VerificationState = {
+  verified: boolean;
+  status?: 'unverified' | 'pending' | 'verified' | 'failed';
+  provider?: 'veriff' | string;
+  verifiedAt?: string | null; // ISO date from backend
+};
 
-// Status Card Component
-function StatusCard({
-  icon,
-  title,
-  subtitle,
-  status,
-  statusColor,
-  children,
-  delay = 0,
-}: {
-  icon: keyof typeof Ionicons.glyphMap;
-  title: string;
-  subtitle: string;
-  status: 'none' | 'pending' | 'verified' | 'minted';
-  statusColor: string;
-  children?: React.ReactNode;
-  delay?: number;
-}) {
-  const { colors } = useTheme();
+type ProfileState = {
+  name?: string;
+  email?: string;
+  country?: string;
+  state?: string;
+  city?: string;
+  // any other fields your backend returns, but we will display only
+};
 
-  const getStatusIcon = () => {
-    switch (status) {
-      case 'verified':
-      case 'minted':
-        return 'checkmark-circle';
-      case 'pending':
-        return 'time';
-      default:
-        return 'ellipse-outline';
-    }
-  };
-
-  return (
-    <Animated.View
-      entering={FadeInUp.delay(delay).duration(400)}
-      style={[
-        styles.statusCard,
-        {
-          backgroundColor: colors.cardBg,
-          borderColor: status === 'verified' || status === 'minted' ? colors.success : colors.border,
-          borderWidth: status === 'verified' || status === 'minted' ? 1.5 : 1,
-        },
-      ]}
-    >
-      <View style={styles.statusHeader}>
-        <View
-          style={[
-            styles.statusIconBg,
-            {
-              backgroundColor:
-                status === 'verified' || status === 'minted'
-                  ? colors.successLight
-                  : status === 'pending'
-                  ? colors.warningLight
-                  : colors.cardBgLight,
-            },
-          ]}
-        >
-          <Ionicons
-            name={icon}
-            size={28}
-            color={
-              status === 'verified' || status === 'minted'
-                ? colors.success
-                : status === 'pending'
-                ? colors.warning
-                : colors.textMuted
-            }
-          />
-        </View>
-        <View style={styles.statusInfo}>
-          <Text style={[styles.statusTitle, { color: colors.text }]}>{title}</Text>
-          <Text style={[styles.statusSubtitle, { color: colors.textSecondary }]}>{subtitle}</Text>
-        </View>
-        <View style={[styles.statusBadge, { backgroundColor: `${statusColor}15` }]}>
-          <Ionicons name={getStatusIcon()} size={16} color={statusColor} />
-        </View>
-      </View>
-      {children}
-    </Animated.View>
-  );
+function formatDate(iso?: string | null) {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
-// Pulsing animation for pending state
-function PulsingDot() {
+function InfoRow({ label, value }: { label: string; value?: string | null }) {
   const { colors } = useTheme();
-  const opacity = useSharedValue(1);
-
-  useEffect(() => {
-    opacity.value = withRepeat(
-      withTiming(0.3, { duration: 1000, easing: Easing.inOut(Easing.ease) }),
-      -1,
-      true
-    );
-  }, []);
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    opacity: opacity.value,
-  }));
-
   return (
-    <Animated.View style={[styles.pulsingDot, { backgroundColor: colors.warning }, animatedStyle]} />
+    <View style={[styles.infoRow, { borderBottomColor: colors.border }]}>
+      <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>{label}</Text>
+      <Text style={[styles.infoValue, { color: colors.text }]} numberOfLines={2}>
+        {value && value.trim().length > 0 ? value : '—'}
+      </Text>
+    </View>
   );
 }
 
 export default function IdentityScreen() {
   const { colors } = useTheme();
-  const { user, isAuthenticated } = useAuthStore();
-  const params = useLocalSearchParams<{ verified?: string; verificationId?: string }>();
+  const { isAuthenticated, user } = useAuthStore();
+
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [verificationStatus, setVerificationStatus] = useState<'none' | 'pending' | 'verified'>('none');
-  const [hasPassport, setHasPassport] = useState(false);
-  const [startingVerification, setStartingVerification] = useState(false);
-  const [mintingPassport, setMintingPassport] = useState(false);
-  const [pendingVerificationId, setPendingVerificationId] = useState<string | null>(null);
-  const [geoScope, setGeoScope] = useState<{ country?: string; state?: string; city?: string }>({});
 
-  const fetchStatus = useCallback(async () => {
-    if (!isAuthenticated) {
-      setLoading(false);
-      return;
-    }
+  const [verification, setVerification] = useState<VerificationState>({
+    verified: false,
+    status: 'unverified',
+    provider: 'veriff',
+    verifiedAt: null,
+  });
+
+  const [profile, setProfile] = useState<ProfileState | null>(null);
+
+  const fetchIdentity = useCallback(async () => {
     try {
-      const [profileRes, passportRes] = await Promise.all([
-        userApi.getVerificationStatus(),
-        passportApi.getStatus(),
+      const results = await Promise.allSettled([
+        isAuthenticated ? userApi.getVerificationStatus() : Promise.resolve({ data: { verified: false } }),
+        isAuthenticated ? userApi.getProfile() : Promise.resolve({ data: null }),
       ]);
-      if (profileRes.data) {
-        setVerificationStatus(profileRes.data.verified ? 'verified' : 'none');
-        setGeoScope({
-          country: profileRes.data.country,
-          state: profileRes.data.state,
-          city: profileRes.data.city,
-        });
-      }
-      if (passportRes.data) setHasPassport(passportRes.data.hasMinted);
-    } catch (error) {
-      console.error('Error fetching status:', error);
+
+      const verificationRes =
+        results[0].status === 'fulfilled' ? results[0].value : { data: { verified: false } };
+      const profileRes = results[1].status === 'fulfilled' ? results[1].value : { data: null };
+
+      const v = verificationRes?.data || {};
+      const p = profileRes?.data || null;
+
+      setVerification({
+        verified: !!v.verified,
+        status: (v.status as any) || (v.verified ? 'verified' : 'unverified'),
+        provider: v.provider || 'veriff',
+        verifiedAt: v.verifiedAt || v.verified_at || null,
+      });
+
+      setProfile(p);
+    } catch (e) {
+      console.error('Identity fetch error:', e);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -168,142 +103,110 @@ export default function IdentityScreen() {
   }, [isAuthenticated]);
 
   useEffect(() => {
-    fetchStatus();
-  }, [fetchStatus]);
+    fetchIdentity();
+  }, [fetchIdentity]);
 
-  useEffect(() => {
-    if (pendingVerificationId) {
-      const interval = setInterval(async () => {
-        const result = await veriffApi.checkDecision(pendingVerificationId);
-        if (result.data?.status === 'approved' || result.data?.decision === 'approved') {
-          setVerificationStatus('verified');
-          setPendingVerificationId(null);
-          Alert.alert('Verification Complete', 'Your identity has been verified!');
-        } else if (result.data?.status === 'declined' || result.data?.decision === 'declined') {
-          setPendingVerificationId(null);
-          setVerificationStatus('none');
-          Alert.alert('Verification Failed', 'Please try again.');
-        }
-      }, 5000);
-      return () => clearInterval(interval);
-    }
-  }, [pendingVerificationId]);
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    fetchIdentity();
+  }, [fetchIdentity]);
 
-  useEffect(() => {
-    if ((params.verified === 'true' || params.verified === 'pending') && params.verificationId) {
-      setPendingVerificationId(params.verificationId);
-      setVerificationStatus('pending');
-      veriffApi.checkDecision(params.verificationId).then((result) => {
-        if (result.data?.status === 'approved' || result.data?.decision === 'approved') {
-          setVerificationStatus('verified');
-          setPendingVerificationId(null);
-          Alert.alert('Verification Complete', 'Your identity has been verified!');
-        }
-      });
-    }
-  }, [params.verified, params.verificationId]);
-
-  const handleStartVerification = async () => {
+  const statusUI = useMemo(() => {
     if (!isAuthenticated) {
-      Alert.alert('Sign In Required', 'Please sign in to verify your identity.');
-      return;
+      return {
+        title: 'Sign in required',
+        subtitle: 'Sign in to complete identity verification.',
+        icon: 'log-in-outline' as const,
+        tone: 'warning' as const,
+      };
     }
-    setStartingVerification(true);
-    try {
-      const result = await veriffApi.createSession();
-      if (result.error) {
-        Alert.alert('Error', result.error);
-        return;
-      }
 
-      const sessionUrl = result.data?.sessionUrl;
-      const verificationId = result.data?.sessionId || result.data?.verificationId;
-
-      if (sessionUrl) {
-        setPendingVerificationId(verificationId);
-        setVerificationStatus('pending');
-        router.push({
-          pathname: '/modals/veriff',
-          params: { sessionUrl, verificationId },
-        });
-      } else {
-        Alert.alert('Error', 'Could not start verification session.');
-      }
-    } catch (error) {
-      Alert.alert('Error', 'Failed to start verification.');
-    } finally {
-      setStartingVerification(false);
+    if (verification.verified) {
+      return {
+        title: 'Verified',
+        subtitle: 'Your identity is verified and locked to your government document.',
+        icon: 'shield-checkmark' as const,
+        tone: 'success' as const,
+      };
     }
-  };
 
-  const handleMintPassport = async () => {
+    if (verification.status === 'pending') {
+      return {
+        title: 'Verification pending',
+        subtitle: 'We’re confirming your verification status with the provider.',
+        icon: 'time-outline' as const,
+        tone: 'info' as const,
+      };
+    }
+
+    if (verification.status === 'failed') {
+      return {
+        title: 'Verification failed',
+        subtitle: 'Your submission was not approved. Please try again.',
+        icon: 'close-circle-outline' as const,
+        tone: 'error' as const,
+      };
+    }
+
+    return {
+      title: 'Not verified',
+      subtitle: 'Verify your identity to vote on proposals and access geo-gated communities.',
+      icon: 'shield-outline' as const,
+      tone: 'warning' as const,
+    };
+  }, [isAuthenticated, verification.verified, verification.status]);
+
+  const toneColors = useMemo(() => {
+    const tone = statusUI.tone;
+    if (tone === 'success') return { bg: colors.successLight, border: colors.success, fg: colors.success };
+    if (tone === 'error') return { bg: colors.errorLight, border: colors.error, fg: colors.error };
+    if (tone === 'info') return { bg: colors.infoLight, border: colors.info, fg: colors.info };
+    return { bg: colors.warningLight, border: colors.warning, fg: colors.warning };
+  }, [statusUI.tone, colors]);
+
+  const handleStartKyc = () => {
     if (!isAuthenticated) {
-      Alert.alert('Sign In Required', 'Please sign in.');
+      Alert.alert('Sign In Required', 'Please sign in to begin verification.');
       return;
     }
-    if (verificationStatus !== 'verified') {
-      Alert.alert('Verification Required', 'Please complete identity verification first.');
-      return;
-    }
-    setMintingPassport(true);
-    try {
-      const result = await passportApi.mint();
-      if (result.error) {
-        Alert.alert('Error', result.error);
-        return;
-      }
-      setHasPassport(true);
-      Alert.alert('Passport Minted', 'Your soulbound passport NFT has been minted!');
-    } catch (error) {
-      Alert.alert('Error', 'Failed to mint passport.');
-    } finally {
-      setMintingPassport(false);
-    }
-  };
 
-  const getInitial = () =>
-    user?.name?.charAt(0).toUpperCase() || user?.email?.charAt(0).toUpperCase() || 'U';
+    haptics.medium();
 
-  const getLocationString = () => {
-    const parts = [geoScope.city, geoScope.state, geoScope.country].filter(Boolean);
-    return parts.length > 0 ? parts.join(', ') : 'Location not verified';
-  };
-
-  // Not authenticated state
-  if (!isAuthenticated) {
-    return (
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <View style={styles.centerContent}>
-          <View style={[styles.emptyIconBg, { backgroundColor: colors.cardBg }]}>
-            <Ionicons name="person-outline" size={48} color={colors.textMuted} />
-          </View>
-          <Text style={[styles.emptyTitle, { color: colors.text }]}>Sign In Required</Text>
-          <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-            Sign in to manage your identity verification
-          </Text>
-          <Button
-            title="Sign In"
-            onPress={() => router.replace('/')}
-            variant="primary"
-            size="lg"
-            style={{ marginTop: SPACING.xl }}
-          />
-        </View>
-      </View>
+    // Hook this to your actual Veriff/KYC flow.
+    // Examples:
+    // - router.push('/modals/kyc')
+    // - Linking.openURL(verificationSessionUrlFromBackend)
+    // - open a WebView modal
+    Alert.alert(
+      'Start Verification',
+      'Connect this button to your Veriff session start endpoint / flow.',
+      [{ text: 'OK' }]
     );
-  }
+  };
 
-  // Loading state
+  const handleRefreshStatus = async () => {
+    // Only allowed while NOT verified
+    if (verification.verified) return;
+
+    haptics.selection();
+    setRefreshing(true);
+    await fetchIdentity();
+  };
+
   if (loading) {
     return (
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <View style={styles.centerContent}>
-          <ActivityIndicator size="large" color={colors.gold} />
-          <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading...</Text>
-        </View>
+      <View style={[styles.container, { backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center' }]}>
+        <ActivityIndicator size="small" color={colors.gold} />
+        <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading identity…</Text>
       </View>
     );
   }
+
+  const displayName = profile?.name || user?.name || 'Citizen';
+  const displayEmail = profile?.email || user?.email || '';
+  const displayCountry = profile?.country || user?.country || '';
+  const displayState = profile?.state || user?.state || '';
+  const displayCity = profile?.city || user?.city || '';
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -313,284 +216,312 @@ export default function IdentityScreen() {
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
-            onRefresh={() => {
-              setRefreshing(true);
-              fetchStatus();
-            }}
+            onRefresh={onRefresh}
             tintColor={colors.gold}
           />
         }
       >
-        {/* Profile Card */}
-        <Animated.View
-          entering={FadeInDown.duration(500)}
-          style={[styles.profileCard, { backgroundColor: colors.cardBg, borderColor: colors.gold }]}
-        >
+        {/* Header */}
+        <Animated.View entering={FadeInDown.duration(400)} style={[styles.headerCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
           <LinearGradient
             colors={[`${colors.gold}10`, 'transparent']}
             style={StyleSheet.absoluteFill}
             start={{ x: 0.5, y: 0 }}
             end={{ x: 0.5, y: 1 }}
           />
-          <View style={[styles.avatar, { backgroundColor: colors.gold, ...SHADOWS.glow }]}>
-            <Text style={[styles.avatarText, { color: colors.background }]}>{getInitial()}</Text>
+          <View style={styles.headerTopRow}>
+            <TouchableOpacity
+              onPress={() => router.back()}
+              style={[styles.backButton, { backgroundColor: colors.cardBgLight, borderColor: colors.border }]}
+              activeOpacity={0.7}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Ionicons name="chevron-back" size={22} color={colors.text} />
+            </TouchableOpacity>
+            <Text style={[styles.headerTitle, { color: colors.text }]}>Identity</Text>
+            <View style={{ width: 44 }} />
           </View>
-          <Text style={[styles.userName, { color: colors.text }]}>{user?.name || 'Citizen'}</Text>
-          <Text style={[styles.userEmail, { color: colors.textSecondary }]}>{user?.email}</Text>
-        </Animated.View>
 
-        {/* Verification Status */}
-        <SectionHeader title="IDENTITY VERIFICATION" style={{ marginTop: SPACING.lg }} />
-        <StatusCard
-          icon={verificationStatus === 'verified' ? 'shield-checkmark' : 'shield-outline'}
-          title={
-            verificationStatus === 'verified'
-              ? 'Identity Verified'
-              : verificationStatus === 'pending'
-              ? 'Verification Pending'
-              : 'Not Verified'
-          }
-          subtitle={
-            verificationStatus === 'verified'
-              ? getLocationString()
-              : verificationStatus === 'pending'
-              ? 'Checking verification status...'
-              : 'Complete identity verification to vote'
-          }
-          status={verificationStatus}
-          statusColor={
-            verificationStatus === 'verified'
-              ? colors.success
-              : verificationStatus === 'pending'
-              ? colors.warning
-              : colors.textMuted
-          }
-          delay={200}
-        >
-          {verificationStatus === 'none' && (
-            <Button
-              title={startingVerification ? 'Starting...' : 'Start Verification'}
-              onPress={handleStartVerification}
-              variant="primary"
-              size="lg"
-              fullWidth
-              loading={startingVerification}
-              icon="scan-outline"
-              style={{ marginTop: SPACING.lg }}
-            />
-          )}
-          {verificationStatus === 'pending' && (
-            <View style={[styles.pendingBanner, { backgroundColor: colors.warningLight }]}>
-              <PulsingDot />
-              <Text style={[styles.pendingText, { color: colors.warning }]}>
-                Checking verification status...
+          {/* Status Banner */}
+          <View style={[styles.statusBanner, { backgroundColor: toneColors.bg, borderColor: toneColors.border }]}>
+            <View style={[styles.statusIconBg, { backgroundColor: `${toneColors.fg}20` }]}>
+              <Ionicons name={statusUI.icon} size={22} color={toneColors.fg} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.statusTitle, { color: colors.text }]}>{statusUI.title}</Text>
+              <Text style={[styles.statusSubtitle, { color: colors.textSecondary }]}>{statusUI.subtitle}</Text>
+            </View>
+          </View>
+
+          {/* Verified Lock Note */}
+          {verification.verified && (
+            <View style={[styles.lockNote, { borderTopColor: colors.border }]}>
+              <Ionicons name="lock-closed-outline" size={16} color={colors.textSecondary} />
+              <Text style={[styles.lockText, { color: colors.textSecondary }]}>
+                Verified identity fields are read-only and match your government document.
               </Text>
             </View>
           )}
-        </StatusCard>
-
-        {/* Passport Status */}
-        <SectionHeader title="REPRESENT PASSPORT" style={{ marginTop: SPACING.xl }} />
-        <StatusCard
-          icon={hasPassport ? 'ribbon' : 'ribbon-outline'}
-          title={hasPassport ? 'Passport Minted' : 'No Passport'}
-          subtitle={
-            hasPassport
-              ? 'Your soulbound passport NFT is active'
-              : 'Mint your passport NFT to vote on proposals'
-          }
-          status={hasPassport ? 'minted' : 'none'}
-          statusColor={hasPassport ? colors.success : colors.textMuted}
-          delay={300}
-        >
-          {!hasPassport && (
-            <Button
-              title={
-                mintingPassport
-                  ? 'Minting...'
-                  : verificationStatus !== 'verified'
-                  ? 'Verify Identity First'
-                  : 'Mint Passport'
-              }
-              onPress={handleMintPassport}
-              variant={verificationStatus !== 'verified' ? 'secondary' : 'primary'}
-              size="lg"
-              fullWidth
-              loading={mintingPassport}
-              disabled={verificationStatus !== 'verified'}
-              icon="diamond-outline"
-              style={{ marginTop: SPACING.lg }}
-            />
-          )}
-        </StatusCard>
-
-        {/* Info Card */}
-        <Animated.View
-          entering={FadeInUp.delay(400).duration(400)}
-          style={[styles.infoCard, { backgroundColor: colors.goldLight, borderColor: colors.gold }]}
-        >
-          <View style={[styles.infoIconBg, { backgroundColor: colors.gold }]}>
-            <Ionicons name="information" size={20} color={colors.background} />
-          </View>
-          <View style={styles.infoContent}>
-            <Text style={[styles.infoTitle, { color: colors.gold }]}>Why verify?</Text>
-            <Text style={[styles.infoText, { color: colors.textSecondary }]}>
-              Identity verification ensures one person, one vote. Your soulbound passport NFT is
-              tied to your verified identity and cannot be transferred.
-            </Text>
-          </View>
         </Animated.View>
 
-        <View style={styles.bottomPadding} />
+        {/* Identity Details (Read-only) */}
+        <Animated.View entering={FadeInUp.delay(100).duration(350)} style={[styles.card, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
+          <Text style={[styles.cardTitle, { color: colors.text }]}>Your Details</Text>
+
+          <InfoRow label="Name" value={displayName} />
+          <InfoRow label="Email" value={displayEmail} />
+          <InfoRow label="Country" value={displayCountry} />
+          <InfoRow label="State/Province" value={displayState} />
+          <InfoRow label="City" value={displayCity} />
+
+          <InfoRow
+            label="Verification Provider"
+            value={verification.provider ? String(verification.provider).toUpperCase() : '—'}
+          />
+          <InfoRow
+            label="Verified Date"
+            value={verification.verified ? (formatDate(verification.verifiedAt) || 'Verified') : '—'}
+          />
+        </Animated.View>
+
+        {/* Actions */}
+        {!isAuthenticated ? (
+          <Animated.View entering={FadeInUp.delay(180).duration(350)} style={styles.actions}>
+            <Button
+              title="Sign In"
+              onPress={() => router.replace('/')}
+              variant="primary"
+              size="lg"
+              fullWidth
+              icon="log-in-outline"
+            />
+          </Animated.View>
+        ) : verification.verified ? (
+          // VERIFIED: no refresh, no edit, no “update” controls
+          <Animated.View entering={FadeInUp.delay(180).duration(350)} style={styles.actions}>
+            <View style={[styles.verifiedCard, { backgroundColor: colors.goldLight, borderColor: colors.gold }]}>
+              <Ionicons name="checkmark-circle" size={20} color={colors.gold} />
+              <Text style={[styles.verifiedText, { color: colors.gold }]}>
+                You’re verified. You can now vote and create geo-gated proposals.
+              </Text>
+            </View>
+
+            <Button
+              title="Go to Proposals"
+              onPress={() => router.push('/(tabs)/proposals')}
+              variant="primary"
+              size="lg"
+              fullWidth
+              icon="arrow-forward"
+              iconPosition="right"
+            />
+          </Animated.View>
+        ) : (
+          // NOT VERIFIED: allow start + refresh
+          <Animated.View entering={FadeInUp.delay(180).duration(350)} style={styles.actions}>
+            <Button
+              title="Start Verification"
+              onPress={handleStartKyc}
+              variant="primary"
+              size="lg"
+              fullWidth
+              icon="shield-checkmark-outline"
+            />
+
+            {/* Only show refresh while NOT verified */}
+            <TouchableOpacity
+              style={[styles.refreshRow, { borderColor: colors.border, backgroundColor: colors.cardBg }]}
+              onPress={handleRefreshStatus}
+              activeOpacity={0.75}
+              disabled={refreshing}
+            >
+              <View style={[styles.refreshIconBg, { backgroundColor: colors.goldLight }]}>
+                {refreshing ? (
+                  <ActivityIndicator size="small" color={colors.gold} />
+                ) : (
+                  <Ionicons name="refresh" size={18} color={colors.gold} />
+                )}
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.refreshTitle, { color: colors.text }]}>Refresh status</Text>
+                <Text style={[styles.refreshSubtitle, { color: colors.textSecondary }]}>
+                  If you just completed KYC, pull the latest status from the backend.
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+            </TouchableOpacity>
+
+            <View style={[styles.noteBox, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
+              <Ionicons name="information-circle-outline" size={18} color={colors.textSecondary} />
+              <Text style={[styles.noteText, { color: colors.textSecondary }]}>
+                Verification details are determined by your identity document and the verification provider. You can’t edit them manually.
+              </Text>
+            </View>
+          </Animated.View>
+        )}
+
+        <View style={{ height: 80 }} />
       </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
+  container: { flex: 1 },
   content: {
+    paddingTop: 70,
     paddingHorizontal: SPACING.lg,
-    paddingTop: 80,
-  },
-  centerContent: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: SPACING.xxl,
-  },
-  // Profile Card
-  profileCard: {
-    alignItems: 'center',
-    padding: SPACING.xxl,
-    borderRadius: BORDER_RADIUS.xxl,
-    borderWidth: 1.5,
-    overflow: 'hidden',
-    ...SHADOWS.md,
-  },
-  avatar: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: SPACING.lg,
-  },
-  avatarText: {
-    fontSize: 28,
-    fontWeight: '700',
-  },
-  userName: {
-    ...TYPOGRAPHY.headlineMedium,
-    marginBottom: SPACING.xs,
-  },
-  userEmail: {
-    ...TYPOGRAPHY.bodyMedium,
-  },
-  // Status Card
-  statusCard: {
-    borderRadius: BORDER_RADIUS.xxl,
-    padding: SPACING.xl,
-    marginBottom: SPACING.md,
-  },
-  statusHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  statusIconBg: {
-    width: 56,
-    height: 56,
-    borderRadius: BORDER_RADIUS.xl,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  statusInfo: {
-    flex: 1,
-    marginLeft: SPACING.lg,
-  },
-  statusTitle: {
-    ...TYPOGRAPHY.headlineSmall,
-    marginBottom: SPACING.xxs,
-  },
-  statusSubtitle: {
-    ...TYPOGRAPHY.bodyMedium,
-  },
-  statusBadge: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  // Pending Banner
-  pendingBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: SPACING.md,
-    borderRadius: BORDER_RADIUS.lg,
-    marginTop: SPACING.lg,
-    gap: SPACING.sm,
-  },
-  pendingText: {
-    ...TYPOGRAPHY.labelMedium,
-  },
-  pulsingDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  // Info Card
-  infoCard: {
-    flexDirection: 'row',
-    borderRadius: BORDER_RADIUS.xl,
-    padding: SPACING.lg,
-    marginTop: SPACING.lg,
-    borderWidth: 1,
-  },
-  infoIconBg: {
-    width: 36,
-    height: 36,
-    borderRadius: BORDER_RADIUS.lg,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  infoContent: {
-    flex: 1,
-    marginLeft: SPACING.md,
-  },
-  infoTitle: {
-    ...TYPOGRAPHY.labelLarge,
-    marginBottom: SPACING.xs,
-  },
-  infoText: {
-    ...TYPOGRAPHY.bodySmall,
-    lineHeight: 20,
-  },
-  // Empty State
-  emptyIconBg: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: SPACING.xl,
-  },
-  emptyTitle: {
-    ...TYPOGRAPHY.headlineMedium,
-    marginBottom: SPACING.sm,
-  },
-  emptyText: {
-    ...TYPOGRAPHY.bodyMedium,
-    textAlign: 'center',
+    paddingBottom: SPACING.xxl,
   },
   loadingText: {
-    ...TYPOGRAPHY.bodyMedium,
-    marginTop: SPACING.lg,
+    marginTop: SPACING.md,
+    ...TYPOGRAPHY.bodySmall,
   },
-  bottomPadding: {
-    height: 120,
+
+  headerCard: {
+    borderRadius: BORDER_RADIUS.xxl,
+    borderWidth: 1,
+    padding: SPACING.xl,
+    overflow: 'hidden',
+    ...SHADOWS.md,
+    marginBottom: SPACING.lg,
+  },
+  headerTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: SPACING.lg,
+  },
+  backButton: {
+    width: 44,
+    height: 44,
+    borderRadius: BORDER_RADIUS.full,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerTitle: {
+    ...TYPOGRAPHY.headlineMedium,
+    fontWeight: '700',
+  },
+
+  statusBanner: {
+    flexDirection: 'row',
+    gap: SPACING.md,
+    padding: SPACING.lg,
+    borderRadius: BORDER_RADIUS.xl,
+    borderWidth: 1,
+  },
+  statusIconBg: {
+    width: 44,
+    height: 44,
+    borderRadius: BORDER_RADIUS.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  statusTitle: {
+    ...TYPOGRAPHY.labelLarge,
+  },
+  statusSubtitle: {
+    ...TYPOGRAPHY.bodySmall,
+    marginTop: SPACING.xxs,
+    lineHeight: 18,
+  },
+
+  lockNote: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+    paddingTop: SPACING.lg,
+    marginTop: SPACING.lg,
+    borderTopWidth: 1,
+  },
+  lockText: {
+    ...TYPOGRAPHY.bodySmall,
+    flex: 1,
+    lineHeight: 18,
+  },
+
+  card: {
+    borderRadius: BORDER_RADIUS.xxl,
+    borderWidth: 1,
+    padding: SPACING.xl,
+    ...SHADOWS.sm,
+    marginBottom: SPACING.lg,
+  },
+  cardTitle: {
+    ...TYPOGRAPHY.headlineSmall,
+    marginBottom: SPACING.md,
+  },
+
+  infoRow: {
+    paddingVertical: SPACING.md,
+    borderBottomWidth: 1,
+  },
+  infoLabel: {
+    ...TYPOGRAPHY.labelSmall,
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    marginBottom: SPACING.xs,
+  },
+  infoValue: {
+    ...TYPOGRAPHY.bodyMedium,
+    fontWeight: '500',
+  },
+
+  actions: {
+    gap: SPACING.md,
+  },
+
+  refreshRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.md,
+    padding: SPACING.lg,
+    borderRadius: BORDER_RADIUS.xl,
+    borderWidth: 1,
+  },
+  refreshIconBg: {
+    width: 40,
+    height: 40,
+    borderRadius: BORDER_RADIUS.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  refreshTitle: {
+    ...TYPOGRAPHY.labelLarge,
+  },
+  refreshSubtitle: {
+    ...TYPOGRAPHY.bodySmall,
+    marginTop: SPACING.xxs,
+    lineHeight: 18,
+  },
+
+  noteBox: {
+    flexDirection: 'row',
+    gap: SPACING.sm,
+    padding: SPACING.lg,
+    borderRadius: BORDER_RADIUS.xl,
+    borderWidth: 1,
+  },
+  noteText: {
+    ...TYPOGRAPHY.bodySmall,
+    flex: 1,
+    lineHeight: 18,
+  },
+
+  verifiedCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+    padding: SPACING.lg,
+    borderRadius: BORDER_RADIUS.xl,
+    borderWidth: 1,
+  },
+  verifiedText: {
+    ...TYPOGRAPHY.bodyMedium,
+    flex: 1,
+    lineHeight: 20,
+    fontWeight: '500',
   },
 });
