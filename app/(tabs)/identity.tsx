@@ -220,7 +220,7 @@ export default function IdentityScreen() {
       const verificationId = result.data?.sessionId || result.data?.verificationId;
 
       if (sessionUrl) {
-        setPendingVerificationId(verificationId);
+        setPendingVerificationId(verificationId || null);
         setVerificationStatus('pending');
         router.push({
           pathname: '/modals/veriff',

@@ -325,7 +325,7 @@ export default function HomeScreen() {
       >
         {/* Welcome Header */}
         <WelcomeHeader
-          name={user?.name}
+          name={user?.name ?? undefined}
           isVerified={isVerified}
           onAvatarPress={() => router.push('/(tabs)/profile')}
         />

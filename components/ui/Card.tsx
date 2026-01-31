@@ -22,7 +22,7 @@ interface CardProps {
   children: React.ReactNode;
   variant?: CardVariant;
   onPress?: () => void;
-  style?: ViewStyle;
+  style?: ViewStyle | ViewStyle[];
   padding?: keyof typeof SPACING | number;
   animated?: boolean;
   animationDelay?: number;
@@ -160,8 +160,8 @@ export function GlowCard({
           shadowRadius: 12,
           elevation: 8,
         },
-        style,
-      ]}
+        style as ViewStyle,
+      ].filter(Boolean) as ViewStyle[]}
     >
       {children}
     </Card>

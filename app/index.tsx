@@ -217,6 +217,13 @@ export default function HomeScreen() {
     checkBiometric();
   }, []);
 
+  // Handle authenticated state - redirect to dashboard
+  useEffect(() => {
+    if (isAuthenticated) {
+      router.replace('/(tabs)/dashboard');
+    }
+  }, [isAuthenticated]);
+
   const handleBiometricLogin = async () => {
     haptics.medium();
     const result = await authenticateWithBiometrics(`Use ${biometricType} to sign in`);
@@ -254,12 +261,6 @@ export default function HomeScreen() {
     );
   }
 
-  useEffect(() => {
-    if (isAuthenticated) {
-      router.replace('/(tabs)/dashboard');
-    }
-  }, [isAuthenticated]);
-
   const handleGoogleLogin = async () => {
     haptics.medium();
     setIsLoading(true);
@@ -268,10 +269,11 @@ export default function HomeScreen() {
       const userInfo = await GoogleSignin.signIn();
       const tokens = await GoogleSignin.getTokens();
 
+      const userData = (userInfo as any).data?.user || (userInfo as any).user;
       const success = await login('google', tokens.accessToken, {
-        email: userInfo.data?.user?.email || '',
-        name: userInfo.data?.user?.name || '',
-        profileImageUrl: userInfo.data?.user?.photo || '',
+        email: userData?.email || '',
+        name: userData?.name || '',
+        profileImageUrl: userData?.photo || '',
       });
 
       if (success) {
