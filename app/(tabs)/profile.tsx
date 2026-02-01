@@ -58,11 +58,11 @@ function MenuItem({
       onPressOut={handlePressOut}
       activeOpacity={1}
     >
-      <View style={[styles.menuIconBg, { backgroundColor: colors.goldLight }]}>
+      <View style={[styles.menuIconBg, { backgroundColor: `${colors.gold}15` }]}>
         <Ionicons name={icon} size={20} color={colors.gold} />
       </View>
       <Text style={[styles.menuLabel, { color: colors.text }]}>{label}</Text>
-      <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+      <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
     </AnimatedTouchable>
   );
 }
@@ -98,7 +98,7 @@ function ThemeChip({
       style={[
         styles.themeChip,
         {
-          backgroundColor: selected ? colors.gold : colors.cardBg,
+          backgroundColor: selected ? colors.gold : colors.surface,
           borderColor: selected ? colors.gold : colors.border,
         },
         animatedStyle,
@@ -153,7 +153,7 @@ export default function ProfileScreen() {
         {/* Profile Header */}
         <Animated.View
           entering={FadeInDown.duration(500)}
-          style={[styles.profileCard, { backgroundColor: colors.cardBg, borderColor: colors.gold }]}
+          style={[styles.profileCard, { backgroundColor: colors.surface, borderColor: colors.gold }]}
         >
           <LinearGradient
             colors={[`${colors.gold}10`, 'transparent']}
@@ -170,7 +170,7 @@ export default function ProfileScreen() {
           <Text style={[styles.userEmail, { color: colors.textSecondary }]}>{user?.email || ''}</Text>
 
           {getLocationString() && (
-            <View style={[styles.locationBadge, { backgroundColor: colors.goldLight }]}>
+            <View style={[styles.locationBadge, { backgroundColor: `${colors.gold}15` }]}>
               <Ionicons name="location" size={14} color={colors.gold} />
               <Text style={[styles.locationText, { color: colors.gold }]}>{getLocationString()}</Text>
             </View>
@@ -180,7 +180,7 @@ export default function ProfileScreen() {
         {/* Menu Card */}
         <Animated.View
           entering={FadeInUp.delay(200).duration(400)}
-          style={[styles.menuCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}
+          style={[styles.menuCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
         >
           <MenuItem icon="card-outline" label="Subscription" onPress={() => navigateTo('/modals/subscription')} delay={300} />
           <MenuItem icon="wallet-outline" label="Connected Wallet" onPress={() => navigateTo('/modals/wallet')} delay={350} />
@@ -192,10 +192,10 @@ export default function ProfileScreen() {
         {/* Theme Card */}
         <Animated.View
           entering={FadeInUp.delay(350).duration(400)}
-          style={[styles.themeCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}
+          style={[styles.themeCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
         >
           <View style={styles.themeHeader}>
-            <View style={[styles.themeIconBg, { backgroundColor: colors.goldLight }]}>
+            <View style={[styles.themeIconBg, { backgroundColor: `${colors.gold}15` }]}>
               <Ionicons name="color-palette-outline" size={18} color={colors.gold} />
             </View>
             <View style={{ flex: 1 }}>
@@ -228,7 +228,7 @@ export default function ProfileScreen() {
         {/* App Version */}
         <Animated.Text
           entering={FadeIn.delay(700).duration(400)}
-          style={[styles.versionText, { color: colors.textMuted }]}
+          style={[styles.versionText, { color: colors.textTertiary }]}
         >
           Represent Wallet v1.0.0
         </Animated.Text>

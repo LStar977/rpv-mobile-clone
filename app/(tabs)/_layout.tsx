@@ -1,15 +1,14 @@
 import { Tabs } from 'expo-router';
 import { View, StyleSheet, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { BlurView } from 'expo-blur';
+import * as Haptics from 'expo-haptics';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withSpring,
   interpolate,
 } from 'react-native-reanimated';
-import { useTheme, SHADOWS, BORDER_RADIUS, SPACING } from '../../lib/theme';
-import { haptics } from '../../lib/haptics';
+import { useTheme, SHADOWS, BORDER_RADIUS, SPACING, ANIMATION } from '../../lib/theme';
 
 // Custom Tab Bar Icon with animation
 function TabIcon({
@@ -22,11 +21,11 @@ function TabIcon({
   focused: boolean;
 }) {
   const { colors } = useTheme();
-  const scale = useSharedValue(focused ? 1 : 0.9);
+  const scale = useSharedValue(focused ? 1 : 0.85);
   const opacity = useSharedValue(focused ? 1 : 0);
 
-  scale.value = withSpring(focused ? 1 : 0.9, { damping: 15, stiffness: 200 });
-  opacity.value = withSpring(focused ? 1 : 0, { damping: 15, stiffness: 200 });
+  scale.value = withSpring(focused ? 1 : 0.85, ANIMATION.spring.gentle);
+  opacity.value = withSpring(focused ? 1 : 0, ANIMATION.spring.gentle);
 
   const iconAnimatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
@@ -37,8 +36,21 @@ function TabIcon({
     transform: [{ scale: interpolate(opacity.value, [0, 1], [0.5, 1]) }],
   }));
 
+  const glowAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value * 0.3,
+    transform: [{ scale: interpolate(opacity.value, [0, 1], [0.8, 1.2]) }],
+  }));
+
   return (
     <View style={styles.iconContainer}>
+      {/* Glow effect behind active icon */}
+      <Animated.View
+        style={[
+          styles.iconGlow,
+          { backgroundColor: colors.gold },
+          glowAnimatedStyle,
+        ]}
+      />
       <Animated.View style={iconAnimatedStyle}>
         <Ionicons
           name={focused ? name.replace('-outline', '') as any : name}
@@ -65,7 +77,7 @@ export default function TabLayout() {
       key={isDark ? 'dark' : 'light'}
       screenListeners={{
         tabPress: () => {
-          haptics.selection();
+          Haptics.selectionAsync();
         },
       }}
       screenOptions={{
@@ -75,21 +87,21 @@ export default function TabLayout() {
           bottom: 0,
           left: 0,
           right: 0,
-          backgroundColor: isDark ? 'rgba(10, 10, 12, 0.95)' : 'rgba(255, 255, 255, 0.95)',
-          borderTopColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)',
+          backgroundColor: isDark ? 'rgba(10, 10, 12, 0.98)' : 'rgba(255, 255, 255, 0.98)',
+          borderTopColor: isDark ? 'rgba(201, 162, 39, 0.15)' : 'rgba(0, 0, 0, 0.06)',
           borderTopWidth: 1,
-          paddingBottom: Platform.OS === 'ios' ? 24 : 12,
-          paddingTop: 12,
-          height: Platform.OS === 'ios' ? 88 : 70,
+          paddingBottom: Platform.OS === 'ios' ? 28 : 14,
+          paddingTop: 14,
+          height: Platform.OS === 'ios' ? 92 : 74,
           ...SHADOWS.lg,
         },
         tabBarActiveTintColor: colors.gold,
-        tabBarInactiveTintColor: colors.textMuted,
+        tabBarInactiveTintColor: colors.textTertiary,
         tabBarLabelStyle: {
           fontSize: 10,
           fontWeight: '600',
           marginTop: 4,
-          letterSpacing: 0.3,
+          letterSpacing: 0.4,
         },
         tabBarItemStyle: {
           paddingTop: 4,
@@ -149,11 +161,19 @@ const styles = StyleSheet.create({
   iconContainer: {
     alignItems: 'center',
     justifyContent: 'center',
+    width: 50,
+    height: 30,
+  },
+  iconGlow: {
+    position: 'absolute',
+    width: 36,
+    height: 36,
+    borderRadius: 18,
   },
   activeDot: {
-    width: 4,
-    height: 4,
-    borderRadius: 2,
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
     marginTop: 4,
   },
 });

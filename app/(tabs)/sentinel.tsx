@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as Haptics from 'expo-haptics';
 import Animated, {
   FadeIn,
   FadeInDown,
@@ -23,8 +24,7 @@ import Animated, {
   Easing,
 } from 'react-native-reanimated';
 import { useAuthStore } from '../../lib/auth';
-import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS } from '../../lib/theme';
-import { haptics } from '../../lib/haptics';
+import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS, ANIMATION } from '../../lib/theme';
 
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
@@ -70,7 +70,7 @@ function TabButton({
   const scale = useSharedValue(1);
 
   const handlePressIn = () => {
-    haptics.selection();
+    Haptics.selectionAsync();
     scale.value = withSpring(0.95, { damping: 15, stiffness: 300 });
   };
 
@@ -135,7 +135,7 @@ function ScoreBar({
   return (
     <Animated.View
       entering={FadeInUp.delay(index * 80).duration(400)}
-      style={[styles.scoreItem, { backgroundColor: colors.cardBgLight, borderColor: colors.border }]}
+      style={[styles.scoreItem, { backgroundColor: colors.surfaceLight, borderColor: colors.border }]}
     >
       <View style={styles.scoreHeader}>
         <Text style={[styles.scoreName, { color: colors.text }]} numberOfLines={1}>
@@ -184,7 +184,7 @@ function FindingCard({
   return (
     <Animated.View
       entering={FadeInUp.delay(index * 80).duration(400)}
-      style={[styles.findingCard, { backgroundColor: colors.cardBgLight, borderColor: colors.border }]}
+      style={[styles.findingCard, { backgroundColor: colors.surfaceLight, borderColor: colors.border }]}
     >
       <View style={styles.findingHeader}>
         <View style={[styles.findingIconBg, { backgroundColor: `${getStatusColor()}20` }]}>
@@ -255,11 +255,11 @@ export default function SentinelScreen() {
 
   const handleAnalyze = async () => {
     if (!title.trim() || !text.trim()) {
-      haptics.warning();
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
       Alert.alert('Error', 'Please enter a title and text to analyze');
       return;
     }
-    haptics.medium();
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setAnalyzing(true);
     try {
       const response = await fetch(`${API_URL}/api/sentinel/analyze`, {
@@ -291,10 +291,10 @@ export default function SentinelScreen() {
       setActiveTab('summary');
       setTitle('');
       setText('');
-      haptics.success();
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       Alert.alert('Analysis Complete', 'Swipe the tabs below to see Scores, Findings, Fixes, and Proposal!');
     } catch (error) {
-      haptics.error();
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       Alert.alert('Error', 'Failed to analyze document.');
     } finally {
       setAnalyzing(false);
@@ -303,11 +303,11 @@ export default function SentinelScreen() {
 
   const handleCreateProposal = async () => {
     if (!selectedAnalysis || !user?.id) {
-      haptics.warning();
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
       Alert.alert('Error', 'Please sign in to create a proposal');
       return;
     }
-    haptics.medium();
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setCreatingProposal(true);
     try {
       const response = await fetch(`${API_URL}/api/proposals`, {
@@ -323,10 +323,10 @@ export default function SentinelScreen() {
       });
       if (!response.ok) throw new Error('Failed to create proposal');
       setProposalCreated(true);
-      haptics.success();
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       Alert.alert('Success', 'Your proposal has been created!');
     } catch (error) {
-      haptics.error();
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       Alert.alert('Error', 'Failed to create proposal.');
     } finally {
       setCreatingProposal(false);
@@ -353,7 +353,7 @@ export default function SentinelScreen() {
         style={[styles.header, { borderBottomColor: colors.border }]}
       >
         <View style={styles.headerContent}>
-          <View style={[styles.headerIconBg, { backgroundColor: colors.goldLight, ...SHADOWS.glow }]}>
+          <View style={[styles.headerIconBg, { backgroundColor: `${colors.gold}15`, ...SHADOWS.glow }]}>
             <Ionicons name="sparkles" size={28} color={colors.gold} />
           </View>
           <View style={styles.headerText}>
@@ -373,7 +373,7 @@ export default function SentinelScreen() {
         {/* Info Card */}
         <Animated.View
           entering={FadeInDown.delay(100).duration(400)}
-          style={[styles.infoCard, { backgroundColor: colors.goldLight, borderColor: colors.gold }]}
+          style={[styles.infoCard, { backgroundColor: `${colors.gold}15`, borderColor: colors.gold }]}
         >
           <LinearGradient
             colors={[`${colors.gold}15`, 'transparent']}
@@ -392,11 +392,11 @@ export default function SentinelScreen() {
           entering={FadeInDown.delay(200).duration(400)}
           style={styles.statsRow}
         >
-          <View style={[styles.statCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
+          <View style={[styles.statCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <Text style={[styles.statValue, { color: colors.gold }]}>155</Text>
             <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Principles</Text>
           </View>
-          <View style={[styles.statCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
+          <View style={[styles.statCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <Text style={[styles.statValue, { color: colors.gold }]}>11</Text>
             <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Categories</Text>
           </View>
@@ -405,7 +405,7 @@ export default function SentinelScreen() {
         {/* Submit Document Card */}
         <Animated.View
           entering={FadeInUp.delay(300).duration(400)}
-          style={[styles.card, { backgroundColor: colors.cardBg, borderColor: colors.gold }]}
+          style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.gold }]}
         >
           <LinearGradient
             colors={[`${colors.gold}08`, 'transparent']}
@@ -415,7 +415,7 @@ export default function SentinelScreen() {
           />
 
           <View style={styles.cardHeader}>
-            <View style={[styles.cardIconBg, { backgroundColor: colors.goldLight }]}>
+            <View style={[styles.cardIconBg, { backgroundColor: `${colors.gold}15` }]}>
               <Ionicons name="document-text-outline" size={20} color={colors.gold} />
             </View>
             <Text style={[styles.cardTitle, { color: colors.gold }]}>Submit Document</Text>
@@ -427,10 +427,10 @@ export default function SentinelScreen() {
             <TextInput
               style={[
                 styles.input,
-                { backgroundColor: colors.cardBgLight, borderColor: colors.border, color: colors.text },
+                { backgroundColor: colors.surfaceLight, borderColor: colors.border, color: colors.text },
               ]}
               placeholder="e.g., Public Safety Act 2024"
-              placeholderTextColor={colors.textMuted}
+              placeholderTextColor={colors.textTertiary}
               value={title}
               onChangeText={setTitle}
             />
@@ -442,7 +442,7 @@ export default function SentinelScreen() {
             <TouchableOpacity
               style={[
                 styles.picker,
-                { backgroundColor: colors.cardBgLight, borderColor: colors.border },
+                { backgroundColor: colors.surfaceLight, borderColor: colors.border },
               ]}
               onPress={() => setShowIssueTypePicker(!showIssueTypePicker)}
             >
@@ -458,7 +458,7 @@ export default function SentinelScreen() {
                 entering={FadeIn.duration(200)}
                 style={[
                   styles.pickerDropdown,
-                  { backgroundColor: colors.cardBg, borderColor: colors.border },
+                  { backgroundColor: colors.surface, borderColor: colors.border },
                 ]}
               >
                 {ISSUE_TYPES.map((type) => (
@@ -466,7 +466,7 @@ export default function SentinelScreen() {
                     key={type}
                     style={[
                       styles.pickerOption,
-                      issueType === type && { backgroundColor: colors.goldLight },
+                      issueType === type && { backgroundColor: `${colors.gold}15` },
                     ]}
                     onPress={() => {
                       setIssueType(type);
@@ -489,10 +489,10 @@ export default function SentinelScreen() {
             <TextInput
               style={[
                 styles.textArea,
-                { backgroundColor: colors.cardBgLight, borderColor: colors.border, color: colors.text },
+                { backgroundColor: colors.surfaceLight, borderColor: colors.border, color: colors.text },
               ]}
               placeholder="Paste governance text here..."
-              placeholderTextColor={colors.textMuted}
+              placeholderTextColor={colors.textTertiary}
               value={text}
               onChangeText={setText}
               multiline
@@ -530,7 +530,7 @@ export default function SentinelScreen() {
         {selectedAnalysis && (
           <Animated.View
             entering={FadeInUp.duration(500)}
-            style={[styles.card, { backgroundColor: colors.cardBg, borderColor: colors.gold }]}
+            style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.gold }]}
           >
             <LinearGradient
               colors={[`${colors.gold}08`, 'transparent']}
@@ -542,7 +542,7 @@ export default function SentinelScreen() {
             {/* Analysis Header */}
             <View style={styles.analysisHeader}>
               <View style={styles.analysisInfo}>
-                <View style={[styles.cardIconBg, { backgroundColor: colors.successLight }]}>
+                <View style={[styles.cardIconBg, { backgroundColor: `${colors.success}15` }]}>
                   <Ionicons name="checkmark-done" size={20} color={colors.success} />
                 </View>
                 <View style={styles.analysisText}>
@@ -578,10 +578,10 @@ export default function SentinelScreen() {
             </View>
 
             {/* Tabs */}
-            <Text style={[styles.tabHint, { color: colors.textMuted }]}>
+            <Text style={[styles.tabHint, { color: colors.textTertiary }]}>
               Tap to explore sections:
             </Text>
-            <View style={[styles.tabsWrapper, { backgroundColor: colors.cardBgLight }]}>
+            <View style={[styles.tabsWrapper, { backgroundColor: colors.surfaceLight }]}>
               <ScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}
@@ -624,7 +624,7 @@ export default function SentinelScreen() {
             <View style={styles.tabContent}>
               {activeTab === 'summary' && (
                 <Animated.View entering={FadeIn.duration(300)} style={styles.tabPane}>
-                  <View style={[styles.summaryBox, { backgroundColor: colors.cardBgLight, borderColor: colors.gold }]}>
+                  <View style={[styles.summaryBox, { backgroundColor: colors.surfaceLight, borderColor: colors.gold }]}>
                     <View style={styles.summaryHeader}>
                       <Ionicons name="document-text" size={16} color={colors.gold} />
                       <Text style={[styles.summaryLabel, { color: colors.gold }]}>Summary</Text>
@@ -634,7 +634,7 @@ export default function SentinelScreen() {
                     </Text>
                   </View>
                   {selectedAnalysis.analysis.reasoning && (
-                    <View style={[styles.summaryBox, { backgroundColor: colors.cardBgLight, borderColor: colors.border }]}>
+                    <View style={[styles.summaryBox, { backgroundColor: colors.surfaceLight, borderColor: colors.border }]}>
                       <View style={styles.summaryHeader}>
                         <Ionicons name="bulb-outline" size={16} color={colors.gold} />
                         <Text style={[styles.summaryLabel, { color: colors.gold }]}>Reasoning</Text>
@@ -651,7 +651,7 @@ export default function SentinelScreen() {
                 <View style={styles.tabPane}>
                   {selectedAnalysis.analysis.categoryScores.length === 0 ? (
                     <View style={styles.emptyState}>
-                      <Ionicons name="bar-chart-outline" size={40} color={colors.textMuted} />
+                      <Ionicons name="bar-chart-outline" size={40} color={colors.textTertiary} />
                       <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
                         No category scores available
                       </Text>
@@ -684,7 +684,7 @@ export default function SentinelScreen() {
               {activeTab === 'corrections' && (
                 <View style={styles.tabPane}>
                   <View style={styles.correctionsHeader}>
-                    <View style={[styles.correctionsIconBg, { backgroundColor: colors.warningLight }]}>
+                    <View style={[styles.correctionsIconBg, { backgroundColor: `${colors.warning}15` }]}>
                       <Ionicons name="construct-outline" size={18} color={colors.warning} />
                     </View>
                     <Text style={[styles.correctionsTitle, { color: colors.gold }]}>
@@ -727,9 +727,9 @@ export default function SentinelScreen() {
                     </Animated.View>
                   ) : (
                     <>
-                      <View style={[styles.proposalBox, { backgroundColor: colors.cardBgLight, borderColor: colors.gold }]}>
+                      <View style={[styles.proposalBox, { backgroundColor: colors.surfaceLight, borderColor: colors.gold }]}>
                         <View style={styles.proposalHeader}>
-                          <View style={[styles.proposalIconBg, { backgroundColor: colors.goldLight }]}>
+                          <View style={[styles.proposalIconBg, { backgroundColor: `${colors.gold}15` }]}>
                             <Ionicons name="document-text" size={18} color={colors.gold} />
                           </View>
                           <Text style={[styles.proposalLabel, { color: colors.gold }]}>
