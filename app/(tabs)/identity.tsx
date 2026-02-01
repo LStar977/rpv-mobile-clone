@@ -1,527 +1,285 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
   TouchableOpacity,
-  RefreshControl,
-  Alert,
-  ActivityIndicator,
-  Platform,
+  ScrollView,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
-import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
-import { router } from 'expo-router';
+import { MaterialIcons } from '@expo/vector-icons';
 
-import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS } from '../../lib/theme';
-import { useAuthStore } from '../../lib/auth';
-import { userApi } from '../../lib/api';
-import { Button } from '../../components/ui';
-import { haptics } from '../../lib/haptics';
-
-type VerificationState = {
-  verified: boolean;
-  status?: 'unverified' | 'pending' | 'verified' | 'failed';
-  provider?: 'veriff' | string;
-  verifiedAt?: string | null; // ISO date from backend
-};
-
-type ProfileState = {
-  name?: string;
-  email?: string;
-  country?: string;
-  state?: string;
-  city?: string;
-  // any other fields your backend returns, but we will display only
-};
-
-function formatDate(iso?: string | null) {
-  if (!iso) return null;
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return null;
-  return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
-}
-
-function InfoRow({ label, value }: { label: string; value?: string | null }) {
-  const { colors } = useTheme();
+export default function IdentityScreen() {
   return (
-    <View style={[styles.infoRow, { borderBottomColor: colors.border }]}>
-      <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>{label}</Text>
-      <Text style={[styles.infoValue, { color: colors.text }]} numberOfLines={2}>
-        {value && value.trim().length > 0 ? value : '—'}
-      </Text>
+    <View style={styles.container}>
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <View style={styles.topBar}>
+          <TouchableOpacity style={styles.iconButton}>
+            <MaterialIcons name="arrow-back" size={22} color="#ffffff" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Verification Status</Text>
+          <View style={styles.iconSpacer} />
+        </View>
+
+        <View style={styles.heroGlow} />
+        <View style={styles.badgeWrap}>
+          <View style={styles.outerRing} />
+          <View style={styles.innerRing} />
+          <View style={styles.badge}>
+            <View style={styles.badgeInner}>
+              <MaterialIcons name="verified-user" size={54} color="#eab957" />
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.headlineWrap}>
+          <Text style={styles.headline}>
+            You are <Text style={styles.headlineAccent}>Verified</Text>
+          </Text>
+          <Text style={styles.subheading}>Your digital identity is secured and ready for voting.</Text>
+        </View>
+
+        <View style={styles.checklist}>
+          <ChecklistItem
+            icon="badge"
+            title="Government ID Match"
+            subtitle="Driver's License Verified"
+          />
+          <ChecklistItem
+            icon="face"
+            title="Biometric Check"
+            subtitle="Face Liveness Confirmed"
+          />
+          <ChecklistItem
+            icon="storage"
+            title="Blockchain Hash Generated"
+            subtitle="Ledger #8x92...A41"
+          />
+        </View>
+      </ScrollView>
+
+      <View style={styles.footer}>
+        <TouchableOpacity style={styles.primaryButton}>
+          <Text style={styles.primaryText}>Continue to Voting</Text>
+          <MaterialIcons name="arrow-forward" size={18} color="#211c11" />
+        </TouchableOpacity>
+        <View style={styles.footerRow}>
+          <MaterialIcons name="lock" size={14} color="rgba(255,255,255,0.5)" />
+          <Text style={styles.footerText}>Secured by Blockchain</Text>
+        </View>
+      </View>
     </View>
   );
 }
 
-export default function IdentityScreen() {
-  const { colors } = useTheme();
-  const { isAuthenticated, user } = useAuthStore();
-
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-
-  const [verification, setVerification] = useState<VerificationState>({
-    verified: false,
-    status: 'unverified',
-    provider: 'veriff',
-    verifiedAt: null,
-  });
-
-  const [profile, setProfile] = useState<ProfileState | null>(null);
-
-  const fetchIdentity = useCallback(async () => {
-    try {
-      const results = await Promise.allSettled([
-        isAuthenticated ? userApi.getVerificationStatus() : Promise.resolve({ data: { verified: false } }),
-        isAuthenticated ? userApi.getProfile() : Promise.resolve({ data: null }),
-      ]);
-
-      const verificationRes =
-        results[0].status === 'fulfilled' ? results[0].value : { data: { verified: false } };
-      const profileRes = results[1].status === 'fulfilled' ? results[1].value : { data: null };
-
-      const v = verificationRes?.data || {};
-      const p = profileRes?.data || null;
-
-      setVerification({
-        verified: !!v.verified,
-        status: (v.status as any) || (v.verified ? 'verified' : 'unverified'),
-        provider: v.provider || 'veriff',
-        verifiedAt: v.verifiedAt || v.verified_at || null,
-      });
-
-      setProfile(p);
-    } catch (e) {
-      console.error('Identity fetch error:', e);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, [isAuthenticated]);
-
-  useEffect(() => {
-    fetchIdentity();
-  }, [fetchIdentity]);
-
-  const onRefresh = useCallback(() => {
-    setRefreshing(true);
-    fetchIdentity();
-  }, [fetchIdentity]);
-
-  const statusUI = useMemo(() => {
-    if (!isAuthenticated) {
-      return {
-        title: 'Sign in required',
-        subtitle: 'Sign in to complete identity verification.',
-        icon: 'log-in-outline' as const,
-        tone: 'warning' as const,
-      };
-    }
-
-    if (verification.verified) {
-      return {
-        title: 'Verified',
-        subtitle: 'Your identity is verified and locked to your government document.',
-        icon: 'shield-checkmark' as const,
-        tone: 'success' as const,
-      };
-    }
-
-    if (verification.status === 'pending') {
-      return {
-        title: 'Verification pending',
-        subtitle: 'We’re confirming your verification status with the provider.',
-        icon: 'time-outline' as const,
-        tone: 'info' as const,
-      };
-    }
-
-    if (verification.status === 'failed') {
-      return {
-        title: 'Verification failed',
-        subtitle: 'Your submission was not approved. Please try again.',
-        icon: 'close-circle-outline' as const,
-        tone: 'error' as const,
-      };
-    }
-
-    return {
-      title: 'Not verified',
-      subtitle: 'Verify your identity to vote on proposals and access geo-gated communities.',
-      icon: 'shield-outline' as const,
-      tone: 'warning' as const,
-    };
-  }, [isAuthenticated, verification.verified, verification.status]);
-
-  const toneColors = useMemo(() => {
-    const tone = statusUI.tone;
-    if (tone === 'success') return { bg: colors.successLight, border: colors.success, fg: colors.success };
-    if (tone === 'error') return { bg: colors.errorLight, border: colors.error, fg: colors.error };
-    if (tone === 'info') return { bg: colors.infoLight, border: colors.info, fg: colors.info };
-    return { bg: colors.warningLight, border: colors.warning, fg: colors.warning };
-  }, [statusUI.tone, colors]);
-
-  const handleStartKyc = () => {
-    if (!isAuthenticated) {
-      Alert.alert('Sign In Required', 'Please sign in to begin verification.');
-      return;
-    }
-
-    haptics.medium();
-
-    // Hook this to your actual Veriff/KYC flow.
-    // Examples:
-    // - router.push('/modals/kyc')
-    // - Linking.openURL(verificationSessionUrlFromBackend)
-    // - open a WebView modal
-    Alert.alert(
-      'Start Verification',
-      'Connect this button to your Veriff session start endpoint / flow.',
-      [{ text: 'OK' }]
-    );
-  };
-
-  const handleRefreshStatus = async () => {
-    // Only allowed while NOT verified
-    if (verification.verified) return;
-
-    haptics.selection();
-    setRefreshing(true);
-    await fetchIdentity();
-  };
-
-  if (loading) {
-    return (
-      <View style={[styles.container, { backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center' }]}>
-        <ActivityIndicator size="small" color={colors.gold} />
-        <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading identity…</Text>
-      </View>
-    );
-  }
-
-  const displayName = profile?.name || user?.name || 'Citizen';
-  const displayEmail = profile?.email || user?.email || '';
-  const displayCountry = profile?.country || user?.country || '';
-  const displayState = profile?.state || user?.state || '';
-  const displayCity = profile?.city || user?.city || '';
-
+function ChecklistItem({
+  icon,
+  title,
+  subtitle,
+}: {
+  icon: keyof typeof MaterialIcons.glyphMap;
+  title: string;
+  subtitle: string;
+}) {
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <ScrollView
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor={colors.gold}
-          />
-        }
-      >
-        {/* Header */}
-        <Animated.View entering={FadeInDown.duration(400)} style={[styles.headerCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
-          <LinearGradient
-            colors={[`${colors.gold}10`, 'transparent']}
-            style={StyleSheet.absoluteFill}
-            start={{ x: 0.5, y: 0 }}
-            end={{ x: 0.5, y: 1 }}
-          />
-          <View style={styles.headerTopRow}>
-            <TouchableOpacity
-              onPress={() => router.back()}
-              style={[styles.backButton, { backgroundColor: colors.cardBgLight, borderColor: colors.border }]}
-              activeOpacity={0.7}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            >
-              <Ionicons name="chevron-back" size={22} color={colors.text} />
-            </TouchableOpacity>
-            <Text style={[styles.headerTitle, { color: colors.text }]}>Identity</Text>
-            <View style={{ width: 44 }} />
-          </View>
-
-          {/* Status Banner */}
-          <View style={[styles.statusBanner, { backgroundColor: toneColors.bg, borderColor: toneColors.border }]}>
-            <View style={[styles.statusIconBg, { backgroundColor: `${toneColors.fg}20` }]}>
-              <Ionicons name={statusUI.icon} size={22} color={toneColors.fg} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.statusTitle, { color: colors.text }]}>{statusUI.title}</Text>
-              <Text style={[styles.statusSubtitle, { color: colors.textSecondary }]}>{statusUI.subtitle}</Text>
-            </View>
-          </View>
-
-          {/* Verified Lock Note */}
-          {verification.verified && (
-            <View style={[styles.lockNote, { borderTopColor: colors.border }]}>
-              <Ionicons name="lock-closed-outline" size={16} color={colors.textSecondary} />
-              <Text style={[styles.lockText, { color: colors.textSecondary }]}>
-                Verified identity fields are read-only and match your government document.
-              </Text>
-            </View>
-          )}
-        </Animated.View>
-
-        {/* Identity Details (Read-only) */}
-        <Animated.View entering={FadeInUp.delay(100).duration(350)} style={[styles.card, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
-          <Text style={[styles.cardTitle, { color: colors.text }]}>Your Details</Text>
-
-          <InfoRow label="Name" value={displayName} />
-          <InfoRow label="Email" value={displayEmail} />
-          <InfoRow label="Country" value={displayCountry} />
-          <InfoRow label="State/Province" value={displayState} />
-          <InfoRow label="City" value={displayCity} />
-
-          <InfoRow
-            label="Verification Provider"
-            value={verification.provider ? String(verification.provider).toUpperCase() : '—'}
-          />
-          <InfoRow
-            label="Verified Date"
-            value={verification.verified ? (formatDate(verification.verifiedAt) || 'Verified') : '—'}
-          />
-        </Animated.View>
-
-        {/* Actions */}
-        {!isAuthenticated ? (
-          <Animated.View entering={FadeInUp.delay(180).duration(350)} style={styles.actions}>
-            <Button
-              title="Sign In"
-              onPress={() => router.replace('/')}
-              variant="primary"
-              size="lg"
-              fullWidth
-              icon="log-in-outline"
-            />
-          </Animated.View>
-        ) : verification.verified ? (
-          // VERIFIED: no refresh, no edit, no “update” controls
-          <Animated.View entering={FadeInUp.delay(180).duration(350)} style={styles.actions}>
-            <View style={[styles.verifiedCard, { backgroundColor: colors.goldLight, borderColor: colors.gold }]}>
-              <Ionicons name="checkmark-circle" size={20} color={colors.gold} />
-              <Text style={[styles.verifiedText, { color: colors.gold }]}>
-                You’re verified. You can now vote and create geo-gated proposals.
-              </Text>
-            </View>
-
-            <Button
-              title="Go to Proposals"
-              onPress={() => router.push('/(tabs)/proposals')}
-              variant="primary"
-              size="lg"
-              fullWidth
-              icon="arrow-forward"
-              iconPosition="right"
-            />
-          </Animated.View>
-        ) : (
-          // NOT VERIFIED: allow start + refresh
-          <Animated.View entering={FadeInUp.delay(180).duration(350)} style={styles.actions}>
-            <Button
-              title="Start Verification"
-              onPress={handleStartKyc}
-              variant="primary"
-              size="lg"
-              fullWidth
-              icon="shield-checkmark-outline"
-            />
-
-            {/* Only show refresh while NOT verified */}
-            <TouchableOpacity
-              style={[styles.refreshRow, { borderColor: colors.border, backgroundColor: colors.cardBg }]}
-              onPress={handleRefreshStatus}
-              activeOpacity={0.75}
-              disabled={refreshing}
-            >
-              <View style={[styles.refreshIconBg, { backgroundColor: colors.goldLight }]}>
-                {refreshing ? (
-                  <ActivityIndicator size="small" color={colors.gold} />
-                ) : (
-                  <Ionicons name="refresh" size={18} color={colors.gold} />
-                )}
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.refreshTitle, { color: colors.text }]}>Refresh status</Text>
-                <Text style={[styles.refreshSubtitle, { color: colors.textSecondary }]}>
-                  If you just completed KYC, pull the latest status from the backend.
-                </Text>
-              </View>
-              <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
-            </TouchableOpacity>
-
-            <View style={[styles.noteBox, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
-              <Ionicons name="information-circle-outline" size={18} color={colors.textSecondary} />
-              <Text style={[styles.noteText, { color: colors.textSecondary }]}>
-                Verification details are determined by your identity document and the verification provider. You can’t edit them manually.
-              </Text>
-            </View>
-          </Animated.View>
-        )}
-
-        <View style={{ height: 80 }} />
-      </ScrollView>
+    <View style={styles.checkItem}>
+      <View style={styles.checkIconWrap}>
+        <MaterialIcons name={icon} size={20} color="#eab957" />
+      </View>
+      <View style={styles.checkTextWrap}>
+        <Text style={styles.checkTitle}>{title}</Text>
+        <Text style={styles.checkSubtitle}>{subtitle}</Text>
+      </View>
+      <MaterialIcons name="check-circle" size={20} color="#eab957" />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
+  container: {
+    flex: 1,
+    backgroundColor: '#211c11',
+  },
   content: {
-    paddingTop: 70,
-    paddingHorizontal: SPACING.lg,
-    paddingBottom: SPACING.xxl,
+    paddingBottom: 160,
   },
-  loadingText: {
-    marginTop: SPACING.md,
-    ...TYPOGRAPHY.bodySmall,
-  },
-
-  headerCard: {
-    borderRadius: BORDER_RADIUS.xxl,
-    borderWidth: 1,
-    padding: SPACING.xl,
-    overflow: 'hidden',
-    ...SHADOWS.md,
-    marginBottom: SPACING.lg,
-  },
-  headerTopRow: {
+  topBar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: SPACING.lg,
+    paddingTop: 50,
+    paddingHorizontal: 20,
+    paddingBottom: 12,
   },
-  backButton: {
+  iconButton: {
     width: 44,
     height: 44,
-    borderRadius: BORDER_RADIUS.full,
-    borderWidth: 1,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  iconSpacer: {
+    width: 44,
   },
   headerTitle: {
-    ...TYPOGRAPHY.headlineMedium,
+    color: '#fff',
+    fontSize: 18,
     fontWeight: '700',
   },
-
-  statusBanner: {
-    flexDirection: 'row',
-    gap: SPACING.md,
-    padding: SPACING.lg,
-    borderRadius: BORDER_RADIUS.xl,
-    borderWidth: 1,
+  heroGlow: {
+    position: 'absolute',
+    top: 160,
+    alignSelf: 'center',
+    width: 220,
+    height: 220,
+    borderRadius: 110,
+    backgroundColor: 'rgba(234,185,87,0.12)',
+    shadowColor: 'rgba(234,185,87,0.4)',
+    shadowOpacity: 0.5,
+    shadowRadius: 80,
+    shadowOffset: { width: 0, height: 0 },
   },
-  statusIconBg: {
-    width: 44,
-    height: 44,
-    borderRadius: BORDER_RADIUS.lg,
+  badgeWrap: {
+    marginTop: 20,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  statusTitle: {
-    ...TYPOGRAPHY.labelLarge,
+  outerRing: {
+    position: 'absolute',
+    width: 170,
+    height: 170,
+    borderRadius: 85,
+    borderWidth: 1,
+    borderColor: 'rgba(234,185,87,0.2)',
   },
-  statusSubtitle: {
-    ...TYPOGRAPHY.bodySmall,
-    marginTop: SPACING.xxs,
-    lineHeight: 18,
+  innerRing: {
+    position: 'absolute',
+    width: 190,
+    height: 190,
+    borderRadius: 95,
+    borderWidth: 1,
+    borderColor: 'rgba(234,185,87,0.1)',
   },
-
-  lockNote: {
+  badge: {
+    width: 140,
+    height: 140,
+    borderRadius: 70,
+    backgroundColor: '#2b2417',
+    borderWidth: 1,
+    borderColor: 'rgba(234,185,87,0.4)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: 'rgba(234,185,87,0.4)',
+    shadowOpacity: 0.5,
+    shadowRadius: 24,
+  },
+  badgeInner: {
+    width: 110,
+    height: 110,
+    borderRadius: 55,
+    borderWidth: 1,
+    borderColor: 'rgba(234,185,87,0.3)',
+    backgroundColor: '#211c11',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headlineWrap: {
+    marginTop: 20,
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    gap: 8,
+  },
+  headline: {
+    color: '#fff',
+    fontSize: 30,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  headlineAccent: {
+    color: '#eab957',
+  },
+  subheading: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: 15,
+    textAlign: 'center',
+    lineHeight: 22,
+  },
+  checklist: {
+    marginTop: 28,
+    paddingHorizontal: 20,
+    gap: 12,
+  },
+  checkItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: SPACING.sm,
-    paddingTop: SPACING.lg,
-    marginTop: SPACING.lg,
-    borderTopWidth: 1,
-  },
-  lockText: {
-    ...TYPOGRAPHY.bodySmall,
-    flex: 1,
-    lineHeight: 18,
-  },
-
-  card: {
-    borderRadius: BORDER_RADIUS.xxl,
+    gap: 12,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 16,
+    padding: 16,
     borderWidth: 1,
-    padding: SPACING.xl,
-    ...SHADOWS.sm,
-    marginBottom: SPACING.lg,
+    borderColor: 'rgba(255,255,255,0.08)',
   },
-  cardTitle: {
-    ...TYPOGRAPHY.headlineSmall,
-    marginBottom: SPACING.md,
-  },
-
-  infoRow: {
-    paddingVertical: SPACING.md,
-    borderBottomWidth: 1,
-  },
-  infoLabel: {
-    ...TYPOGRAPHY.labelSmall,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-    marginBottom: SPACING.xs,
-  },
-  infoValue: {
-    ...TYPOGRAPHY.bodyMedium,
-    fontWeight: '500',
-  },
-
-  actions: {
-    gap: SPACING.md,
-  },
-
-  refreshRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.md,
-    padding: SPACING.lg,
-    borderRadius: BORDER_RADIUS.xl,
-    borderWidth: 1,
-  },
-  refreshIconBg: {
+  checkIconWrap: {
     width: 40,
     height: 40,
-    borderRadius: BORDER_RADIUS.lg,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: 'rgba(234,185,87,0.15)',
   },
-  refreshTitle: {
-    ...TYPOGRAPHY.labelLarge,
-  },
-  refreshSubtitle: {
-    ...TYPOGRAPHY.bodySmall,
-    marginTop: SPACING.xxs,
-    lineHeight: 18,
-  },
-
-  noteBox: {
-    flexDirection: 'row',
-    gap: SPACING.sm,
-    padding: SPACING.lg,
-    borderRadius: BORDER_RADIUS.xl,
-    borderWidth: 1,
-  },
-  noteText: {
-    ...TYPOGRAPHY.bodySmall,
+  checkTextWrap: {
     flex: 1,
-    lineHeight: 18,
   },
-
-  verifiedCard: {
+  checkTitle: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  checkSubtitle: {
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: 12,
+    marginTop: 4,
+  },
+  footer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: 20,
+    paddingBottom: 28,
+    paddingTop: 12,
+    backgroundColor: '#211c11',
+  },
+  primaryButton: {
+    height: 56,
+    backgroundColor: '#eab957',
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 8,
+    shadowColor: 'rgba(234,185,87,0.5)',
+    shadowOpacity: 0.4,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 6 },
+  },
+  primaryText: {
+    color: '#211c11',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  footerRow: {
+    marginTop: 14,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: SPACING.sm,
-    padding: SPACING.lg,
-    borderRadius: BORDER_RADIUS.xl,
-    borderWidth: 1,
+    justifyContent: 'center',
+    gap: 6,
+    opacity: 0.7,
   },
-  verifiedText: {
-    ...TYPOGRAPHY.bodyMedium,
-    flex: 1,
-    lineHeight: 20,
-    fontWeight: '500',
+  footerText: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
   },
 });
