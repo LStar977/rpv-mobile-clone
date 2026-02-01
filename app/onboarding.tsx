@@ -48,6 +48,29 @@ type Slide = {
 
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
+// Separate component for animated dots to avoid hooks-in-map violation
+function ProgressDot({
+  index,
+  progress,
+  accentColor,
+  borderColor,
+}: {
+  index: number;
+  progress: Animated.SharedValue<number>;
+  accentColor: string;
+  borderColor: string;
+}) {
+  const dotAnimStyle = useAnimatedStyle(() => {
+    const isActive = Math.round(progress.value) === index;
+    return {
+      width: withSpring(isActive ? 24 : 8, EASING.springSnappy),
+      backgroundColor: isActive ? accentColor : borderColor,
+    };
+  });
+
+  return <Animated.View style={[styles.dot, dotAnimStyle]} />;
+}
+
 export default function Onboarding() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
@@ -286,17 +309,15 @@ export default function Onboarding() {
         {/* Progress dots */}
         <View style={styles.progressContainer}>
           <View style={styles.dots}>
-            {slides.map((slide, i) => {
-              const dotAnimStyle = useAnimatedStyle(() => {
-                const isActive = Math.round(progress.value) === i;
-                return {
-                  width: withSpring(isActive ? 24 : 8, EASING.springSnappy),
-                  backgroundColor: isActive ? slide.accentColor : colors.border,
-                };
-              });
-
-              return <Animated.View key={i} style={[styles.dot, dotAnimStyle]} />;
-            })}
+            {slides.map((slide, i) => (
+              <ProgressDot
+                key={i}
+                index={i}
+                progress={progress}
+                accentColor={slide.accentColor}
+                borderColor={colors.border}
+              />
+            ))}
           </View>
           <Text style={[styles.progressText, { color: colors.textTertiary }]}>
             {currentIndex + 1} of {slides.length}
