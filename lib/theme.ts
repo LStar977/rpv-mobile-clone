@@ -132,6 +132,15 @@ export const DARK_COLORS = {
   inputBgFocus: 'rgba(255, 255, 255, 0.08)',
 
   // ─────────────────────────────────────────────────────────────────────────────
+  // LEGACY ALIASES - For backward compatibility with existing components
+  // ─────────────────────────────────────────────────────────────────────────────
+  cardBg: '#161618',                 // Alias for surface
+  cardBgLight: '#1C1C1F',            // Alias for surfaceElevated
+  textMuted: '#6B6B70',              // Alias for textTertiary
+  surfaceHover: '#222225',           // Alias for surfaceHighlight
+  borderLight: 'rgba(255, 255, 255, 0.05)', // Alias for borderSubtle
+
+  // ─────────────────────────────────────────────────────────────────────────────
   // GRADIENTS (as arrays for LinearGradient)
   // ─────────────────────────────────────────────────────────────────────────────
   gradientGold: ['#E5C34A', '#C9A227', '#9E7E1E'],
@@ -235,6 +244,13 @@ export const LIGHT_COLORS = {
 
   inputBg: 'rgba(0, 0, 0, 0.03)',
   inputBgFocus: 'rgba(0, 0, 0, 0.06)',
+
+  // Legacy aliases for backward compatibility
+  cardBg: '#FFFFFF',
+  cardBgLight: '#F5F5F7',
+  textMuted: '#8E8E93',
+  surfaceHover: '#F5F5F7',
+  borderLight: 'rgba(0, 0, 0, 0.05)',
 
   gradientGold: ['#C9A227', '#9E7E1E', '#7A6217'],
   gradientDark: ['#FFFFFF', '#FAFAFA', '#F5F5F7'],
