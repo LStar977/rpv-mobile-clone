@@ -13,26 +13,32 @@ import {
   KeyboardAvoidingView,
   Platform,
   Image,
+  Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as Haptics from 'expo-haptics';
 import Animated, {
   FadeIn,
   FadeInDown,
   FadeInUp,
+  FadeInRight,
   useAnimatedStyle,
   useSharedValue,
   withSpring,
   withTiming,
   withDelay,
+  withRepeat,
+  withSequence,
+  interpolate,
 } from 'react-native-reanimated';
 import { proposalsApi, userApi, uploadsApi, Proposal } from '../../lib/api';
 import { useAuthStore } from '../../lib/auth';
 import { shareProposal } from '../../lib/share';
-import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS } from '../../lib/theme';
-import { haptics } from '../../lib/haptics';
+import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS, ANIMATION } from '../../lib/theme';
 import * as ImagePicker from 'expo-image-picker';
 
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
 const CATEGORIES = [
@@ -66,7 +72,7 @@ function isProposalEnded(p: Proposal) {
   return getTimeRemaining(p.deadline) === 'Ended';
 }
 
-// Filter Chip Component
+// Premium Filter Chip
 function FilterChip({
   label,
   selected,
@@ -79,13 +85,13 @@ function FilterChip({
   const { colors } = useTheme();
   const scale = useSharedValue(1);
 
-  const handlePressIn = () => {
-    haptics.selection();
-    scale.value = withSpring(0.95, { damping: 15, stiffness: 300 });
-  };
-
-  const handlePressOut = () => {
-    scale.value = withSpring(1, { damping: 15, stiffness: 300 });
+  const handlePress = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    scale.value = withSequence(
+      withTiming(0.92, { duration: 80 }),
+      withSpring(1, ANIMATION.spring.snappy)
+    );
+    onPress();
   };
 
   const animatedStyle = useAnimatedStyle(() => ({
@@ -97,16 +103,22 @@ function FilterChip({
       style={[
         styles.filterChip,
         {
-          backgroundColor: selected ? colors.gold : colors.cardBg,
+          backgroundColor: selected ? colors.gold : colors.surface,
           borderColor: selected ? colors.gold : colors.border,
         },
         animatedStyle,
       ]}
-      onPress={onPress}
-      onPressIn={handlePressIn}
-      onPressOut={handlePressOut}
+      onPress={handlePress}
       activeOpacity={1}
     >
+      {selected && (
+        <LinearGradient
+          colors={[colors.gold, colors.goldDark || '#A68523']}
+          style={StyleSheet.absoluteFill}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+        />
+      )}
       <Text style={[styles.filterChipText, { color: selected ? '#000' : colors.text }]}>
         {label}
       </Text>
@@ -114,7 +126,7 @@ function FilterChip({
   );
 }
 
-// Premium Proposal Card Component
+// Premium Proposal Card
 interface ProposalCardProps {
   proposal: Proposal;
   hasClaimed: boolean;
@@ -139,6 +151,19 @@ function ProposalCard({
   const { colors } = useTheme();
   const [claiming, setClaiming] = useState(false);
   const scale = useSharedValue(1);
+  const shimmer = useSharedValue(0);
+
+  useEffect(() => {
+    shimmer.value = withRepeat(
+      withTiming(1, { duration: 3000 }),
+      -1,
+      false
+    );
+  }, []);
+
+  const shimmerStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: interpolate(shimmer.value, [0, 1], [-SCREEN_WIDTH, SCREEN_WIDTH]) }],
+  }));
 
   const totalVotes = (proposal.supportVotes || 0) + (proposal.opposeVotes || 0);
   const supportPercent =
@@ -149,33 +174,33 @@ function ProposalCard({
   const geoTags = proposal.geoRestrictions || [];
 
   const handlePressIn = () => {
-    haptics.light();
-    scale.value = withSpring(0.98, { damping: 15, stiffness: 300 });
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    scale.value = withSpring(0.98, ANIMATION.spring.snappy);
   };
 
   const handlePressOut = () => {
-    scale.value = withSpring(1, { damping: 15, stiffness: 300 });
+    scale.value = withSpring(1, ANIMATION.spring.snappy);
   };
 
-  const animatedStyle = useAnimatedStyle(() => ({
+  const animatedCardStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
   }));
 
   const handleClaimToken = async () => {
-    haptics.medium();
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setClaiming(true);
     try {
       await onClaimToken(proposal.id as number);
-      haptics.success();
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch {
-      haptics.error();
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     } finally {
       setClaiming(false);
     }
   };
 
   const handleShare = () => {
-    haptics.light();
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     shareProposal({
       id: proposal.id as number,
       title: proposal.title,
@@ -185,57 +210,70 @@ function ProposalCard({
 
   return (
     <AnimatedTouchable
-      entering={FadeInUp.delay(index * 80).duration(400).springify()}
-      style={[styles.card, { backgroundColor: colors.cardBg, borderColor: colors.border }, animatedStyle]}
+      entering={FadeInUp.delay(index * 60).duration(400).springify()}
+      style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }, animatedCardStyle]}
       onPress={onPress}
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}
       activeOpacity={1}
     >
-      <LinearGradient
-        colors={[`${colors.gold}08`, 'transparent']}
-        style={styles.cardGradient}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-      />
+      {/* Subtle shimmer */}
+      <View style={styles.shimmerContainer}>
+        <Animated.View style={[styles.shimmerBar, shimmerStyle]}>
+          <LinearGradient
+            colors={['transparent', `${colors.gold}06`, 'transparent']}
+            style={StyleSheet.absoluteFill}
+            start={{ x: 0, y: 0.5 }}
+            end={{ x: 1, y: 0.5 }}
+          />
+        </Animated.View>
+      </View>
 
+      {/* Header */}
       <View style={styles.cardHeader}>
-        <View style={[styles.categoryBadge, { backgroundColor: colors.goldLight }]}>
-          <Text style={[styles.categoryText, { color: colors.gold }]}>{proposal.category || 'General'}</Text>
+        <View style={[styles.categoryBadge, { backgroundColor: `${colors.gold}15` }]}>
+          <Text style={[styles.categoryText, { color: colors.gold }]}>
+            {proposal.category || 'General'}
+          </Text>
         </View>
 
         <View style={styles.headerRight}>
           {timeRemaining ? (
             <View
               style={[
-                styles.deadlineBadge,
-                { backgroundColor: isEnded ? colors.errorLight : colors.goldLight },
+                styles.timeBadge,
+                { backgroundColor: isEnded ? `${colors.error}15` : `${colors.gold}15` },
               ]}
             >
-              <Ionicons name="time-outline" size={12} color={isEnded ? colors.error : colors.gold} />
-              <Text style={[styles.deadlineText, { color: isEnded ? colors.error : colors.gold }]}>
+              <Ionicons
+                name="time-outline"
+                size={12}
+                color={isEnded ? colors.error : colors.gold}
+              />
+              <Text style={[styles.timeText, { color: isEnded ? colors.error : colors.gold }]}>
                 {timeRemaining}
               </Text>
             </View>
           ) : null}
 
           <TouchableOpacity
-            style={[styles.shareButton, { backgroundColor: colors.goldLight }]}
+            style={[styles.shareBtn, { backgroundColor: colors.surfaceHover || `${colors.gold}08` }]}
             onPress={(e) => {
               e.stopPropagation();
               handleShare();
             }}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
-            <Ionicons name="share-outline" size={16} color={colors.gold} />
+            <Ionicons name="share-outline" size={16} color={colors.textSecondary} />
           </TouchableOpacity>
         </View>
       </View>
 
+      {/* Geo tags */}
       {geoTags.length > 0 && (
         <View style={styles.geoTags}>
           {geoTags.slice(0, 3).map((tag, i) => (
-            <View key={i} style={[styles.geoTag, { backgroundColor: colors.infoLight }]}>
+            <View key={i} style={[styles.geoTag, { backgroundColor: `${colors.info}12` }]}>
               <Ionicons name="location-outline" size={10} color={colors.info} />
               <Text style={[styles.geoTagText, { color: colors.info }]}>{tag}</Text>
             </View>
@@ -243,27 +281,39 @@ function ProposalCard({
         </View>
       )}
 
+      {/* Content */}
       <Text style={[styles.cardTitle, { color: colors.text }]} numberOfLines={2}>
         {proposal.title}
       </Text>
-      <Text style={[styles.cardDescription, { color: colors.textSecondary }]} numberOfLines={3}>
+      <Text style={[styles.cardDesc, { color: colors.textSecondary }]} numberOfLines={3}>
         {proposal.description}
       </Text>
 
-      {proposal.imageUrl ? (
-        <View style={styles.imageContainer}>
+      {/* Image */}
+      {proposal.imageUrl && (
+        <View style={styles.imageWrapper}>
           <Image source={{ uri: proposal.imageUrl }} style={styles.proposalImage} resizeMode="cover" />
+          <LinearGradient
+            colors={['transparent', 'rgba(0,0,0,0.3)']}
+            style={styles.imageOverlay}
+          />
         </View>
-      ) : null}
+      )}
 
+      {/* Vote Bar */}
       <View style={styles.voteSection}>
-        <View style={[styles.voteBar, { backgroundColor: colors.error }]}>
-          <Animated.View style={[styles.supportBar, { width: `${supportPercent}%`, backgroundColor: colors.success }]} />
+        <View style={[styles.voteBarBg, { backgroundColor: colors.error }]}>
+          <Animated.View
+            style={[
+              styles.voteBarFill,
+              { width: `${supportPercent}%`, backgroundColor: colors.success },
+            ]}
+          />
         </View>
 
         <View style={styles.voteStats}>
           <View style={styles.voteStat}>
-            <View style={[styles.voteIconBg, { backgroundColor: `${colors.success}20` }]}>
+            <View style={[styles.voteIconBg, { backgroundColor: `${colors.success}15` }]}>
               <Ionicons name="thumbs-up" size={12} color={colors.success} />
             </View>
             <Text style={[styles.voteCount, { color: colors.textSecondary }]}>
@@ -272,7 +322,7 @@ function ProposalCard({
           </View>
 
           <View style={styles.voteStat}>
-            <View style={[styles.voteIconBg, { backgroundColor: `${colors.error}20` }]}>
+            <View style={[styles.voteIconBg, { backgroundColor: `${colors.error}15` }]}>
               <Ionicons name="thumbs-down" size={12} color={colors.error} />
             </View>
             <Text style={[styles.voteCount, { color: colors.textSecondary }]}>
@@ -282,73 +332,80 @@ function ProposalCard({
         </View>
       </View>
 
+      {/* Actions */}
       {isEnded ? (
-        <View style={[styles.statusContainer, { backgroundColor: colors.errorLight }]}>
-          <Ionicons name="flag-outline" size={18} color={colors.error} />
+        <View style={[styles.statusBanner, { backgroundColor: `${colors.error}10` }]}>
+          <Ionicons name="flag-outline" size={16} color={colors.error} />
           <Text style={[styles.statusText, { color: colors.error }]}>Voting has ended</Text>
         </View>
       ) : hasVoted ? (
-        <View style={[styles.statusContainer, { backgroundColor: colors.goldLight }]}>
-          <Ionicons name="checkmark-circle" size={18} color={colors.gold} />
-          <Text style={[styles.statusText, { color: colors.gold }]}>You have voted</Text>
+        <View style={[styles.statusBanner, { backgroundColor: `${colors.success}10` }]}>
+          <Ionicons name="checkmark-circle" size={16} color={colors.success} />
+          <Text style={[styles.statusText, { color: colors.success }]}>You have voted</Text>
         </View>
       ) : !hasClaimed ? (
         <TouchableOpacity
-          style={[styles.claimButton, { backgroundColor: colors.gold }, claiming && styles.buttonDisabled]}
+          style={[styles.claimBtn, claiming && styles.btnDisabled]}
           onPress={(e) => {
             e.stopPropagation();
             handleClaimToken();
           }}
           disabled={claiming}
-          activeOpacity={0.8}
+          activeOpacity={0.85}
         >
+          <LinearGradient
+            colors={[colors.gold, colors.goldDark || '#A68523']}
+            style={StyleSheet.absoluteFill}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+          />
           {claiming ? (
             <ActivityIndicator size="small" color="#000" />
           ) : (
             <>
               <Ionicons name="wallet-outline" size={18} color="#000" />
-              <Text style={styles.claimButtonText}>Claim Vote Token</Text>
+              <Text style={styles.claimBtnText}>Claim Vote Token</Text>
             </>
           )}
         </TouchableOpacity>
       ) : (
-        <View style={styles.actionButtons}>
+        <View style={styles.voteActions}>
           <TouchableOpacity
-            style={[styles.voteButton, { backgroundColor: colors.success }, isVoting && styles.buttonDisabled]}
+            style={[styles.voteBtn, { backgroundColor: colors.success }, isVoting && styles.btnDisabled]}
             onPress={(e) => {
               e.stopPropagation();
-              haptics.medium();
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
               onVote(proposal.id as number, 'support');
             }}
             disabled={isVoting}
-            activeOpacity={0.8}
+            activeOpacity={0.85}
           >
             {isVoting ? (
               <ActivityIndicator size="small" color="#fff" />
             ) : (
               <>
                 <Ionicons name="checkmark-circle" size={16} color="#fff" />
-                <Text style={styles.voteButtonText}>Support</Text>
+                <Text style={styles.voteBtnText}>Support</Text>
               </>
             )}
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.voteButton, { backgroundColor: colors.error }, isVoting && styles.buttonDisabled]}
+            style={[styles.voteBtn, { backgroundColor: colors.error }, isVoting && styles.btnDisabled]}
             onPress={(e) => {
               e.stopPropagation();
-              haptics.medium();
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
               onVote(proposal.id as number, 'oppose');
             }}
             disabled={isVoting}
-            activeOpacity={0.8}
+            activeOpacity={0.85}
           >
             {isVoting ? (
               <ActivityIndicator size="small" color="#fff" />
             ) : (
               <>
                 <Ionicons name="close-circle" size={16} color="#fff" />
-                <Text style={styles.voteButtonText}>Oppose</Text>
+                <Text style={styles.voteBtnText}>Oppose</Text>
               </>
             )}
           </TouchableOpacity>
@@ -358,22 +415,36 @@ function ProposalCard({
   );
 }
 
+// Skeleton Card
 function ProposalSkeleton({ index }: { index: number }) {
   const { colors } = useTheme();
+  const shimmer = useSharedValue(0);
+
+  useEffect(() => {
+    shimmer.value = withRepeat(
+      withTiming(1, { duration: 1500 }),
+      -1,
+      false
+    );
+  }, []);
+
+  const shimmerStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(shimmer.value, [0, 0.5, 1], [0.3, 0.7, 0.3]),
+  }));
 
   return (
     <Animated.View
-      entering={FadeIn.delay(index * 100).duration(300)}
-      style={[styles.card, { backgroundColor: colors.cardBg, borderColor: colors.border }]}
+      entering={FadeIn.delay(index * 80).duration(300)}
+      style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}
     >
       <View style={styles.cardHeader}>
-        <View style={[styles.skeletonBadge, { backgroundColor: colors.goldLight }]} />
-        <View style={[styles.skeletonSmall, { backgroundColor: colors.goldLight }]} />
+        <Animated.View style={[styles.skeletonBadge, { backgroundColor: `${colors.gold}15` }, shimmerStyle]} />
+        <Animated.View style={[styles.skeletonSmall, { backgroundColor: `${colors.gold}15` }, shimmerStyle]} />
       </View>
-      <View style={[styles.skeletonTitle, { backgroundColor: colors.goldLight }]} />
-      <View style={[styles.skeletonLine, { backgroundColor: colors.goldLight }]} />
-      <View style={[styles.skeletonLine, { backgroundColor: colors.goldLight, width: '60%' }]} />
-      <View style={[styles.skeletonButton, { backgroundColor: colors.goldLight }]} />
+      <Animated.View style={[styles.skeletonTitle, { backgroundColor: `${colors.gold}10` }, shimmerStyle]} />
+      <Animated.View style={[styles.skeletonLine, { backgroundColor: `${colors.gold}10` }, shimmerStyle]} />
+      <Animated.View style={[styles.skeletonLine, { backgroundColor: `${colors.gold}10`, width: '70%' }, shimmerStyle]} />
+      <Animated.View style={[styles.skeletonBtn, { backgroundColor: `${colors.gold}10` }, shimmerStyle]} />
     </Animated.View>
   );
 }
@@ -398,7 +469,6 @@ export default function ProposalsScreen() {
   const [userCity, setUserCity] = useState('');
   const [isVerified, setIsVerified] = useState(false);
 
-  // Details modal
   const [selectedProposal, setSelectedProposal] = useState<Proposal | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
 
@@ -582,7 +652,6 @@ export default function ProposalsScreen() {
         )
       );
 
-      // Keep details modal in sync if open
       setSelectedProposal((sp) => {
         if (!sp) return sp;
         if ((sp.id as number) !== proposalId) return sp;
@@ -593,7 +662,8 @@ export default function ProposalsScreen() {
         };
       });
 
-      Alert.alert('Vote Recorded', `Your ${vote} vote has been recorded on the blockchain.`);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      Alert.alert('Vote Recorded', `Your ${vote} vote has been recorded.`);
     } catch {
       Alert.alert('Error', 'Failed to submit vote. Please try again.');
     } finally {
@@ -653,6 +723,7 @@ export default function ProposalsScreen() {
         return;
       }
 
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       Alert.alert('Success', 'Your proposal has been created!');
       setShowCreateModal(false);
       setNewProposal({
@@ -682,6 +753,7 @@ export default function ProposalsScreen() {
     setSelectedGeoLevel('All');
     setSelectedFilterAge('All Ages');
     setSelectedFilterGender('All Genders');
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   };
 
   const hasActiveFilters =
@@ -693,7 +765,7 @@ export default function ProposalsScreen() {
     selectedFilterGender !== 'All Genders';
 
   const openProposal = (p: Proposal) => {
-    haptics.light();
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setSelectedProposal(p);
     setShowDetailModal(true);
   };
@@ -712,70 +784,77 @@ export default function ProposalsScreen() {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
       <Animated.View entering={FadeInDown.duration(400)} style={[styles.header, { borderBottomColor: colors.border }]}>
-        <View style={styles.headerContent}>
+        <View style={styles.headerRow}>
           <View>
             <Text style={[styles.headerTitle, { color: colors.text }]}>Proposals</Text>
-            <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>
-              {activeCount} active
+            <Text style={[styles.headerSubtitle, { color: colors.textTertiary }]}>
+              {activeCount} active proposal{activeCount !== 1 ? 's' : ''}
             </Text>
           </View>
 
-          <View style={styles.headerButtons}>
+          <View style={styles.headerActions}>
             <TouchableOpacity
               style={[
-                styles.iconButton,
+                styles.filterBtn,
                 {
-                  backgroundColor: hasActiveFilters ? colors.gold : colors.cardBg,
+                  backgroundColor: hasActiveFilters ? colors.gold : colors.surface,
                   borderColor: hasActiveFilters ? colors.gold : colors.border,
                 },
               ]}
-              onPress={() => setShowFilters(!showFilters)}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                setShowFilters(!showFilters);
+              }}
             >
-              <Ionicons name="filter" size={18} color={hasActiveFilters ? '#000' : colors.text} />
+              <Ionicons name="options-outline" size={18} color={hasActiveFilters ? '#000' : colors.text} />
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.createButton, { backgroundColor: colors.gold, ...SHADOWS.glow }]}
               onPress={() => {
-                haptics.light();
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                 setShowCreateModal(true);
               }}
             >
-              <Ionicons name="add" size={22} color="#000" />
+              <LinearGradient
+                colors={[colors.gold, colors.goldDark || '#A68523']}
+                style={styles.createBtn}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+              >
+                <Ionicons name="add" size={22} color="#000" />
+              </LinearGradient>
             </TouchableOpacity>
           </View>
         </View>
 
         {/* Search */}
-        <View style={styles.searchWrapper}>
-          <View style={[styles.searchContainer, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
-            <Ionicons name="search-outline" size={18} color={colors.textMuted} />
-            <TextInput
-              style={[styles.searchInput, { color: colors.text }]}
-              placeholder="Search proposals..."
-              placeholderTextColor={colors.textMuted}
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-            />
-            {searchQuery ? (
-              <TouchableOpacity onPress={() => setSearchQuery('')}>
-                <Ionicons name="close-circle" size={18} color={colors.textMuted} />
-              </TouchableOpacity>
-            ) : null}
-          </View>
+        <View style={[styles.searchBar, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <Ionicons name="search-outline" size={18} color={colors.textTertiary} />
+          <TextInput
+            style={[styles.searchInput, { color: colors.text }]}
+            placeholder="Search proposals..."
+            placeholderTextColor={colors.textTertiary}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
+          {searchQuery ? (
+            <TouchableOpacity onPress={() => setSearchQuery('')}>
+              <Ionicons name="close-circle" size={18} color={colors.textTertiary} />
+            </TouchableOpacity>
+          ) : null}
         </View>
       </Animated.View>
 
       {/* Filter Panel */}
       {showFilters && (
         <Animated.View
-          entering={FadeInDown.duration(300)}
-          style={[styles.filterPanel, { backgroundColor: colors.cardBg, borderColor: colors.border }]}
+          entering={FadeInDown.duration(250)}
+          style={[styles.filterPanel, { backgroundColor: colors.surface, borderColor: colors.border }]}
         >
           <View style={styles.filterSection}>
-            <Text style={[styles.filterLabel, { color: colors.textSecondary }]}>Category</Text>
+            <Text style={[styles.filterLabel, { color: colors.textTertiary }]}>CATEGORY</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              <View style={styles.filterOptions}>
+              <View style={styles.filterRow}>
                 {CATEGORIES.map((cat) => (
                   <FilterChip
                     key={cat}
@@ -789,9 +868,9 @@ export default function ProposalsScreen() {
           </View>
 
           <View style={styles.filterSection}>
-            <Text style={[styles.filterLabel, { color: colors.textSecondary }]}>Status</Text>
+            <Text style={[styles.filterLabel, { color: colors.textTertiary }]}>STATUS</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              <View style={styles.filterOptions}>
+              <View style={styles.filterRow}>
                 {STATUS_FILTERS.map((s) => (
                   <FilterChip key={s} label={s} selected={selectedStatus === s} onPress={() => setSelectedStatus(s)} />
                 ))}
@@ -800,9 +879,9 @@ export default function ProposalsScreen() {
           </View>
 
           <View style={styles.filterSection}>
-            <Text style={[styles.filterLabel, { color: colors.textSecondary }]}>Geographic Level</Text>
+            <Text style={[styles.filterLabel, { color: colors.textTertiary }]}>GEOGRAPHIC LEVEL</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              <View style={styles.filterOptions}>
+              <View style={styles.filterRow}>
                 {GEO_LEVELS.map((g) => (
                   <FilterChip key={g} label={g} selected={selectedGeoLevel === g} onPress={() => setSelectedGeoLevel(g)} />
                 ))}
@@ -811,9 +890,9 @@ export default function ProposalsScreen() {
           </View>
 
           {hasActiveFilters && (
-            <TouchableOpacity style={styles.clearFiltersButton} onPress={clearFilters}>
+            <TouchableOpacity style={styles.clearBtn} onPress={clearFilters}>
               <Ionicons name="close-circle" size={16} color={colors.error} />
-              <Text style={[styles.clearFiltersText, { color: colors.error }]}>Clear all filters</Text>
+              <Text style={[styles.clearBtnText, { color: colors.error }]}>Clear all filters</Text>
             </TouchableOpacity>
           )}
         </Animated.View>
@@ -821,41 +900,48 @@ export default function ProposalsScreen() {
 
       {/* Content */}
       {loading ? (
-        <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+        <ScrollView style={styles.list} contentContainerStyle={styles.listContent}>
           {[0, 1, 2].map((i) => (
             <ProposalSkeleton key={i} index={i} />
           ))}
         </ScrollView>
       ) : filteredProposals.length === 0 ? (
-        <Animated.View entering={FadeIn.duration(400)} style={styles.emptyContainer}>
-          <View style={[styles.emptyIcon, { backgroundColor: colors.goldLight }]}>
+        <Animated.View entering={FadeIn.duration(400)} style={styles.emptyState}>
+          <View style={[styles.emptyIcon, { backgroundColor: `${colors.gold}15` }]}>
             <Ionicons name="document-text-outline" size={48} color={colors.gold} />
           </View>
-          <Text style={[styles.emptyText, { color: colors.text }]}>No proposals found</Text>
-          <Text style={[styles.emptySubtext, { color: colors.textSecondary }]}>
+          <Text style={[styles.emptyTitle, { color: colors.text }]}>No proposals found</Text>
+          <Text style={[styles.emptyDesc, { color: colors.textSecondary }]}>
             {hasActiveFilters ? 'Try adjusting your filters' : 'Be the first to create one!'}
           </Text>
           {!hasActiveFilters && (
             <TouchableOpacity
-              style={[styles.emptyCreateButton, { backgroundColor: colors.gold }]}
               onPress={() => setShowCreateModal(true)}
+              style={styles.emptyBtn}
             >
-              <Ionicons name="add-circle-outline" size={20} color="#000" />
-              <Text style={styles.emptyCreateButtonText}>Create Proposal</Text>
+              <LinearGradient
+                colors={[colors.gold, colors.goldDark || '#A68523']}
+                style={styles.emptyBtnGradient}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+              >
+                <Ionicons name="add-circle-outline" size={20} color="#000" />
+                <Text style={styles.emptyBtnText}>Create Proposal</Text>
+              </LinearGradient>
             </TouchableOpacity>
           )}
         </Animated.View>
       ) : (
         <ScrollView
-          style={styles.scrollView}
-          contentContainerStyle={styles.scrollContent}
+          style={styles.list}
+          contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
               onRefresh={() => fetchData(true)}
               tintColor={colors.gold}
-              colors={[colors.gold]}
+              progressBackgroundColor={colors.surface}
             />
           }
         >
@@ -872,55 +958,52 @@ export default function ProposalsScreen() {
               index={index}
             />
           ))}
-          <View style={styles.bottomPadding} />
+          <View style={styles.listSpacer} />
         </ScrollView>
       )}
 
-      {/* Proposal Details Modal */}
+      {/* Detail Modal */}
       <Modal visible={showDetailModal} animationType="slide" presentationStyle="pageSheet" onRequestClose={closeProposal}>
-        <View style={[styles.detailContainer, { backgroundColor: colors.background }]}>
-          <View style={[styles.detailHeader, { borderBottomColor: colors.border }]}>
-            <TouchableOpacity onPress={closeProposal} style={styles.modalHeaderButton} activeOpacity={0.7}>
+        <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
+          <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
+            <TouchableOpacity onPress={closeProposal} style={styles.modalClose}>
               <Ionicons name="chevron-down" size={24} color={colors.textSecondary} />
             </TouchableOpacity>
 
-            <Text style={[styles.detailHeaderTitle, { color: colors.text }]} numberOfLines={1}>
-              Proposal
-            </Text>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>Proposal</Text>
 
             <TouchableOpacity
               onPress={() => {
                 if (!detail) return;
-                haptics.light();
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                 shareProposal({ id: detail.id as number, title: detail.title, description: detail.description });
               }}
-              style={[styles.detailShareBtn, { backgroundColor: colors.cardBg, borderColor: colors.border }]}
-              activeOpacity={0.8}
+              style={[styles.modalShare, { backgroundColor: colors.surface, borderColor: colors.border }]}
             >
               <Ionicons name="share-outline" size={18} color={colors.text} />
             </TouchableOpacity>
           </View>
 
-          {!detail ? null : (
-            <ScrollView contentContainerStyle={styles.detailContent} showsVerticalScrollIndicator={false}>
-              <View style={[styles.detailCard, { backgroundColor: colors.cardBg, borderColor: colors.border }, SHADOWS.md]}>
+          {detail && (
+            <ScrollView contentContainerStyle={styles.modalContent} showsVerticalScrollIndicator={false}>
+              <View style={[styles.detailCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                 <LinearGradient
-                  colors={[`${colors.gold}10`, 'transparent']}
+                  colors={[`${colors.gold}08`, 'transparent']}
                   style={StyleSheet.absoluteFill}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                 />
 
-                <View style={styles.detailTopRow}>
-                  <View style={[styles.categoryBadge, { backgroundColor: colors.goldLight }]}>
+                <View style={styles.detailHeaderRow}>
+                  <View style={[styles.categoryBadge, { backgroundColor: `${colors.gold}15` }]}>
                     <Text style={[styles.categoryText, { color: colors.gold }]}>{detail.category || 'General'}</Text>
                   </View>
 
-                  {detail.deadline ? (
+                  {detail.deadline && (
                     <View
                       style={[
-                        styles.deadlineBadge,
-                        { backgroundColor: isProposalEnded(detail) ? colors.errorLight : colors.goldLight },
+                        styles.timeBadge,
+                        { backgroundColor: isProposalEnded(detail) ? `${colors.error}15` : `${colors.gold}15` },
                       ]}
                     >
                       <Ionicons
@@ -929,21 +1012,18 @@ export default function ProposalsScreen() {
                         color={isProposalEnded(detail) ? colors.error : colors.gold}
                       />
                       <Text
-                        style={[
-                          styles.deadlineText,
-                          { color: isProposalEnded(detail) ? colors.error : colors.gold },
-                        ]}
+                        style={[styles.timeText, { color: isProposalEnded(detail) ? colors.error : colors.gold }]}
                       >
                         {getTimeRemaining(detail.deadline)}
                       </Text>
                     </View>
-                  ) : null}
+                  )}
                 </View>
 
                 {(detail.geoRestrictions || []).length > 0 && (
                   <View style={[styles.geoTags, { marginTop: SPACING.sm }]}>
                     {(detail.geoRestrictions || []).slice(0, 6).map((tag, i) => (
-                      <View key={i} style={[styles.geoTag, { backgroundColor: colors.infoLight }]}>
+                      <View key={i} style={[styles.geoTag, { backgroundColor: `${colors.info}12` }]}>
                         <Ionicons name="location-outline" size={10} color={colors.info} />
                         <Text style={[styles.geoTagText, { color: colors.info }]}>{tag}</Text>
                       </View>
@@ -954,27 +1034,25 @@ export default function ProposalsScreen() {
                 <Text style={[styles.detailTitle, { color: colors.text }]}>{detail.title}</Text>
                 <Text style={[styles.detailDesc, { color: colors.textSecondary }]}>{detail.description}</Text>
 
-                {detail.imageUrl ? (
-                  <View style={[styles.imageContainer, { marginTop: SPACING.md }]}>
+                {detail.imageUrl && (
+                  <View style={[styles.imageWrapper, { marginTop: SPACING.lg }]}>
                     <Image source={{ uri: detail.imageUrl }} style={styles.proposalImage} resizeMode="cover" />
                   </View>
-                ) : null}
+                )}
 
-                {/* Progress */}
-                <View style={[styles.voteSection, { marginTop: SPACING.lg, marginBottom: 0 }]}>
+                {/* Vote Progress */}
+                <View style={[styles.voteSection, { marginTop: SPACING.xl }]}>
                   {(() => {
                     const total = (detail.supportVotes || 0) + (detail.opposeVotes || 0);
-                    const supportPct = total > 0 ? Math.round(((detail.supportVotes || 0) / total) * 100) : 50;
+                    const pct = total > 0 ? Math.round(((detail.supportVotes || 0) / total) * 100) : 50;
                     return (
                       <>
-                        <View style={[styles.voteBar, { backgroundColor: colors.error }]}>
-                          <Animated.View
-                            style={[styles.supportBar, { width: `${supportPct}%`, backgroundColor: colors.success }]}
-                          />
+                        <View style={[styles.voteBarBg, { backgroundColor: colors.error }]}>
+                          <Animated.View style={[styles.voteBarFill, { width: `${pct}%`, backgroundColor: colors.success }]} />
                         </View>
                         <View style={styles.voteStats}>
                           <View style={styles.voteStat}>
-                            <View style={[styles.voteIconBg, { backgroundColor: `${colors.success}20` }]}>
+                            <View style={[styles.voteIconBg, { backgroundColor: `${colors.success}15` }]}>
                               <Ionicons name="thumbs-up" size={12} color={colors.success} />
                             </View>
                             <Text style={[styles.voteCount, { color: colors.textSecondary }]}>
@@ -982,7 +1060,7 @@ export default function ProposalsScreen() {
                             </Text>
                           </View>
                           <View style={styles.voteStat}>
-                            <View style={[styles.voteIconBg, { backgroundColor: `${colors.error}20` }]}>
+                            <View style={[styles.voteIconBg, { backgroundColor: `${colors.error}15` }]}>
                               <Ionicons name="thumbs-down" size={12} color={colors.error} />
                             </View>
                             <Text style={[styles.voteCount, { color: colors.textSecondary }]}>
@@ -996,41 +1074,47 @@ export default function ProposalsScreen() {
                 </View>
 
                 {/* Actions */}
-                <View style={{ marginTop: SPACING.lg }}>
+                <View style={{ marginTop: SPACING.xl }}>
                   {isProposalEnded(detail) ? (
-                    <View style={[styles.statusContainer, { backgroundColor: colors.errorLight }]}>
-                      <Ionicons name="flag-outline" size={18} color={colors.error} />
+                    <View style={[styles.statusBanner, { backgroundColor: `${colors.error}10` }]}>
+                      <Ionicons name="flag-outline" size={16} color={colors.error} />
                       <Text style={[styles.statusText, { color: colors.error }]}>Voting has ended</Text>
                     </View>
                   ) : detailHasVoted ? (
-                    <View style={[styles.statusContainer, { backgroundColor: colors.goldLight }]}>
-                      <Ionicons name="checkmark-circle" size={18} color={colors.gold} />
-                      <Text style={[styles.statusText, { color: colors.gold }]}>You have voted</Text>
+                    <View style={[styles.statusBanner, { backgroundColor: `${colors.success}10` }]}>
+                      <Ionicons name="checkmark-circle" size={16} color={colors.success} />
+                      <Text style={[styles.statusText, { color: colors.success }]}>You have voted</Text>
                     </View>
                   ) : !detailHasClaimed ? (
                     <TouchableOpacity
-                      style={[styles.claimButton, { backgroundColor: colors.gold }, detailIsVoting && styles.buttonDisabled]}
+                      style={[styles.claimBtn, detailIsVoting && styles.btnDisabled]}
                       onPress={async () => {
                         if (!detail) return;
-                        haptics.medium();
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                         await handleClaimToken(detail.id as number);
                       }}
                       activeOpacity={0.85}
                       disabled={detailIsVoting}
                     >
+                      <LinearGradient
+                        colors={[colors.gold, colors.goldDark || '#A68523']}
+                        style={StyleSheet.absoluteFill}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 0 }}
+                      />
                       {detailIsVoting ? (
                         <ActivityIndicator size="small" color="#000" />
                       ) : (
                         <>
                           <Ionicons name="wallet-outline" size={18} color="#000" />
-                          <Text style={styles.claimButtonText}>Claim Vote Token</Text>
+                          <Text style={styles.claimBtnText}>Claim Vote Token</Text>
                         </>
                       )}
                     </TouchableOpacity>
                   ) : (
-                    <View style={styles.actionButtons}>
+                    <View style={styles.voteActions}>
                       <TouchableOpacity
-                        style={[styles.voteButton, { backgroundColor: colors.success }, detailIsVoting && styles.buttonDisabled]}
+                        style={[styles.voteBtn, { backgroundColor: colors.success }, detailIsVoting && styles.btnDisabled]}
                         onPress={() => detail && handleVote(detail.id as number, 'support')}
                         disabled={detailIsVoting}
                         activeOpacity={0.85}
@@ -1040,13 +1124,13 @@ export default function ProposalsScreen() {
                         ) : (
                           <>
                             <Ionicons name="checkmark-circle" size={16} color="#fff" />
-                            <Text style={styles.voteButtonText}>Support</Text>
+                            <Text style={styles.voteBtnText}>Support</Text>
                           </>
                         )}
                       </TouchableOpacity>
 
                       <TouchableOpacity
-                        style={[styles.voteButton, { backgroundColor: colors.error }, detailIsVoting && styles.buttonDisabled]}
+                        style={[styles.voteBtn, { backgroundColor: colors.error }, detailIsVoting && styles.btnDisabled]}
                         onPress={() => detail && handleVote(detail.id as number, 'oppose')}
                         disabled={detailIsVoting}
                         activeOpacity={0.85}
@@ -1056,7 +1140,7 @@ export default function ProposalsScreen() {
                         ) : (
                           <>
                             <Ionicons name="close-circle" size={16} color="#fff" />
-                            <Text style={styles.voteButtonText}>Oppose</Text>
+                            <Text style={styles.voteBtnText}>Oppose</Text>
                           </>
                         )}
                       </TouchableOpacity>
@@ -1071,48 +1155,61 @@ export default function ProposalsScreen() {
         </View>
       </Modal>
 
-      {/* Create Proposal Modal */}
+      {/* Create Modal */}
       <Modal visible={showCreateModal} animationType="slide" presentationStyle="pageSheet">
         <KeyboardAvoidingView
           style={[styles.modalContainer, { backgroundColor: colors.background }]}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
           <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
-            <TouchableOpacity onPress={() => setShowCreateModal(false)} style={styles.modalHeaderButton}>
+            <TouchableOpacity onPress={() => setShowCreateModal(false)} style={styles.modalClose}>
               <Ionicons name="close" size={24} color={colors.textSecondary} />
             </TouchableOpacity>
+
             <Text style={[styles.modalTitle, { color: colors.text }]}>New Proposal</Text>
+
             <TouchableOpacity
               onPress={handleCreateProposal}
               disabled={creating}
-              style={[styles.modalSubmitButton, { backgroundColor: colors.gold }, creating && styles.buttonDisabled]}
+              style={[creating && styles.btnDisabled]}
             >
-              {creating ? <ActivityIndicator size="small" color="#000" /> : <Text style={styles.modalSubmitText}>Create</Text>}
+              <LinearGradient
+                colors={[colors.gold, colors.goldDark || '#A68523']}
+                style={styles.submitBtn}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+              >
+                {creating ? (
+                  <ActivityIndicator size="small" color="#000" />
+                ) : (
+                  <Text style={styles.submitBtnText}>Create</Text>
+                )}
+              </LinearGradient>
             </TouchableOpacity>
           </View>
 
-          <ScrollView style={styles.modalContent} showsVerticalScrollIndicator={false}>
-            <View style={styles.inputGroup}>
-              <Text style={[styles.inputLabel, { color: colors.gold }]}>Title</Text>
+          <ScrollView style={styles.formScroll} showsVerticalScrollIndicator={false}>
+            <View style={styles.formSection}>
+              <Text style={[styles.formLabel, { color: colors.gold }]}>Title</Text>
               <TextInput
-                style={[styles.input, { backgroundColor: colors.cardBg, color: colors.text, borderColor: colors.border }]}
+                style={[styles.formInput, { backgroundColor: colors.surface, color: colors.text, borderColor: colors.border }]}
                 placeholder="Enter proposal title..."
-                placeholderTextColor={colors.textMuted}
+                placeholderTextColor={colors.textTertiary}
                 value={newProposal.title}
                 onChangeText={(t) => setNewProposal((p) => ({ ...p, title: t }))}
               />
             </View>
 
-            <View style={styles.inputGroup}>
-              <Text style={[styles.inputLabel, { color: colors.gold }]}>Description</Text>
+            <View style={styles.formSection}>
+              <Text style={[styles.formLabel, { color: colors.gold }]}>Description</Text>
               <TextInput
                 style={[
-                  styles.input,
-                  styles.textArea,
-                  { backgroundColor: colors.cardBg, color: colors.text, borderColor: colors.border },
+                  styles.formInput,
+                  styles.formTextArea,
+                  { backgroundColor: colors.surface, color: colors.text, borderColor: colors.border },
                 ]}
                 placeholder="Describe your proposal..."
-                placeholderTextColor={colors.textMuted}
+                placeholderTextColor={colors.textTertiary}
                 value={newProposal.description}
                 onChangeText={(t) => setNewProposal((p) => ({ ...p, description: t }))}
                 multiline
@@ -1121,164 +1218,205 @@ export default function ProposalsScreen() {
               />
             </View>
 
-            <View style={styles.inputGroup}>
-              <Text style={[styles.inputLabel, { color: colors.gold }]}>Image (Optional)</Text>
+            <View style={styles.formSection}>
+              <Text style={[styles.formLabel, { color: colors.gold }]}>Image (Optional)</Text>
               <TouchableOpacity
-                style={[styles.imagePickerButton, { backgroundColor: colors.cardBg, borderColor: colors.border }]}
+                style={[styles.imagePicker, { backgroundColor: colors.surface, borderColor: colors.border }]}
                 onPress={pickImage}
               >
                 {newProposal.imageUri ? (
                   <Image source={{ uri: newProposal.imageUri }} style={styles.imagePreview} />
                 ) : (
-                  <View style={styles.imagePickerPlaceholder}>
-                    <Ionicons name="image-outline" size={32} color={colors.textMuted} />
-                    <Text style={[styles.imagePickerText, { color: colors.textMuted }]}>Tap to add image</Text>
+                  <View style={styles.imagePickerContent}>
+                    <Ionicons name="image-outline" size={32} color={colors.textTertiary} />
+                    <Text style={[styles.imagePickerText, { color: colors.textTertiary }]}>Tap to add image</Text>
                   </View>
                 )}
               </TouchableOpacity>
 
-              {newProposal.imageUri ? (
-                <TouchableOpacity style={styles.removeImageButton} onPress={() => setNewProposal((p) => ({ ...p, imageUri: '' }))}>
+              {newProposal.imageUri && (
+                <TouchableOpacity
+                  style={styles.removeImageBtn}
+                  onPress={() => setNewProposal((p) => ({ ...p, imageUri: '' }))}
+                >
                   <Ionicons name="trash-outline" size={16} color={colors.error} />
                   <Text style={[styles.removeImageText, { color: colors.error }]}>Remove</Text>
                 </TouchableOpacity>
-              ) : null}
+              )}
             </View>
 
-            <View style={styles.inputGroup}>
-              <Text style={[styles.inputLabel, { color: colors.gold }]}>Category</Text>
+            <View style={styles.formSection}>
+              <Text style={[styles.formLabel, { color: colors.gold }]}>Category</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                <View style={styles.categoryPicker}>
+                <View style={styles.filterRow}>
                   {CATEGORIES.filter((c) => c !== 'All').map((cat) => (
-                    <FilterChip key={cat} label={cat} selected={newProposal.category === cat} onPress={() => setNewProposal((p) => ({ ...p, category: cat }))} />
+                    <FilterChip
+                      key={cat}
+                      label={cat}
+                      selected={newProposal.category === cat}
+                      onPress={() => setNewProposal((p) => ({ ...p, category: cat }))}
+                    />
                   ))}
                 </View>
               </ScrollView>
             </View>
 
-            <View style={[styles.sectionDivider, { borderTopColor: colors.border }]}>
-              <View style={[styles.sectionIcon, { backgroundColor: colors.goldLight }]}>
+            <View style={[styles.formDivider, { borderTopColor: colors.border }]}>
+              <View style={[styles.formDividerIcon, { backgroundColor: `${colors.gold}15` }]}>
                 <Ionicons name="location-outline" size={16} color={colors.gold} />
               </View>
-              <Text style={[styles.sectionLabel, { color: colors.gold }]}>Geographic Scope</Text>
+              <Text style={[styles.formDividerLabel, { color: colors.gold }]}>Geographic Scope</Text>
             </View>
 
             {userCountry ? (
               <>
-                <Text style={[styles.helperText, { color: colors.textSecondary }]}>
-                  Based on your verified location, you can create proposals for:
+                <Text style={[styles.formHelper, { color: colors.textSecondary }]}>
+                  Based on your verified location:
                 </Text>
 
-                <View style={[styles.locationCard, { backgroundColor: colors.cardBg, borderColor: colors.gold }]}>
+                <View style={[styles.locationBadge, { backgroundColor: colors.surface, borderColor: colors.gold }]}>
                   <Ionicons name="location" size={16} color={colors.gold} />
                   <Text style={[styles.locationText, { color: colors.text }]}>
                     {[userCity, userState, userCountry].filter(Boolean).join(', ')}
                   </Text>
                 </View>
 
-                <View style={styles.inputGroup}>
-                  <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>
-                    Who can vote on this proposal?
-                  </Text>
+                <View style={styles.scopeGrid}>
+                  <TouchableOpacity
+                    style={[
+                      styles.scopeCard,
+                      {
+                        backgroundColor: newProposal.geoScope === 'national' ? `${colors.gold}15` : colors.surface,
+                        borderColor: newProposal.geoScope === 'national' ? colors.gold : colors.border,
+                      },
+                    ]}
+                    onPress={() => setNewProposal((p) => ({ ...p, geoScope: 'national' }))}
+                  >
+                    <Ionicons
+                      name="globe-outline"
+                      size={24}
+                      color={newProposal.geoScope === 'national' ? colors.gold : colors.textSecondary}
+                    />
+                    <Text
+                      style={[
+                        styles.scopeTitle,
+                        { color: newProposal.geoScope === 'national' ? colors.gold : colors.text },
+                      ]}
+                    >
+                      National
+                    </Text>
+                    <Text style={[styles.scopeDesc, { color: colors.textTertiary }]}>All of {userCountry}</Text>
+                  </TouchableOpacity>
 
-                  <View style={styles.scopeOptions}>
+                  {userState && (
                     <TouchableOpacity
                       style={[
-                        styles.scopeOption,
+                        styles.scopeCard,
                         {
-                          backgroundColor: newProposal.geoScope === 'national' ? colors.goldLight : colors.cardBg,
-                          borderColor: newProposal.geoScope === 'national' ? colors.gold : colors.border,
+                          backgroundColor: newProposal.geoScope === 'state' ? `${colors.gold}15` : colors.surface,
+                          borderColor: newProposal.geoScope === 'state' ? colors.gold : colors.border,
                         },
                       ]}
-                      onPress={() => setNewProposal((p) => ({ ...p, geoScope: 'national' }))}
+                      onPress={() => setNewProposal((p) => ({ ...p, geoScope: 'state' }))}
                     >
-                      <Ionicons name="globe-outline" size={24} color={newProposal.geoScope === 'national' ? colors.gold : colors.textSecondary} />
-                      <Text style={[styles.scopeTitle, { color: newProposal.geoScope === 'national' ? colors.gold : colors.text }]}>National</Text>
-                      <Text style={[styles.scopeDesc, { color: colors.textSecondary }]}>All of {userCountry}</Text>
+                      <Ionicons
+                        name="map-outline"
+                        size={24}
+                        color={newProposal.geoScope === 'state' ? colors.gold : colors.textSecondary}
+                      />
+                      <Text
+                        style={[
+                          styles.scopeTitle,
+                          { color: newProposal.geoScope === 'state' ? colors.gold : colors.text },
+                        ]}
+                      >
+                        State
+                      </Text>
+                      <Text style={[styles.scopeDesc, { color: colors.textTertiary }]}>{userState} only</Text>
                     </TouchableOpacity>
+                  )}
 
-                    {userState ? (
-                      <TouchableOpacity
+                  {userCity && (
+                    <TouchableOpacity
+                      style={[
+                        styles.scopeCard,
+                        {
+                          backgroundColor: newProposal.geoScope === 'city' ? `${colors.gold}15` : colors.surface,
+                          borderColor: newProposal.geoScope === 'city' ? colors.gold : colors.border,
+                        },
+                      ]}
+                      onPress={() => setNewProposal((p) => ({ ...p, geoScope: 'city' }))}
+                    >
+                      <Ionicons
+                        name="business-outline"
+                        size={24}
+                        color={newProposal.geoScope === 'city' ? colors.gold : colors.textSecondary}
+                      />
+                      <Text
                         style={[
-                          styles.scopeOption,
-                          {
-                            backgroundColor: newProposal.geoScope === 'state' ? colors.goldLight : colors.cardBg,
-                            borderColor: newProposal.geoScope === 'state' ? colors.gold : colors.border,
-                          },
+                          styles.scopeTitle,
+                          { color: newProposal.geoScope === 'city' ? colors.gold : colors.text },
                         ]}
-                        onPress={() => setNewProposal((p) => ({ ...p, geoScope: 'state' }))}
                       >
-                        <Ionicons name="map-outline" size={24} color={newProposal.geoScope === 'state' ? colors.gold : colors.textSecondary} />
-                        <Text style={[styles.scopeTitle, { color: newProposal.geoScope === 'state' ? colors.gold : colors.text }]}>State/Province</Text>
-                        <Text style={[styles.scopeDesc, { color: colors.textSecondary }]}>{userState} only</Text>
-                      </TouchableOpacity>
-                    ) : null}
-
-                    {userCity ? (
-                      <TouchableOpacity
-                        style={[
-                          styles.scopeOption,
-                          {
-                            backgroundColor: newProposal.geoScope === 'city' ? colors.goldLight : colors.cardBg,
-                            borderColor: newProposal.geoScope === 'city' ? colors.gold : colors.border,
-                          },
-                        ]}
-                        onPress={() => setNewProposal((p) => ({ ...p, geoScope: 'city' }))}
-                      >
-                        <Ionicons name="business-outline" size={24} color={newProposal.geoScope === 'city' ? colors.gold : colors.textSecondary} />
-                        <Text style={[styles.scopeTitle, { color: newProposal.geoScope === 'city' ? colors.gold : colors.text }]}>City/Local</Text>
-                        <Text style={[styles.scopeDesc, { color: colors.textSecondary }]}>{userCity} only</Text>
-                      </TouchableOpacity>
-                    ) : null}
-                  </View>
+                        City
+                      </Text>
+                      <Text style={[styles.scopeDesc, { color: colors.textTertiary }]}>{userCity} only</Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
               </>
             ) : (
-              <View style={[styles.warningCard, { backgroundColor: colors.warningLight, borderColor: colors.warning }]}>
+              <View style={[styles.warningBanner, { backgroundColor: `${colors.warning}12`, borderColor: `${colors.warning}30` }]}>
                 <Ionicons name="warning-outline" size={20} color={colors.warning} />
                 <View style={styles.warningContent}>
                   <Text style={[styles.warningTitle, { color: colors.warning }]}>Location Not Verified</Text>
-                  <Text style={[styles.warningText, { color: colors.textSecondary }]}>
-                    Complete identity verification to create geo-restricted proposals. Your proposal will be visible to all users.
+                  <Text style={[styles.warningDesc, { color: colors.textSecondary }]}>
+                    Complete identity verification to create geo-restricted proposals.
                   </Text>
                 </View>
               </View>
             )}
 
-            <View style={[styles.sectionDivider, { borderTopColor: colors.border }]}>
-              <View style={[styles.sectionIcon, { backgroundColor: colors.goldLight }]}>
+            <View style={[styles.formDivider, { borderTopColor: colors.border }]}>
+              <View style={[styles.formDividerIcon, { backgroundColor: `${colors.gold}15` }]}>
                 <Ionicons name="people-outline" size={16} color={colors.gold} />
               </View>
-              <Text style={[styles.sectionLabel, { color: colors.gold }]}>Demographic Restrictions</Text>
+              <Text style={[styles.formDividerLabel, { color: colors.gold }]}>Demographics (Optional)</Text>
             </View>
 
-            <Text style={[styles.helperText, { color: colors.textSecondary }]}>
-              Limit who can vote based on demographics (optional)
-            </Text>
-
-            <View style={styles.inputGroup}>
-              <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>Age Group</Text>
+            <View style={styles.formSection}>
+              <Text style={[styles.formSubLabel, { color: colors.textSecondary }]}>Age Group</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                <View style={styles.filterOptions}>
+                <View style={styles.filterRow}>
                   {AGE_GROUPS.map((age) => (
-                    <FilterChip key={age} label={age} selected={newProposal.ageGroup === age} onPress={() => setNewProposal((p) => ({ ...p, ageGroup: age }))} />
+                    <FilterChip
+                      key={age}
+                      label={age}
+                      selected={newProposal.ageGroup === age}
+                      onPress={() => setNewProposal((p) => ({ ...p, ageGroup: age }))}
+                    />
                   ))}
                 </View>
               </ScrollView>
             </View>
 
-            <View style={styles.inputGroup}>
-              <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>Gender</Text>
+            <View style={styles.formSection}>
+              <Text style={[styles.formSubLabel, { color: colors.textSecondary }]}>Gender</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                <View style={styles.filterOptions}>
+                <View style={styles.filterRow}>
                   {GENDERS.map((g) => (
-                    <FilterChip key={g} label={g} selected={newProposal.gender === g} onPress={() => setNewProposal((p) => ({ ...p, gender: g }))} />
+                    <FilterChip
+                      key={g}
+                      label={g}
+                      selected={newProposal.gender === g}
+                      onPress={() => setNewProposal((p) => ({ ...p, gender: g }))}
+                    />
                   ))}
                 </View>
               </ScrollView>
             </View>
 
-            <View style={{ height: 50 }} />
+            <View style={{ height: 100 }} />
           </ScrollView>
         </KeyboardAvoidingView>
       </Modal>
@@ -1296,40 +1434,40 @@ const styles = StyleSheet.create({
     paddingBottom: SPACING.md,
     borderBottomWidth: 1,
   },
-  headerContent: {
+  headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: SPACING.md,
   },
-  headerTitle: { ...TYPOGRAPHY.headlineLarge },
-  headerSubtitle: { ...TYPOGRAPHY.bodySmall, marginTop: SPACING.xxs },
-  headerButtons: { flexDirection: 'row', gap: SPACING.sm },
+  headerTitle: { ...TYPOGRAPHY.displaySmall },
+  headerSubtitle: { ...TYPOGRAPHY.labelMedium, marginTop: 2 },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm },
 
-  iconButton: {
+  filterBtn: {
     width: 44,
     height: 44,
-    borderRadius: BORDER_RADIUS.full,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
   },
-  createButton: {
+  createBtn: {
     width: 44,
     height: 44,
-    borderRadius: BORDER_RADIUS.full,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
+    ...SHADOWS.md,
   },
 
   // Search
-  searchWrapper: { marginTop: SPACING.xs },
-  searchContainer: {
+  searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.sm,
-    borderRadius: BORDER_RADIUS.lg,
+    borderRadius: BORDER_RADIUS.xl,
     borderWidth: 1,
     gap: SPACING.sm,
   },
@@ -1340,41 +1478,50 @@ const styles = StyleSheet.create({
     marginHorizontal: SPACING.lg,
     marginTop: SPACING.md,
     padding: SPACING.lg,
-    borderRadius: BORDER_RADIUS.xl,
+    borderRadius: BORDER_RADIUS.xxl,
     borderWidth: 1,
   },
   filterSection: { marginBottom: SPACING.md },
-  filterLabel: { ...TYPOGRAPHY.overline, marginBottom: SPACING.sm },
-  filterOptions: { flexDirection: 'row', gap: SPACING.sm },
+  filterLabel: { ...TYPOGRAPHY.labelSmall, letterSpacing: 1, marginBottom: SPACING.sm },
+  filterRow: { flexDirection: 'row', gap: SPACING.sm },
   filterChip: {
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.sm,
     borderRadius: BORDER_RADIUS.full,
     borderWidth: 1,
+    overflow: 'hidden',
   },
-  filterChipText: { ...TYPOGRAPHY.labelSmall },
-  clearFiltersButton: {
+  filterChipText: { ...TYPOGRAPHY.labelSmall, fontWeight: '500' },
+  clearBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: SPACING.xs,
     paddingTop: SPACING.sm,
   },
-  clearFiltersText: { ...TYPOGRAPHY.labelMedium },
+  clearBtnText: { ...TYPOGRAPHY.labelMedium },
 
-  // Content
-  scrollView: { flex: 1 },
-  scrollContent: { padding: SPACING.lg, gap: SPACING.md },
+  // List
+  list: { flex: 1 },
+  listContent: { padding: SPACING.lg, gap: SPACING.md },
+  listSpacer: { height: 100 },
 
   // Card
   card: {
-    borderRadius: BORDER_RADIUS.xl,
+    borderRadius: BORDER_RADIUS.xxl,
     padding: SPACING.lg,
     borderWidth: 1,
     overflow: 'hidden',
     ...SHADOWS.md,
   },
-  cardGradient: { ...StyleSheet.absoluteFillObject, borderRadius: BORDER_RADIUS.xl },
+  shimmerContainer: {
+    ...StyleSheet.absoluteFillObject,
+    overflow: 'hidden',
+  },
+  shimmerBar: {
+    width: SCREEN_WIDTH,
+    height: '100%',
+  },
   cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -1387,20 +1534,20 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.xs,
     borderRadius: BORDER_RADIUS.full,
   },
-  categoryText: { ...TYPOGRAPHY.labelSmall, fontWeight: '600', textTransform: 'uppercase' },
-  deadlineBadge: {
+  categoryText: { ...TYPOGRAPHY.labelSmall, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5 },
+  timeBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: SPACING.xs,
+    gap: 4,
     paddingHorizontal: SPACING.sm,
     paddingVertical: SPACING.xs,
     borderRadius: BORDER_RADIUS.full,
   },
-  deadlineText: { ...TYPOGRAPHY.labelSmall },
-  shareButton: {
+  timeText: { ...TYPOGRAPHY.labelSmall, fontWeight: '500' },
+  shareBtn: {
     width: 32,
     height: 32,
-    borderRadius: BORDER_RADIUS.full,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1413,136 +1560,108 @@ const styles = StyleSheet.create({
   geoTag: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: SPACING.xxs,
+    gap: 3,
     paddingHorizontal: SPACING.sm,
-    paddingVertical: SPACING.xxs,
+    paddingVertical: 3,
     borderRadius: BORDER_RADIUS.full,
   },
   geoTagText: { ...TYPOGRAPHY.labelSmall, fontSize: 10 },
   cardTitle: { ...TYPOGRAPHY.headlineSmall, marginBottom: SPACING.sm },
-  cardDescription: { ...TYPOGRAPHY.bodyMedium, lineHeight: 22, marginBottom: SPACING.lg },
+  cardDesc: { ...TYPOGRAPHY.bodyMedium, lineHeight: 22, marginBottom: SPACING.lg },
 
-  imageContainer: {
-    marginBottom: SPACING.md,
-    borderRadius: BORDER_RADIUS.lg,
+  imageWrapper: {
+    marginBottom: SPACING.lg,
+    borderRadius: BORDER_RADIUS.xl,
     overflow: 'hidden',
   },
   proposalImage: { width: '100%', height: 180 },
+  imageOverlay: {
+    ...StyleSheet.absoluteFillObject,
+  },
 
   // Vote Section
   voteSection: { marginBottom: SPACING.lg },
-  voteBar: {
+  voteBarBg: {
     height: 8,
     borderRadius: BORDER_RADIUS.full,
     overflow: 'hidden',
     marginBottom: SPACING.sm,
   },
-  supportBar: { height: '100%', borderRadius: BORDER_RADIUS.full },
+  voteBarFill: { height: '100%', borderRadius: BORDER_RADIUS.full },
   voteStats: { flexDirection: 'row', justifyContent: 'space-between' },
   voteStat: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm },
   voteIconBg: {
     width: 24,
     height: 24,
-    borderRadius: BORDER_RADIUS.full,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
   },
   voteCount: { ...TYPOGRAPHY.labelMedium },
 
   // Actions
-  statusContainer: {
+  statusBanner: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: SPACING.md,
-    borderRadius: BORDER_RADIUS.lg,
+    borderRadius: BORDER_RADIUS.xl,
     gap: SPACING.sm,
   },
-  statusText: { ...TYPOGRAPHY.labelMedium },
-  claimButton: {
+  statusText: { ...TYPOGRAPHY.labelMedium, fontWeight: '500' },
+  claimBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: SPACING.md,
-    borderRadius: BORDER_RADIUS.lg,
+    paddingVertical: 14,
+    borderRadius: BORDER_RADIUS.xl,
     gap: SPACING.sm,
+    overflow: 'hidden',
   },
-  claimButtonText: { color: '#000', ...TYPOGRAPHY.labelLarge, fontWeight: '600' },
-  actionButtons: { flexDirection: 'row', gap: SPACING.md },
-  voteButton: {
+  claimBtnText: { color: '#000', ...TYPOGRAPHY.labelLarge, fontWeight: '600' },
+  voteActions: { flexDirection: 'row', gap: SPACING.md },
+  voteBtn: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: SPACING.md,
-    borderRadius: BORDER_RADIUS.lg,
+    paddingVertical: 14,
+    borderRadius: BORDER_RADIUS.xl,
     gap: SPACING.xs,
   },
-  voteButtonText: { color: '#fff', ...TYPOGRAPHY.labelMedium, fontWeight: '600' },
-  buttonDisabled: { opacity: 0.6 },
+  voteBtnText: { color: '#fff', ...TYPOGRAPHY.labelMedium, fontWeight: '600' },
+  btnDisabled: { opacity: 0.6 },
 
   // Skeleton
   skeletonBadge: { width: 80, height: 24, borderRadius: BORDER_RADIUS.full },
   skeletonSmall: { width: 60, height: 24, borderRadius: BORDER_RADIUS.full },
   skeletonTitle: { height: 24, borderRadius: BORDER_RADIUS.sm, marginBottom: SPACING.sm },
   skeletonLine: { height: 16, borderRadius: BORDER_RADIUS.sm, marginBottom: SPACING.xs },
-  skeletonButton: { height: 48, borderRadius: BORDER_RADIUS.lg, marginTop: SPACING.md },
+  skeletonBtn: { height: 48, borderRadius: BORDER_RADIUS.xl, marginTop: SPACING.md },
 
   // Empty State
-  emptyContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: SPACING.xxxl },
+  emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: SPACING.xxxl },
   emptyIcon: {
     width: 100,
     height: 100,
-    borderRadius: BORDER_RADIUS.full,
+    borderRadius: 50,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: SPACING.xl,
   },
-  emptyText: { ...TYPOGRAPHY.headlineSmall, marginBottom: SPACING.xs },
-  emptySubtext: { ...TYPOGRAPHY.bodyMedium, textAlign: 'center', marginBottom: SPACING.xl },
-  emptyCreateButton: {
+  emptyTitle: { ...TYPOGRAPHY.headlineSmall, marginBottom: SPACING.xs },
+  emptyDesc: { ...TYPOGRAPHY.bodyMedium, textAlign: 'center', marginBottom: SPACING.xl },
+  emptyBtn: { overflow: 'hidden', borderRadius: BORDER_RADIUS.full },
+  emptyBtnGradient: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: SPACING.xl,
     paddingVertical: SPACING.md,
-    borderRadius: BORDER_RADIUS.full,
     gap: SPACING.sm,
   },
-  emptyCreateButtonText: { color: '#000', ...TYPOGRAPHY.labelLarge, fontWeight: '600' },
-  bottomPadding: { height: 100 },
+  emptyBtnText: { color: '#000', ...TYPOGRAPHY.labelLarge, fontWeight: '600' },
 
-  // Detail modal
-  detailContainer: { flex: 1 },
-  detailHeader: {
-    paddingTop: SPACING.lg,
-    paddingBottom: SPACING.md,
-    paddingHorizontal: SPACING.lg,
-    borderBottomWidth: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  detailHeaderTitle: { ...TYPOGRAPHY.headlineSmall },
-  detailShareBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: BORDER_RADIUS.full,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-  },
-  detailContent: { padding: SPACING.lg },
-  detailCard: {
-    borderRadius: BORDER_RADIUS.xxl,
-    borderWidth: 1,
-    padding: SPACING.xl,
-    overflow: 'hidden',
-  },
-  detailTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  detailTitle: { ...TYPOGRAPHY.headlineLarge, marginTop: SPACING.lg },
-  detailDesc: { ...TYPOGRAPHY.bodyLarge, marginTop: SPACING.md, lineHeight: 26 },
-
-  // Create modal
+  // Modal
   modalContainer: { flex: 1 },
   modalHeader: {
     flexDirection: 'row',
@@ -1553,79 +1672,104 @@ const styles = StyleSheet.create({
     paddingBottom: SPACING.md,
     borderBottomWidth: 1,
   },
-  modalHeaderButton: { padding: SPACING.xs },
+  modalClose: { padding: SPACING.xs },
   modalTitle: { ...TYPOGRAPHY.headlineSmall },
-  modalSubmitButton: {
+  modalShare: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+  },
+  modalContent: { padding: SPACING.lg },
+
+  // Detail Card
+  detailCard: {
+    borderRadius: BORDER_RADIUS.xxl,
+    borderWidth: 1,
+    padding: SPACING.xl,
+    overflow: 'hidden',
+    ...SHADOWS.lg,
+  },
+  detailHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  detailTitle: { ...TYPOGRAPHY.headlineLarge, marginTop: SPACING.lg },
+  detailDesc: { ...TYPOGRAPHY.bodyLarge, marginTop: SPACING.md, lineHeight: 26 },
+
+  // Create Form
+  submitBtn: {
     paddingHorizontal: SPACING.lg,
     paddingVertical: SPACING.sm,
     borderRadius: BORDER_RADIUS.full,
     minWidth: 80,
     alignItems: 'center',
   },
-  modalSubmitText: { color: '#000', ...TYPOGRAPHY.labelMedium, fontWeight: '600' },
-  modalContent: { flex: 1, padding: SPACING.lg },
-
-  // Form
-  inputGroup: { marginBottom: SPACING.lg },
-  inputLabel: { ...TYPOGRAPHY.labelMedium, marginBottom: SPACING.sm },
-  input: {
+  submitBtnText: { color: '#000', ...TYPOGRAPHY.labelMedium, fontWeight: '600' },
+  formScroll: { flex: 1, padding: SPACING.lg },
+  formSection: { marginBottom: SPACING.lg },
+  formLabel: { ...TYPOGRAPHY.labelMedium, marginBottom: SPACING.sm },
+  formSubLabel: { ...TYPOGRAPHY.labelSmall, marginBottom: SPACING.sm },
+  formInput: {
     borderWidth: 1,
-    borderRadius: BORDER_RADIUS.lg,
+    borderRadius: BORDER_RADIUS.xl,
     paddingHorizontal: SPACING.lg,
     paddingVertical: SPACING.md,
     ...TYPOGRAPHY.bodyMedium,
   },
-  textArea: { minHeight: 140, paddingTop: SPACING.md },
-  imagePickerButton: { borderWidth: 1, borderRadius: BORDER_RADIUS.lg, overflow: 'hidden', borderStyle: 'dashed' },
+  formTextArea: { minHeight: 140, paddingTop: SPACING.md },
+  imagePicker: {
+    borderWidth: 1,
+    borderRadius: BORDER_RADIUS.xl,
+    overflow: 'hidden',
+    borderStyle: 'dashed',
+  },
   imagePreview: { width: '100%', height: 180 },
-  imagePickerPlaceholder: { alignItems: 'center', justifyContent: 'center', paddingVertical: SPACING.xxxl },
+  imagePickerContent: { alignItems: 'center', justifyContent: 'center', paddingVertical: SPACING.xxxl },
   imagePickerText: { ...TYPOGRAPHY.bodySmall, marginTop: SPACING.sm },
-  removeImageButton: { flexDirection: 'row', alignItems: 'center', gap: SPACING.xs, marginTop: SPACING.sm },
+  removeImageBtn: { flexDirection: 'row', alignItems: 'center', gap: SPACING.xs, marginTop: SPACING.sm },
   removeImageText: { ...TYPOGRAPHY.labelMedium },
-  categoryPicker: { flexDirection: 'row', gap: SPACING.sm },
 
-  // Section
-  sectionDivider: {
+  formDivider: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: SPACING.sm,
     marginTop: SPACING.xl,
-    marginBottom: SPACING.md,
+    marginBottom: SPACING.lg,
     paddingTop: SPACING.xl,
     borderTopWidth: 1,
   },
-  sectionIcon: { width: 32, height: 32, borderRadius: BORDER_RADIUS.full, alignItems: 'center', justifyContent: 'center' },
-  sectionLabel: { ...TYPOGRAPHY.headlineSmall, fontSize: 16 },
-  helperText: { ...TYPOGRAPHY.bodySmall, marginBottom: SPACING.md },
-  locationCard: {
+  formDividerIcon: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  formDividerLabel: { ...TYPOGRAPHY.headlineSmall, fontSize: 16 },
+  formHelper: { ...TYPOGRAPHY.bodySmall, marginBottom: SPACING.md },
+  locationBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: SPACING.sm,
     padding: SPACING.md,
-    borderRadius: BORDER_RADIUS.lg,
+    borderRadius: BORDER_RADIUS.xl,
     borderWidth: 1,
     marginBottom: SPACING.lg,
   },
   locationText: { ...TYPOGRAPHY.bodyMedium, fontWeight: '500' },
-  scopeOptions: { gap: SPACING.md },
-  scopeOption: {
+  scopeGrid: { gap: SPACING.md },
+  scopeCard: {
     alignItems: 'center',
     padding: SPACING.lg,
     borderRadius: BORDER_RADIUS.xl,
     borderWidth: 2,
   },
   scopeTitle: { ...TYPOGRAPHY.labelLarge, marginTop: SPACING.sm },
-  scopeDesc: { ...TYPOGRAPHY.bodySmall, marginTop: SPACING.xxs },
-  warningCard: {
+  scopeDesc: { ...TYPOGRAPHY.bodySmall, marginTop: 2 },
+  warningBanner: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: SPACING.md,
     padding: SPACING.lg,
-    borderRadius: BORDER_RADIUS.lg,
+    borderRadius: BORDER_RADIUS.xl,
     borderWidth: 1,
     marginBottom: SPACING.lg,
   },
   warningContent: { flex: 1 },
-  warningTitle: { ...TYPOGRAPHY.labelMedium, marginBottom: SPACING.xs },
-  warningText: { ...TYPOGRAPHY.bodySmall, lineHeight: 20 },
+  warningTitle: { ...TYPOGRAPHY.labelMedium, marginBottom: SPACING.xxs },
+  warningDesc: { ...TYPOGRAPHY.bodySmall, lineHeight: 20 },
 });

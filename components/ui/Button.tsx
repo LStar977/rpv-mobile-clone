@@ -9,19 +9,22 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withSpring,
   withTiming,
   interpolate,
+  Extrapolation,
 } from 'react-native-reanimated';
-import { useTheme, SHADOWS, BORDER_RADIUS, SPACING, TYPOGRAPHY } from '../../lib/theme';
+import { useTheme, SHADOWS, RADIUS, SPACING, TYPOGRAPHY, EASING } from '../../lib/theme';
 import { haptics } from '../../lib/haptics';
 
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
+const AnimatedLinearGradient = Animated.createAnimatedComponent(LinearGradient);
 
-type ButtonVariant = 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger';
+type ButtonVariant = 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger' | 'success';
 type ButtonSize = 'sm' | 'md' | 'lg' | 'xl';
 
 interface ButtonProps {
@@ -55,84 +58,95 @@ export function Button({
 }: ButtonProps) {
   const { colors, isDark } = useTheme();
   const scale = useSharedValue(1);
-  const opacity = useSharedValue(1);
+  const pressed = useSharedValue(0);
 
   const handlePressIn = () => {
-    // Trigger haptic feedback based on variant
-    if (variant === 'danger') {
-      haptics.medium();
-    } else if (variant === 'primary') {
-      haptics.light();
-    } else {
-      haptics.light();
-    }
-    scale.value = withSpring(0.97, { damping: 15, stiffness: 300 });
-    opacity.value = withTiming(0.9, { duration: 100 });
+    haptics.light();
+    scale.value = withSpring(0.97, EASING.springSnappy);
+    pressed.value = withTiming(1, { duration: 100 });
   };
 
   const handlePressOut = () => {
-    scale.value = withSpring(1, { damping: 15, stiffness: 300 });
-    opacity.value = withTiming(1, { duration: 100 });
+    scale.value = withSpring(1, EASING.springSnappy);
+    pressed.value = withTiming(0, { duration: 150 });
   };
 
-  const animatedStyle = useAnimatedStyle(() => ({
+  const animatedContainerStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
-    opacity: opacity.value,
+    opacity: interpolate(pressed.value, [0, 1], [1, 0.9], Extrapolation.CLAMP),
   }));
 
-  const sizeStyles = {
+  const sizeConfig = {
     sm: {
-      paddingVertical: SPACING.sm + 2,
-      paddingHorizontal: SPACING.lg,
-      borderRadius: BORDER_RADIUS.md,
+      paddingVertical: 10,
+      paddingHorizontal: 16,
+      borderRadius: RADIUS.md,
       fontSize: 13,
       iconSize: 16,
+      minHeight: 36,
     },
     md: {
-      paddingVertical: SPACING.md + 2,
-      paddingHorizontal: SPACING.xl,
-      borderRadius: BORDER_RADIUS.lg,
+      paddingVertical: 14,
+      paddingHorizontal: 24,
+      borderRadius: RADIUS.button,
       fontSize: 15,
       iconSize: 18,
+      minHeight: 48,
     },
     lg: {
-      paddingVertical: SPACING.lg,
-      paddingHorizontal: SPACING.xxl,
-      borderRadius: BORDER_RADIUS.xl,
+      paddingVertical: 16,
+      paddingHorizontal: 28,
+      borderRadius: RADIUS.lg,
       fontSize: 16,
       iconSize: 20,
+      minHeight: 54,
     },
     xl: {
-      paddingVertical: SPACING.xl,
-      paddingHorizontal: SPACING.xxxl,
-      borderRadius: BORDER_RADIUS.xxl,
+      paddingVertical: 18,
+      paddingHorizontal: 32,
+      borderRadius: RADIUS.xl,
       fontSize: 17,
       iconSize: 22,
+      minHeight: 60,
     },
   };
 
-  const getVariantStyles = (): { container: ViewStyle; text: TextStyle; iconColor: string } => {
+  const getVariantStyles = (): {
+    container: ViewStyle;
+    text: TextStyle;
+    iconColor: string;
+    useGradient?: boolean;
+    gradientColors?: string[];
+  } => {
     const isDisabled = disabled || loading;
 
     switch (variant) {
       case 'primary':
         return {
           container: {
-            backgroundColor: isDisabled ? colors.goldMedium : colors.gold,
-            ...(!isDisabled && SHADOWS.glow),
+            backgroundColor: isDisabled ? colors.goldSurface : colors.gold,
+            ...(isDisabled ? {} : SHADOWS.glow),
           },
-          text: { color: colors.background, fontWeight: '600' },
-          iconColor: colors.background,
+          text: {
+            color: isDisabled ? colors.textTertiary : colors.black,
+            fontWeight: '600'
+          },
+          iconColor: isDisabled ? colors.textTertiary : colors.black,
+          useGradient: !isDisabled,
+          gradientColors: [colors.goldLight, colors.gold, colors.goldDark],
         };
       case 'secondary':
         return {
           container: {
-            backgroundColor: isDisabled ? colors.cardBg : colors.cardBgElevated,
+            backgroundColor: isDisabled ? colors.surface : colors.surfaceElevated,
             borderWidth: 1,
             borderColor: colors.border,
           },
-          text: { color: isDisabled ? colors.textMuted : colors.text, fontWeight: '600' },
-          iconColor: isDisabled ? colors.textMuted : colors.gold,
+          text: {
+            color: isDisabled ? colors.textDisabled : colors.text,
+            fontWeight: '600'
+          },
+          iconColor: isDisabled ? colors.textDisabled : colors.gold,
         };
       case 'outline':
         return {
@@ -141,67 +155,62 @@ export function Button({
             borderWidth: 1.5,
             borderColor: isDisabled ? colors.border : colors.gold,
           },
-          text: { color: isDisabled ? colors.textMuted : colors.gold, fontWeight: '600' },
-          iconColor: isDisabled ? colors.textMuted : colors.gold,
+          text: {
+            color: isDisabled ? colors.textDisabled : colors.gold,
+            fontWeight: '600'
+          },
+          iconColor: isDisabled ? colors.textDisabled : colors.gold,
         };
       case 'ghost':
         return {
           container: {
             backgroundColor: 'transparent',
           },
-          text: { color: isDisabled ? colors.textMuted : colors.gold, fontWeight: '600' },
-          iconColor: isDisabled ? colors.textMuted : colors.gold,
+          text: {
+            color: isDisabled ? colors.textDisabled : colors.gold,
+            fontWeight: '600'
+          },
+          iconColor: isDisabled ? colors.textDisabled : colors.gold,
         };
       case 'danger':
         return {
           container: {
-            backgroundColor: isDisabled ? colors.errorLight : colors.error,
+            backgroundColor: isDisabled ? colors.errorSurface : colors.error,
+            ...(isDisabled ? {} : SHADOWS.glowError),
           },
-          text: { color: '#fff', fontWeight: '600' },
-          iconColor: '#fff',
+          text: { color: colors.white, fontWeight: '600' },
+          iconColor: colors.white,
+        };
+      case 'success':
+        return {
+          container: {
+            backgroundColor: isDisabled ? colors.successSurface : colors.success,
+            ...(isDisabled ? {} : SHADOWS.glowSuccess),
+          },
+          text: { color: colors.black, fontWeight: '600' },
+          iconColor: colors.black,
         };
       default:
         return {
           container: { backgroundColor: colors.gold },
-          text: { color: colors.background, fontWeight: '600' },
-          iconColor: colors.background,
+          text: { color: colors.black, fontWeight: '600' },
+          iconColor: colors.black,
         };
     }
   };
 
   const variantStyles = getVariantStyles();
-  const currentSize = sizeStyles[size];
+  const currentSize = sizeConfig[size];
 
-  return (
-    <AnimatedTouchable
-      onPress={onPress}
-      onPressIn={handlePressIn}
-      onPressOut={handlePressOut}
-      disabled={disabled || loading}
-      activeOpacity={1}
-      accessibilityRole="button"
-      accessibilityLabel={accessibilityLabel || title}
-      accessibilityState={{ disabled: disabled || loading }}
-      style={[
-        styles.container,
-        {
-          paddingVertical: currentSize.paddingVertical,
-          paddingHorizontal: currentSize.paddingHorizontal,
-          borderRadius: currentSize.borderRadius,
-        },
-        variantStyles.container,
-        fullWidth && styles.fullWidth,
-        animatedStyle,
-        style,
-      ]}
-    >
+  const buttonContent = (
+    <View style={styles.content}>
       {loading ? (
         <ActivityIndicator
           size="small"
           color={variantStyles.iconColor}
         />
       ) : (
-        <View style={styles.content}>
+        <>
           {icon && iconPosition === 'left' && (
             <Ionicons
               name={icon}
@@ -228,8 +237,168 @@ export function Button({
               style={styles.iconRight}
             />
           )}
-        </View>
+        </>
       )}
+    </View>
+  );
+
+  // For primary variant, use gradient background
+  if (variantStyles.useGradient && variantStyles.gradientColors) {
+    return (
+      <AnimatedTouchable
+        onPress={onPress}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
+        disabled={disabled || loading}
+        activeOpacity={1}
+        accessibilityRole="button"
+        accessibilityLabel={accessibilityLabel || title}
+        accessibilityState={{ disabled: disabled || loading }}
+        style={[
+          animatedContainerStyle,
+          fullWidth && styles.fullWidth,
+          style,
+        ]}
+      >
+        <LinearGradient
+          colors={variantStyles.gradientColors as any}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={[
+            styles.container,
+            {
+              paddingVertical: currentSize.paddingVertical,
+              paddingHorizontal: currentSize.paddingHorizontal,
+              borderRadius: currentSize.borderRadius,
+              minHeight: currentSize.minHeight,
+            },
+            variantStyles.container,
+          ]}
+        >
+          {buttonContent}
+        </LinearGradient>
+      </AnimatedTouchable>
+    );
+  }
+
+  return (
+    <AnimatedTouchable
+      onPress={onPress}
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
+      disabled={disabled || loading}
+      activeOpacity={1}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel || title}
+      accessibilityState={{ disabled: disabled || loading }}
+      style={[
+        styles.container,
+        {
+          paddingVertical: currentSize.paddingVertical,
+          paddingHorizontal: currentSize.paddingHorizontal,
+          borderRadius: currentSize.borderRadius,
+          minHeight: currentSize.minHeight,
+        },
+        variantStyles.container,
+        fullWidth && styles.fullWidth,
+        animatedContainerStyle,
+        style,
+      ]}
+    >
+      {buttonContent}
+    </AnimatedTouchable>
+  );
+}
+
+// Icon Button - for icon-only buttons
+interface IconButtonProps {
+  icon: keyof typeof Ionicons.glyphMap;
+  onPress: () => void;
+  size?: 'sm' | 'md' | 'lg';
+  variant?: 'default' | 'filled' | 'outline';
+  color?: string;
+  disabled?: boolean;
+  style?: ViewStyle;
+}
+
+export function IconButton({
+  icon,
+  onPress,
+  size = 'md',
+  variant = 'default',
+  color,
+  disabled = false,
+  style,
+}: IconButtonProps) {
+  const { colors } = useTheme();
+  const scale = useSharedValue(1);
+
+  const handlePressIn = () => {
+    haptics.light();
+    scale.value = withSpring(0.9, EASING.springSnappy);
+  };
+
+  const handlePressOut = () => {
+    scale.value = withSpring(1, EASING.springSnappy);
+  };
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+
+  const sizeConfig = {
+    sm: { size: 36, iconSize: 18 },
+    md: { size: 44, iconSize: 22 },
+    lg: { size: 52, iconSize: 26 },
+  };
+
+  const currentSize = sizeConfig[size];
+  const iconColor = color || colors.text;
+
+  const getVariantStyles = (): ViewStyle => {
+    switch (variant) {
+      case 'filled':
+        return {
+          backgroundColor: colors.surface,
+        };
+      case 'outline':
+        return {
+          backgroundColor: 'transparent',
+          borderWidth: 1,
+          borderColor: colors.border,
+        };
+      default:
+        return {
+          backgroundColor: 'transparent',
+        };
+    }
+  };
+
+  return (
+    <AnimatedTouchable
+      onPress={onPress}
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
+      disabled={disabled}
+      activeOpacity={1}
+      style={[
+        styles.iconButton,
+        {
+          width: currentSize.size,
+          height: currentSize.size,
+          borderRadius: currentSize.size / 2,
+          opacity: disabled ? 0.5 : 1,
+        },
+        getVariantStyles(),
+        animatedStyle,
+        style,
+      ]}
+    >
+      <Ionicons
+        name={icon}
+        size={currentSize.iconSize}
+        color={disabled ? colors.textDisabled : iconColor}
+      />
     </AnimatedTouchable>
   );
 }
@@ -250,11 +419,16 @@ const styles = StyleSheet.create({
   },
   text: {
     textAlign: 'center',
+    letterSpacing: 0.3,
   },
   iconLeft: {
     marginRight: SPACING.sm,
   },
   iconRight: {
     marginLeft: SPACING.sm,
+  },
+  iconButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

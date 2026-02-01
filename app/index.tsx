@@ -5,7 +5,6 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
-  TextInput,
   KeyboardAvoidingView,
   Platform,
   Image,
@@ -15,6 +14,7 @@ import {
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { BlurView } from 'expo-blur';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Animated, {
   FadeIn,
@@ -25,14 +25,18 @@ import Animated, {
   withSpring,
   withTiming,
   withDelay,
+  withSequence,
+  interpolate,
+  Extrapolation,
 } from 'react-native-reanimated';
-import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS } from '../lib/theme';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTheme, SPACING, RADIUS, TYPOGRAPHY, SHADOWS, EASING } from '../lib/theme';
 import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { useAuthStore } from '../lib/auth';
 import { router } from 'expo-router';
 import { isBiometricAvailable, getBiometricType, authenticateWithBiometrics, isBiometricEnabled } from '../lib/biometrics';
-import { Button } from '../components/ui';
+import { Button, Input, Card, Badge } from '../components/ui';
 import { haptics } from '../lib/haptics';
 import { ONBOARDING_KEY } from './onboarding';
 
@@ -44,8 +48,10 @@ GoogleSignin.configure({
   offlineAccess: true,
 });
 
-// Animated Feature Icon Component
-function FeatureIcon({
+const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
+
+// Premium Feature Pill Component
+function FeaturePill({
   icon,
   label,
   delay,
@@ -57,117 +63,171 @@ function FeatureIcon({
   IconComponent?: any;
 }) {
   const { colors } = useTheme();
-  const scale = useSharedValue(0);
-
-  useEffect(() => {
-    scale.value = withDelay(delay, withSpring(1, { damping: 12, stiffness: 100 }));
-  }, []);
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-    opacity: scale.value,
-  }));
-
-  return (
-    <Animated.View style={[styles.featureItem, animatedStyle]}>
-      <View style={[styles.featureIconContainer, { borderColor: colors.gold }]}>
-        <LinearGradient
-          colors={[`${colors.gold}20`, `${colors.gold}05`]}
-          style={styles.featureIconGradient}
-        >
-          <IconComponent name={icon} size={28} color={colors.gold} />
-        </LinearGradient>
-      </View>
-      <Text style={[styles.featureLabel, { color: colors.textSecondary }]}>{label}</Text>
-    </Animated.View>
-  );
-}
-
-// Animated Input Component
-function AnimatedInput({
-  label,
-  value,
-  onChangeText,
-  placeholder,
-  keyboardType,
-  secureTextEntry,
-  autoCapitalize,
-  autoCorrect,
-  delay = 0,
-}: {
-  label: string;
-  value: string;
-  onChangeText: (text: string) => void;
-  placeholder: string;
-  keyboardType?: any;
-  secureTextEntry?: boolean;
-  autoCapitalize?: any;
-  autoCorrect?: boolean;
-  delay?: number;
-}) {
-  const { colors } = useTheme();
-  const [isFocused, setIsFocused] = useState(false);
-
-  const handleFocus = () => setIsFocused(true);
-  const handleBlur = () => setIsFocused(false);
 
   return (
     <Animated.View
-      entering={FadeInUp.delay(delay).duration(400)}
-      style={styles.inputGroup}
+      entering={FadeInUp.delay(delay).duration(500).springify()}
+      style={[styles.featurePill, { backgroundColor: colors.surface, borderColor: colors.border }]}
     >
-      <Text style={[styles.inputLabel, { color: isFocused ? colors.gold : colors.textSecondary }]}>
-        {label}
-      </Text>
-      <View
-        style={[
-          styles.inputContainer,
-          {
-            backgroundColor: colors.cardBgLight,
-            borderColor: isFocused ? colors.gold : colors.border,
-          },
-        ]}
-      >
-        <TextInput
-          style={[styles.input, { color: colors.text }]}
-          placeholder={placeholder}
-          placeholderTextColor={colors.textMuted}
-          value={value}
-          onChangeText={onChangeText}
-          onFocus={handleFocus}
-          onBlur={handleBlur}
-          keyboardType={keyboardType}
-          secureTextEntry={secureTextEntry}
-          autoCapitalize={autoCapitalize}
-          autoCorrect={autoCorrect}
-          selectionColor={colors.gold}
-        />
-      </View>
+      <IconComponent name={icon} size={16} color={colors.gold} />
+      <Text style={[styles.featurePillText, { color: colors.textSecondary }]}>{label}</Text>
     </Animated.View>
   );
 }
 
-export default function HomeScreen() {
+// Premium Social Button
+function SocialButton({
+  provider,
+  onPress,
+  disabled,
+  loading,
+}: {
+  provider: 'google' | 'apple';
+  onPress: () => void;
+  disabled?: boolean;
+  loading?: boolean;
+}) {
   const { colors, isDark } = useTheme();
+  const scale = useSharedValue(1);
+
+  const handlePressIn = () => {
+    if (!disabled) {
+      haptics.light();
+      scale.value = withSpring(0.97, EASING.springSnappy);
+    }
+  };
+
+  const handlePressOut = () => {
+    scale.value = withSpring(1, EASING.springSnappy);
+  };
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+
+  const isGoogle = provider === 'google';
+  const bgColor = isGoogle ? '#FFFFFF' : (isDark ? '#FFFFFF' : '#000000');
+  const textColor = isGoogle ? '#1F1F1F' : (isDark ? '#000000' : '#FFFFFF');
+
+  return (
+    <AnimatedTouchable
+      onPress={onPress}
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
+      disabled={disabled || loading}
+      activeOpacity={1}
+      style={[
+        styles.socialButton,
+        { backgroundColor: bgColor, opacity: disabled ? 0.5 : 1 },
+        animatedStyle,
+      ]}
+    >
+      {loading ? (
+        <ActivityIndicator size="small" color={textColor} />
+      ) : (
+        <>
+          <Ionicons
+            name={isGoogle ? 'logo-google' : 'logo-apple'}
+            size={20}
+            color={textColor}
+          />
+          <Text style={[styles.socialButtonText, { color: textColor }]}>
+            {isGoogle ? 'Google' : 'Apple'}
+          </Text>
+        </>
+      )}
+    </AnimatedTouchable>
+  );
+}
+
+// Biometric Quick Login Button
+function BiometricButton({
+  type,
+  onPress,
+}: {
+  type: string;
+  onPress: () => void;
+}) {
+  const { colors } = useTheme();
+  const scale = useSharedValue(1);
+  const glow = useSharedValue(0);
+
+  useEffect(() => {
+    glow.value = withSequence(
+      withTiming(1, { duration: 1500 }),
+      withTiming(0.5, { duration: 1500 })
+    );
+  }, []);
+
+  const handlePress = () => {
+    haptics.medium();
+    scale.value = withSequence(
+      withSpring(0.92, EASING.springSnappy),
+      withSpring(1, EASING.springSnappy)
+    );
+    onPress();
+  };
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+
+  const glowStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(glow.value, [0, 1], [0.3, 0.6], Extrapolation.CLAMP),
+  }));
+
+  const isFaceID = type === 'Face ID';
+
+  return (
+    <AnimatedTouchable
+      onPress={handlePress}
+      activeOpacity={1}
+      style={[styles.biometricContainer, animatedStyle]}
+    >
+      <Animated.View style={[styles.biometricGlow, { backgroundColor: colors.gold }, glowStyle]} />
+      <LinearGradient
+        colors={[colors.goldLight, colors.gold, colors.goldDark] as any}
+        style={styles.biometricButton}
+      >
+        <Ionicons
+          name={isFaceID ? 'scan-outline' : 'finger-print-outline'}
+          size={32}
+          color={colors.black}
+        />
+      </LinearGradient>
+      <Text style={[styles.biometricLabel, { color: colors.textSecondary }]}>
+        {type}
+      </Text>
+    </AnimatedTouchable>
+  );
+}
+
+export default function AuthScreen() {
+  const { colors, isDark } = useTheme();
+  const insets = useSafeAreaInsets();
   const [view, setView] = useState<'welcome' | 'login' | 'signup'>('welcome');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const [appleLoading, setAppleLoading] = useState(false);
   const [appleAvailable, setAppleAvailable] = useState(false);
   const [biometricAvailable, setBiometricAvailable] = useState(false);
   const [biometricType, setBiometricType] = useState('Biometric');
   const [checkingOnboarding, setCheckingOnboarding] = useState(true);
   const { login, isAuthenticated, checkAuth } = useAuthStore();
 
-  // Logo animation
+  // Animations
   const logoScale = useSharedValue(0.8);
   const logoOpacity = useSharedValue(0);
+  const contentOpacity = useSharedValue(0);
 
   useEffect(() => {
-    logoOpacity.value = withTiming(1, { duration: 600 });
-    logoScale.value = withSpring(1, { damping: 12, stiffness: 100 });
+    logoOpacity.value = withTiming(1, { duration: 800 });
+    logoScale.value = withSpring(1, EASING.springGentle);
+    contentOpacity.value = withDelay(400, withTiming(1, { duration: 600 }));
   }, []);
 
   const logoAnimatedStyle = useAnimatedStyle(() => ({
@@ -175,7 +235,7 @@ export default function HomeScreen() {
     transform: [{ scale: logoScale.value }],
   }));
 
-  // Check if onboarding has been completed
+  // Check onboarding status
   useEffect(() => {
     const checkOnboarding = async () => {
       try {
@@ -193,6 +253,7 @@ export default function HomeScreen() {
     checkOnboarding();
   }, []);
 
+  // Check biometric availability
   useEffect(() => {
     AppleAuthentication.isAvailableAsync().then(setAppleAvailable);
 
@@ -216,7 +277,7 @@ export default function HomeScreen() {
     checkBiometric();
   }, []);
 
-  // MOVED: This useEffect must be before any early returns
+  // Redirect when authenticated
   useEffect(() => {
     if (isAuthenticated) {
       router.replace('/(tabs)/dashboard');
@@ -224,7 +285,6 @@ export default function HomeScreen() {
   }, [isAuthenticated]);
 
   const handleBiometricLogin = async () => {
-    haptics.medium();
     const result = await authenticateWithBiometrics(`Use ${biometricType} to sign in`);
     if (result.success) {
       haptics.success();
@@ -233,36 +293,13 @@ export default function HomeScreen() {
         router.replace('/(tabs)/dashboard');
       } else {
         haptics.error();
-        Alert.alert('Session Expired', 'Please sign in again with Google or Apple.');
+        Alert.alert('Session Expired', 'Please sign in again.');
       }
     }
   };
 
-  // Show loading while checking onboarding status
-  if (checkingOnboarding) {
-    return (
-      <View style={[styles.container, styles.loadingContainer, { backgroundColor: colors.background }]}>
-        <LinearGradient
-          colors={[`${colors.gold}08`, 'transparent', `${colors.gold}05`]}
-          style={StyleSheet.absoluteFill}
-          start={{ x: 0.5, y: 0 }}
-          end={{ x: 0.5, y: 1 }}
-        />
-        <View style={[styles.loadingLogoBox, { backgroundColor: colors.goldLight, ...SHADOWS.glow }]}>
-          <Image
-            source={require('../assets/logo.png')}
-            style={styles.loadingLogoImage}
-            resizeMode="contain"
-          />
-        </View>
-        <ActivityIndicator size="small" color={colors.gold} style={{ marginTop: SPACING.xl }} />
-      </View>
-    );
-  }
-
   const handleGoogleLogin = async () => {
-    haptics.medium();
-    setIsLoading(true);
+    setGoogleLoading(true);
     try {
       await GoogleSignin.hasPlayServices();
       const userInfo = await GoogleSignin.signIn();
@@ -280,29 +317,25 @@ export default function HomeScreen() {
         router.replace('/(tabs)/dashboard');
       } else {
         haptics.error();
-        Alert.alert('Login Failed', 'Could not authenticate with the server. Please try again.');
+        Alert.alert('Login Failed', 'Could not authenticate. Please try again.');
       }
     } catch (err: any) {
       if (err.code === statusCodes.SIGN_IN_CANCELLED) {
-        console.log('User cancelled');
+        // User cancelled
       } else if (err.code === statusCodes.IN_PROGRESS) {
         haptics.warning();
         Alert.alert('Please wait', 'Sign in is already in progress');
-      } else if (err.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
-        haptics.error();
-        Alert.alert('Error', 'Play services not available');
       } else {
         haptics.error();
         Alert.alert('Error', err.message || 'Failed to sign in with Google');
       }
     } finally {
-      setIsLoading(false);
+      setGoogleLoading(false);
     }
   };
 
   const handleAppleLogin = async () => {
-    haptics.medium();
-    setIsLoading(true);
+    setAppleLoading(true);
     try {
       const credential = await AppleAuthentication.signInAsync({
         requestedScopes: [
@@ -326,118 +359,153 @@ export default function HomeScreen() {
         router.replace('/(tabs)/dashboard');
       } else {
         haptics.error();
-        Alert.alert('Login Failed', 'Could not authenticate with the server. Please try again.');
+        Alert.alert('Login Failed', 'Could not authenticate. Please try again.');
       }
     } catch (err: any) {
-      if (err.code === 'ERR_REQUEST_CANCELED') {
-        console.log('User canceled Apple sign in');
-      } else {
+      if (err.code !== 'ERR_REQUEST_CANCELED') {
         haptics.error();
         Alert.alert('Error', 'An error occurred during Apple sign in');
       }
     } finally {
-      setIsLoading(false);
+      setAppleLoading(false);
     }
   };
+
+  const handleEmailAuth = () => {
+    if (!email || !password || (view === 'signup' && !name)) {
+      setError('Please fill in all fields');
+      haptics.warning();
+      return;
+    }
+    setError('');
+    setIsLoading(true);
+    // Simulated - replace with actual auth
+    setTimeout(() => {
+      setIsLoading(false);
+      haptics.error();
+      setError('Email authentication coming soon. Please use Google or Apple.');
+    }, 1000);
+  };
+
+  // Loading screen
+  if (checkingOnboarding) {
+    return (
+      <View style={[styles.container, styles.loadingContainer, { backgroundColor: colors.background }]}>
+        <View style={[styles.loadingLogo, SHADOWS.glow]}>
+          <LinearGradient
+            colors={[colors.goldLight, colors.gold] as any}
+            style={styles.loadingLogoGradient}
+          >
+            <Image
+              source={require('../assets/logo.png')}
+              style={styles.loadingLogoImage}
+              resizeMode="contain"
+            />
+          </LinearGradient>
+        </View>
+        <View style={[styles.loadingDots, { marginTop: SPACING['2xl'] }]}>
+          <ActivityIndicator size="small" color={colors.gold} />
+        </View>
+      </View>
+    );
+  }
 
   // Welcome Screen
   if (view === 'welcome') {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
+        {/* Background gradient */}
         <LinearGradient
-          colors={[`${colors.gold}08`, 'transparent', `${colors.gold}05`]}
-          style={StyleSheet.absoluteFill}
-          start={{ x: 0.5, y: 0 }}
-          end={{ x: 0.5, y: 1 }}
+          colors={['transparent', colors.goldSurface, 'transparent']}
+          locations={[0, 0.5, 1]}
+          style={styles.backgroundGradient}
         />
 
-        <View style={styles.welcomeContent}>
-          <Animated.View style={[styles.logoContainer, logoAnimatedStyle]}>
-            <LinearGradient
-              colors={[colors.cardBgElevated, colors.cardBg]}
-              style={styles.logoGradient}
-            >
-              <Image
-                source={require('../assets/logo.png')}
-                style={styles.logoImage}
-                resizeMode="contain"
-              />
-            </LinearGradient>
-            <View style={[styles.logoGlow, { shadowColor: colors.gold }]} />
+        {/* Content */}
+        <View style={[styles.welcomeContent, { paddingTop: insets.top + 60 }]}>
+          {/* Logo */}
+          <Animated.View style={[styles.logoWrapper, logoAnimatedStyle]}>
+            <View style={[styles.logoOuter, { borderColor: colors.gold + '30' }]}>
+              <LinearGradient
+                colors={[colors.surface, colors.surfaceElevated] as any}
+                style={styles.logoInner}
+              >
+                <Image
+                  source={require('../assets/logo.png')}
+                  style={styles.logoImage}
+                  resizeMode="contain"
+                />
+              </LinearGradient>
+            </View>
+            <Animated.View style={[styles.logoGlow, { backgroundColor: colors.gold }]} />
           </Animated.View>
 
+          {/* Brand */}
           <Animated.Text
-            entering={FadeInDown.delay(200).duration(500)}
-            style={[styles.brandTitle, { color: colors.text }]}
+            entering={FadeInDown.delay(300).duration(600)}
+            style={[styles.brandName, { color: colors.text }]}
           >
             Represent
           </Animated.Text>
 
           <Animated.Text
-            entering={FadeInDown.delay(300).duration(500)}
+            entering={FadeInDown.delay(400).duration(600)}
             style={[styles.tagline, { color: colors.textSecondary }]}
           >
-            Your civic platform for identity, voting, and community.
+            Your voice in governance.{'\n'}Verified. Secure. Powerful.
           </Animated.Text>
 
-          <View style={styles.featuresRow}>
-            <FeatureIcon icon="shield-outline" label="Identity" delay={400} />
-            <FeatureIcon
-              icon="vote-outline"
-              label="Voice"
-              delay={500}
-              IconComponent={MaterialCommunityIcons}
-            />
-            <FeatureIcon icon="people-outline" label="Community" delay={600} />
+          {/* Feature pills */}
+          <View style={styles.featurePills}>
+            <FeaturePill icon="shield-checkmark" label="Identity" delay={500} />
+            <FeaturePill icon="checkmark-done-circle" label="Vote" delay={600} />
+            <FeaturePill icon="sparkles" label="AI Analysis" delay={700} />
           </View>
 
+          {/* Biometric login (if available) */}
+          {biometricAvailable && (
+            <Animated.View
+              entering={FadeInUp.delay(800).duration(500)}
+              style={styles.biometricSection}
+            >
+              <BiometricButton type={biometricType} onPress={handleBiometricLogin} />
+            </Animated.View>
+          )}
+
+          {/* Auth buttons */}
           <Animated.View
-            entering={FadeInUp.delay(700).duration(500)}
-            style={styles.buttonContainer}
+            entering={FadeInUp.delay(900).duration(500)}
+            style={styles.welcomeButtons}
           >
             <Button
-              title="Create Account"
+              title="Get Started"
               onPress={() => setView('signup')}
               variant="primary"
               size="xl"
               fullWidth
-              icon="person-add-outline"
             />
-
             <Button
-              title="Log In"
+              title="I have an account"
               onPress={() => setView('login')}
-              variant="secondary"
-              size="xl"
+              variant="ghost"
+              size="lg"
               fullWidth
-              icon="log-in-outline"
             />
-
-            {biometricAvailable && (
-              <TouchableOpacity
-                style={[styles.biometricButton, { borderColor: colors.gold }]}
-                onPress={handleBiometricLogin}
-                activeOpacity={0.7}
-              >
-                <Ionicons
-                  name={biometricType === 'Face ID' ? 'scan-outline' : 'finger-print-outline'}
-                  size={24}
-                  color={colors.gold}
-                />
-                <Text style={[styles.biometricButtonText, { color: colors.gold }]}>
-                  Quick Sign In with {biometricType}
-                </Text>
-              </TouchableOpacity>
-            )}
           </Animated.View>
         </View>
 
-        <View style={[styles.bottomDecoration, { backgroundColor: colors.gold }]} />
+        {/* Bottom accent */}
+        <LinearGradient
+          colors={[colors.goldLight, colors.gold, colors.goldDark] as any}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={[styles.bottomAccent, { bottom: insets.bottom }]}
+        />
       </View>
     );
   }
 
-  // Auth Screen (Login/Signup)
+  // Login/Signup Screen
   const isLogin = view === 'login';
 
   return (
@@ -445,178 +513,158 @@ export default function HomeScreen() {
       style={[styles.container, { backgroundColor: colors.background }]}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <LinearGradient
-        colors={[`${colors.gold}05`, 'transparent']}
-        style={StyleSheet.absoluteFill}
-        start={{ x: 0.5, y: 0 }}
-        end={{ x: 0.5, y: 0.5 }}
-      />
-
       <ScrollView
-        contentContainerStyle={styles.authContent}
+        contentContainerStyle={[styles.authContent, { paddingTop: insets.top + 20 }]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
+        {/* Back button */}
         <Animated.View entering={FadeIn.duration(300)}>
           <TouchableOpacity
-            style={[styles.backButton, { backgroundColor: colors.cardBg }]}
-            onPress={() => setView('welcome')}
+            style={[styles.backButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
+            onPress={() => {
+              haptics.light();
+              setView('welcome');
+              setError('');
+            }}
             activeOpacity={0.7}
           >
-            <Ionicons name="arrow-back" size={22} color={colors.text} />
+            <Ionicons name="chevron-back" size={22} color={colors.text} />
           </TouchableOpacity>
         </Animated.View>
 
+        {/* Header */}
         <Animated.View
-          entering={FadeInUp.delay(100).duration(400).springify()}
-          style={[
-            styles.authCard,
-            {
-              backgroundColor: colors.cardBg,
-              borderColor: colors.border,
-              ...SHADOWS.lg,
-            },
-          ]}
+          entering={FadeInDown.delay(100).duration(400)}
+          style={styles.authHeader}
         >
-          <View style={styles.authHeader}>
-            <Animated.View
-              entering={FadeInDown.delay(200).duration(400)}
-              style={[styles.authLogoContainer, { backgroundColor: colors.cardBgLight }]}
-            >
-              <Image
-                source={require('../assets/logo.png')}
-                style={styles.authLogoImage}
-                resizeMode="contain"
-              />
-            </Animated.View>
-
-            <Animated.Text
-              entering={FadeInDown.delay(250).duration(400)}
-              style={[styles.authTitle, { color: colors.text }]}
-            >
-              {isLogin ? 'Welcome Back' : 'Join Represent'}
-            </Animated.Text>
-
-            <Animated.Text
-              entering={FadeInDown.delay(300).duration(400)}
-              style={[styles.authSubtitle, { color: colors.textSecondary }]}
-            >
-              {isLogin
-                ? 'Sign in to access your wallet and civic platform'
-                : 'Create your account to start participating in governance'}
-            </Animated.Text>
+          <View style={[styles.authLogo, { backgroundColor: colors.goldSurface }]}>
+            <Image
+              source={require('../assets/logo.png')}
+              style={styles.authLogoImage}
+              resizeMode="contain"
+            />
           </View>
+          <Text style={[styles.authTitle, { color: colors.text }]}>
+            {isLogin ? 'Welcome back' : 'Create account'}
+          </Text>
+          <Text style={[styles.authSubtitle, { color: colors.textSecondary }]}>
+            {isLogin
+              ? 'Sign in to continue to Represent'
+              : 'Join the future of civic engagement'}
+          </Text>
+        </Animated.View>
 
+        {/* Social login buttons */}
+        <Animated.View
+          entering={FadeInUp.delay(200).duration(400)}
+          style={styles.socialButtons}
+        >
+          <SocialButton
+            provider="google"
+            onPress={handleGoogleLogin}
+            disabled={googleLoading || appleLoading}
+            loading={googleLoading}
+          />
+          {Platform.OS === 'ios' && appleAvailable && (
+            <SocialButton
+              provider="apple"
+              onPress={handleAppleLogin}
+              disabled={googleLoading || appleLoading}
+              loading={appleLoading}
+            />
+          )}
+        </Animated.View>
+
+        {/* Divider */}
+        <Animated.View
+          entering={FadeIn.delay(300).duration(400)}
+          style={styles.divider}
+        >
+          <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
+          <Text style={[styles.dividerText, { color: colors.textTertiary }]}>or</Text>
+          <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
+        </Animated.View>
+
+        {/* Form */}
+        <Animated.View entering={FadeInUp.delay(350).duration(400)}>
           {error ? (
-            <Animated.View
-              entering={FadeIn.duration(200)}
-              style={[styles.errorContainer, { backgroundColor: colors.errorLight, borderLeftColor: colors.error }]}
-            >
+            <View style={[styles.errorBox, { backgroundColor: colors.errorSurface, borderColor: colors.error }]}>
               <Ionicons name="alert-circle" size={18} color={colors.error} />
               <Text style={[styles.errorText, { color: colors.error }]}>{error}</Text>
-            </Animated.View>
+            </View>
           ) : null}
 
           {!isLogin && (
-            <AnimatedInput
+            <Input
               label="Full Name"
-              placeholder="Jane Doe"
+              placeholder="Enter your name"
               value={name}
               onChangeText={setName}
               autoCapitalize="words"
-              delay={350}
+              leftIcon="person-outline"
             />
           )}
 
-          <AnimatedInput
-            label="Email Address"
-            placeholder="citizen@example.com"
+          <Input
+            label="Email"
+            placeholder="Enter your email"
             value={email}
             onChangeText={setEmail}
             keyboardType="email-address"
             autoCapitalize="none"
             autoCorrect={false}
-            delay={isLogin ? 350 : 400}
+            leftIcon="mail-outline"
           />
 
-          <AnimatedInput
+          <Input
             label="Password"
-            placeholder={isLogin ? 'Enter password' : 'Create a strong password'}
+            placeholder={isLogin ? 'Enter password' : 'Create a password'}
             value={password}
             onChangeText={setPassword}
             secureTextEntry
-            delay={isLogin ? 400 : 450}
+            leftIcon="lock-closed-outline"
           />
 
-          <Animated.View entering={FadeInUp.delay(500).duration(400)}>
-            <Button
-              title={isLoading ? (isLogin ? 'Signing in...' : 'Creating account...') : (isLogin ? 'Sign In' : 'Create Account')}
-              onPress={() => {
-                if (!email || !password || (!isLogin && !name)) {
-                  setError('Please fill in all fields');
-                  return;
-                }
-                setError('');
-                setIsLoading(true);
-                setTimeout(() => setIsLoading(false), 1500);
-              }}
-              variant="primary"
-              size="lg"
-              fullWidth
-              loading={isLoading}
-              style={{ marginTop: SPACING.md }}
-            />
-          </Animated.View>
-
-          <Animated.View
-            entering={FadeIn.delay(550).duration(400)}
-            style={styles.orDivider}
-          >
-            <View style={[styles.orLine, { backgroundColor: colors.border }]} />
-            <Text style={[styles.orText, { color: colors.textMuted }]}>OR</Text>
-            <View style={[styles.orLine, { backgroundColor: colors.border }]} />
-          </Animated.View>
-
-          <Animated.View entering={FadeInUp.delay(600).duration(400)}>
-            <TouchableOpacity
-              style={[styles.socialButton, styles.googleButton, isLoading && styles.socialButtonDisabled]}
-              onPress={handleGoogleLogin}
-              disabled={isLoading}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="logo-google" size={20} color="#fff" />
-              <Text style={styles.googleButtonText}>
-                {isLoading ? 'Signing in...' : 'Continue with Google'}
-              </Text>
-            </TouchableOpacity>
-
-            {Platform.OS === 'ios' && appleAvailable && (
-              <TouchableOpacity
-                style={[styles.socialButton, styles.appleButton, isLoading && styles.socialButtonDisabled]}
-                onPress={handleAppleLogin}
-                disabled={isLoading}
-                activeOpacity={0.8}
-              >
-                <Ionicons name="logo-apple" size={20} color="#000" />
-                <Text style={styles.appleButtonText}>Continue with Apple</Text>
-              </TouchableOpacity>
-            )}
-          </Animated.View>
-
-          <Animated.View entering={FadeIn.delay(700).duration(400)}>
-            <TouchableOpacity
-              style={styles.switchAuth}
-              onPress={() => setView(isLogin ? 'signup' : 'login')}
-            >
-              <Text style={[styles.switchAuthText, { color: colors.textSecondary }]}>
-                {isLogin ? "Don't have an account? " : 'Already have an account? '}
-                <Text style={[styles.switchAuthLink, { color: colors.gold }]}>
-                  {isLogin ? 'Sign up' : 'Sign in'}
-                </Text>
-              </Text>
-            </TouchableOpacity>
-          </Animated.View>
+          <Button
+            title={isLogin ? 'Sign In' : 'Create Account'}
+            onPress={handleEmailAuth}
+            variant="primary"
+            size="lg"
+            fullWidth
+            loading={isLoading}
+            style={{ marginTop: SPACING.sm }}
+          />
         </Animated.View>
+
+        {/* Switch auth */}
+        <Animated.View
+          entering={FadeIn.delay(450).duration(400)}
+          style={styles.switchAuth}
+        >
+          <Text style={[styles.switchAuthText, { color: colors.textSecondary }]}>
+            {isLogin ? "Don't have an account? " : 'Already have an account? '}
+          </Text>
+          <TouchableOpacity
+            onPress={() => {
+              haptics.light();
+              setView(isLogin ? 'signup' : 'login');
+              setError('');
+            }}
+          >
+            <Text style={[styles.switchAuthLink, { color: colors.gold }]}>
+              {isLogin ? 'Sign up' : 'Sign in'}
+            </Text>
+          </TouchableOpacity>
+        </Animated.View>
+
+        {/* Terms */}
+        <Animated.Text
+          entering={FadeIn.delay(500).duration(400)}
+          style={[styles.terms, { color: colors.textTertiary }]}
+        >
+          By continuing, you agree to our Terms of Service and Privacy Policy
+        </Animated.Text>
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -630,118 +678,137 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  loadingLogoBox: {
-    width: 80,
-    height: 80,
-    borderRadius: BORDER_RADIUS.xl,
-    alignItems: 'center',
-    justifyContent: 'center',
+  loadingLogo: {
+    borderRadius: RADIUS['2xl'],
     overflow: 'hidden',
   },
+  loadingLogoGradient: {
+    width: 80,
+    height: 80,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   loadingLogoImage: {
-    width: 64,
-    height: 64,
+    width: 56,
+    height: 56,
+  },
+  loadingDots: {},
+  backgroundGradient: {
+    ...StyleSheet.absoluteFillObject,
+    opacity: 0.5,
   },
   welcomeContent: {
     flex: 1,
-    paddingHorizontal: SPACING.xxl,
-    paddingTop: SCREEN_HEIGHT * 0.1,
+    paddingHorizontal: SPACING.xl,
     alignItems: 'center',
   },
-  logoContainer: {
-    marginBottom: SPACING.xxxl,
+  logoWrapper: {
+    marginBottom: SPACING['3xl'],
     position: 'relative',
   },
-  logoGradient: {
-    width: 120,
-    height: 120,
-    borderRadius: BORDER_RADIUS.xxl,
+  logoOuter: {
+    width: 140,
+    height: 140,
+    borderRadius: 70,
+    borderWidth: 2,
     alignItems: 'center',
     justifyContent: 'center',
-    overflow: 'hidden',
+    padding: 8,
+  },
+  logoInner: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 62,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   logoImage: {
-    width: 100,
-    height: 100,
+    width: 80,
+    height: 80,
   },
   logoGlow: {
     position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    borderRadius: BORDER_RADIUS.xxl,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.4,
-    shadowRadius: 30,
+    top: 20,
+    left: 20,
+    right: 20,
+    bottom: 20,
+    borderRadius: 60,
+    opacity: 0.15,
+    zIndex: -1,
   },
-  brandTitle: {
-    fontSize: 44,
+  brandName: {
+    fontSize: 48,
     fontWeight: '700',
-    letterSpacing: -1,
-    marginBottom: SPACING.sm,
+    letterSpacing: -1.5,
+    marginBottom: SPACING.md,
   },
   tagline: {
     ...TYPOGRAPHY.bodyLarge,
     textAlign: 'center',
-    marginBottom: SPACING.xxxl,
-    paddingHorizontal: SPACING.lg,
+    lineHeight: 26,
+    marginBottom: SPACING['3xl'],
   },
-  featuresRow: {
+  featurePills: {
     flexDirection: 'row',
-    justifyContent: 'center',
-    gap: SPACING.xxl,
-    marginBottom: SPACING.xxxl,
+    gap: SPACING.md,
+    marginBottom: SPACING['3xl'],
   },
-  featureItem: {
+  featurePill: {
+    flexDirection: 'row',
     alignItems: 'center',
     gap: SPACING.sm,
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.sm,
+    borderRadius: RADIUS.full,
+    borderWidth: 1,
   },
-  featureIconContainer: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    borderWidth: 1.5,
-    overflow: 'hidden',
-  },
-  featureIconGradient: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  featureLabel: {
+  featurePillText: {
     ...TYPOGRAPHY.labelSmall,
   },
-  buttonContainer: {
-    width: '100%',
-    gap: SPACING.md,
+  biometricSection: {
+    marginBottom: SPACING['2xl'],
+    alignItems: 'center',
+  },
+  biometricContainer: {
+    alignItems: 'center',
+  },
+  biometricGlow: {
+    position: 'absolute',
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    top: 4,
+    left: 4,
   },
   biometricButton: {
-    flexDirection: 'row',
+    width: 72,
+    height: 72,
+    borderRadius: 36,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: SPACING.sm,
-    paddingVertical: SPACING.md,
-    borderRadius: BORDER_RADIUS.full,
-    borderWidth: 1,
+  },
+  biometricLabel: {
+    ...TYPOGRAPHY.caption,
     marginTop: SPACING.sm,
   },
-  biometricButtonText: {
-    ...TYPOGRAPHY.labelMedium,
+  welcomeButtons: {
+    width: '100%',
+    gap: SPACING.md,
+    marginTop: 'auto',
+    marginBottom: SPACING['2xl'],
   },
-  bottomDecoration: {
+  bottomAccent: {
     position: 'absolute',
-    bottom: 0,
     left: 0,
     right: 0,
-    height: 4,
-    opacity: 0.3,
+    height: 3,
+    opacity: 0.6,
   },
+  // Auth screen
   authContent: {
     flexGrow: 1,
-    paddingHorizontal: SPACING.lg,
-    paddingTop: 60,
-    paddingBottom: SPACING.xxl,
+    paddingHorizontal: SPACING.xl,
+    paddingBottom: SPACING['3xl'],
   },
   backButton: {
     width: 44,
@@ -749,118 +816,92 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: SPACING.lg,
-  },
-  authCard: {
-    borderRadius: BORDER_RADIUS.xxl,
-    padding: SPACING.xl,
     borderWidth: 1,
+    marginBottom: SPACING.xl,
   },
   authHeader: {
     alignItems: 'center',
-    marginBottom: SPACING.xl,
+    marginBottom: SPACING['2xl'],
   },
-  authLogoContainer: {
+  authLogo: {
     width: 64,
     height: 64,
-    borderRadius: BORDER_RADIUS.xl,
+    borderRadius: RADIUS.xl,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: SPACING.lg,
-    overflow: 'hidden',
   },
   authLogoImage: {
-    width: 48,
-    height: 48,
+    width: 44,
+    height: 44,
   },
   authTitle: {
-    ...TYPOGRAPHY.headlineLarge,
+    ...TYPOGRAPHY.h2,
     marginBottom: SPACING.xs,
   },
   authSubtitle: {
-    ...TYPOGRAPHY.bodyMedium,
+    ...TYPOGRAPHY.body,
     textAlign: 'center',
   },
-  errorContainer: {
+  socialButtons: {
+    flexDirection: 'row',
+    gap: SPACING.md,
+    marginBottom: SPACING.xl,
+  },
+  socialButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SPACING.sm,
+    height: 52,
+    borderRadius: RADIUS.md,
+  },
+  socialButtonText: {
+    ...TYPOGRAPHY.label,
+  },
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: SPACING.xl,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+  },
+  dividerText: {
+    ...TYPOGRAPHY.caption,
+    marginHorizontal: SPACING.lg,
+  },
+  errorBox: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: SPACING.sm,
     padding: SPACING.md,
-    borderRadius: BORDER_RADIUS.md,
-    borderLeftWidth: 3,
-    marginBottom: SPACING.md,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    marginBottom: SPACING.lg,
   },
   errorText: {
     ...TYPOGRAPHY.bodySmall,
     flex: 1,
   },
-  inputGroup: {
-    marginBottom: SPACING.md,
-  },
-  inputLabel: {
-    ...TYPOGRAPHY.labelSmall,
-    marginBottom: SPACING.xs,
-    marginLeft: SPACING.xs,
-  },
-  inputContainer: {
-    borderRadius: BORDER_RADIUS.lg,
-    borderWidth: 1.5,
-    overflow: 'hidden',
-  },
-  input: {
-    ...TYPOGRAPHY.bodyMedium,
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.md,
-  },
-  orDivider: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: SPACING.lg,
-  },
-  orLine: {
-    flex: 1,
-    height: 1,
-  },
-  orText: {
-    ...TYPOGRAPHY.labelSmall,
-    marginHorizontal: SPACING.md,
-  },
-  socialButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: SPACING.md,
-    borderRadius: BORDER_RADIUS.lg,
-    gap: SPACING.sm,
-    marginBottom: SPACING.sm,
-  },
-  socialButtonDisabled: {
-    opacity: 0.6,
-  },
-  googleButton: {
-    backgroundColor: '#4285F4',
-  },
-  googleButtonText: {
-    ...TYPOGRAPHY.labelMedium,
-    color: '#fff',
-  },
-  appleButton: {
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#000',
-  },
-  appleButtonText: {
-    ...TYPOGRAPHY.labelMedium,
-    color: '#000',
-  },
   switchAuth: {
-    alignItems: 'center',
-    paddingTop: SPACING.lg,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginTop: SPACING.xl,
   },
   switchAuthText: {
-    ...TYPOGRAPHY.bodyMedium,
+    ...TYPOGRAPHY.body,
   },
   switchAuthLink: {
+    ...TYPOGRAPHY.body,
     fontWeight: '600',
+  },
+  terms: {
+    ...TYPOGRAPHY.captionSmall,
+    textAlign: 'center',
+    marginTop: SPACING.xl,
+    paddingHorizontal: SPACING.lg,
   },
 });

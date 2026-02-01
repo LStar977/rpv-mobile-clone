@@ -1,9 +1,12 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Dimensions } from 'react-native';
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
+import { BlurView } from 'expo-blur';
+import * as Haptics from 'expo-haptics';
 import Animated, {
+  FadeIn,
   FadeInDown,
   FadeInUp,
   FadeInRight,
@@ -12,14 +15,20 @@ import Animated, {
   withSpring,
   withDelay,
   withTiming,
+  withRepeat,
+  withSequence,
+  interpolate,
+  Extrapolation,
 } from 'react-native-reanimated';
-import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS } from '../../lib/theme';
+import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS, ANIMATION } from '../../lib/theme';
 import { useAuthStore } from '../../lib/auth';
 import { proposalsApi, userApi } from '../../lib/api';
 import { Button, Badge, CountBadge, SectionHeader } from '../../components/ui';
-import { SkeletonStats, SkeletonListItem } from '../../components/ui/Skeleton';
+import { SkeletonStats, SkeletonListItem, SkeletonWelcome } from '../../components/ui/Skeleton';
 
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
+const AnimatedLinearGradient = Animated.createAnimatedComponent(LinearGradient);
 
 type Community = {
   id: string;
@@ -46,92 +55,151 @@ type ActivityItem = {
   color: string;
 };
 
-// --- Small animated stat pill (demoted visually) ---
-function MiniStat({
+// --- Premium Stat Card ---
+function StatCard({
   icon,
   value,
   label,
-  tone,
+  accent,
   delay = 0,
+  index = 0,
 }: {
   icon: string;
   value: string;
   label: string;
-  tone: 'gold' | 'success' | 'warning';
+  accent: string;
   delay?: number;
+  index?: number;
 }) {
   const { colors } = useTheme();
-  const scale = useSharedValue(0.95);
+  const scale = useSharedValue(0.8);
+  const opacity = useSharedValue(0);
 
   useEffect(() => {
-    scale.value = withDelay(delay, withSpring(1, { damping: 14, stiffness: 120 }));
+    scale.value = withDelay(delay, withSpring(1, ANIMATION.spring.gentle));
+    opacity.value = withDelay(delay, withTiming(1, { duration: 400 }));
   }, []);
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
-    opacity: scale.value,
+    opacity: opacity.value,
   }));
 
-  const toneColor =
-    tone === 'success' ? colors.success : tone === 'warning' ? colors.warning : colors.gold;
-
   return (
-    <Animated.View
-      style={[
-        styles.miniStat,
-        { backgroundColor: colors.cardBg, borderColor: colors.border },
-        animatedStyle,
-      ]}
+    <AnimatedTouchable
+      style={[styles.statCard, { backgroundColor: colors.surface, borderColor: colors.border }, animatedStyle]}
+      activeOpacity={0.7}
+      onPress={() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)}
     >
-      <View style={[styles.miniStatIcon, { backgroundColor: `${toneColor}18` }]}>
-        <Ionicons name={icon as any} size={14} color={toneColor} />
+      <LinearGradient
+        colors={[`${accent}08`, 'transparent']}
+        style={StyleSheet.absoluteFill}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+      />
+      <View style={[styles.statIconContainer, { backgroundColor: `${accent}15` }]}>
+        <Ionicons name={icon as any} size={18} color={accent} />
       </View>
-      <View style={{ flex: 1 }}>
-        <Text style={[styles.miniStatValue, { color: colors.text }]}>{value}</Text>
-        <Text style={[styles.miniStatLabel, { color: colors.textMuted }]}>{label}</Text>
-      </View>
-    </Animated.View>
+      <Text style={[styles.statValue, { color: colors.text }]}>{value}</Text>
+      <Text style={[styles.statLabel, { color: colors.textTertiary }]}>{label}</Text>
+    </AnimatedTouchable>
   );
 }
 
-// --- Premium Welcome (kept but visually secondary) ---
+// --- Premium Welcome Header ---
 function WelcomeHeader({
   name,
   isVerified,
   onAvatarPress,
+  onNotificationPress,
 }: {
   name?: string;
   isVerified: boolean;
   onAvatarPress: () => void;
+  onNotificationPress?: () => void;
 }) {
   const { colors } = useTheme();
   const displayName = name ? name.split(' ')[0] : 'there';
   const letter = name ? name.charAt(0).toUpperCase() : 'U';
 
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good morning';
+    if (hour < 17) return 'Good afternoon';
+    return 'Good evening';
+  };
+
+  const pulseAnim = useSharedValue(1);
+
+  useEffect(() => {
+    if (isVerified) {
+      pulseAnim.value = withRepeat(
+        withSequence(
+          withTiming(1.15, { duration: 1000 }),
+          withTiming(1, { duration: 1000 })
+        ),
+        -1,
+        false
+      );
+    }
+  }, [isVerified]);
+
+  const verifiedPulse = useAnimatedStyle(() => ({
+    transform: [{ scale: pulseAnim.value }],
+  }));
+
   return (
-    <Animated.View entering={FadeInDown.duration(420)} style={styles.welcomeRow}>
-      <View style={{ flex: 1 }}>
-        <Text style={[styles.welcomeKicker, { color: colors.textMuted }]}>Good to see you</Text>
+    <Animated.View entering={FadeInDown.duration(500).springify()} style={styles.welcomeContainer}>
+      <View style={styles.welcomeContent}>
+        <Text style={[styles.welcomeGreeting, { color: colors.textTertiary }]}>
+          {getGreeting()}
+        </Text>
         <Text style={[styles.welcomeName, { color: colors.text }]} numberOfLines={1}>
           {displayName}
         </Text>
       </View>
 
-      <TouchableOpacity onPress={onAvatarPress} style={styles.avatarContainer} activeOpacity={0.8}>
-        <View style={[styles.avatar, { backgroundColor: colors.gold, ...SHADOWS.glow }]}>
-          <Text style={[styles.avatarText, { color: colors.background }]}>{letter}</Text>
-        </View>
-        {isVerified && (
-          <View style={[styles.verifiedBadge, { backgroundColor: colors.success }]}>
-            <Ionicons name="checkmark" size={10} color="#fff" />
-          </View>
+      <View style={styles.welcomeActions}>
+        {onNotificationPress && (
+          <TouchableOpacity
+            onPress={onNotificationPress}
+            style={[styles.notificationButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="notifications-outline" size={20} color={colors.textSecondary} />
+          </TouchableOpacity>
         )}
-      </TouchableOpacity>
+
+        <TouchableOpacity onPress={onAvatarPress} activeOpacity={0.8}>
+          <LinearGradient
+            colors={[colors.gold, colors.goldDark || '#A68523']}
+            style={styles.avatarGradient}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+          >
+            <View style={[styles.avatarInner, { backgroundColor: colors.background }]}>
+              <LinearGradient
+                colors={[colors.gold, colors.goldDark || '#A68523']}
+                style={styles.avatarFill}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+              >
+                <Text style={[styles.avatarText, { color: colors.background }]}>{letter}</Text>
+              </LinearGradient>
+            </View>
+          </LinearGradient>
+          {isVerified && (
+            <Animated.View style={[styles.verifiedBadge, { backgroundColor: colors.success }, verifiedPulse]}>
+              <Ionicons name="checkmark" size={10} color="#FFFFFF" />
+            </Animated.View>
+          )}
+        </TouchableOpacity>
+      </View>
     </Animated.View>
   );
 }
 
-// --- HERO Priority Card (Momentum & urgency) ---
+// --- Premium Priority Card ---
 function PriorityCard({
   isAuthenticated,
   isVerified,
@@ -151,7 +219,20 @@ function PriorityCard({
   onSeeUrgent: () => void;
   onExplore: () => void;
 }) {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
+  const shimmer = useSharedValue(0);
+
+  useEffect(() => {
+    shimmer.value = withRepeat(
+      withTiming(1, { duration: 2500 }),
+      -1,
+      false
+    );
+  }, []);
+
+  const shimmerStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: interpolate(shimmer.value, [0, 1], [-SCREEN_WIDTH, SCREEN_WIDTH]) }],
+  }));
 
   const mode: 'verify' | 'urgent' | 'explore' = useMemo(() => {
     if (isAuthenticated && !isVerified) return 'verify';
@@ -159,97 +240,283 @@ function PriorityCard({
     return 'explore';
   }, [isAuthenticated, isVerified, urgentCount]);
 
-  const accent =
-    mode === 'verify' ? colors.warning : mode === 'urgent' ? colors.error : colors.gold;
+  const config = {
+    verify: {
+      icon: 'shield-checkmark',
+      gradientColors: [colors.warning, '#D4A318'] as const,
+      bgColor: `${colors.warning}12`,
+      title: 'Complete Verification',
+      subtitle: 'Verify your identity to unlock voting on proposals in your community.',
+      cta: 'Start Verification',
+      chip: 'Required',
+      onPress: onVerify,
+    },
+    urgent: {
+      icon: 'flame',
+      gradientColors: [colors.error, '#E84545'] as const,
+      bgColor: `${colors.error}12`,
+      title: 'Time-Sensitive Votes',
+      subtitle: `${urgentCount} proposal${urgentCount === 1 ? '' : 's'} closing within 48 hours need your attention.`,
+      cta: 'Vote Now',
+      chip: `${urgentCount} urgent`,
+      onPress: onSeeUrgent,
+    },
+    explore: {
+      icon: 'compass',
+      gradientColors: [colors.gold, colors.goldDark || '#A68523'] as const,
+      bgColor: `${colors.gold}08`,
+      title: pendingCount > 0 ? 'Pending Proposals' : 'Stay Engaged',
+      subtitle: pendingCount > 0
+        ? `You have ${pendingCount} proposal${pendingCount === 1 ? '' : 's'} waiting for your vote.`
+        : 'Explore new proposals and make your voice heard in your community.',
+      cta: 'Explore Proposals',
+      chip: pendingCount > 0 ? `${pendingCount} pending` : 'Discover',
+      onPress: onExplore,
+    },
+  };
 
-  const bg =
-    mode === 'verify'
-      ? colors.warningLight
-      : mode === 'urgent'
-      ? colors.errorLight
-      : colors.goldLight;
-
-  const title =
-    mode === 'verify'
-      ? 'Verify to unlock voting'
-      : mode === 'urgent'
-      ? 'Closing soon'
-      : 'What’s next';
-
-  const subtitle =
-    mode === 'verify'
-      ? 'Identity verification is required to vote on proposals.'
-      : mode === 'urgent'
-      ? `${urgentCount} proposal${urgentCount === 1 ? '' : 's'} need your vote within 48 hours.`
-      : pendingCount > 0
-      ? `${pendingCount} proposal${pendingCount === 1 ? '' : 's'} waiting for your vote.`
-      : 'Explore new proposals and see what your community thinks.';
-
-  const cta =
-    mode === 'verify' ? 'Start verification' : mode === 'urgent' ? 'Review now' : 'Explore proposals';
-
-  const onPress = mode === 'verify' ? onVerify : mode === 'urgent' ? onSeeUrgent : onExplore;
-
-  const icon =
-    mode === 'verify' ? 'shield-checkmark' : mode === 'urgent' ? 'alarm' : 'sparkles';
-
-  const rightChip =
-    mode === 'urgent'
-      ? `${topUrgent?.hoursLeft ?? ''}h`
-      : mode === 'verify'
-      ? 'Required'
-      : pendingCount > 0
-      ? `${pendingCount} pending`
-      : 'New';
+  const { icon, gradientColors, bgColor, title, subtitle, cta, chip, onPress } = config[mode];
 
   return (
     <AnimatedTouchable
-      entering={FadeInUp.delay(120).duration(420)}
-      activeOpacity={0.85}
-      onPress={onPress}
-      style={[styles.hero, { borderColor: accent, backgroundColor: bg }]}
+      entering={FadeInUp.delay(150).duration(500).springify()}
+      activeOpacity={0.92}
+      onPress={() => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        onPress();
+      }}
+      style={[styles.priorityCard, { backgroundColor: bgColor, borderColor: `${gradientColors[0]}30` }]}
     >
-      <LinearGradient
-        colors={[`${accent}24`, 'transparent']}
-        style={StyleSheet.absoluteFill}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-      />
+      {/* Shimmer effect */}
+      <View style={styles.shimmerContainer}>
+        <Animated.View style={[styles.shimmerBar, shimmerStyle]}>
+          <LinearGradient
+            colors={['transparent', `${gradientColors[0]}15`, 'transparent']}
+            style={StyleSheet.absoluteFill}
+            start={{ x: 0, y: 0.5 }}
+            end={{ x: 1, y: 0.5 }}
+          />
+        </Animated.View>
+      </View>
 
-      <View style={styles.heroTopRow}>
-        <View style={[styles.heroIcon, { backgroundColor: `${accent}18` }]}>
-          <Ionicons name={icon as any} size={18} color={accent} />
-        </View>
+      {/* Header row */}
+      <View style={styles.priorityHeader}>
+        <LinearGradient
+          colors={gradientColors}
+          style={styles.priorityIconContainer}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+        >
+          <Ionicons name={icon as any} size={22} color="#FFFFFF" />
+        </LinearGradient>
 
-        <View style={[styles.heroChip, { backgroundColor: `${accent}18` }]}>
-          <Text style={[styles.heroChipText, { color: accent }]}>{rightChip}</Text>
+        <View style={[styles.priorityChip, { backgroundColor: `${gradientColors[0]}20` }]}>
+          <View style={[styles.priorityChipDot, { backgroundColor: gradientColors[0] }]} />
+          <Text style={[styles.priorityChipText, { color: gradientColors[0] }]}>{chip}</Text>
         </View>
       </View>
 
-      <Text style={[styles.heroTitle, { color: colors.text }]}>{title}</Text>
-      <Text style={[styles.heroSubtitle, { color: colors.textSecondary }]}>{subtitle}</Text>
+      {/* Content */}
+      <Text style={[styles.priorityTitle, { color: colors.text }]}>{title}</Text>
+      <Text style={[styles.prioritySubtitle, { color: colors.textSecondary }]}>{subtitle}</Text>
 
-      {mode === 'urgent' && topUrgent?.title ? (
-        <View style={[styles.heroUrgentRow, { borderColor: `${accent}40` }]}>
-          <Ionicons name="document-text" size={14} color={colors.textSecondary} />
-          <Text style={[styles.heroUrgentText, { color: colors.text }]} numberOfLines={1}>
+      {/* Urgent proposal preview */}
+      {mode === 'urgent' && topUrgent?.title && (
+        <View style={[styles.urgentPreview, { backgroundColor: `${colors.error}10`, borderColor: `${colors.error}25` }]}>
+          <Ionicons name="document-text-outline" size={16} color={colors.error} />
+          <Text style={[styles.urgentPreviewText, { color: colors.text }]} numberOfLines={1}>
             {topUrgent.title}
           </Text>
-          <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+          <View style={[styles.urgentTimeChip, { backgroundColor: `${colors.error}20` }]}>
+            <Ionicons name="time-outline" size={12} color={colors.error} />
+            <Text style={[styles.urgentTimeText, { color: colors.error }]}>{topUrgent.hoursLeft}h</Text>
+          </View>
         </View>
-      ) : null}
+      )}
 
-      <View style={styles.heroCtaRow}>
-        <View style={[styles.heroCtaButton, { backgroundColor: accent }]}>
-          <Text style={[styles.heroCtaText, { color: colors.background }]}>{cta}</Text>
-          <Ionicons name="arrow-forward" size={16} color={colors.background} />
-        </View>
+      {/* CTA Button */}
+      <View style={styles.priorityCta}>
+        <LinearGradient
+          colors={gradientColors}
+          style={styles.priorityCtaButton}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+        >
+          <Text style={styles.priorityCtaText}>{cta}</Text>
+          <View style={styles.priorityCtaIconContainer}>
+            <Ionicons name="arrow-forward" size={16} color={gradientColors[0]} />
+          </View>
+        </LinearGradient>
       </View>
     </AnimatedTouchable>
   );
 }
 
-export default function HomeScreen() {
+// --- Token Alert Card ---
+function TokenAlertCard({
+  count,
+  onPress,
+}: {
+  count: number;
+  onPress: () => void;
+}) {
+  const { colors } = useTheme();
+
+  return (
+    <AnimatedTouchable
+      entering={FadeInUp.delay(200).duration(400)}
+      style={[styles.tokenAlert, { backgroundColor: colors.surface, borderColor: `${colors.success}30` }]}
+      onPress={() => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        onPress();
+      }}
+      activeOpacity={0.8}
+    >
+      <LinearGradient
+        colors={[`${colors.success}10`, 'transparent']}
+        style={StyleSheet.absoluteFill}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+      />
+      <View style={[styles.tokenAlertIcon, { backgroundColor: `${colors.success}15` }]}>
+        <Ionicons name="gift-outline" size={20} color={colors.success} />
+      </View>
+      <View style={styles.tokenAlertContent}>
+        <Text style={[styles.tokenAlertTitle, { color: colors.text }]}>
+          {count} Token{count > 1 ? 's' : ''} Available
+        </Text>
+        <Text style={[styles.tokenAlertSubtitle, { color: colors.textTertiary }]}>
+          Claim rewards for voting
+        </Text>
+      </View>
+      <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
+    </AnimatedTouchable>
+  );
+}
+
+// --- Urgent Proposal Card ---
+function UrgentProposalCard({
+  proposal,
+  index,
+  onPress,
+}: {
+  proposal: UrgentProposal;
+  index: number;
+  onPress: () => void;
+}) {
+  const { colors } = useTheme();
+
+  const getUrgencyColor = (hours: number) => {
+    if (hours <= 6) return colors.error;
+    if (hours <= 24) return colors.warning;
+    return colors.gold;
+  };
+
+  const urgencyColor = getUrgencyColor(proposal.hoursLeft);
+
+  return (
+    <AnimatedTouchable
+      entering={FadeInRight.delay(index * 80).duration(350)}
+      style={[styles.urgentCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
+      onPress={() => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        onPress();
+      }}
+      activeOpacity={0.75}
+    >
+      <View style={[styles.urgentCardAccent, { backgroundColor: urgencyColor }]} />
+      <View style={styles.urgentCardContent}>
+        <View style={styles.urgentCardHeader}>
+          <Badge label={proposal.category} variant="default" size="sm" />
+          <View style={[styles.urgentCardTime, { backgroundColor: `${urgencyColor}15` }]}>
+            <Ionicons name="time-outline" size={14} color={urgencyColor} />
+            <Text style={[styles.urgentCardTimeText, { color: urgencyColor }]}>{proposal.hoursLeft}h left</Text>
+          </View>
+        </View>
+        <Text style={[styles.urgentCardTitle, { color: colors.text }]} numberOfLines={2}>
+          {proposal.title}
+        </Text>
+      </View>
+      <View style={[styles.urgentCardArrow, { backgroundColor: colors.surfaceHover || `${colors.gold}08` }]}>
+        <Ionicons name="chevron-forward" size={16} color={colors.textSecondary} />
+      </View>
+    </AnimatedTouchable>
+  );
+}
+
+// --- Community Card ---
+function CommunityCard({
+  community,
+  index,
+  onPress,
+}: {
+  community: Community;
+  index: number;
+  onPress: () => void;
+}) {
+  const { colors } = useTheme();
+
+  return (
+    <AnimatedTouchable
+      entering={FadeInRight.delay(index * 70).duration(300)}
+      style={[styles.communityCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
+      onPress={() => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        onPress();
+      }}
+      activeOpacity={0.75}
+    >
+      <View style={[styles.communityIcon, { backgroundColor: `${colors.gold}10` }]}>
+        <Text style={styles.communityIconText}>{community.icon}</Text>
+      </View>
+      <View style={styles.communityContent}>
+        <Text style={[styles.communityName, { color: colors.text }]}>{community.name}</Text>
+        <Text style={[styles.communityMeta, { color: colors.textTertiary }]}>
+          {community.proposalCount} proposal{community.proposalCount !== 1 ? 's' : ''}
+        </Text>
+      </View>
+      {community.unvotedCount > 0 && (
+        <View style={[styles.communityBadge, { backgroundColor: colors.gold }]}>
+          <Text style={[styles.communityBadgeText, { color: colors.background }]}>
+            {community.unvotedCount}
+          </Text>
+        </View>
+      )}
+      <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
+    </AnimatedTouchable>
+  );
+}
+
+// --- Activity Card ---
+function ActivityCard({
+  activity,
+  index,
+}: {
+  activity: ActivityItem;
+  index: number;
+}) {
+  const { colors } = useTheme();
+
+  return (
+    <Animated.View
+      entering={FadeInRight.delay(index * 60).duration(280)}
+      style={[styles.activityCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
+    >
+      <View style={[styles.activityIcon, { backgroundColor: `${activity.color}12` }]}>
+        <Ionicons name={activity.icon as any} size={18} color={activity.color} />
+      </View>
+      <View style={styles.activityContent}>
+        <Text style={[styles.activityMessage, { color: colors.text }]} numberOfLines={1}>
+          {activity.message}
+        </Text>
+        <Text style={[styles.activityTime, { color: colors.textTertiary }]}>{activity.time}</Text>
+      </View>
+    </Animated.View>
+  );
+}
+
+// --- Main Dashboard Screen ---
+export default function DashboardScreen() {
   const { colors } = useTheme();
   const router = useRouter();
   const { user, isAuthenticated } = useAuthStore();
@@ -261,7 +528,6 @@ export default function HomeScreen() {
   const [communities, setCommunities] = useState<Community[]>([]);
   const [urgentProposals, setUrgentProposals] = useState<UrgentProposal[]>([]);
   const [unclaimedTokens, setUnclaimedTokens] = useState(0);
-  const [votingStreak, setVotingStreak] = useState(0);
   const [activities, setActivities] = useState<ActivityItem[]>([]);
   const [isVerified, setIsVerified] = useState(false);
 
@@ -411,7 +677,6 @@ export default function HomeScreen() {
       setCommunities(Object.values(communityMap).filter((c) => c.proposalCount > 0));
       setUrgentProposals(urgent.slice(0, 3));
       setUnclaimedTokens(unclaimed);
-      setVotingStreak(Math.min(votedIds.size, 7));
       setIsVerified(verificationRes.data?.verified || false);
 
       const recentActivities: ActivityItem[] = [];
@@ -421,9 +686,9 @@ export default function HomeScreen() {
         recentActivities.push({
           id: '1',
           type: 'new_proposal',
-          message: `New: ${title.length > 38 ? title.substring(0, 38) + '...' : title}`,
+          message: `New: ${title.length > 35 ? title.substring(0, 35) + '...' : title}`,
           time: '2h ago',
-          icon: 'document-text',
+          icon: 'document-text-outline',
           color: colors.gold,
         });
       }
@@ -431,10 +696,10 @@ export default function HomeScreen() {
         recentActivities.push({
           id: '2',
           type: 'badge_earned',
-          message: `You've cast ${votedIds.size} vote${votedIds.size > 1 ? 's' : ''}!`,
+          message: `You've cast ${votedIds.size} vote${votedIds.size > 1 ? 's' : ''}`,
           time: 'Recent',
-          icon: 'trophy',
-          color: colors.gold,
+          icon: 'trophy-outline',
+          color: colors.success,
         });
       }
       setActivities(recentActivities);
@@ -444,7 +709,7 @@ export default function HomeScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [isAuthenticated, user, colors.gold]);
+  }, [isAuthenticated, user, colors.gold, colors.success]);
 
   useEffect(() => {
     fetchDashboardData();
@@ -452,20 +717,23 @@ export default function HomeScreen() {
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     fetchDashboardData();
   }, [fetchDashboardData]);
 
   const navigateToProposals = () => router.push('/(tabs)/proposals');
 
+  // Loading skeleton
   if (loading) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <View style={styles.skeletonHeader}>
-          <View style={[styles.skeletonHero, { backgroundColor: colors.cardBg }]} />
-        </View>
-        <View style={styles.skeletonContent}>
-          <SkeletonStats count={3} />
-          <View style={{ marginTop: SPACING.xxl }}>
+        <View style={styles.loadingContent}>
+          <SkeletonWelcome />
+          <View style={styles.loadingCards}>
+            <SkeletonStats count={3} />
+          </View>
+          <View style={styles.loadingList}>
+            <SkeletonListItem />
             <SkeletonListItem />
             <SkeletonListItem />
           </View>
@@ -479,18 +747,25 @@ export default function HomeScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView
-        contentContainerStyle={styles.content}
+        contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.gold} />}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={colors.gold}
+            progressBackgroundColor={colors.surface}
+          />
+        }
       >
-        {/* Subtle welcome */}
+        {/* Welcome Header */}
         <WelcomeHeader
           name={user?.name ?? undefined}
           isVerified={isVerified}
           onAvatarPress={() => router.push('/(tabs)/profile')}
         />
 
-        {/* HERO: single priority moment */}
+        {/* Priority Card */}
         <PriorityCard
           isAuthenticated={isAuthenticated}
           isVerified={isVerified}
@@ -502,62 +777,58 @@ export default function HomeScreen() {
           onExplore={navigateToProposals}
         />
 
-        {/* Optional: Unclaimed tokens (kept, but subordinate) */}
+        {/* Token Alert */}
         {unclaimedTokens > 0 && (
-          <AnimatedTouchable
-            entering={FadeInUp.delay(180).duration(350)}
-            style={[styles.subAlert, { backgroundColor: colors.cardBg, borderColor: colors.border }]}
-            onPress={navigateToProposals}
-            activeOpacity={0.8}
-          >
-            <View style={[styles.subAlertIcon, { backgroundColor: `${colors.success}18` }]}>
-              <Ionicons name="ticket" size={18} color={colors.success} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.subAlertTitle, { color: colors.text }]}>
-                {unclaimedTokens} token{unclaimedTokens > 1 ? 's' : ''} available
-              </Text>
-              <Text style={[styles.subAlertSub, { color: colors.textMuted }]}>Claim and vote</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
-          </AnimatedTouchable>
+          <TokenAlertCard count={unclaimedTokens} onPress={navigateToProposals} />
         )}
 
-        {/* Demoted stats */}
-        <SectionHeader title="AT A GLANCE" style={{ marginTop: SPACING.lg, paddingHorizontal: SPACING.lg }} />
-        <View style={styles.miniStatsRow}>
-          <MiniStat icon="time-outline" value={stats.pending.toString()} label="Pending" tone="warning" delay={0} />
-          <MiniStat icon="checkmark-done-outline" value={stats.voted.toString()} label="Voted" tone="success" delay={80} />
-          <MiniStat icon="trophy-outline" value={stats.passed.toString()} label="Passed" tone="gold" delay={160} />
+        {/* Stats Section */}
+        <View style={styles.section}>
+          <SectionHeader title="YOUR IMPACT" style={styles.sectionHeader} />
+          <View style={styles.statsGrid}>
+            <StatCard
+              icon="hourglass-outline"
+              value={stats.pending.toString()}
+              label="Pending"
+              accent={colors.warning}
+              delay={0}
+              index={0}
+            />
+            <StatCard
+              icon="checkmark-circle-outline"
+              value={stats.voted.toString()}
+              label="Voted"
+              accent={colors.success}
+              delay={80}
+              index={1}
+            />
+            <StatCard
+              icon="trophy-outline"
+              value={stats.passed.toString()}
+              label="Passed"
+              accent={colors.gold}
+              delay={160}
+              index={2}
+            />
+          </View>
         </View>
 
-        {/* Closing soon section stays, but feels urgent */}
+        {/* Urgent Proposals */}
         {urgentProposals.length > 0 && (
           <View style={styles.section}>
-            <SectionHeader title="CLOSING SOON" icon="alarm" iconColor={colors.error} />
+            <SectionHeader
+              title="CLOSING SOON"
+              icon="flame-outline"
+              iconColor={colors.error}
+              style={styles.sectionHeader}
+            />
             {urgentProposals.map((proposal, idx) => (
-              <AnimatedTouchable
+              <UrgentProposalCard
                 key={proposal.id}
-                entering={FadeInRight.delay(idx * 90).duration(280)}
-                style={[styles.urgentCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}
+                proposal={proposal}
+                index={idx}
                 onPress={navigateToProposals}
-                activeOpacity={0.75}
-              >
-                <View style={[styles.urgentLeftBar, { backgroundColor: `${colors.error}35` }]} />
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.urgentTitle, { color: colors.text }]} numberOfLines={1}>
-                    {proposal.title}
-                  </Text>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: SPACING.sm, marginTop: SPACING.xs }}>
-                    <Badge label={proposal.category} variant="gold" size="sm" />
-                    <View style={[styles.urgentTimeChip, { backgroundColor: colors.errorLight }]}>
-                      <Ionicons name="time" size={14} color={colors.error} />
-                      <Text style={[styles.urgentTimeText, { color: colors.error }]}>{proposal.hoursLeft}h</Text>
-                    </View>
-                  </View>
-                </View>
-                <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
-              </AnimatedTouchable>
+              />
             ))}
           </View>
         )}
@@ -565,55 +836,30 @@ export default function HomeScreen() {
         {/* Communities */}
         {communities.length > 0 && (
           <View style={styles.section}>
-            <SectionHeader title="YOUR COMMUNITIES" />
+            <SectionHeader title="YOUR COMMUNITIES" style={styles.sectionHeader} />
             {communities.map((community, idx) => (
-              <AnimatedTouchable
+              <CommunityCard
                 key={community.id}
-                entering={FadeInRight.delay(idx * 80).duration(260)}
-                style={[styles.communityCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}
+                community={community}
+                index={idx}
                 onPress={navigateToProposals}
-                activeOpacity={0.75}
-              >
-                <Text style={styles.communityIcon}>{community.icon}</Text>
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.communityName, { color: colors.text }]}>{community.name}</Text>
-                  <Text style={[styles.communityMeta, { color: colors.textMuted }]}>
-                    {community.proposalCount} proposal{community.proposalCount !== 1 ? 's' : ''}
-                  </Text>
-                </View>
-                {community.unvotedCount > 0 ? <CountBadge count={community.unvotedCount} /> : null}
-                <Ionicons name="chevron-forward" size={18} color={colors.textMuted} style={{ marginLeft: SPACING.sm }} />
-              </AnimatedTouchable>
+              />
             ))}
           </View>
         )}
 
-        {/* Activity (quiet) */}
+        {/* Activity Feed */}
         {activities.length > 0 && (
           <View style={styles.section}>
-            <SectionHeader title="RECENT" />
+            <SectionHeader title="RECENT ACTIVITY" style={styles.sectionHeader} />
             {activities.map((activity, idx) => (
-              <Animated.View
-                key={activity.id}
-                entering={FadeInRight.delay(idx * 70).duration(240)}
-                style={[styles.activityCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}
-              >
-                <View style={[styles.activityIconBg, { backgroundColor: `${activity.color}15` }]}>
-                  <Ionicons name={activity.icon as any} size={18} color={activity.color} />
-                </View>
-                <View style={{ flex: 1, marginLeft: SPACING.md }}>
-                  <Text style={[styles.activityMessage, { color: colors.text }]} numberOfLines={1}>
-                    {activity.message}
-                  </Text>
-                  <Text style={[styles.activityTime, { color: colors.textMuted }]}>{activity.time}</Text>
-                </View>
-              </Animated.View>
+              <ActivityCard key={activity.id} activity={activity} index={idx} />
             ))}
           </View>
         )}
 
         {/* Bottom CTA */}
-        <Animated.View entering={FadeInUp.delay(500).duration(320)} style={styles.ctaContainer}>
+        <Animated.View entering={FadeInUp.delay(400).duration(400)} style={styles.ctaSection}>
           <Button
             title="Explore All Proposals"
             onPress={navigateToProposals}
@@ -625,178 +871,129 @@ export default function HomeScreen() {
           />
         </Animated.View>
 
-        <View style={{ height: 120 }} />
+        <View style={styles.bottomSpacer} />
       </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  content: { paddingTop: 60 },
+  container: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingTop: 60,
+  },
+  loadingContent: {
+    paddingTop: 60,
+    paddingHorizontal: SPACING.lg,
+  },
+  loadingCards: {
+    marginTop: SPACING.xl,
+  },
+  loadingList: {
+    marginTop: SPACING.xxl,
+    gap: SPACING.md,
+  },
 
-  // Skeleton
-  skeletonHeader: { paddingHorizontal: SPACING.lg, paddingTop: 60 },
-  skeletonHero: { height: 190, borderRadius: BORDER_RADIUS.xxl },
-  skeletonContent: { padding: SPACING.lg },
-
-  // Welcome row (subtle)
-  welcomeRow: {
+  // Welcome Header
+  welcomeContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: SPACING.lg,
-    marginBottom: SPACING.md,
+    marginBottom: SPACING.lg,
   },
-  welcomeKicker: { ...TYPOGRAPHY.labelSmall },
-  welcomeName: { ...TYPOGRAPHY.headlineLarge, marginTop: SPACING.xxs },
-
-  avatarContainer: { position: 'relative' },
-  avatar: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
+  welcomeContent: {
+    flex: 1,
+  },
+  welcomeGreeting: {
+    ...TYPOGRAPHY.labelMedium,
+    letterSpacing: 0.5,
+  },
+  welcomeName: {
+    ...TYPOGRAPHY.displaySmall,
+    marginTop: SPACING.xxs,
+  },
+  welcomeActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.md,
+  },
+  notificationButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+  },
+  avatarGradient: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    padding: 2,
+  },
+  avatarInner: {
+    flex: 1,
+    borderRadius: 24,
+    padding: 2,
+  },
+  avatarFill: {
+    flex: 1,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  avatarText: { fontSize: 18, fontWeight: '800' },
+  avatarText: {
+    fontSize: 20,
+    fontWeight: '700',
+  },
   verifiedBadge: {
     position: 'absolute',
-    bottom: -1,
-    right: -1,
-    width: 16,
-    height: 16,
-    borderRadius: 8,
+    bottom: 0,
+    right: 0,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
-    borderColor: '#0F0F12',
+    borderColor: '#0A0A0C',
   },
 
-  // HERO priority card
-  hero: {
+  // Priority Card
+  priorityCard: {
     marginHorizontal: SPACING.lg,
     borderRadius: BORDER_RADIUS.xxl,
     borderWidth: 1.5,
     padding: SPACING.xl,
     overflow: 'hidden',
-    ...SHADOWS.md,
+    ...SHADOWS.lg,
   },
-  heroTopRow: {
+  shimmerContainer: {
+    ...StyleSheet.absoluteFillObject,
+    overflow: 'hidden',
+  },
+  shimmerBar: {
+    width: SCREEN_WIDTH,
+    height: '100%',
+  },
+  priorityHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: SPACING.md,
+    marginBottom: SPACING.lg,
   },
-  heroIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+  priorityIconContainer: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
+    ...SHADOWS.md,
   },
-  heroChip: {
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
-    borderRadius: BORDER_RADIUS.full,
-  },
-  heroChipText: { ...TYPOGRAPHY.labelMedium },
-
-  heroTitle: { ...TYPOGRAPHY.headlineLarge },
-  heroSubtitle: { ...TYPOGRAPHY.bodyMedium, marginTop: SPACING.sm, maxWidth: 520 },
-
-  heroUrgentRow: {
-    marginTop: SPACING.lg,
-    borderWidth: 1,
-    borderRadius: BORDER_RADIUS.lg,
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.sm,
-  },
-  heroUrgentText: { ...TYPOGRAPHY.labelLarge, flex: 1 },
-
-  heroCtaRow: { marginTop: SPACING.lg, alignItems: 'flex-start' },
-  heroCtaButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.sm,
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: 12,
-    borderRadius: BORDER_RADIUS.full,
-  },
-  heroCtaText: { ...TYPOGRAPHY.labelLarge },
-
-  // Sub alert (tokens)
-  subAlert: {
-    marginHorizontal: SPACING.lg,
-    marginTop: SPACING.md,
-    borderRadius: BORDER_RADIUS.xl,
-    borderWidth: 1,
-    padding: SPACING.lg,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.md,
-  },
-  subAlertIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: BORDER_RADIUS.lg,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  subAlertTitle: { ...TYPOGRAPHY.labelLarge },
-  subAlertSub: { ...TYPOGRAPHY.bodySmall, marginTop: SPACING.xxs },
-
-  // Mini stats
-  miniStatsRow: {
-    paddingHorizontal: SPACING.lg,
-    flexDirection: 'row',
-    gap: SPACING.md,
-  },
-  miniStat: {
-    flex: 1,
-    borderRadius: BORDER_RADIUS.xl,
-    borderWidth: 1,
-    padding: SPACING.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.sm,
-  },
-  miniStatIcon: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  miniStatValue: { ...TYPOGRAPHY.labelLarge, fontWeight: '800' },
-  miniStatLabel: { ...TYPOGRAPHY.labelSmall },
-
-  // Sections
-  section: {
-    marginTop: SPACING.xl,
-    paddingHorizontal: SPACING.lg,
-  },
-
-  // Urgent
-  urgentCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: SPACING.lg,
-    borderRadius: BORDER_RADIUS.xl,
-    borderWidth: 1,
-    marginBottom: SPACING.md,
-    overflow: 'hidden',
-  },
-  urgentLeftBar: {
-    width: 6,
-    borderRadius: 999,
-    marginRight: SPACING.md,
-    height: 46,
-  },
-  urgentTitle: { ...TYPOGRAPHY.labelLarge },
-  urgentTimeChip: {
+  priorityChip: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: SPACING.md,
@@ -804,39 +1001,279 @@ const styles = StyleSheet.create({
     borderRadius: BORDER_RADIUS.full,
     gap: SPACING.xs,
   },
-  urgentTimeText: { ...TYPOGRAPHY.labelMedium },
-
-  // Communities
-  communityCard: {
+  priorityChipDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  priorityChipText: {
+    ...TYPOGRAPHY.labelMedium,
+    fontWeight: '600',
+  },
+  priorityTitle: {
+    ...TYPOGRAPHY.headlineLarge,
+    marginBottom: SPACING.sm,
+  },
+  prioritySubtitle: {
+    ...TYPOGRAPHY.bodyMedium,
+    lineHeight: 22,
+  },
+  urgentPreview: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: SPACING.lg,
-    borderRadius: BORDER_RADIUS.xl,
-    borderWidth: 1,
-    marginBottom: SPACING.md,
-  },
-  communityIcon: { fontSize: 28, marginRight: SPACING.md },
-  communityName: { ...TYPOGRAPHY.labelLarge },
-  communityMeta: { ...TYPOGRAPHY.bodySmall, marginTop: SPACING.xxs },
-
-  // Activity
-  activityCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: SPACING.lg,
-    borderRadius: BORDER_RADIUS.xl,
-    borderWidth: 1,
-    marginBottom: SPACING.md,
-  },
-  activityIconBg: {
-    width: 40,
-    height: 40,
+    marginTop: SPACING.lg,
+    padding: SPACING.md,
     borderRadius: BORDER_RADIUS.lg,
+    borderWidth: 1,
+    gap: SPACING.sm,
+  },
+  urgentPreviewText: {
+    ...TYPOGRAPHY.labelMedium,
+    flex: 1,
+  },
+  urgentTimeChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: SPACING.xs,
+    borderRadius: BORDER_RADIUS.full,
+    gap: 4,
+  },
+  urgentTimeText: {
+    ...TYPOGRAPHY.labelSmall,
+    fontWeight: '600',
+  },
+  priorityCta: {
+    marginTop: SPACING.xl,
+  },
+  priorityCtaButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: SPACING.xl,
+    borderRadius: BORDER_RADIUS.full,
+    gap: SPACING.sm,
+    ...SHADOWS.md,
+  },
+  priorityCtaText: {
+    ...TYPOGRAPHY.labelLarge,
+    color: '#FFFFFF',
+    fontWeight: '600',
+  },
+  priorityCtaIconContainer: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.95)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  activityMessage: { ...TYPOGRAPHY.labelLarge },
-  activityTime: { ...TYPOGRAPHY.bodySmall, marginTop: SPACING.xxs },
 
-  ctaContainer: { paddingHorizontal: SPACING.lg, marginTop: SPACING.xl },
+  // Token Alert
+  tokenAlert: {
+    marginHorizontal: SPACING.lg,
+    marginTop: SPACING.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: SPACING.lg,
+    borderRadius: BORDER_RADIUS.xl,
+    borderWidth: 1,
+    gap: SPACING.md,
+    overflow: 'hidden',
+  },
+  tokenAlertIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tokenAlertContent: {
+    flex: 1,
+  },
+  tokenAlertTitle: {
+    ...TYPOGRAPHY.labelLarge,
+  },
+  tokenAlertSubtitle: {
+    ...TYPOGRAPHY.bodySmall,
+    marginTop: 2,
+  },
+
+  // Sections
+  section: {
+    marginTop: SPACING.xxl,
+  },
+  sectionHeader: {
+    paddingHorizontal: SPACING.lg,
+  },
+
+  // Stats Grid
+  statsGrid: {
+    flexDirection: 'row',
+    paddingHorizontal: SPACING.lg,
+    gap: SPACING.md,
+  },
+  statCard: {
+    flex: 1,
+    padding: SPACING.lg,
+    borderRadius: BORDER_RADIUS.xl,
+    borderWidth: 1,
+    alignItems: 'center',
+    overflow: 'hidden',
+  },
+  statIconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: SPACING.sm,
+  },
+  statValue: {
+    ...TYPOGRAPHY.headlineMedium,
+    fontWeight: '700',
+  },
+  statLabel: {
+    ...TYPOGRAPHY.labelSmall,
+    marginTop: 2,
+  },
+
+  // Urgent Cards
+  urgentCard: {
+    marginHorizontal: SPACING.lg,
+    marginBottom: SPACING.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: SPACING.lg,
+    borderRadius: BORDER_RADIUS.xl,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  urgentCardAccent: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 4,
+    borderTopLeftRadius: BORDER_RADIUS.xl,
+    borderBottomLeftRadius: BORDER_RADIUS.xl,
+  },
+  urgentCardContent: {
+    flex: 1,
+    marginLeft: SPACING.sm,
+  },
+  urgentCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+    marginBottom: SPACING.sm,
+  },
+  urgentCardTime: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: 4,
+    borderRadius: BORDER_RADIUS.full,
+    gap: 4,
+  },
+  urgentCardTimeText: {
+    ...TYPOGRAPHY.labelSmall,
+    fontWeight: '600',
+  },
+  urgentCardTitle: {
+    ...TYPOGRAPHY.labelLarge,
+    lineHeight: 22,
+  },
+  urgentCardArrow: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: SPACING.md,
+  },
+
+  // Community Cards
+  communityCard: {
+    marginHorizontal: SPACING.lg,
+    marginBottom: SPACING.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: SPACING.lg,
+    borderRadius: BORDER_RADIUS.xl,
+    borderWidth: 1,
+    gap: SPACING.md,
+  },
+  communityIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  communityIconText: {
+    fontSize: 24,
+  },
+  communityContent: {
+    flex: 1,
+  },
+  communityName: {
+    ...TYPOGRAPHY.labelLarge,
+  },
+  communityMeta: {
+    ...TYPOGRAPHY.bodySmall,
+    marginTop: 2,
+  },
+  communityBadge: {
+    minWidth: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: SPACING.sm,
+  },
+  communityBadgeText: {
+    ...TYPOGRAPHY.labelSmall,
+    fontWeight: '700',
+  },
+
+  // Activity Cards
+  activityCard: {
+    marginHorizontal: SPACING.lg,
+    marginBottom: SPACING.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: SPACING.lg,
+    borderRadius: BORDER_RADIUS.xl,
+    borderWidth: 1,
+    gap: SPACING.md,
+  },
+  activityIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  activityContent: {
+    flex: 1,
+  },
+  activityMessage: {
+    ...TYPOGRAPHY.labelLarge,
+  },
+  activityTime: {
+    ...TYPOGRAPHY.labelSmall,
+    marginTop: 2,
+  },
+
+  // CTA Section
+  ctaSection: {
+    paddingHorizontal: SPACING.lg,
+    marginTop: SPACING.xl,
+  },
+
+  bottomSpacer: {
+    height: 120,
+  },
 });
