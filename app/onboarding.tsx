@@ -21,13 +21,10 @@ import Animated, {
   FadeInUp,
   useAnimatedStyle,
   withSpring,
-  interpolate,
-  Extrapolation,
 } from 'react-native-reanimated';
 
-import { useTheme, SPACING, RADIUS, TYPOGRAPHY, SHADOWS, EASING } from '../lib/theme';
+import { useTheme, SPACING, RADIUS, TYPOGRAPHY, EASING } from '../lib/theme';
 import { haptics } from '../lib/haptics';
-import { Button } from '../components/ui';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -152,8 +149,8 @@ export default function Onboarding() {
 
   const handleNext = () => {
     haptics.medium();
-    if (currentIndex < slides.length - 1) {
-      listRef.current?.scrollToIndex({ index: currentIndex + 1, animated: true });
+    if (safeIndex < slides.length - 1) {
+      listRef.current?.scrollToIndex({ index: safeIndex + 1, animated: true });
     } else {
       completeOnboarding();
     }
@@ -169,8 +166,9 @@ export default function Onboarding() {
     }
   };
 
-  const isLastSlide = currentIndex === slides.length - 1;
-  const currentSlide = slides[currentIndex];
+  const safeIndex = Math.min(Math.max(currentIndex, 0), slides.length - 1);
+  const isLastSlide = safeIndex === slides.length - 1;
+  const currentSlide = slides[safeIndex];
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -213,7 +211,7 @@ export default function Onboarding() {
         onViewableItemsChanged={onViewableItemsChanged}
         viewabilityConfig={viewabilityConfig}
         contentContainerStyle={{ paddingBottom: 200 }}
-        renderItem={({ item, index }) => (
+        renderItem={({ item }) => (
           <View style={[styles.slide, { width: SCREEN_WIDTH }]}>
             {/* Layer badge */}
             <Animated.View
@@ -300,7 +298,7 @@ export default function Onboarding() {
         <View style={styles.progressContainer}>
           <View style={styles.dots}>
             {slides.map((slide, i) => {
-              const isActive = currentIndex === i;
+              const isActive = safeIndex === i;
               return (
                 <ProgressDot
                   key={slide.id}
@@ -312,7 +310,7 @@ export default function Onboarding() {
             })}
           </View>
           <Text style={[styles.progressText, { color: colors.textTertiary }]}>
-            {currentIndex + 1} of {slides.length}
+            {safeIndex + 1} of {slides.length}
           </Text>
         </View>
 
