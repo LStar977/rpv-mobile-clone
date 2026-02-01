@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -34,7 +34,7 @@ import { useTheme, SPACING, RADIUS, TYPOGRAPHY, SHADOWS, EASING } from '../lib/t
 import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { useAuthStore } from '../lib/auth';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { isBiometricAvailable, getBiometricType, authenticateWithBiometrics, isBiometricEnabled } from '../lib/biometrics';
 import { Button, Input, Card, Badge } from '../components/ui';
 import { haptics } from '../lib/haptics';
@@ -235,23 +235,28 @@ export default function AuthScreen() {
     transform: [{ scale: logoScale.value }],
   }));
 
-  // Check onboarding status
-  useEffect(() => {
-    const checkOnboarding = async () => {
-      try {
-        const hasCompletedOnboarding = await AsyncStorage.getItem(ONBOARDING_KEY);
-        if (!hasCompletedOnboarding) {
-          router.replace('/onboarding');
-          return;
-        }
+  const checkOnboardingStatus = useCallback(async () => {
+    setCheckingOnboarding(true);
+    try {
+      const hasCompletedOnboarding = await AsyncStorage.getItem(ONBOARDING_KEY);
+      if (!hasCompletedOnboarding) {
         setCheckingOnboarding(false);
-      } catch (error) {
-        console.error('Error checking onboarding status:', error);
-        setCheckingOnboarding(false);
+        router.replace('/onboarding');
+        return;
       }
-    };
-    checkOnboarding();
+      setCheckingOnboarding(false);
+    } catch (error) {
+      console.error('Error checking onboarding status:', error);
+      setCheckingOnboarding(false);
+    }
   }, []);
+
+  // Check onboarding status whenever this screen gains focus
+  useFocusEffect(
+    useCallback(() => {
+      checkOnboardingStatus();
+    }, [checkOnboardingStatus])
+  );
 
   // Check biometric availability
   useEffect(() => {
