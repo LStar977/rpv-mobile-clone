@@ -16,22 +16,16 @@ import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
-  FadeIn,
   FadeInDown,
   FadeInUp,
   useAnimatedStyle,
-  useSharedValue,
   withSpring,
-  withTiming,
-  interpolate,
-  Extrapolation,
 } from 'react-native-reanimated';
 
-import { useTheme, SPACING, RADIUS, TYPOGRAPHY, SHADOWS, EASING } from '../lib/theme';
+import { useTheme, SPACING, RADIUS, TYPOGRAPHY, EASING } from '../lib/theme';
 import { haptics } from '../lib/haptics';
-import { Button } from '../components/ui';
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 export const ONBOARDING_KEY = '@represent_onboarding_complete';
 
@@ -50,25 +44,20 @@ const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
 // Separate component for animated dots to avoid hooks-in-map violation
 function ProgressDot({
-  index,
-  progress,
-  accentColor,
-  borderColor,
+  isActive,
+  activeColor,
+  inactiveColor,
 }: {
-  index: number;
-  progress: Animated.SharedValue<number>;
-  accentColor: string;
-  borderColor: string;
+  isActive: boolean;
+  activeColor: string;
+  inactiveColor: string;
 }) {
-  const dotAnimStyle = useAnimatedStyle(() => {
-    const isActive = Math.round(progress.value) === index;
-    return {
-      width: withSpring(isActive ? 24 : 8, EASING.springSnappy),
-      backgroundColor: isActive ? accentColor : borderColor,
-    };
-  });
+  const animatedStyle = useAnimatedStyle(() => ({
+    width: withSpring(isActive ? 24 : 8, EASING.springSnappy),
+    backgroundColor: isActive ? activeColor : inactiveColor,
+  }));
 
-  return <Animated.View style={[styles.dot, dotAnimStyle]} />;
+  return <Animated.View style={[styles.dot, animatedStyle]} />;
 }
 
 export default function Onboarding() {
@@ -76,7 +65,6 @@ export default function Onboarding() {
   const insets = useSafeAreaInsets();
   const listRef = useRef<FlatList<Slide>>(null);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const progress = useSharedValue(0);
 
   const slides: Slide[] = useMemo(
     () => [
@@ -148,7 +136,6 @@ export default function Onboarding() {
     ({ viewableItems }: { viewableItems: ViewToken[] }) => {
       const current = viewableItems?.[0]?.index ?? 0;
       setCurrentIndex(current);
-      progress.value = withTiming(current, { duration: 300 });
     },
     []
   );
@@ -162,8 +149,8 @@ export default function Onboarding() {
 
   const handleNext = () => {
     haptics.medium();
-    if (currentIndex < slides.length - 1) {
-      listRef.current?.scrollToIndex({ index: currentIndex + 1, animated: true });
+    if (safeIndex < slides.length - 1) {
+      listRef.current?.scrollToIndex({ index: safeIndex + 1, animated: true });
     } else {
       completeOnboarding();
     }
@@ -179,8 +166,9 @@ export default function Onboarding() {
     }
   };
 
-  const isLastSlide = currentIndex === slides.length - 1;
-  const currentSlide = slides[currentIndex];
+  const safeIndex = Math.min(Math.max(currentIndex, 0), slides.length - 1);
+  const isLastSlide = safeIndex === slides.length - 1;
+  const currentSlide = slides[safeIndex];
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -223,7 +211,7 @@ export default function Onboarding() {
         onViewableItemsChanged={onViewableItemsChanged}
         viewabilityConfig={viewabilityConfig}
         contentContainerStyle={{ paddingBottom: 200 }}
-        renderItem={({ item, index }) => (
+        renderItem={({ item }) => (
           <View style={[styles.slide, { width: SCREEN_WIDTH }]}>
             {/* Layer badge */}
             <Animated.View
@@ -311,16 +299,15 @@ export default function Onboarding() {
           <View style={styles.dots}>
             {slides.map((slide, i) => (
               <ProgressDot
-                key={i}
-                index={i}
-                progress={progress}
-                accentColor={slide.accentColor}
-                borderColor={colors.border}
+                key={slide.id}
+                isActive={safeIndex === i}
+                activeColor={slide.accentColor}
+                inactiveColor={colors.border}
               />
             ))}
           </View>
           <Text style={[styles.progressText, { color: colors.textTertiary }]}>
-            {currentIndex + 1} of {slides.length}
+            {safeIndex + 1} of {slides.length}
           </Text>
         </View>
 
