@@ -15,19 +15,10 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Animated, {
-  FadeIn,
-  FadeInDown,
-  FadeInUp,
-  useAnimatedStyle,
-  withSpring,
-  interpolate,
-  Extrapolation,
-} from 'react-native-reanimated';
+import Animated, { FadeIn, FadeInDown, FadeInUp } from 'react-native-reanimated';
 
-import { useTheme, SPACING, RADIUS, TYPOGRAPHY, SHADOWS, EASING } from '../lib/theme';
+import { useTheme, SPACING, RADIUS, TYPOGRAPHY } from '../lib/theme';
 import { haptics } from '../lib/haptics';
-import { Button } from '../components/ui';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -45,23 +36,6 @@ type Slide = {
 };
 
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
-
-function ProgressDot({
-  isActive,
-  activeColor,
-  inactiveColor,
-}: {
-  isActive: boolean;
-  activeColor: string;
-  inactiveColor: string;
-}) {
-  const animatedStyle = useAnimatedStyle(() => ({
-    width: withSpring(isActive ? 24 : 8, EASING.springSnappy),
-    backgroundColor: isActive ? activeColor : inactiveColor,
-  }));
-
-  return <Animated.View style={[styles.dot, animatedStyle]} />;
-}
 
 export default function Onboarding() {
   const { colors } = useTheme();
@@ -303,11 +277,15 @@ export default function Onboarding() {
             {slides.map((slide, i) => {
               const isActive = safeIndex === i;
               return (
-                <ProgressDot
+                <View
                   key={slide.id}
-                  isActive={isActive}
-                  activeColor={slide.accentColor}
-                  inactiveColor={colors.border}
+                  style={[
+                    styles.dot,
+                    {
+                      width: isActive ? 24 : 8,
+                      backgroundColor: isActive ? slide.accentColor : colors.border,
+                    },
+                  ]}
                 />
               );
             })}
