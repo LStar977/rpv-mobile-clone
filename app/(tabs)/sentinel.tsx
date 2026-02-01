@@ -135,7 +135,7 @@ function ScoreBar({
   return (
     <Animated.View
       entering={FadeInUp.delay(index * 80).duration(400)}
-      style={[styles.scoreItem, { backgroundColor: colors.surfaceLight, borderColor: colors.border }]}
+      style={[styles.scoreItem, { backgroundColor: colors.surfaceHighlight, borderColor: colors.border }]}
     >
       <View style={styles.scoreHeader}>
         <Text style={[styles.scoreName, { color: colors.text }]} numberOfLines={1}>
@@ -184,7 +184,7 @@ function FindingCard({
   return (
     <Animated.View
       entering={FadeInUp.delay(index * 80).duration(400)}
-      style={[styles.findingCard, { backgroundColor: colors.surfaceLight, borderColor: colors.border }]}
+      style={[styles.findingCard, { backgroundColor: colors.surfaceHighlight, borderColor: colors.border }]}
     >
       <View style={styles.findingHeader}>
         <View style={[styles.findingIconBg, { backgroundColor: `${getStatusColor()}20` }]}>
@@ -427,7 +427,7 @@ export default function SentinelScreen() {
             <TextInput
               style={[
                 styles.input,
-                { backgroundColor: colors.surfaceLight, borderColor: colors.border, color: colors.text },
+                { backgroundColor: colors.surfaceHighlight, borderColor: colors.border, color: colors.text },
               ]}
               placeholder="e.g., Public Safety Act 2024"
               placeholderTextColor={colors.textTertiary}
@@ -442,7 +442,7 @@ export default function SentinelScreen() {
             <TouchableOpacity
               style={[
                 styles.picker,
-                { backgroundColor: colors.surfaceLight, borderColor: colors.border },
+                { backgroundColor: colors.surfaceHighlight, borderColor: colors.border },
               ]}
               onPress={() => setShowIssueTypePicker(!showIssueTypePicker)}
             >
@@ -489,7 +489,7 @@ export default function SentinelScreen() {
             <TextInput
               style={[
                 styles.textArea,
-                { backgroundColor: colors.surfaceLight, borderColor: colors.border, color: colors.text },
+                { backgroundColor: colors.surfaceHighlight, borderColor: colors.border, color: colors.text },
               ]}
               placeholder="Paste governance text here..."
               placeholderTextColor={colors.textTertiary}
@@ -581,7 +581,7 @@ export default function SentinelScreen() {
             <Text style={[styles.tabHint, { color: colors.textTertiary }]}>
               Tap to explore sections:
             </Text>
-            <View style={[styles.tabsWrapper, { backgroundColor: colors.surfaceLight }]}>
+            <View style={[styles.tabsWrapper, { backgroundColor: colors.surfaceHighlight }]}>
               <ScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}
@@ -624,7 +624,7 @@ export default function SentinelScreen() {
             <View style={styles.tabContent}>
               {activeTab === 'summary' && (
                 <Animated.View entering={FadeIn.duration(300)} style={styles.tabPane}>
-                  <View style={[styles.summaryBox, { backgroundColor: colors.surfaceLight, borderColor: colors.gold }]}>
+                  <View style={[styles.summaryBox, { backgroundColor: colors.surfaceHighlight, borderColor: colors.gold }]}>
                     <View style={styles.summaryHeader}>
                       <Ionicons name="document-text" size={16} color={colors.gold} />
                       <Text style={[styles.summaryLabel, { color: colors.gold }]}>Summary</Text>
@@ -634,7 +634,7 @@ export default function SentinelScreen() {
                     </Text>
                   </View>
                   {selectedAnalysis.analysis.reasoning && (
-                    <View style={[styles.summaryBox, { backgroundColor: colors.surfaceLight, borderColor: colors.border }]}>
+                    <View style={[styles.summaryBox, { backgroundColor: colors.surfaceHighlight, borderColor: colors.border }]}>
                       <View style={styles.summaryHeader}>
                         <Ionicons name="bulb-outline" size={16} color={colors.gold} />
                         <Text style={[styles.summaryLabel, { color: colors.gold }]}>Reasoning</Text>
@@ -727,7 +727,7 @@ export default function SentinelScreen() {
                     </Animated.View>
                   ) : (
                     <>
-                      <View style={[styles.proposalBox, { backgroundColor: colors.surfaceLight, borderColor: colors.gold }]}>
+                      <View style={[styles.proposalBox, { backgroundColor: colors.surfaceHighlight, borderColor: colors.gold }]}>
                         <View style={styles.proposalHeader}>
                           <View style={[styles.proposalIconBg, { backgroundColor: `${colors.gold}15` }]}>
                             <Ionicons name="document-text" size={18} color={colors.gold} />

@@ -16,7 +16,6 @@ import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
-  FadeIn,
   FadeInDown,
   FadeInUp,
   useAnimatedStyle,
@@ -26,7 +25,7 @@ import Animated, {
 import { useTheme, SPACING, RADIUS, TYPOGRAPHY, EASING } from '../lib/theme';
 import { haptics } from '../lib/haptics';
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 export const ONBOARDING_KEY = '@represent_onboarding_complete';
 
@@ -43,6 +42,7 @@ type Slide = {
 
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
+// Separate component for animated dots to avoid hooks-in-map violation
 function ProgressDot({
   isActive,
   activeColor,
@@ -297,17 +297,14 @@ export default function Onboarding() {
         {/* Progress dots */}
         <View style={styles.progressContainer}>
           <View style={styles.dots}>
-            {slides.map((slide, i) => {
-              const isActive = safeIndex === i;
-              return (
-                <ProgressDot
-                  key={slide.id}
-                  isActive={isActive}
-                  activeColor={slide.accentColor}
-                  inactiveColor={colors.border}
-                />
-              );
-            })}
+            {slides.map((slide, i) => (
+              <ProgressDot
+                key={slide.id}
+                isActive={safeIndex === i}
+                activeColor={slide.accentColor}
+                inactiveColor={colors.border}
+              />
+            ))}
           </View>
           <Text style={[styles.progressText, { color: colors.textTertiary }]}>
             {safeIndex + 1} of {slides.length}
