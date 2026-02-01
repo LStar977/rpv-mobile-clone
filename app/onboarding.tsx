@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useMemo, useRef, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -14,7 +14,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
+  FadeIn,
   FadeInDown,
   FadeInUp,
   useAnimatedStyle,
@@ -25,84 +27,108 @@ import Animated, {
   Extrapolation,
 } from 'react-native-reanimated';
 
-import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS } from '../lib/theme';
+import { useTheme, SPACING, RADIUS, TYPOGRAPHY, SHADOWS, EASING } from '../lib/theme';
 import { haptics } from '../lib/haptics';
+import { Button } from '../components/ui';
 
-const { width } = Dimensions.get('window');
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-// ✅ IMPORTANT: export this so app/index.tsx can import it
 export const ONBOARDING_KEY = '@represent_onboarding_complete';
 
 type Slide = {
   id: string;
-  kicker: string;
-  title: string;
-  subtitle: string;
+  layer: string;
+  headline: string;
+  subheadline: string;
   description: string;
-  bullets: string[];
+  features: { icon: keyof typeof Ionicons.glyphMap; text: string }[];
   icon: keyof typeof Ionicons.glyphMap;
+  accentColor: string;
 };
+
+const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
 export default function Onboarding() {
   const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
   const listRef = useRef<FlatList<Slide>>(null);
-  const [index, setIndex] = useState(0);
-
+  const [currentIndex, setCurrentIndex] = useState(0);
   const progress = useSharedValue(0);
 
   const slides: Slide[] = useMemo(
     () => [
       {
         id: '1',
-        kicker: 'Trust Layer',
-        title: 'Verify once.',
-        subtitle: 'Own your voice everywhere.',
+        layer: 'Trust',
+        headline: 'Verify once',
+        subheadline: 'Own your voice forever',
         description:
-          'Complete identity verification and receive a Soulbound Passport that proves you’re a real person — without revealing more than necessary.',
-        bullets: ['Fast verification', 'One person, one voice', 'Privacy-first'],
+          'Complete identity verification once and receive a privacy-preserving digital passport that proves you are a real, unique person.',
+        features: [
+          { icon: 'shield-checkmark', text: 'Secure verification' },
+          { icon: 'finger-print', text: 'One person, one vote' },
+          { icon: 'eye-off', text: 'Privacy-first design' },
+        ],
         icon: 'shield-checkmark',
+        accentColor: '#34D399',
       },
       {
         id: '2',
-        kicker: 'Consent Layer',
-        title: 'Vote on',
-        subtitle: 'real proposals.',
+        layer: 'Voice',
+        headline: 'Vote on',
+        subheadline: 'what matters to you',
         description:
-          'See what verified residents actually think — by country, region, city, or community. Every vote is geo-gated to the right people.',
-        bullets: ['Geo-gated voting', 'Clear outcomes', 'Verified residents only'],
-        icon: 'checkmark-done',
+          'Participate in decisions that affect your community. Every vote is geo-verified and counted equally - no bots, no manipulation.',
+        features: [
+          { icon: 'location', text: 'Geo-gated voting' },
+          { icon: 'stats-chart', text: 'Real-time results' },
+          { icon: 'people', text: 'Community decisions' },
+        ],
+        icon: 'checkmark-done-circle',
+        accentColor: '#60A5FA',
       },
       {
         id: '3',
-        kicker: 'Creation Layer',
-        title: 'Create',
-        subtitle: 'better decisions.',
+        layer: 'Create',
+        headline: 'Propose',
+        subheadline: 'better solutions',
         description:
-          'Draft proposals in minutes. Share them to the right jurisdiction or organization and collect verified consent — not noise.',
-        bullets: ['Simple creation', 'Targeted distribution', 'Track results'],
+          'Draft proposals in minutes and share them with the right audience. Collect verified support and drive real change.',
+        features: [
+          { icon: 'create', text: 'Simple drafting' },
+          { icon: 'share-social', text: 'Targeted sharing' },
+          { icon: 'trending-up', text: 'Track momentum' },
+        ],
         icon: 'sparkles',
+        accentColor: '#C9A227',
       },
       {
         id: '4',
-        kicker: 'Intelligence Layer',
-        title: 'Sentinel',
-        subtitle: 'reads what others miss.',
+        layer: 'Intelligence',
+        headline: 'Sentinel AI',
+        subheadline: 'sees what you miss',
         description:
-          'Paste a policy or proposal. Sentinel scores it against core governance principles and helps you generate fixes or a stronger proposal.',
-        bullets: ['Instant analysis', 'Principle scoring', 'Generate improvements'],
+          'Paste any policy or proposal. Sentinel analyzes it against core governance principles and helps you understand the implications.',
+        features: [
+          { icon: 'flash', text: 'Instant analysis' },
+          { icon: 'analytics', text: 'Principle scoring' },
+          { icon: 'bulb', text: 'Smart suggestions' },
+        ],
         icon: 'eye',
+        accentColor: '#8B5CF6',
       },
     ],
     []
   );
 
-  const onViewableItemsChanged = useRef(
+  const onViewableItemsChanged = useCallback(
     ({ viewableItems }: { viewableItems: ViewToken[] }) => {
       const current = viewableItems?.[0]?.index ?? 0;
-      setIndex(current);
-      progress.value = withTiming(current, { duration: 240 });
-    }
-  ).current;
+      setCurrentIndex(current);
+      progress.value = withTiming(current, { duration: 300 });
+    },
+    []
+  );
 
   const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 70 }).current;
 
@@ -112,9 +138,9 @@ export default function Onboarding() {
   };
 
   const handleNext = () => {
-    haptics.light();
-    if (index < slides.length - 1) {
-      listRef.current?.scrollToIndex({ index: index + 1, animated: true });
+    haptics.medium();
+    if (currentIndex < slides.length - 1) {
+      listRef.current?.scrollToIndex({ index: currentIndex + 1, animated: true });
     } else {
       completeOnboarding();
     }
@@ -125,39 +151,41 @@ export default function Onboarding() {
       await AsyncStorage.setItem(ONBOARDING_KEY, 'true');
       haptics.success();
       router.replace('/');
-    } catch (e) {
-      // If storage fails, still move forward so user isn't stuck.
+    } catch {
       router.replace('/');
     }
   };
 
-  const headerGlowStyle = useAnimatedStyle(() => {
-    const t = interpolate(progress.value, [0, slides.length - 1], [0.25, 0.45], Extrapolation.CLAMP);
-    return { opacity: withSpring(t) };
-  });
+  const isLastSlide = currentIndex === slides.length - 1;
+  const currentSlide = slides[currentIndex];
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <StatusBar barStyle="light-content" />
 
-      {/* Background */}
+      {/* Background gradient */}
       <LinearGradient
-        colors={[colors.background, colors.backgroundSecondary, colors.background]}
-        start={{ x: 0.2, y: 0 }}
-        end={{ x: 0.8, y: 1 }}
+        colors={['transparent', currentSlide.accentColor + '08', 'transparent']}
+        locations={[0, 0.5, 1]}
         style={StyleSheet.absoluteFill}
       />
-      <Animated.View style={[styles.goldGlow, { backgroundColor: colors.goldLight }, headerGlowStyle]} />
 
-      {/* Top bar */}
-      <View style={styles.topBar}>
-        <View style={styles.brandRow}>
-          <Image source={require('../assets/logo.png')} style={styles.logo} resizeMode="contain" />
+      {/* Header */}
+      <View style={[styles.header, { paddingTop: insets.top + SPACING.md }]}>
+        <View style={styles.headerLeft}>
+          <Image
+            source={require('../assets/logo.png')}
+            style={styles.logo}
+            resizeMode="contain"
+          />
           <Text style={[styles.brand, { color: colors.text }]}>Represent</Text>
         </View>
-
-        <TouchableOpacity onPress={handleSkip} activeOpacity={0.85} style={styles.skipButton}>
-          <Text style={[styles.skipText, { color: colors.textSecondary }]}>Skip</Text>
+        <TouchableOpacity
+          onPress={handleSkip}
+          style={styles.skipButton}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          <Text style={[styles.skipText, { color: colors.textTertiary }]}>Skip</Text>
         </TouchableOpacity>
       </View>
 
@@ -169,183 +197,292 @@ export default function Onboarding() {
         horizontal
         pagingEnabled
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 160 }}
         onViewableItemsChanged={onViewableItemsChanged}
         viewabilityConfig={viewabilityConfig}
-        renderItem={({ item }) => (
-          <View style={[styles.slide, { width }]}>
-            <Animated.View entering={FadeInUp.duration(420)} style={styles.heroWrap}>
-              <View
-                style={[
-                  styles.iconPill,
-                  { borderColor: colors.borderLight, backgroundColor: colors.cardBgElevated },
-                  SHADOWS.medium,
-                ]}
-              >
-                <Ionicons name={item.icon} size={18} color={colors.gold} />
-                <Text style={[styles.kicker, { color: colors.textSecondary }]}>{item.kicker}</Text>
-              </View>
+        contentContainerStyle={{ paddingBottom: 200 }}
+        renderItem={({ item, index }) => (
+          <View style={[styles.slide, { width: SCREEN_WIDTH }]}>
+            {/* Layer badge */}
+            <Animated.View
+              entering={FadeInDown.delay(100).duration(400)}
+              style={[
+                styles.layerBadge,
+                {
+                  backgroundColor: item.accentColor + '15',
+                  borderColor: item.accentColor + '30',
+                },
+              ]}
+            >
+              <Ionicons name={item.icon} size={14} color={item.accentColor} />
+              <Text style={[styles.layerText, { color: item.accentColor }]}>
+                {item.layer} Layer
+              </Text>
+            </Animated.View>
 
-              <Text style={[styles.title, { color: colors.text }]}>{item.title}</Text>
-              <Text style={[styles.subtitle, { color: colors.text }]}>{item.subtitle}</Text>
+            {/* Headlines */}
+            <Animated.Text
+              entering={FadeInDown.delay(200).duration(400)}
+              style={[styles.headline, { color: colors.text }]}
+            >
+              {item.headline}
+            </Animated.Text>
+            <Animated.Text
+              entering={FadeInDown.delay(250).duration(400)}
+              style={[styles.subheadline, { color: colors.text }]}
+            >
+              {item.subheadline}
+            </Animated.Text>
 
-              <Text style={[styles.desc, { color: colors.textSecondary }]}>{item.description}</Text>
+            {/* Description */}
+            <Animated.Text
+              entering={FadeInDown.delay(300).duration(400)}
+              style={[styles.description, { color: colors.textSecondary }]}
+            >
+              {item.description}
+            </Animated.Text>
 
-              <View style={[styles.card, { backgroundColor: colors.cardBg, borderColor: colors.border }, SHADOWS.soft]}>
-                {item.bullets.map((b) => (
-                  <View key={b} style={styles.bulletRow}>
-                    <View style={[styles.bulletDot, { backgroundColor: colors.goldMedium }]} />
-                    <Text style={[styles.bulletText, { color: colors.text }]}>{b}</Text>
+            {/* Features */}
+            <Animated.View
+              entering={FadeInUp.delay(400).duration(500)}
+              style={[
+                styles.featuresCard,
+                {
+                  backgroundColor: colors.surface,
+                  borderColor: colors.border,
+                },
+              ]}
+            >
+              {item.features.map((feature, i) => (
+                <View
+                  key={i}
+                  style={[
+                    styles.featureRow,
+                    i < item.features.length - 1 && {
+                      borderBottomWidth: 1,
+                      borderBottomColor: colors.borderSubtle,
+                    },
+                  ]}
+                >
+                  <View
+                    style={[
+                      styles.featureIcon,
+                      { backgroundColor: item.accentColor + '15' },
+                    ]}
+                  >
+                    <Ionicons name={feature.icon} size={16} color={item.accentColor} />
                   </View>
-                ))}
-              </View>
+                  <Text style={[styles.featureText, { color: colors.text }]}>
+                    {feature.text}
+                  </Text>
+                </View>
+              ))}
             </Animated.View>
           </View>
         )}
       />
 
       {/* Bottom controls */}
-      <View style={styles.bottom}>
-        <View style={styles.dots}>
-          {slides.map((_, i) => {
-            const dotStyle = useAnimatedStyle(() => {
-              const w = interpolate(progress.value, [i - 1, i, i + 1], [8, 18, 8], Extrapolation.CLAMP);
-              const o = interpolate(progress.value, [i - 1, i, i + 1], [0.35, 1, 0.35], Extrapolation.CLAMP);
-              return { width: withSpring(w), opacity: withSpring(o) };
-            });
+      <View style={[styles.bottom, { paddingBottom: insets.bottom + SPACING.lg }]}>
+        {/* Progress dots */}
+        <View style={styles.progressContainer}>
+          <View style={styles.dots}>
+            {slides.map((slide, i) => {
+              const dotAnimStyle = useAnimatedStyle(() => {
+                const isActive = Math.round(progress.value) === i;
+                return {
+                  width: withSpring(isActive ? 24 : 8, EASING.springSnappy),
+                  backgroundColor: isActive ? slide.accentColor : colors.border,
+                };
+              });
 
-            return (
-              <Animated.View key={i} style={[styles.dot, { backgroundColor: colors.gold }, dotStyle]} />
-            );
-          })}
+              return <Animated.View key={i} style={[styles.dot, dotAnimStyle]} />;
+            })}
+          </View>
+          <Text style={[styles.progressText, { color: colors.textTertiary }]}>
+            {currentIndex + 1} of {slides.length}
+          </Text>
         </View>
 
-        <Animated.View entering={FadeInDown.duration(380)} style={styles.ctaRow}>
-          <View style={styles.ctaMeta}>
-            <Text style={[styles.stepText, { color: colors.textSecondary }]}>
-              {index + 1} / {slides.length}
-            </Text>
-            <Text style={[styles.stepHint, { color: colors.text }]}>
-              {index === slides.length - 1 ? 'Ready to begin' : 'Continue'}
+        {/* Actions */}
+        <View style={styles.actions}>
+          <View style={styles.actionMeta}>
+            <Text style={[styles.actionHint, { color: colors.textSecondary }]}>
+              {isLastSlide ? 'Ready to begin?' : 'Swipe or tap to continue'}
             </Text>
           </View>
-
-          <TouchableOpacity
-            activeOpacity={0.9}
+          <AnimatedTouchable
             onPress={handleNext}
-            style={[styles.primaryButton, { backgroundColor: colors.gold }]}
+            activeOpacity={0.9}
+            style={[styles.nextButton]}
           >
-            <Text style={[styles.primaryText, { color: colors.black }]}>
-              {index === slides.length - 1 ? 'Get Started' : 'Next'}
-            </Text>
-            <Ionicons
-              name={index === slides.length - 1 ? 'arrow-forward' : 'chevron-forward'}
-              size={18}
-              color={colors.black}
-            />
-          </TouchableOpacity>
-        </Animated.View>
+            <LinearGradient
+              colors={[
+                currentSlide.accentColor,
+                currentSlide.accentColor + 'DD',
+              ] as any}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.nextButtonGradient}
+            >
+              <Text style={[styles.nextButtonText, { color: colors.white }]}>
+                {isLastSlide ? 'Get Started' : 'Next'}
+              </Text>
+              <Ionicons
+                name={isLastSlide ? 'arrow-forward' : 'chevron-forward'}
+                size={20}
+                color={colors.white}
+              />
+            </LinearGradient>
+          </AnimatedTouchable>
+        </View>
       </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  goldGlow: {
-    position: 'absolute',
-    top: -120,
-    left: -120,
-    width: 280,
-    height: 280,
-    borderRadius: 999,
+  container: {
+    flex: 1,
   },
-
-  topBar: {
-    paddingTop: 14,
-    paddingHorizontal: SPACING.lg,
+  header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    paddingHorizontal: SPACING.xl,
+    paddingBottom: SPACING.md,
   },
-  brandRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  logo: { width: 26, height: 26 },
-  brand: { ...TYPOGRAPHY.titleMedium },
-
-  skipButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 10,
-    borderRadius: 999,
-  },
-  skipText: { ...TYPOGRAPHY.labelLarge },
-
-  slide: { paddingHorizontal: SPACING.lg, paddingTop: 26 },
-  heroWrap: { flex: 1 },
-
-  iconPill: {
-    alignSelf: 'flex-start',
+  headerLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 999,
-    borderWidth: 1,
-    marginBottom: 18,
+    gap: SPACING.sm,
   },
-  kicker: { ...TYPOGRAPHY.labelMedium },
-
-  title: { ...TYPOGRAPHY.displaySmall, marginTop: 6 },
-  subtitle: { ...TYPOGRAPHY.displaySmall, marginTop: 2 },
-  desc: { ...TYPOGRAPHY.bodyLarge, marginTop: 14, maxWidth: 520 },
-
-  card: {
-    marginTop: 20,
-    borderWidth: 1,
-    borderRadius: BORDER_RADIUS.lg,
-    padding: SPACING.lg,
+  logo: {
+    width: 28,
+    height: 28,
   },
-  bulletRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 },
-  bulletDot: { width: 8, height: 8, borderRadius: 999 },
-  bulletText: { ...TYPOGRAPHY.bodyMedium, flex: 1 },
-
+  brand: {
+    ...TYPOGRAPHY.h5,
+  },
+  skipButton: {
+    paddingVertical: SPACING.sm,
+    paddingHorizontal: SPACING.md,
+  },
+  skipText: {
+    ...TYPOGRAPHY.label,
+  },
+  slide: {
+    paddingHorizontal: SPACING.xl,
+    paddingTop: SPACING['2xl'],
+  },
+  layerBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: SPACING.sm,
+    paddingVertical: SPACING.sm,
+    paddingHorizontal: SPACING.md,
+    borderRadius: RADIUS.full,
+    borderWidth: 1,
+    marginBottom: SPACING.xl,
+  },
+  layerText: {
+    ...TYPOGRAPHY.labelSmall,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  headline: {
+    fontSize: 44,
+    fontWeight: '700',
+    letterSpacing: -1.5,
+    lineHeight: 50,
+  },
+  subheadline: {
+    fontSize: 44,
+    fontWeight: '700',
+    letterSpacing: -1.5,
+    lineHeight: 50,
+    marginBottom: SPACING.lg,
+  },
+  description: {
+    ...TYPOGRAPHY.bodyLarge,
+    lineHeight: 26,
+    marginBottom: SPACING['2xl'],
+  },
+  featuresCard: {
+    borderRadius: RADIUS.xl,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  featureRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: SPACING.lg,
+    paddingHorizontal: SPACING.lg,
+    gap: SPACING.md,
+  },
+  featureIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: RADIUS.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  featureText: {
+    ...TYPOGRAPHY.body,
+    flex: 1,
+    fontWeight: '500',
+  },
   bottom: {
     position: 'absolute',
     left: 0,
     right: 0,
     bottom: 0,
-    paddingHorizontal: SPACING.lg,
-    paddingBottom: 18,
-    paddingTop: 12,
+    paddingHorizontal: SPACING.xl,
+    paddingTop: SPACING.lg,
+  },
+  progressContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: SPACING.lg,
   },
   dots: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    marginBottom: 14,
+    gap: SPACING.sm,
   },
   dot: {
     height: 8,
-    borderRadius: 999,
+    borderRadius: RADIUS.full,
   },
-
-  ctaRow: {
+  progressText: {
+    ...TYPOGRAPHY.caption,
+  },
+  actions: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 14,
+    gap: SPACING.lg,
   },
-  ctaMeta: { flex: 1 },
-  stepText: { ...TYPOGRAPHY.labelMedium },
-  stepHint: { ...TYPOGRAPHY.titleSmall, marginTop: 2 },
-
-  primaryButton: {
+  actionMeta: {
+    flex: 1,
+  },
+  actionHint: {
+    ...TYPOGRAPHY.body,
+  },
+  nextButton: {
+    borderRadius: RADIUS.full,
+    overflow: 'hidden',
+  },
+  nextButtonGradient: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    paddingVertical: 14,
-    paddingHorizontal: 18,
-    borderRadius: 999,
+    gap: SPACING.sm,
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.xl,
   },
-  primaryText: { ...TYPOGRAPHY.labelLarge },
+  nextButtonText: {
+    ...TYPOGRAPHY.label,
+    fontWeight: '600',
+  },
 });

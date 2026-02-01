@@ -1,10 +1,20 @@
 import React from 'react';
 import { View, Text, StyleSheet, ViewStyle, TextStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
-import { useTheme, BORDER_RADIUS, SPACING, TYPOGRAPHY } from '../../lib/theme';
+import { LinearGradient } from 'expo-linear-gradient';
+import Animated, {
+  FadeIn,
+  FadeOut,
+  useAnimatedStyle,
+  useSharedValue,
+  withRepeat,
+  withTiming,
+  withSequence,
+  Easing,
+} from 'react-native-reanimated';
+import { useTheme, RADIUS, SPACING, TYPOGRAPHY } from '../../lib/theme';
 
-type BadgeVariant = 'default' | 'success' | 'error' | 'warning' | 'info' | 'gold';
+type BadgeVariant = 'default' | 'success' | 'error' | 'warning' | 'info' | 'gold' | 'premium';
 type BadgeSize = 'sm' | 'md' | 'lg';
 
 interface BadgeProps {
@@ -30,49 +40,83 @@ export function Badge({
 }: BadgeProps) {
   const { colors } = useTheme();
 
-  const sizeStyles = {
+  const sizeConfig = {
     sm: {
       paddingHorizontal: SPACING.sm,
-      paddingVertical: SPACING.xxs + 1,
+      paddingVertical: 3,
       fontSize: 10,
       iconSize: 10,
-      borderRadius: BORDER_RADIUS.sm,
+      borderRadius: RADIUS.xs,
+      gap: 4,
     },
     md: {
       paddingHorizontal: SPACING.md,
-      paddingVertical: SPACING.xs,
+      paddingVertical: 5,
       fontSize: 11,
       iconSize: 12,
-      borderRadius: BORDER_RADIUS.md,
+      borderRadius: RADIUS.badge,
+      gap: 5,
     },
     lg: {
       paddingHorizontal: SPACING.lg,
       paddingVertical: SPACING.sm,
       fontSize: 12,
       iconSize: 14,
-      borderRadius: BORDER_RADIUS.lg,
+      borderRadius: RADIUS.md,
+      gap: 6,
     },
   };
 
   const getVariantColors = () => {
     switch (variant) {
       case 'success':
-        return { bg: colors.successLight, border: colors.success, text: colors.success };
+        return {
+          bg: colors.successSurface,
+          border: colors.success,
+          text: colors.success,
+        };
       case 'error':
-        return { bg: colors.errorLight, border: colors.error, text: colors.error };
+        return {
+          bg: colors.errorSurface,
+          border: colors.error,
+          text: colors.error,
+        };
       case 'warning':
-        return { bg: colors.warningLight, border: colors.warning, text: colors.warning };
+        return {
+          bg: colors.warningSurface,
+          border: colors.warning,
+          text: colors.warning,
+        };
       case 'info':
-        return { bg: colors.infoLight, border: colors.info, text: colors.info };
+        return {
+          bg: colors.infoSurface,
+          border: colors.info,
+          text: colors.info,
+        };
       case 'gold':
-        return { bg: colors.goldLight, border: colors.gold, text: colors.gold };
+        return {
+          bg: colors.goldSurface,
+          border: colors.gold,
+          text: colors.gold,
+        };
+      case 'premium':
+        return {
+          bg: colors.goldSurfaceStrong,
+          border: colors.gold,
+          text: colors.gold,
+          isGradient: true,
+        };
       default:
-        return { bg: colors.cardBgLight, border: colors.border, text: colors.textSecondary };
+        return {
+          bg: colors.surface,
+          border: colors.border,
+          text: colors.textSecondary,
+        };
     }
   };
 
   const variantColors = getVariantColors();
-  const currentSize = sizeStyles[size];
+  const currentSize = sizeConfig[size];
 
   const containerStyle: ViewStyle = {
     backgroundColor: outlined ? 'transparent' : variantColors.bg,
@@ -81,48 +125,99 @@ export function Badge({
     paddingHorizontal: currentSize.paddingHorizontal,
     paddingVertical: currentSize.paddingVertical,
     borderRadius: currentSize.borderRadius,
+    gap: currentSize.gap,
   };
 
   const content = (
-    <View style={[styles.container, containerStyle, style]}>
+    <>
       {icon && (
         <Ionicons
           name={icon}
           size={currentSize.iconSize}
           color={variantColors.text}
-          style={styles.icon}
         />
       )}
       <Text
         style={[
           styles.label,
-          { color: variantColors.text, fontSize: currentSize.fontSize },
+          {
+            color: variantColors.text,
+            fontSize: currentSize.fontSize,
+          },
           textStyle,
         ]}
       >
         {label}
       </Text>
+    </>
+  );
+
+  // Premium variant with gradient background
+  if (variant === 'premium' && !outlined) {
+    return (
+      <LinearGradient
+        colors={[colors.goldLight, colors.gold, colors.goldDark] as any}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}
+        style={[
+          styles.container,
+          {
+            paddingHorizontal: currentSize.paddingHorizontal,
+            paddingVertical: currentSize.paddingVertical,
+            borderRadius: currentSize.borderRadius,
+            gap: currentSize.gap,
+          },
+          style,
+        ]}
+      >
+        {icon && (
+          <Ionicons
+            name={icon}
+            size={currentSize.iconSize}
+            color={colors.black}
+          />
+        )}
+        <Text
+          style={[
+            styles.label,
+            {
+              color: colors.black,
+              fontSize: currentSize.fontSize,
+            },
+            textStyle,
+          ]}
+        >
+          {label}
+        </Text>
+      </LinearGradient>
+    );
+  }
+
+  const wrapper = (
+    <View style={[styles.container, containerStyle, style]}>
+      {content}
     </View>
   );
 
   if (animated) {
     return (
-      <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(200)}>
-        {content}
+      <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(150)}>
+        {wrapper}
       </Animated.View>
     );
   }
 
-  return content;
+  return wrapper;
 }
 
 // Count Badge - for notification dots
 interface CountBadgeProps {
   count: number;
   max?: number;
-  variant?: 'gold' | 'error' | 'success';
-  size?: 'sm' | 'md';
+  variant?: 'gold' | 'error' | 'success' | 'info';
+  size?: 'sm' | 'md' | 'lg';
   style?: ViewStyle;
+  showZero?: boolean;
 }
 
 export function CountBadge({
@@ -131,10 +226,11 @@ export function CountBadge({
   variant = 'gold',
   size = 'md',
   style,
+  showZero = false,
 }: CountBadgeProps) {
   const { colors } = useTheme();
 
-  if (count <= 0) return null;
+  if (count <= 0 && !showZero) return null;
 
   const displayCount = count > max ? `${max}+` : count.toString();
 
@@ -142,14 +238,18 @@ export function CountBadge({
     gold: colors.gold,
     error: colors.error,
     success: colors.success,
+    info: colors.info,
   }[variant];
 
-  const sizeStyles = {
-    sm: { minWidth: 18, height: 18, fontSize: 10 },
-    md: { minWidth: 24, height: 24, fontSize: 12 },
+  const textColor = variant === 'gold' ? colors.black : colors.white;
+
+  const sizeConfig = {
+    sm: { minWidth: 16, height: 16, fontSize: 9, paddingHorizontal: 4 },
+    md: { minWidth: 20, height: 20, fontSize: 11, paddingHorizontal: 5 },
+    lg: { minWidth: 24, height: 24, fontSize: 12, paddingHorizontal: 6 },
   };
 
-  const currentSize = sizeStyles[size];
+  const currentSize = sizeConfig[size];
 
   return (
     <Animated.View
@@ -160,11 +260,12 @@ export function CountBadge({
           backgroundColor: bgColor,
           minWidth: currentSize.minWidth,
           height: currentSize.height,
+          paddingHorizontal: currentSize.paddingHorizontal,
         },
         style,
       ]}
     >
-      <Text style={[styles.countText, { fontSize: currentSize.fontSize }]}>
+      <Text style={[styles.countText, { fontSize: currentSize.fontSize, color: textColor }]}>
         {displayCount}
       </Text>
     </Animated.View>
@@ -173,7 +274,7 @@ export function CountBadge({
 
 // Status Dot - simple indicator
 interface StatusDotProps {
-  variant?: 'success' | 'error' | 'warning' | 'info' | 'offline';
+  variant?: 'success' | 'error' | 'warning' | 'info' | 'offline' | 'online';
   size?: 'sm' | 'md' | 'lg';
   pulse?: boolean;
   style?: ViewStyle;
@@ -186,40 +287,170 @@ export function StatusDot({
   style,
 }: StatusDotProps) {
   const { colors } = useTheme();
+  const pulseAnim = useSharedValue(1);
+
+  React.useEffect(() => {
+    if (pulse) {
+      pulseAnim.value = withRepeat(
+        withSequence(
+          withTiming(1.4, { duration: 600, easing: Easing.out(Easing.ease) }),
+          withTiming(1, { duration: 600, easing: Easing.in(Easing.ease) })
+        ),
+        -1,
+        false
+      );
+    }
+  }, [pulse]);
+
+  const animatedPulseStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: pulseAnim.value }],
+    opacity: 1.5 - pulseAnim.value * 0.5,
+  }));
 
   const dotColor = {
     success: colors.success,
     error: colors.error,
     warning: colors.warning,
     info: colors.info,
-    offline: colors.textMuted,
+    offline: colors.textTertiary,
+    online: colors.success,
   }[variant];
 
   const sizeValue = {
-    sm: 8,
-    md: 10,
-    lg: 12,
+    sm: 6,
+    md: 8,
+    lg: 10,
   }[size];
+
+  return (
+    <View style={[styles.statusDotContainer, style]}>
+      {pulse && (
+        <Animated.View
+          style={[
+            styles.statusDotPulse,
+            {
+              width: sizeValue * 2,
+              height: sizeValue * 2,
+              borderRadius: sizeValue,
+              backgroundColor: dotColor,
+            },
+            animatedPulseStyle,
+          ]}
+        />
+      )}
+      <View
+        style={[
+          styles.statusDot,
+          {
+            width: sizeValue,
+            height: sizeValue,
+            borderRadius: sizeValue / 2,
+            backgroundColor: dotColor,
+          },
+        ]}
+      />
+    </View>
+  );
+}
+
+// Live Badge - for live content indicators
+interface LiveBadgeProps {
+  size?: 'sm' | 'md';
+  style?: ViewStyle;
+}
+
+export function LiveBadge({ size = 'md', style }: LiveBadgeProps) {
+  const { colors } = useTheme();
+
+  const sizeConfig = {
+    sm: { paddingHorizontal: 8, paddingVertical: 3, fontSize: 9, dotSize: 5 },
+    md: { paddingHorizontal: 10, paddingVertical: 4, fontSize: 10, dotSize: 6 },
+  };
+
+  const currentSize = sizeConfig[size];
 
   return (
     <View
       style={[
-        styles.statusDot,
+        styles.liveBadge,
         {
-          width: sizeValue,
-          height: sizeValue,
-          borderRadius: sizeValue / 2,
-          backgroundColor: dotColor,
-        },
-        pulse && {
-          shadowColor: dotColor,
-          shadowOffset: { width: 0, height: 0 },
-          shadowOpacity: 0.6,
-          shadowRadius: 4,
+          backgroundColor: colors.errorSurface,
+          borderColor: colors.error,
+          paddingHorizontal: currentSize.paddingHorizontal,
+          paddingVertical: currentSize.paddingVertical,
         },
         style,
       ]}
-    />
+    >
+      <StatusDot variant="error" size="sm" pulse />
+      <Text
+        style={[
+          styles.liveText,
+          { color: colors.error, fontSize: currentSize.fontSize },
+        ]}
+      >
+        LIVE
+      </Text>
+    </View>
+  );
+}
+
+// Verification Badge
+interface VerificationBadgeProps {
+  verified?: boolean;
+  size?: 'sm' | 'md' | 'lg';
+  showLabel?: boolean;
+  style?: ViewStyle;
+}
+
+export function VerificationBadge({
+  verified = false,
+  size = 'md',
+  showLabel = false,
+  style,
+}: VerificationBadgeProps) {
+  const { colors } = useTheme();
+
+  const sizeConfig = {
+    sm: { iconSize: 14, padding: 4 },
+    md: { iconSize: 18, padding: 5 },
+    lg: { iconSize: 22, padding: 6 },
+  };
+
+  const currentSize = sizeConfig[size];
+
+  if (!verified) return null;
+
+  if (showLabel) {
+    return (
+      <Badge
+        label="Verified"
+        variant="success"
+        size={size}
+        icon="checkmark-circle"
+        style={style}
+      />
+    );
+  }
+
+  return (
+    <View
+      style={[
+        styles.verificationBadge,
+        {
+          backgroundColor: colors.success,
+          padding: currentSize.padding,
+          borderRadius: RADIUS.full,
+        },
+        style,
+      ]}
+    >
+      <Ionicons
+        name="checkmark"
+        size={currentSize.iconSize}
+        color={colors.white}
+      />
+    </View>
   );
 }
 
@@ -229,23 +460,41 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     alignSelf: 'flex-start',
   },
-  icon: {
-    marginRight: SPACING.xs,
-  },
   label: {
     fontWeight: '600',
-    letterSpacing: 0.3,
+    letterSpacing: 0.5,
     textTransform: 'uppercase',
   },
   countBadge: {
-    borderRadius: BORDER_RADIUS.full,
+    borderRadius: RADIUS.full,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: SPACING.xs,
   },
   countText: {
-    color: '#000',
     fontWeight: '700',
+    textAlign: 'center',
+  },
+  statusDotContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  statusDotPulse: {
+    position: 'absolute',
   },
   statusDot: {},
+  liveBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: RADIUS.sm,
+    borderWidth: 1,
+    gap: 6,
+  },
+  liveText: {
+    fontWeight: '700',
+    letterSpacing: 1,
+  },
+  verificationBadge: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 });

@@ -8,18 +8,28 @@ import {
   RefreshControl,
   Alert,
   ActivityIndicator,
-  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
+import * as Haptics from 'expo-haptics';
+import Animated, {
+  FadeIn,
+  FadeInDown,
+  FadeInUp,
+  useAnimatedStyle,
+  useSharedValue,
+  withRepeat,
+  withSequence,
+  withTiming,
+} from 'react-native-reanimated';
 import { router } from 'expo-router';
 
-import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS } from '../../lib/theme';
+import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS, ANIMATION } from '../../lib/theme';
 import { useAuthStore } from '../../lib/auth';
 import { userApi, veriffApi } from '../../lib/api';
 import { Button } from '../../components/ui';
-import { haptics } from '../../lib/haptics';
+
+const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
 type VerificationState = {
   verified: boolean;
@@ -43,15 +53,113 @@ function formatDate(iso?: string | null) {
   return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
-function InfoRow({ label, value }: { label: string; value?: string | null }) {
+// Premium Info Row
+function InfoRow({
+  label,
+  value,
+  icon,
+  verified,
+}: {
+  label: string;
+  value?: string | null;
+  icon?: string;
+  verified?: boolean;
+}) {
   const { colors } = useTheme();
+  const hasValue = value && value.trim().length > 0;
+
   return (
     <View style={[styles.infoRow, { borderBottomColor: colors.border }]}>
-      <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>{label}</Text>
-      <Text style={[styles.infoValue, { color: colors.text }]} numberOfLines={2}>
-        {value && value.trim().length > 0 ? value : '—'}
-      </Text>
+      <View style={styles.infoRowContent}>
+        {icon && (
+          <View style={[styles.infoIcon, { backgroundColor: `${colors.gold}12` }]}>
+            <Ionicons name={icon as any} size={16} color={colors.gold} />
+          </View>
+        )}
+        <View style={styles.infoText}>
+          <Text style={[styles.infoLabel, { color: colors.textTertiary }]}>{label}</Text>
+          <Text style={[styles.infoValue, { color: hasValue ? colors.text : colors.textTertiary }]} numberOfLines={2}>
+            {hasValue ? value : '—'}
+          </Text>
+        </View>
+      </View>
+      {verified && (
+        <View style={[styles.verifiedTag, { backgroundColor: `${colors.success}15` }]}>
+          <Ionicons name="checkmark-circle" size={14} color={colors.success} />
+        </View>
+      )}
     </View>
+  );
+}
+
+// Premium Shield Badge
+function ShieldBadge({
+  status,
+  size = 'large',
+}: {
+  status: 'verified' | 'pending' | 'failed' | 'unverified';
+  size?: 'small' | 'large';
+}) {
+  const { colors } = useTheme();
+  const pulse = useSharedValue(1);
+
+  useEffect(() => {
+    if (status === 'verified') {
+      pulse.value = withRepeat(
+        withSequence(
+          withTiming(1.05, { duration: 1200 }),
+          withTiming(1, { duration: 1200 })
+        ),
+        -1,
+        true
+      );
+    }
+  }, [status]);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: pulse.value }],
+  }));
+
+  const config = {
+    verified: {
+      icon: 'shield-checkmark',
+      colors: [colors.success, '#0F8A5F'] as const,
+      glow: colors.success,
+    },
+    pending: {
+      icon: 'time',
+      colors: [colors.info, '#2563EB'] as const,
+      glow: colors.info,
+    },
+    failed: {
+      icon: 'shield',
+      colors: [colors.error, '#DC2626'] as const,
+      glow: colors.error,
+    },
+    unverified: {
+      icon: 'shield-outline',
+      colors: [colors.gold, colors.goldDark || '#A68523'] as const,
+      glow: colors.gold,
+    },
+  };
+
+  const { icon, colors: gradientColors, glow } = config[status];
+  const iconSize = size === 'large' ? 48 : 28;
+  const containerSize = size === 'large' ? 100 : 56;
+
+  return (
+    <Animated.View style={[animatedStyle, { alignItems: 'center' }]}>
+      <View style={[styles.shieldGlow, { backgroundColor: `${glow}15`, width: containerSize + 20, height: containerSize + 20 }]}>
+        <LinearGradient
+          colors={gradientColors}
+          style={[styles.shieldContainer, { width: containerSize, height: containerSize }]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+        >
+          <Ionicons name={icon as any} size={iconSize} color="#FFFFFF" />
+        </LinearGradient>
+      </View>
+    </Animated.View>
   );
 }
 
@@ -70,6 +178,7 @@ export default function IdentityScreen() {
   });
 
   const [profile, setProfile] = useState<ProfileState | null>(null);
+  const [startingKyc, setStartingKyc] = useState(false);
 
   const fetchIdentity = useCallback(async () => {
     try {
@@ -106,64 +215,60 @@ export default function IdentityScreen() {
   }, [fetchIdentity]);
 
   const onRefresh = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setRefreshing(true);
     fetchIdentity();
   }, [fetchIdentity]);
 
-  const statusUI = useMemo(() => {
+  const statusConfig = useMemo(() => {
     if (!isAuthenticated) {
       return {
-        title: 'Sign in required',
-        subtitle: 'Sign in to complete identity verification.',
-        icon: 'log-in-outline' as const,
-        tone: 'warning' as const,
+        title: 'Sign in Required',
+        subtitle: 'Sign in to access identity verification and unlock voting.',
+        status: 'unverified' as const,
+        actionLabel: 'Sign In',
+        actionIcon: 'log-in-outline',
       };
     }
 
     if (verification.verified) {
       return {
-        title: 'Verified',
-        subtitle: 'Your identity is verified and locked to your government document.',
-        icon: 'shield-checkmark' as const,
-        tone: 'success' as const,
+        title: 'Identity Verified',
+        subtitle: 'Your identity is verified and secured with government-issued documentation.',
+        status: 'verified' as const,
+        actionLabel: 'Explore Proposals',
+        actionIcon: 'arrow-forward',
       };
     }
 
     if (verification.status === 'pending') {
       return {
-        title: 'Verification pending',
-        subtitle: 'We're confirming your verification status with the provider.',
-        icon: 'time-outline' as const,
-        tone: 'info' as const,
+        title: 'Verification Pending',
+        subtitle: 'Your identity verification is being processed. This usually takes a few minutes.',
+        status: 'pending' as const,
+        actionLabel: 'Refresh Status',
+        actionIcon: 'refresh',
       };
     }
 
     if (verification.status === 'failed') {
       return {
-        title: 'Verification failed',
-        subtitle: 'Your submission was not approved. Please try again.',
-        icon: 'close-circle-outline' as const,
-        tone: 'error' as const,
+        title: 'Verification Failed',
+        subtitle: 'Your submission was not approved. Please try again with a valid document.',
+        status: 'failed' as const,
+        actionLabel: 'Try Again',
+        actionIcon: 'refresh',
       };
     }
 
     return {
-      title: 'Not verified',
-      subtitle: 'Verify your identity to vote on proposals and access geo-gated communities.',
-      icon: 'shield-outline' as const,
-      tone: 'warning' as const,
+      title: 'Verify Your Identity',
+      subtitle: 'Complete identity verification to vote on proposals and access geo-restricted communities.',
+      status: 'unverified' as const,
+      actionLabel: 'Start Verification',
+      actionIcon: 'shield-checkmark-outline',
     };
   }, [isAuthenticated, verification.verified, verification.status]);
-
-  const toneColors = useMemo(() => {
-    const tone = statusUI.tone;
-    if (tone === 'success') return { bg: colors.successLight, border: colors.success, fg: colors.success };
-    if (tone === 'error') return { bg: colors.errorLight, border: colors.error, fg: colors.error };
-    if (tone === 'info') return { bg: colors.infoLight, border: colors.info, fg: colors.info };
-    return { bg: colors.warningLight, border: colors.warning, fg: colors.warning };
-  }, [statusUI.tone, colors]);
-
-  const [startingKyc, setStartingKyc] = useState(false);
 
   const handleStartKyc = async () => {
     if (!isAuthenticated) {
@@ -171,12 +276,12 @@ export default function IdentityScreen() {
       return;
     }
 
-    haptics.medium();
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setStartingKyc(true);
 
     try {
       const response = await veriffApi.createSession();
-      
+
       if (response.data?.sessionUrl && response.data?.verificationId) {
         router.push({
           pathname: '/modals/veriff',
@@ -186,42 +291,56 @@ export default function IdentityScreen() {
           },
         });
       } else {
-        haptics.error();
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
         Alert.alert(
           'Verification Error',
           response.data?.error || 'Could not start verification session. Please try again.'
         );
       }
     } catch (error: any) {
-      haptics.error();
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       console.error('Veriff session error:', error);
       Alert.alert(
         'Connection Error',
-        'Unable to connect to the verification service. Please check your internet connection and try again.'
+        'Unable to connect to the verification service. Please check your connection and try again.'
       );
     } finally {
       setStartingKyc(false);
     }
   };
 
-  const handleRefreshStatus = async () => {
-    if (verification.verified) return;
+  const handleAction = () => {
+    if (!isAuthenticated) {
+      router.replace('/');
+      return;
+    }
 
-    haptics.selection();
-    setRefreshing(true);
-    await fetchIdentity();
+    if (verification.verified) {
+      router.push('/(tabs)/proposals');
+      return;
+    }
+
+    if (verification.status === 'pending') {
+      onRefresh();
+      return;
+    }
+
+    handleStartKyc();
   };
 
+  // Loading state
   if (loading) {
     return (
-      <View style={[styles.container, { backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center' }]}>
-        <ActivityIndicator size="small" color={colors.gold} />
-        <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading identity…</Text>
+      <View style={[styles.container, styles.loadingContainer, { backgroundColor: colors.background }]}>
+        <View style={[styles.loadingCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <ActivityIndicator size="small" color={colors.gold} />
+          <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading identity...</Text>
+        </View>
       </View>
     );
   }
 
-  const displayName = profile?.name || user?.name || 'Citizen';
+  const displayName = profile?.name || user?.name || '';
   const displayEmail = profile?.email || user?.email || '';
   const displayCountry = profile?.country || user?.country || '';
   const displayState = profile?.state || user?.state || '';
@@ -230,150 +349,190 @@ export default function IdentityScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView
-        contentContainerStyle={styles.content}
+        contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
             tintColor={colors.gold}
+            progressBackgroundColor={colors.surface}
           />
         }
       >
-        <Animated.View entering={FadeInDown.duration(400)} style={[styles.headerCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
+        {/* Header */}
+        <Animated.View entering={FadeInDown.duration(400)} style={styles.header}>
+          <Text style={[styles.pageTitle, { color: colors.text }]}>Identity</Text>
+          <Text style={[styles.pageSubtitle, { color: colors.textSecondary }]}>
+            Verification status and profile
+          </Text>
+        </Animated.View>
+
+        {/* Status Card */}
+        <Animated.View
+          entering={FadeInUp.delay(100).duration(400)}
+          style={[styles.statusCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
+        >
           <LinearGradient
-            colors={[`${colors.gold}10`, 'transparent']}
+            colors={[`${colors.gold}08`, 'transparent']}
             style={StyleSheet.absoluteFill}
             start={{ x: 0.5, y: 0 }}
             end={{ x: 0.5, y: 1 }}
           />
-          <View style={styles.headerTopRow}>
-            <TouchableOpacity
-              onPress={() => router.back()}
-              style={[styles.backButton, { backgroundColor: colors.cardBgLight, borderColor: colors.border }]}
-              activeOpacity={0.7}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            >
-              <Ionicons name="chevron-back" size={22} color={colors.text} />
-            </TouchableOpacity>
-            <Text style={[styles.headerTitle, { color: colors.text }]}>Identity</Text>
-            <View style={{ width: 44 }} />
-          </View>
 
-          <View style={[styles.statusBanner, { backgroundColor: toneColors.bg, borderColor: toneColors.border }]}>
-            <View style={[styles.statusIconBg, { backgroundColor: `${toneColors.fg}20` }]}>
-              <Ionicons name={statusUI.icon} size={22} color={toneColors.fg} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.statusTitle, { color: colors.text }]}>{statusUI.title}</Text>
-              <Text style={[styles.statusSubtitle, { color: colors.textSecondary }]}>{statusUI.subtitle}</Text>
-            </View>
-          </View>
+          <ShieldBadge status={statusConfig.status} />
+
+          <Text style={[styles.statusTitle, { color: colors.text }]}>{statusConfig.title}</Text>
+          <Text style={[styles.statusSubtitle, { color: colors.textSecondary }]}>{statusConfig.subtitle}</Text>
 
           {verification.verified && (
-            <View style={[styles.lockNote, { borderTopColor: colors.border }]}>
-              <Ionicons name="lock-closed-outline" size={16} color={colors.textSecondary} />
-              <Text style={[styles.lockText, { color: colors.textSecondary }]}>
-                Verified identity fields are read-only and match your government document.
+            <View style={[styles.verifiedBanner, { backgroundColor: `${colors.success}12`, borderColor: `${colors.success}25` }]}>
+              <Ionicons name="lock-closed" size={16} color={colors.success} />
+              <Text style={[styles.verifiedBannerText, { color: colors.success }]}>
+                Identity verified and secured
               </Text>
             </View>
           )}
-        </Animated.View>
 
-        <Animated.View entering={FadeInUp.delay(100).duration(350)} style={[styles.card, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
-          <Text style={[styles.cardTitle, { color: colors.text }]}>Your Details</Text>
-
-          <InfoRow label="Name" value={displayName} />
-          <InfoRow label="Email" value={displayEmail} />
-          <InfoRow label="Country" value={displayCountry} />
-          <InfoRow label="State/Province" value={displayState} />
-          <InfoRow label="City" value={displayCity} />
-
-          <InfoRow
-            label="Verification Provider"
-            value={verification.provider ? String(verification.provider).toUpperCase() : '—'}
-          />
-          <InfoRow
-            label="Verified Date"
-            value={verification.verified ? (formatDate(verification.verifiedAt) || 'Verified') : '—'}
-          />
-        </Animated.View>
-
-        {!isAuthenticated ? (
-          <Animated.View entering={FadeInUp.delay(180).duration(350)} style={styles.actions}>
+          <View style={styles.statusAction}>
             <Button
-              title="Sign In"
-              onPress={() => router.replace('/')}
+              title={startingKyc ? 'Starting...' : statusConfig.actionLabel}
+              onPress={handleAction}
               variant="primary"
               size="lg"
               fullWidth
-              icon="log-in-outline"
-            />
-          </Animated.View>
-        ) : verification.verified ? (
-          <Animated.View entering={FadeInUp.delay(180).duration(350)} style={styles.actions}>
-            <View style={[styles.verifiedCard, { backgroundColor: colors.goldLight, borderColor: colors.gold }]}>
-              <Ionicons name="checkmark-circle" size={20} color={colors.gold} />
-              <Text style={[styles.verifiedText, { color: colors.gold }]}>
-                You're verified. You can now vote and create geo-gated proposals.
-              </Text>
-            </View>
-
-            <Button
-              title="Go to Proposals"
-              onPress={() => router.push('/(tabs)/proposals')}
-              variant="primary"
-              size="lg"
-              fullWidth
-              icon="arrow-forward"
-              iconPosition="right"
-            />
-          </Animated.View>
-        ) : (
-          <Animated.View entering={FadeInUp.delay(180).duration(350)} style={styles.actions}>
-            <Button
-              title={startingKyc ? "Starting Verification..." : "Start Verification"}
-              onPress={handleStartKyc}
-              variant="primary"
-              size="lg"
-              fullWidth
-              icon="shield-checkmark-outline"
+              icon={statusConfig.actionIcon}
+              iconPosition={verification.verified ? 'right' : 'left'}
               loading={startingKyc}
               disabled={startingKyc}
             />
+          </View>
+        </Animated.View>
 
-            <TouchableOpacity
-              style={[styles.refreshRow, { borderColor: colors.border, backgroundColor: colors.cardBg }]}
-              onPress={handleRefreshStatus}
-              activeOpacity={0.75}
-              disabled={refreshing}
-            >
-              <View style={[styles.refreshIconBg, { backgroundColor: colors.goldLight }]}>
-                {refreshing ? (
-                  <ActivityIndicator size="small" color={colors.gold} />
-                ) : (
-                  <Ionicons name="refresh" size={18} color={colors.gold} />
-                )}
+        {/* Details Card */}
+        <Animated.View
+          entering={FadeInUp.delay(200).duration(400)}
+          style={[styles.detailsCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
+        >
+          <View style={styles.detailsHeader}>
+            <Text style={[styles.detailsTitle, { color: colors.text }]}>Your Details</Text>
+            {verification.verified && (
+              <View style={[styles.lockedBadge, { backgroundColor: `${colors.gold}15` }]}>
+                <Ionicons name="lock-closed-outline" size={12} color={colors.gold} />
+                <Text style={[styles.lockedBadgeText, { color: colors.gold }]}>Verified</Text>
               </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.refreshTitle, { color: colors.text }]}>Refresh status</Text>
-                <Text style={[styles.refreshSubtitle, { color: colors.textSecondary }]}>
-                  If you just completed KYC, pull the latest status from the backend.
-                </Text>
-              </View>
-              <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
-            </TouchableOpacity>
+            )}
+          </View>
 
-            <View style={[styles.noteBox, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
-              <Ionicons name="information-circle-outline" size={18} color={colors.textSecondary} />
-              <Text style={[styles.noteText, { color: colors.textSecondary }]}>
-                Verification details are determined by your identity document and the verification provider. You can't edit them manually.
+          <InfoRow
+            label="Full Name"
+            value={displayName}
+            icon="person-outline"
+            verified={verification.verified}
+          />
+          <InfoRow
+            label="Email"
+            value={displayEmail}
+            icon="mail-outline"
+          />
+          <InfoRow
+            label="Country"
+            value={displayCountry}
+            icon="globe-outline"
+            verified={verification.verified}
+          />
+          <InfoRow
+            label="State / Province"
+            value={displayState}
+            icon="map-outline"
+            verified={verification.verified}
+          />
+          <InfoRow
+            label="City"
+            value={displayCity}
+            icon="business-outline"
+            verified={verification.verified}
+          />
+        </Animated.View>
+
+        {/* Verification Info Card */}
+        <Animated.View
+          entering={FadeInUp.delay(300).duration(400)}
+          style={[styles.infoCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
+        >
+          <View style={styles.infoCardHeader}>
+            <View style={[styles.infoCardIcon, { backgroundColor: `${colors.gold}12` }]}>
+              <Ionicons name="shield-checkmark-outline" size={20} color={colors.gold} />
+            </View>
+            <Text style={[styles.infoCardTitle, { color: colors.text }]}>Verification Details</Text>
+          </View>
+
+          <View style={styles.infoCardContent}>
+            <View style={styles.infoCardRow}>
+              <Text style={[styles.infoCardLabel, { color: colors.textTertiary }]}>Provider</Text>
+              <Text style={[styles.infoCardValue, { color: colors.text }]}>
+                {verification.provider ? verification.provider.toUpperCase() : '—'}
               </Text>
             </View>
+
+            <View style={[styles.infoCardDivider, { backgroundColor: colors.border }]} />
+
+            <View style={styles.infoCardRow}>
+              <Text style={[styles.infoCardLabel, { color: colors.textTertiary }]}>Status</Text>
+              <View style={[
+                styles.statusBadge,
+                {
+                  backgroundColor: verification.verified
+                    ? `${colors.success}15`
+                    : verification.status === 'pending'
+                    ? `${colors.info}15`
+                    : verification.status === 'failed'
+                    ? `${colors.error}15`
+                    : `${colors.warning}15`,
+                },
+              ]}>
+                <Text style={[
+                  styles.statusBadgeText,
+                  {
+                    color: verification.verified
+                      ? colors.success
+                      : verification.status === 'pending'
+                      ? colors.info
+                      : verification.status === 'failed'
+                      ? colors.error
+                      : colors.warning,
+                  },
+                ]}>
+                  {verification.verified ? 'Verified' : (verification.status || 'Unverified').charAt(0).toUpperCase() + (verification.status || 'Unverified').slice(1)}
+                </Text>
+              </View>
+            </View>
+
+            <View style={[styles.infoCardDivider, { backgroundColor: colors.border }]} />
+
+            <View style={styles.infoCardRow}>
+              <Text style={[styles.infoCardLabel, { color: colors.textTertiary }]}>Verified Date</Text>
+              <Text style={[styles.infoCardValue, { color: colors.text }]}>
+                {verification.verified ? (formatDate(verification.verifiedAt) || 'Verified') : '—'}
+              </Text>
+            </View>
+          </View>
+        </Animated.View>
+
+        {/* Help Card */}
+        {!verification.verified && isAuthenticated && (
+          <Animated.View
+            entering={FadeInUp.delay(400).duration(400)}
+            style={[styles.helpCard, { backgroundColor: `${colors.info}10`, borderColor: `${colors.info}25` }]}
+          >
+            <Ionicons name="information-circle-outline" size={20} color={colors.info} />
+            <Text style={[styles.helpText, { color: colors.textSecondary }]}>
+              Verification is powered by Veriff and requires a valid government-issued ID. Your data is encrypted and securely processed.
+            </Text>
           </Animated.View>
         )}
 
-        <View style={{ height: 80 }} />
+        <View style={styles.bottomSpacer} />
       </ScrollView>
     </View>
   );
@@ -381,160 +540,236 @@ export default function IdentityScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  content: {
-    paddingTop: 70,
+  loadingContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadingCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.md,
+    paddingHorizontal: SPACING.xl,
+    paddingVertical: SPACING.lg,
+    borderRadius: BORDER_RADIUS.xl,
+    borderWidth: 1,
+  },
+  loadingText: {
+    ...TYPOGRAPHY.bodyMedium,
+  },
+
+  scrollContent: {
+    paddingTop: 60,
     paddingHorizontal: SPACING.lg,
     paddingBottom: SPACING.xxl,
   },
-  loadingText: {
-    marginTop: SPACING.md,
-    ...TYPOGRAPHY.bodySmall,
+
+  // Header
+  header: {
+    marginBottom: SPACING.xl,
+  },
+  pageTitle: {
+    ...TYPOGRAPHY.displaySmall,
+  },
+  pageSubtitle: {
+    ...TYPOGRAPHY.bodyMedium,
+    marginTop: SPACING.xs,
   },
 
-  headerCard: {
+  // Status Card
+  statusCard: {
+    borderRadius: BORDER_RADIUS.xxl,
+    borderWidth: 1,
+    padding: SPACING.xxl,
+    alignItems: 'center',
+    overflow: 'hidden',
+    marginBottom: SPACING.lg,
+    ...SHADOWS.lg,
+  },
+  shieldGlow: {
+    borderRadius: 999,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: SPACING.lg,
+  },
+  shieldContainer: {
+    borderRadius: 999,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...SHADOWS.md,
+  },
+  statusTitle: {
+    ...TYPOGRAPHY.headlineLarge,
+    textAlign: 'center',
+    marginBottom: SPACING.sm,
+  },
+  statusSubtitle: {
+    ...TYPOGRAPHY.bodyMedium,
+    textAlign: 'center',
+    lineHeight: 22,
+    maxWidth: 300,
+  },
+  verifiedBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.md,
+    borderRadius: BORDER_RADIUS.full,
+    borderWidth: 1,
+    marginTop: SPACING.lg,
+  },
+  verifiedBannerText: {
+    ...TYPOGRAPHY.labelMedium,
+    fontWeight: '600',
+  },
+  statusAction: {
+    width: '100%',
+    marginTop: SPACING.xl,
+  },
+
+  // Details Card
+  detailsCard: {
     borderRadius: BORDER_RADIUS.xxl,
     borderWidth: 1,
     padding: SPACING.xl,
-    overflow: 'hidden',
-    ...SHADOWS.md,
     marginBottom: SPACING.lg,
+    ...SHADOWS.sm,
   },
-  headerTopRow: {
+  detailsHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: SPACING.lg,
   },
-  backButton: {
-    width: 44,
-    height: 44,
-    borderRadius: BORDER_RADIUS.full,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    ...TYPOGRAPHY.headlineMedium,
-    fontWeight: '700',
-  },
-
-  statusBanner: {
-    flexDirection: 'row',
-    gap: SPACING.md,
-    padding: SPACING.lg,
-    borderRadius: BORDER_RADIUS.xl,
-    borderWidth: 1,
-  },
-  statusIconBg: {
-    width: 44,
-    height: 44,
-    borderRadius: BORDER_RADIUS.lg,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  statusTitle: {
-    ...TYPOGRAPHY.labelLarge,
-  },
-  statusSubtitle: {
-    ...TYPOGRAPHY.bodySmall,
-    marginTop: SPACING.xxs,
-    lineHeight: 18,
-  },
-
-  lockNote: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.sm,
-    paddingTop: SPACING.lg,
-    marginTop: SPACING.lg,
-    borderTopWidth: 1,
-  },
-  lockText: {
-    ...TYPOGRAPHY.bodySmall,
-    flex: 1,
-    lineHeight: 18,
-  },
-
-  card: {
-    borderRadius: BORDER_RADIUS.xxl,
-    borderWidth: 1,
-    padding: SPACING.xl,
-    ...SHADOWS.sm,
-    marginBottom: SPACING.lg,
-  },
-  cardTitle: {
+  detailsTitle: {
     ...TYPOGRAPHY.headlineSmall,
-    marginBottom: SPACING.md,
+  },
+  lockedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.xs,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.xs,
+    borderRadius: BORDER_RADIUS.full,
+  },
+  lockedBadgeText: {
+    ...TYPOGRAPHY.labelSmall,
+    fontWeight: '600',
   },
 
   infoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingVertical: SPACING.md,
     borderBottomWidth: 1,
   },
+  infoRowContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    gap: SPACING.md,
+  },
+  infoIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  infoText: {
+    flex: 1,
+  },
   infoLabel: {
     ...TYPOGRAPHY.labelSmall,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-    marginBottom: SPACING.xs,
+    letterSpacing: 0.5,
+    marginBottom: 2,
   },
   infoValue: {
     ...TYPOGRAPHY.bodyMedium,
     fontWeight: '500',
   },
-
-  actions: {
-    gap: SPACING.md,
+  verifiedTag: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: SPACING.sm,
   },
 
-  refreshRow: {
+  // Info Card
+  infoCard: {
+    borderRadius: BORDER_RADIUS.xxl,
+    borderWidth: 1,
+    overflow: 'hidden',
+    marginBottom: SPACING.lg,
+    ...SHADOWS.sm,
+  },
+  infoCardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: SPACING.md,
-    padding: SPACING.lg,
-    borderRadius: BORDER_RADIUS.xl,
-    borderWidth: 1,
+    paddingHorizontal: SPACING.xl,
+    paddingTop: SPACING.xl,
+    paddingBottom: SPACING.lg,
   },
-  refreshIconBg: {
+  infoCardIcon: {
     width: 40,
     height: 40,
-    borderRadius: BORDER_RADIUS.lg,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  refreshTitle: {
+  infoCardTitle: {
     ...TYPOGRAPHY.labelLarge,
   },
-  refreshSubtitle: {
-    ...TYPOGRAPHY.bodySmall,
-    marginTop: SPACING.xxs,
-    lineHeight: 18,
+  infoCardContent: {
+    paddingHorizontal: SPACING.xl,
+    paddingBottom: SPACING.xl,
   },
-
-  noteBox: {
-    flexDirection: 'row',
-    gap: SPACING.sm,
-    padding: SPACING.lg,
-    borderRadius: BORDER_RADIUS.xl,
-    borderWidth: 1,
-  },
-  noteText: {
-    ...TYPOGRAPHY.bodySmall,
-    flex: 1,
-    lineHeight: 18,
-  },
-
-  verifiedCard: {
+  infoCardRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: SPACING.sm,
+    justifyContent: 'space-between',
+    paddingVertical: SPACING.md,
+  },
+  infoCardLabel: {
+    ...TYPOGRAPHY.labelMedium,
+  },
+  infoCardValue: {
+    ...TYPOGRAPHY.bodyMedium,
+    fontWeight: '500',
+  },
+  infoCardDivider: {
+    height: 1,
+  },
+  statusBadge: {
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.xs,
+    borderRadius: BORDER_RADIUS.full,
+  },
+  statusBadgeText: {
+    ...TYPOGRAPHY.labelSmall,
+    fontWeight: '600',
+  },
+
+  // Help Card
+  helpCard: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: SPACING.md,
     padding: SPACING.lg,
     borderRadius: BORDER_RADIUS.xl,
     borderWidth: 1,
   },
-  verifiedText: {
-    ...TYPOGRAPHY.bodyMedium,
+  helpText: {
+    ...TYPOGRAPHY.bodySmall,
     flex: 1,
     lineHeight: 20,
-    fontWeight: '500',
+  },
+
+  bottomSpacer: {
+    height: 100,
   },
 });
