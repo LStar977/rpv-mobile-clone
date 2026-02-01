@@ -718,6 +718,15 @@ export const ANIMATION = {
     buttonPress: 100,
     ripple: 400,
   },
+
+  // Spring configs (for Reanimated) - also available in EASING
+  spring: {
+    default: { damping: 20, stiffness: 300, mass: 1 },
+    bouncy: { damping: 12, stiffness: 180, mass: 0.8 },
+    gentle: { damping: 25, stiffness: 200, mass: 1 },
+    snappy: { damping: 30, stiffness: 400, mass: 0.8 },
+    slowmo: { damping: 35, stiffness: 150, mass: 1.2 },
+  },
 };
 
 // Easing curves
