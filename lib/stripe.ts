@@ -9,8 +9,8 @@ import {
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://representportal.com';
 
-// Stripe publishable key - should be set via environment variable in production
-export const STRIPE_PUBLISHABLE_KEY = process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY || 'pk_test_placeholder';
+// Stripe publishable key
+export const STRIPE_PUBLISHABLE_KEY = process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY || 'pk_live_51SXWK5D2jsTroGJyzClzoHiUPBego83bH9EwfQncDVt9D7ArUNiB6KzIJRlTT0CiGBaPKKVlyOP2DaltuuFf8T1o00xmHM5kGX';
 
 // Merchant identifier for Apple Pay
 export const MERCHANT_IDENTIFIER = 'merchant.com.representwallet.app';
