@@ -226,11 +226,12 @@ export default function ProfileScreen() {
           entering={FadeInUp.delay(200).duration(400)}
           style={[styles.menuCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
         >
-          <MenuItem icon="card-outline" label="Subscription" onPress={() => navigateTo('/modals/subscription')} delay={300} />
-          <MenuItem icon="wallet-outline" label="Connected Wallet" onPress={() => navigateTo('/modals/wallet')} delay={350} />
-          <MenuItem icon="time-outline" label="Voting History" onPress={() => navigateTo('/modals/voting-history')} delay={400} />
-          <MenuItem icon="trophy-outline" label="Badges & Achievements" onPress={() => navigateTo('/modals/badges')} delay={450} />
-          <MenuItem icon="settings-outline" label="Settings & Privacy" onPress={() => navigateTo('/modals/privacy')} delay={500} showBorder={false} />
+          <MenuItem icon="business-outline" label="My Organizations" onPress={() => navigateTo('/modals/organizations')} delay={300} />
+          <MenuItem icon="card-outline" label="Subscription" onPress={() => navigateTo('/modals/subscription')} delay={350} />
+          <MenuItem icon="wallet-outline" label="Connected Wallet" onPress={() => navigateTo('/modals/wallet')} delay={400} />
+          <MenuItem icon="time-outline" label="Voting History" onPress={() => navigateTo('/modals/voting-history')} delay={450} />
+          <MenuItem icon="trophy-outline" label="Badges & Achievements" onPress={() => navigateTo('/modals/badges')} delay={500} />
+          <MenuItem icon="settings-outline" label="Settings & Privacy" onPress={() => navigateTo('/modals/privacy')} delay={550} showBorder={false} />
         </Animated.View>
 
         {/* Theme Card */}

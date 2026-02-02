@@ -153,6 +153,63 @@ export const veriffApi = {
   },
 };
 
+// Organization types
+export interface Organization {
+  id: string;
+  name: string;
+  description: string;
+  logoUrl?: string;
+  memberCount: number;
+  tier: 'starter' | 'professional';
+  verified: boolean;
+  createdAt: string;
+  role?: 'admin' | 'member';
+}
+
+export interface OrganizationProposal extends Proposal {
+  organizationId: string;
+  organizationName: string;
+  isOfficial: boolean;
+}
+
+export const organizationsApi = {
+  async getMyOrganizations(): Promise<ApiResponse<Organization[]>> {
+    const result = await apiRequest<any>('/api/organizations');
+    if (Array.isArray(result.data)) return { data: result.data, error: null };
+    if (result.data?.organizations) return { data: result.data.organizations, error: null };
+    return { data: [], error: result.error };
+  },
+
+  async getOrganization(orgId: string): Promise<ApiResponse<Organization>> {
+    return apiRequest<Organization>(`/api/organizations/${orgId}`);
+  },
+
+  async joinWithInviteCode(inviteCode: string): Promise<ApiResponse<{ success: boolean; organization: Organization }>> {
+    return apiRequest('/api/organizations/join', {
+      method: 'POST',
+      body: JSON.stringify({ inviteCode }),
+    });
+  },
+
+  async leaveOrganization(orgId: string): Promise<ApiResponse<{ success: boolean }>> {
+    return apiRequest(`/api/organizations/${orgId}/leave`, { method: 'POST' });
+  },
+
+  async getOrganizationProposals(orgId: string): Promise<ApiResponse<OrganizationProposal[]>> {
+    const result = await apiRequest<any>(`/api/organizations/${orgId}/proposals`);
+    if (Array.isArray(result.data)) return { data: result.data, error: null };
+    if (result.data?.proposals) return { data: result.data.proposals, error: null };
+    return { data: [], error: result.error };
+  },
+
+  async getOrganizationAnnouncements(orgId: string): Promise<ApiResponse<any[]>> {
+    const result = await apiRequest<any>(`/api/organizations/${orgId}/announcements`);
+    if (Array.isArray(result.data)) return { data: result.data, error: null };
+    if (result.data?.announcements) return { data: result.data.announcements, error: null };
+    return { data: [], error: result.error };
+  },
+};
+
 export const passportApi = {
   async mint(): Promise<ApiResponse<{ success: boolean; txHash?: string }>> {
     const authState = useAuthStore.getState();
@@ -208,6 +265,7 @@ export const api = {
   veriff: veriffApi,
   passport: passportApi,
   uploads: uploadsApi,
+  organizations: organizationsApi,
 };
 
 export default api;
