@@ -129,9 +129,7 @@ function FilterChip({
 // Premium Proposal Card
 interface ProposalCardProps {
   proposal: Proposal;
-  hasClaimed: boolean;
   hasVoted: boolean;
-  onClaimToken: (id: number) => Promise<void>;
   onVote: (id: number, vote: 'support' | 'oppose') => Promise<void>;
   isVoting: boolean;
   onPress: () => void;
@@ -140,16 +138,13 @@ interface ProposalCardProps {
 
 function ProposalCard({
   proposal,
-  hasClaimed,
   hasVoted,
-  onClaimToken,
   onVote,
   isVoting,
   onPress,
   index,
 }: ProposalCardProps) {
   const { colors } = useTheme();
-  const [claiming, setClaiming] = useState(false);
   const scale = useSharedValue(1);
   const shimmer = useSharedValue(0);
 
@@ -185,19 +180,6 @@ function ProposalCard({
   const animatedCardStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
   }));
-
-  const handleClaimToken = async () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    setClaiming(true);
-    try {
-      await onClaimToken(proposal.id as number);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } catch {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-    } finally {
-      setClaiming(false);
-    }
-  };
 
   const handleShare = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -343,31 +325,6 @@ function ProposalCard({
           <Ionicons name="checkmark-circle" size={16} color={colors.success} />
           <Text style={[styles.statusText, { color: colors.success }]}>You have voted</Text>
         </View>
-      ) : !hasClaimed ? (
-        <TouchableOpacity
-          style={[styles.claimBtn, claiming && styles.btnDisabled]}
-          onPress={(e) => {
-            e.stopPropagation();
-            handleClaimToken();
-          }}
-          disabled={claiming}
-          activeOpacity={0.85}
-        >
-          <LinearGradient
-            colors={[colors.gold, colors.goldDark || '#A68523']}
-            style={StyleSheet.absoluteFill}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-          />
-          {claiming ? (
-            <ActivityIndicator size="small" color="#000" />
-          ) : (
-            <>
-              <Ionicons name="wallet-outline" size={18} color="#000" />
-              <Text style={styles.claimBtnText}>Claim Vote Token</Text>
-            </>
-          )}
-        </TouchableOpacity>
       ) : (
         <View style={styles.voteActions}>
           <TouchableOpacity
@@ -515,7 +472,8 @@ export default function ProposalsScreen() {
   }, [userCountry, userState, userCity]);
 
   const filteredProposals = useMemo(() => {
-    return proposals.filter((proposal) => {
+    // Reverse to show most recent proposals first
+    return [...proposals].reverse().filter((proposal) => {
       const matchesSearch =
         searchQuery === '' ||
         proposal.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -607,24 +565,6 @@ export default function ProposalsScreen() {
     fetchData();
   }, [fetchData]);
 
-  const handleClaimToken = async (proposalId: number) => {
-    if (!isAuthenticated) {
-      Alert.alert('Sign In Required', 'Please sign in to claim vote tokens.');
-      return;
-    }
-    try {
-      const result = await proposalsApi.claimVoteToken(proposalId);
-      if (result.error) {
-        Alert.alert('Error', result.error);
-        return;
-      }
-      setClaimedTokens((prev) => new Set([...prev, proposalId]));
-      Alert.alert('Success', 'Vote token claimed! You can now vote on this proposal.');
-    } catch {
-      Alert.alert('Error', 'Failed to claim vote token. Please try again.');
-    }
-  };
-
   const handleVote = async (proposalId: number, vote: 'support' | 'oppose') => {
     if (!isAuthenticated) {
       Alert.alert('Sign In Required', 'Please sign in to vote.');
@@ -632,6 +572,18 @@ export default function ProposalsScreen() {
     }
     setVotingProposalId(proposalId);
     try {
+      // First claim the token if not already claimed
+      if (!claimedTokens.has(proposalId)) {
+        const claimResult = await proposalsApi.claimVoteToken(proposalId);
+        if (claimResult.error) {
+          Alert.alert('Error', claimResult.error);
+          setVotingProposalId(null);
+          return;
+        }
+        setClaimedTokens((prev) => new Set([...prev, proposalId]));
+      }
+
+      // Then submit the vote
       const result = await proposalsApi.submitVote(proposalId, vote);
       if (result.error) {
         Alert.alert('Error', result.error);
@@ -776,7 +728,6 @@ export default function ProposalsScreen() {
   };
 
   const detail = selectedProposal;
-  const detailHasClaimed = detail ? claimedTokens.has(detail.id as number) : false;
   const detailHasVoted = detail ? votedProposals.has(detail.id as number) : false;
   const detailIsVoting = detail ? votingProposalId === (detail.id as number) : false;
 
@@ -949,9 +900,7 @@ export default function ProposalsScreen() {
             <ProposalCard
               key={proposal.id}
               proposal={proposal}
-              hasClaimed={claimedTokens.has(proposal.id as number)}
               hasVoted={votedProposals.has(proposal.id as number)}
-              onClaimToken={handleClaimToken}
               onVote={handleVote}
               isVoting={votingProposalId === proposal.id}
               onPress={() => openProposal(proposal)}
@@ -1085,32 +1034,6 @@ export default function ProposalsScreen() {
                       <Ionicons name="checkmark-circle" size={16} color={colors.success} />
                       <Text style={[styles.statusText, { color: colors.success }]}>You have voted</Text>
                     </View>
-                  ) : !detailHasClaimed ? (
-                    <TouchableOpacity
-                      style={[styles.claimBtn, detailIsVoting && styles.btnDisabled]}
-                      onPress={async () => {
-                        if (!detail) return;
-                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                        await handleClaimToken(detail.id as number);
-                      }}
-                      activeOpacity={0.85}
-                      disabled={detailIsVoting}
-                    >
-                      <LinearGradient
-                        colors={[colors.gold, colors.goldDark || '#A68523']}
-                        style={StyleSheet.absoluteFill}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 0 }}
-                      />
-                      {detailIsVoting ? (
-                        <ActivityIndicator size="small" color="#000" />
-                      ) : (
-                        <>
-                          <Ionicons name="wallet-outline" size={18} color="#000" />
-                          <Text style={styles.claimBtnText}>Claim Vote Token</Text>
-                        </>
-                      )}
-                    </TouchableOpacity>
                   ) : (
                     <View style={styles.voteActions}>
                       <TouchableOpacity
@@ -1609,16 +1532,6 @@ const styles = StyleSheet.create({
     gap: SPACING.sm,
   },
   statusText: { ...TYPOGRAPHY.labelMedium, fontWeight: '500' },
-  claimBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 14,
-    borderRadius: BORDER_RADIUS.xl,
-    gap: SPACING.sm,
-    overflow: 'hidden',
-  },
-  claimBtnText: { color: '#000', ...TYPOGRAPHY.labelLarge, fontWeight: '600' },
   voteActions: { flexDirection: 'row', gap: SPACING.md },
   voteBtn: {
     flex: 1,

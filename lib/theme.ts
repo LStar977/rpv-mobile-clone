@@ -14,53 +14,53 @@ export type ThemePreference = 'system' | 'dark' | 'light';
 
 export const DARK_COLORS = {
   // ─────────────────────────────────────────────────────────────────────────────
-  // BACKGROUNDS - Deep, rich blacks with subtle blue undertones for sophistication
+  // BACKGROUNDS - Obsidian Black for authority and premium feel
   // ─────────────────────────────────────────────────────────────────────────────
-  background: '#000000',           // Pure black - premium feel
-  backgroundElevated: '#0C0C0E',   // Slightly elevated surfaces
-  backgroundSecondary: '#111113',  // Secondary background
+  background: '#040707',           // Obsidian Black - primary background
+  backgroundElevated: '#0A0D0D',   // Slightly elevated surfaces
+  backgroundSecondary: '#0F1212',  // Secondary background
 
   // Surface hierarchy (cards, modals, sheets)
-  surface: '#161618',              // Primary surface
-  surfaceElevated: '#1C1C1F',      // Elevated surface (modals)
-  surfaceHighlight: '#222225',     // Highlighted surface (hover states)
-  surfacePressed: '#2A2A2D',       // Pressed state
+  surface: '#141818',              // Primary surface
+  surfaceElevated: '#1A1F1F',      // Elevated surface (modals)
+  surfaceHighlight: '#202626',     // Highlighted surface (hover states)
+  surfacePressed: '#282E2E',       // Pressed state
 
   // ─────────────────────────────────────────────────────────────────────────────
   // BORDERS - Subtle, sophisticated separators
   // ─────────────────────────────────────────────────────────────────────────────
-  border: 'rgba(255, 255, 255, 0.08)',      // Default border
-  borderSubtle: 'rgba(255, 255, 255, 0.05)', // Subtle dividers
-  borderStrong: 'rgba(255, 255, 255, 0.12)', // Prominent borders
-  borderFocus: 'rgba(255, 255, 255, 0.20)',  // Focus states
+  border: 'rgba(244, 245, 246, 0.08)',      // Default border
+  borderSubtle: 'rgba(244, 245, 246, 0.05)', // Subtle dividers
+  borderStrong: 'rgba(244, 245, 246, 0.12)', // Prominent borders
+  borderFocus: 'rgba(244, 245, 246, 0.20)',  // Focus states
 
   // ─────────────────────────────────────────────────────────────────────────────
-  // TEXT HIERARCHY - Crystal clear readability
+  // TEXT HIERARCHY - Civic White for clean readability
   // ─────────────────────────────────────────────────────────────────────────────
-  text: '#FFFFFF',                 // Primary text - pure white
-  textPrimary: '#FFFFFF',          // Alias for primary
-  textSecondary: '#A0A0A5',        // Secondary text
-  textTertiary: '#6B6B70',         // Tertiary/muted text
-  textDisabled: '#404045',         // Disabled text
-  textInverse: '#000000',          // Text on light backgrounds
+  text: '#F4F5F6',                 // Civic White - primary text
+  textPrimary: '#F4F5F6',          // Alias for primary
+  textSecondary: '#B8BABB',        // Secondary text
+  textTertiary: '#7A7D7E',         // Tertiary/muted text
+  textDisabled: '#4A4D4E',         // Disabled text
+  textInverse: '#040707',          // Text on light backgrounds
 
   // ─────────────────────────────────────────────────────────────────────────────
-  // BRAND - Premium Gold System
+  // BRAND - Sovereign Gold System
   // ─────────────────────────────────────────────────────────────────────────────
-  // Primary gold - warm, rich, trustworthy
-  gold: '#C9A227',                 // Primary brand gold
-  goldLight: '#E5C34A',            // Light gold for highlights
-  goldDark: '#9E7E1E',             // Dark gold for depth
+  // Primary gold - governance highlights, calls-to-action
+  gold: '#EABA58',                 // Sovereign Gold - primary brand
+  goldLight: '#F0CB7A',            // Light gold for highlights
+  goldDark: '#C99A38',             // Dark gold for depth
 
   // Gold surfaces (for backgrounds, highlights)
-  goldSurface: 'rgba(201, 162, 39, 0.08)',     // Subtle gold tint
-  goldSurfaceStrong: 'rgba(201, 162, 39, 0.15)', // Stronger gold tint
-  goldSurfaceIntense: 'rgba(201, 162, 39, 0.25)', // Intense gold tint
+  goldSurface: 'rgba(234, 186, 88, 0.08)',     // Subtle gold tint
+  goldSurfaceStrong: 'rgba(234, 186, 88, 0.15)', // Stronger gold tint
+  goldSurfaceIntense: 'rgba(234, 186, 88, 0.25)', // Intense gold tint
 
   // Gold gradient
-  goldGradientStart: '#E5C34A',
-  goldGradientMiddle: '#C9A227',
-  goldGradientEnd: '#9E7E1E',
+  goldGradientStart: '#F0CB7A',
+  goldGradientMiddle: '#EABA58',
+  goldGradientEnd: '#C99A38',
 
   // ─────────────────────────────────────────────────────────────────────────────
   // SEMANTIC COLORS - Clear, accessible status indicators
@@ -105,48 +105,48 @@ export const DARK_COLORS = {
   // ─────────────────────────────────────────────────────────────────────────────
   // UTILITY COLORS
   // ─────────────────────────────────────────────────────────────────────────────
-  white: '#FFFFFF',
-  black: '#000000',
+  white: '#F4F5F6',
+  black: '#040707',
   transparent: 'transparent',
 
   // Overlays
-  overlay: 'rgba(0, 0, 0, 0.75)',
-  overlayLight: 'rgba(0, 0, 0, 0.50)',
-  overlayUltraLight: 'rgba(0, 0, 0, 0.30)',
+  overlay: 'rgba(4, 7, 7, 0.75)',
+  overlayLight: 'rgba(4, 7, 7, 0.50)',
+  overlayUltraLight: 'rgba(4, 7, 7, 0.30)',
 
   // Glass effects
-  glass: 'rgba(255, 255, 255, 0.03)',
-  glassMedium: 'rgba(255, 255, 255, 0.06)',
-  glassStrong: 'rgba(255, 255, 255, 0.10)',
+  glass: 'rgba(244, 245, 246, 0.03)',
+  glassMedium: 'rgba(244, 245, 246, 0.06)',
+  glassStrong: 'rgba(244, 245, 246, 0.10)',
 
   // Shimmer (for skeleton loading)
-  shimmer: 'rgba(255, 255, 255, 0.05)',
-  shimmerHighlight: 'rgba(255, 255, 255, 0.10)',
+  shimmer: 'rgba(244, 245, 246, 0.05)',
+  shimmerHighlight: 'rgba(244, 245, 246, 0.10)',
 
   // Tab bar
-  tabBar: 'rgba(0, 0, 0, 0.85)',
-  tabBarBorder: 'rgba(255, 255, 255, 0.06)',
+  tabBar: 'rgba(4, 7, 7, 0.85)',
+  tabBarBorder: 'rgba(244, 245, 246, 0.06)',
 
   // Input fields
-  inputBg: 'rgba(255, 255, 255, 0.04)',
-  inputBgFocus: 'rgba(255, 255, 255, 0.08)',
+  inputBg: 'rgba(244, 245, 246, 0.04)',
+  inputBgFocus: 'rgba(244, 245, 246, 0.08)',
 
   // ─────────────────────────────────────────────────────────────────────────────
   // LEGACY ALIASES - For backward compatibility with existing components
   // ─────────────────────────────────────────────────────────────────────────────
-  cardBg: '#161618',                 // Alias for surface
-  cardBgLight: '#1C1C1F',            // Alias for surfaceElevated
-  textMuted: '#6B6B70',              // Alias for textTertiary
-  surfaceHover: '#222225',           // Alias for surfaceHighlight
-  borderLight: 'rgba(255, 255, 255, 0.05)', // Alias for borderSubtle
+  cardBg: '#141818',                 // Alias for surface
+  cardBgLight: '#1A1F1F',            // Alias for surfaceElevated
+  textMuted: '#7A7D7E',              // Alias for textTertiary
+  surfaceHover: '#202626',           // Alias for surfaceHighlight
+  borderLight: 'rgba(244, 245, 246, 0.05)', // Alias for borderSubtle
 
   // ─────────────────────────────────────────────────────────────────────────────
   // GRADIENTS (as arrays for LinearGradient)
   // ─────────────────────────────────────────────────────────────────────────────
-  gradientGold: ['#E5C34A', '#C9A227', '#9E7E1E'],
-  gradientDark: ['#1C1C1F', '#111113', '#000000'],
-  gradientCard: ['rgba(255,255,255,0.06)', 'rgba(255,255,255,0.02)'],
-  gradientHero: ['#161618', '#0C0C0E', '#000000'],
+  gradientGold: ['#F0CB7A', '#EABA58', '#C99A38'],
+  gradientDark: ['#1A1F1F', '#0F1212', '#040707'],
+  gradientCard: ['rgba(244,245,246,0.06)', 'rgba(244,245,246,0.02)'],
+  gradientHero: ['#141818', '#0A0D0D', '#040707'],
   gradientSuccess: ['#34D399', '#059669'],
   gradientAccent: ['#8B5CF6', '#6366F1'],
 };
@@ -626,7 +626,7 @@ export const SHADOWS = {
 
   // Gold glow for premium/active elements
   glow: {
-    shadowColor: '#C9A227',
+    shadowColor: '#EABA58',
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.35,
     shadowRadius: 16,
@@ -634,7 +634,7 @@ export const SHADOWS = {
   },
 
   glowStrong: {
-    shadowColor: '#C9A227',
+    shadowColor: '#EABA58',
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.50,
     shadowRadius: 24,
@@ -642,7 +642,7 @@ export const SHADOWS = {
   },
 
   glowSubtle: {
-    shadowColor: '#C9A227',
+    shadowColor: '#EABA58',
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.20,
     shadowRadius: 8,
@@ -718,13 +718,15 @@ export const ANIMATION = {
     buttonPress: 100,
     ripple: 400,
   },
-spring: {
-  default: { damping: 20, stiffness: 300, mass: 1 },
-  bouncy: { damping: 12, stiffness: 180, mass: 0.8 },
-  gentle: { damping: 25, stiffness: 200, mass: 1 },
-  snappy: { damping: 30, stiffness: 400, mass: 0.8 },
-  slowmo: { damping: 35, stiffness: 150, mass: 1.2 },
-},
+
+  // Spring configs (for Reanimated) - also available in EASING
+  spring: {
+    default: { damping: 20, stiffness: 300, mass: 1 },
+    bouncy: { damping: 12, stiffness: 180, mass: 0.8 },
+    gentle: { damping: 25, stiffness: 200, mass: 1 },
+    snappy: { damping: 30, stiffness: 400, mass: 0.8 },
+    slowmo: { damping: 35, stiffness: 150, mass: 1.2 },
+  },
 };
 
 // Easing curves
