@@ -62,14 +62,12 @@ function StatCard({
   label,
   accent,
   delay = 0,
-  index = 0,
 }: {
   icon: string;
   value: string;
   label: string;
   accent: string;
   delay?: number;
-  index?: number;
 }) {
   const { colors } = useTheme();
   const scale = useSharedValue(0.8);
@@ -86,10 +84,8 @@ function StatCard({
   }));
 
   return (
-    <AnimatedTouchable
+    <Animated.View
       style={[styles.statCard, { backgroundColor: colors.surface, borderColor: colors.border }, animatedStyle]}
-      activeOpacity={0.7}
-      onPress={() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)}
     >
       <LinearGradient
         colors={[`${accent}08`, 'transparent']}
@@ -102,7 +98,7 @@ function StatCard({
       </View>
       <Text style={[styles.statValue, { color: colors.text }]}>{value}</Text>
       <Text style={[styles.statLabel, { color: colors.textTertiary }]}>{label}</Text>
-    </AnimatedTouchable>
+    </Animated.View>
   );
 }
 
@@ -352,48 +348,6 @@ function PriorityCard({
   );
 }
 
-// --- Token Alert Card ---
-function TokenAlertCard({
-  count,
-  onPress,
-}: {
-  count: number;
-  onPress: () => void;
-}) {
-  const { colors } = useTheme();
-
-  return (
-    <AnimatedTouchable
-      entering={FadeInUp.delay(200).duration(400)}
-      style={[styles.tokenAlert, { backgroundColor: colors.surface, borderColor: `${colors.success}30` }]}
-      onPress={() => {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        onPress();
-      }}
-      activeOpacity={0.8}
-    >
-      <LinearGradient
-        colors={[`${colors.success}10`, 'transparent']}
-        style={StyleSheet.absoluteFill}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-      />
-      <View style={[styles.tokenAlertIcon, { backgroundColor: `${colors.success}15` }]}>
-        <Ionicons name="gift-outline" size={20} color={colors.success} />
-      </View>
-      <View style={styles.tokenAlertContent}>
-        <Text style={[styles.tokenAlertTitle, { color: colors.text }]}>
-          {count} Token{count > 1 ? 's' : ''} Available
-        </Text>
-        <Text style={[styles.tokenAlertSubtitle, { color: colors.textTertiary }]}>
-          Claim rewards for voting
-        </Text>
-      </View>
-      <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
-    </AnimatedTouchable>
-  );
-}
-
 // --- Urgent Proposal Card ---
 function UrgentProposalCard({
   proposal,
@@ -527,7 +481,6 @@ export default function DashboardScreen() {
   const [stats, setStats] = useState({ pending: 0, voted: 0, passed: 0 });
   const [communities, setCommunities] = useState<Community[]>([]);
   const [urgentProposals, setUrgentProposals] = useState<UrgentProposal[]>([]);
-  const [unclaimedTokens, setUnclaimedTokens] = useState(0);
   const [activities, setActivities] = useState<ActivityItem[]>([]);
   const [isVerified, setIsVerified] = useState(false);
 
@@ -576,8 +529,6 @@ export default function DashboardScreen() {
       });
 
       urgent.sort((a, b) => a.hoursLeft - b.hoursLeft);
-
-      const unclaimed = proposals.filter((p: any) => !claimedIds.has(p.id) && !votedIds.has(p.id)).length;
 
       const profile = profileRes.data;
       const userCountry = profile?.country || user?.country || '';
@@ -676,7 +627,6 @@ export default function DashboardScreen() {
       setStats({ pending: pendingCount, voted: votedIds.size, passed: passedCount });
       setCommunities(Object.values(communityMap).filter((c) => c.proposalCount > 0));
       setUrgentProposals(urgent.slice(0, 3));
-      setUnclaimedTokens(unclaimed);
       setIsVerified(verificationRes.data?.verified || false);
 
       const recentActivities: ActivityItem[] = [];
@@ -777,11 +727,6 @@ export default function DashboardScreen() {
           onExplore={navigateToProposals}
         />
 
-        {/* Token Alert */}
-        {unclaimedTokens > 0 && (
-          <TokenAlertCard count={unclaimedTokens} onPress={navigateToProposals} />
-        )}
-
         {/* Stats Section */}
         <View style={styles.section}>
           <SectionHeader title="YOUR IMPACT" style={styles.sectionHeader} />
@@ -792,7 +737,6 @@ export default function DashboardScreen() {
               label="Pending"
               accent={colors.warning}
               delay={0}
-              index={0}
             />
             <StatCard
               icon="checkmark-circle-outline"
@@ -800,7 +744,6 @@ export default function DashboardScreen() {
               label="Voted"
               accent={colors.success}
               delay={80}
-              index={1}
             />
             <StatCard
               icon="trophy-outline"
@@ -808,7 +751,6 @@ export default function DashboardScreen() {
               label="Passed"
               accent={colors.gold}
               delay={160}
-              index={2}
             />
           </View>
         </View>
@@ -1068,36 +1010,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.95)',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-
-  // Token Alert
-  tokenAlert: {
-    marginHorizontal: SPACING.lg,
-    marginTop: SPACING.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: SPACING.lg,
-    borderRadius: BORDER_RADIUS.xl,
-    borderWidth: 1,
-    gap: SPACING.md,
-    overflow: 'hidden',
-  },
-  tokenAlertIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  tokenAlertContent: {
-    flex: 1,
-  },
-  tokenAlertTitle: {
-    ...TYPOGRAPHY.labelLarge,
-  },
-  tokenAlertSubtitle: {
-    ...TYPOGRAPHY.bodySmall,
-    marginTop: 2,
   },
 
   // Sections
