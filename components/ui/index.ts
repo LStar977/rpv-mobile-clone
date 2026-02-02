@@ -62,6 +62,7 @@ export {
 
 // Overlays & Feedback
 export { VoteConfirmationOverlay } from './VoteConfirmationOverlay';
+export { VerificationModal } from './VerificationModal';
 
 // Tier Badges
 export { TierBadge, TierCard } from './TierBadge';

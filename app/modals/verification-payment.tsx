@@ -33,16 +33,18 @@ export default function VerificationPaymentScreen() {
         headers,
       });
 
-      if (response.ok) {
-        const { url } = await response.json();
-        // Open Stripe checkout
-        await Linking.openURL(url);
-        // After payment, user will be redirected back and can start Veriff
-        router.back();
-      } else {
-        const error = await response.json();
-        throw new Error(error.message || 'Failed to create checkout session');
+      // Safe JSON parsing - handle HTML error pages gracefully
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok || !data?.url) {
+        const errorMessage = data?.error || data?.message || 'Payment service unavailable. Please try again later.';
+        throw new Error(errorMessage);
       }
+
+      // Open Stripe checkout
+      await Linking.openURL(data.url);
+      // After payment, user will be redirected back and can start Veriff
+      router.back();
     } catch (error: any) {
       Alert.alert('Error', error.message || 'Failed to start payment. Please try again.');
     } finally {

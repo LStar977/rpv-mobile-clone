@@ -124,12 +124,15 @@ export default function SubscriptionScreen() {
         headers,
       });
 
-      if (response.ok) {
-        const { url } = await response.json();
-        await Linking.openURL(url);
-      } else {
-        throw new Error('Failed to create checkout');
+      // Safe JSON parsing - handle HTML error pages gracefully
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok || !data?.url) {
+        const errorMessage = data?.error || data?.message || 'Payment service unavailable. Please try again later.';
+        throw new Error(errorMessage);
       }
+
+      await Linking.openURL(data.url);
     } catch (error: any) {
       Alert.alert('Error', error.message || 'Failed to start checkout');
     } finally {
@@ -148,12 +151,15 @@ export default function SubscriptionScreen() {
         headers,
       });
 
-      if (response.ok) {
-        const { url } = await response.json();
-        await Linking.openURL(url);
-      } else {
-        throw new Error('Failed to open billing portal');
+      // Safe JSON parsing - handle HTML error pages gracefully
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok || !data?.url) {
+        const errorMessage = data?.error || data?.message || 'Billing service unavailable. Please try again later.';
+        throw new Error(errorMessage);
       }
+
+      await Linking.openURL(data.url);
     } catch (error: any) {
       Alert.alert('Error', error.message || 'Failed to open billing');
     } finally {

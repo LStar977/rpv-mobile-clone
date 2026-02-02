@@ -38,7 +38,7 @@ import { useAuthStore } from '../../lib/auth';
 import { shareProposal } from '../../lib/share';
 import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS, ANIMATION } from '../../lib/theme';
 import { showVoteConfirmation } from '../../lib/notifications';
-import { VoteConfirmationOverlay } from '../../components/ui';
+import { VoteConfirmationOverlay, VerificationModal } from '../../components/ui';
 import * as ImagePicker from 'expo-image-picker';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -473,6 +473,11 @@ export default function ProposalsScreen() {
   const [showVoteOverlay, setShowVoteOverlay] = useState(false);
   const [lastVoteType, setLastVoteType] = useState<'support' | 'oppose'>('support');
 
+  // Verification modal state
+  const [showVerificationModal, setShowVerificationModal] = useState(false);
+  const [verificationModalType, setVerificationModalType] = useState<'verification' | 'location'>('verification');
+  const [verificationModalMessage, setVerificationModalMessage] = useState('');
+
   const [newProposal, setNewProposal] = useState({
     title: '',
     description: '',
@@ -627,17 +632,9 @@ export default function ProposalsScreen() {
 
     // Gate geo-restricted proposals for unverified users
     if (hasGeoRestrictions && !isVerified) {
-      Alert.alert(
-        'Verification Required',
-        'This proposal is restricted to verified users in specific regions. Complete identity verification to vote.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Get Verified ($4.99)',
-            onPress: () => router.push('/modals/verification-payment')
-          },
-        ]
-      );
+      setVerificationModalType('verification');
+      setVerificationModalMessage('This proposal is restricted to verified users in specific regions. Complete identity verification to vote.');
+      setShowVerificationModal(true);
       return;
     }
 
@@ -656,11 +653,9 @@ export default function ProposalsScreen() {
 
       if (!locationMatches) {
         const locationDescription = proposalGeo.join(', ');
-        Alert.alert(
-          'Location Restricted',
-          `This proposal is only for voters in ${locationDescription}. Your verified location does not match.`,
-          [{ text: 'OK' }]
-        );
+        setVerificationModalType('location');
+        setVerificationModalMessage(`This proposal is only for voters in ${locationDescription}. Your verified location does not match.`);
+        setShowVerificationModal(true);
         return;
       }
     }
@@ -1561,6 +1556,19 @@ export default function ProposalsScreen() {
         visible={showVoteOverlay}
         voteType={lastVoteType}
         onDismiss={() => setShowVoteOverlay(false)}
+      />
+
+      {/* Verification Required Modal */}
+      <VerificationModal
+        visible={showVerificationModal}
+        onClose={() => setShowVerificationModal(false)}
+        onGetVerified={() => {
+          setShowVerificationModal(false);
+          router.push('/modals/verification-payment');
+        }}
+        title={verificationModalType === 'location' ? 'Location Restricted' : 'Verification Required'}
+        message={verificationModalMessage}
+        type={verificationModalType}
       />
     </View>
   );
