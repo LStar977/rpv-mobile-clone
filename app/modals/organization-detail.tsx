@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator, RefreshControl, Modal, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
 import { useState, useEffect, useCallback } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -8,6 +8,8 @@ import * as Haptics from 'expo-haptics';
 import { useAuthStore } from '../../lib/auth';
 import { organizationsApi, Organization, OrganizationProposal } from '../../lib/api';
 import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS } from '../../lib/theme';
+
+const CATEGORIES = ['Transportation', 'Environment', 'Housing', 'Education', 'Healthcare', 'Economy', 'Public Safety', 'Infrastructure', 'Other'];
 
 type TabType = 'proposals' | 'announcements' | 'about';
 
@@ -134,6 +136,16 @@ export default function OrganizationDetailScreen() {
   const [activeTab, setActiveTab] = useState<TabType>('proposals');
   const [leaving, setLeaving] = useState(false);
 
+  // Admin proposal creation state
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [proposalLimits, setProposalLimits] = useState<{ created: number; limit: number; period: 'month' | 'week'; resetDate: string } | null>(null);
+  const [newProposal, setNewProposal] = useState({
+    title: '',
+    description: '',
+    category: 'Other',
+  });
+
   const fetchData = useCallback(async () => {
     if (!token || !params.orgId) {
       setLoading(false);
@@ -141,15 +153,17 @@ export default function OrganizationDetailScreen() {
     }
 
     try {
-      const [orgResult, proposalsResult, announcementsResult] = await Promise.all([
+      const [orgResult, proposalsResult, announcementsResult, limitsResult] = await Promise.all([
         organizationsApi.getOrganization(params.orgId),
         organizationsApi.getOrganizationProposals(params.orgId),
         organizationsApi.getOrganizationAnnouncements(params.orgId),
+        organizationsApi.getProposalLimits(params.orgId),
       ]);
 
       if (orgResult.data) setOrganization(orgResult.data);
       if (proposalsResult.data) setProposals(proposalsResult.data);
       if (announcementsResult.data) setAnnouncements(announcementsResult.data);
+      if (limitsResult.data) setProposalLimits(limitsResult.data);
     } catch (error) {
       console.error('Failed to fetch organization data:', error);
     } finally {
@@ -202,6 +216,49 @@ export default function OrganizationDetailScreen() {
         },
       ]
     );
+  };
+
+  const handleCreateProposal = async () => {
+    if (!newProposal.title.trim() || !newProposal.description.trim()) {
+      Alert.alert('Missing Fields', 'Please fill in both title and description.');
+      return;
+    }
+
+    // Check limits
+    if (proposalLimits && proposalLimits.created >= proposalLimits.limit) {
+      Alert.alert(
+        'Limit Reached',
+        `You've reached your ${proposalLimits.period}ly proposal limit. Limits reset on ${new Date(proposalLimits.resetDate).toLocaleDateString()}.`
+      );
+      return;
+    }
+
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setCreating(true);
+
+    try {
+      const result = await organizationsApi.createProposal(params.orgId, {
+        title: newProposal.title.trim(),
+        description: newProposal.description.trim(),
+        category: newProposal.category,
+      });
+
+      if (result.error) {
+        Alert.alert('Error', result.error);
+        return;
+      }
+
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setShowCreateModal(false);
+      setNewProposal({ title: '', description: '', category: 'Other' });
+
+      // Refresh data
+      fetchData();
+    } catch (error) {
+      Alert.alert('Error', 'Failed to create proposal. Please try again.');
+    } finally {
+      setCreating(false);
+    }
   };
 
   const getTierBadge = () => {
@@ -339,6 +396,27 @@ export default function OrganizationDetailScreen() {
         {/* Tab Content */}
         {activeTab === 'proposals' && (
           <>
+            {/* Admin Create Proposal Button */}
+            {organization?.role === 'admin' && (
+              <Animated.View entering={FadeInUp.duration(300)} style={{ marginBottom: SPACING.md }}>
+                <TouchableOpacity
+                  style={[styles.createProposalBtn, { backgroundColor: colors.gold }]}
+                  onPress={() => setShowCreateModal(true)}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="add-circle" size={20} color="#000" />
+                  <Text style={styles.createProposalBtnText}>Create Proposal</Text>
+                  {proposalLimits && (
+                    <View style={[styles.limitBadge, { backgroundColor: 'rgba(0,0,0,0.15)' }]}>
+                      <Text style={styles.limitBadgeText}>
+                        {proposalLimits.created}/{proposalLimits.limit}
+                      </Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              </Animated.View>
+            )}
+
             {proposals.length === 0 ? (
               <Animated.View
                 entering={FadeInUp.duration(400)}
@@ -438,6 +516,127 @@ export default function OrganizationDetailScreen() {
 
         <View style={styles.bottomSpacer} />
       </ScrollView>
+
+      {/* Create Proposal Modal */}
+      <Modal
+        visible={showCreateModal}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setShowCreateModal(false)}
+      >
+        <KeyboardAvoidingView
+          style={[styles.modalContainer, { backgroundColor: colors.background }]}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
+          {/* Modal Header */}
+          <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
+            <TouchableOpacity onPress={() => setShowCreateModal(false)} style={styles.modalCloseBtn}>
+              <Ionicons name="close" size={24} color={colors.text} />
+            </TouchableOpacity>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>Create Proposal</Text>
+            <TouchableOpacity
+              style={[styles.modalSubmitBtn, { backgroundColor: creating ? colors.textTertiary : colors.gold }]}
+              onPress={handleCreateProposal}
+              disabled={creating}
+            >
+              {creating ? (
+                <ActivityIndicator size="small" color="#000" />
+              ) : (
+                <Text style={styles.modalSubmitBtnText}>Post</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView style={styles.modalContent} showsVerticalScrollIndicator={false}>
+            {/* Limits Display */}
+            {proposalLimits && (
+              <View style={[styles.limitsCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                <Ionicons name="analytics-outline" size={18} color={colors.gold} />
+                <Text style={[styles.limitsText, { color: colors.textSecondary }]}>
+                  {proposalLimits.created} of {proposalLimits.limit} proposals this {proposalLimits.period}
+                </Text>
+              </View>
+            )}
+
+            {/* Title Input */}
+            <View style={styles.inputGroup}>
+              <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>Title</Text>
+              <TextInput
+                style={[styles.textInput, { backgroundColor: colors.surface, borderColor: colors.border, color: colors.text }]}
+                placeholder="What are you proposing?"
+                placeholderTextColor={colors.textTertiary}
+                value={newProposal.title}
+                onChangeText={(text) => setNewProposal((prev) => ({ ...prev, title: text }))}
+                maxLength={100}
+              />
+              <Text style={[styles.charCount, { color: colors.textTertiary }]}>
+                {newProposal.title.length}/100
+              </Text>
+            </View>
+
+            {/* Description Input */}
+            <View style={styles.inputGroup}>
+              <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>Description</Text>
+              <TextInput
+                style={[styles.textArea, { backgroundColor: colors.surface, borderColor: colors.border, color: colors.text }]}
+                placeholder="Provide details about your proposal..."
+                placeholderTextColor={colors.textTertiary}
+                value={newProposal.description}
+                onChangeText={(text) => setNewProposal((prev) => ({ ...prev, description: text }))}
+                multiline
+                numberOfLines={6}
+                textAlignVertical="top"
+                maxLength={1000}
+              />
+              <Text style={[styles.charCount, { color: colors.textTertiary }]}>
+                {newProposal.description.length}/1000
+              </Text>
+            </View>
+
+            {/* Category Selection */}
+            <View style={styles.inputGroup}>
+              <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>Category</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryScroll}>
+                {CATEGORIES.map((cat) => (
+                  <TouchableOpacity
+                    key={cat}
+                    style={[
+                      styles.categoryChip,
+                      {
+                        backgroundColor: newProposal.category === cat ? colors.gold : colors.surface,
+                        borderColor: newProposal.category === cat ? colors.gold : colors.border,
+                      },
+                    ]}
+                    onPress={() => {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      setNewProposal((prev) => ({ ...prev, category: cat }));
+                    }}
+                  >
+                    <Text
+                      style={[
+                        styles.categoryChipText,
+                        { color: newProposal.category === cat ? '#000' : colors.textSecondary },
+                      ]}
+                    >
+                      {cat}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+
+            {/* Official Notice */}
+            <View style={[styles.officialNotice, { backgroundColor: `${colors.gold}10`, borderColor: `${colors.gold}30` }]}>
+              <Ionicons name="ribbon" size={18} color={colors.gold} />
+              <Text style={[styles.officialNoticeText, { color: colors.gold }]}>
+                This proposal will be marked as an official proposal from {organization?.name}
+              </Text>
+            </View>
+
+            <View style={{ height: 100 }} />
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </Modal>
     </View>
   );
 }
@@ -737,5 +936,139 @@ const styles = StyleSheet.create({
 
   bottomSpacer: {
     height: 100,
+  },
+
+  // Admin Create Proposal Button
+  createProposalBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: SPACING.lg,
+    borderRadius: BORDER_RADIUS.xl,
+    gap: SPACING.sm,
+    ...SHADOWS.sm,
+  },
+  createProposalBtnText: {
+    ...TYPOGRAPHY.labelMedium,
+    color: '#000',
+    fontWeight: '700',
+  },
+  limitBadge: {
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: 2,
+    borderRadius: BORDER_RADIUS.full,
+    marginLeft: SPACING.xs,
+  },
+  limitBadgeText: {
+    ...TYPOGRAPHY.labelSmall,
+    color: '#000',
+    fontWeight: '600',
+    fontSize: 10,
+  },
+
+  // Create Proposal Modal
+  modalContainer: {
+    flex: 1,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: SPACING.lg,
+    paddingTop: SPACING.xl,
+    paddingBottom: SPACING.md,
+    borderBottomWidth: 1,
+  },
+  modalCloseBtn: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalTitle: {
+    ...TYPOGRAPHY.headlineSmall,
+  },
+  modalSubmitBtn: {
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.sm,
+    borderRadius: BORDER_RADIUS.full,
+    minWidth: 70,
+    alignItems: 'center',
+  },
+  modalSubmitBtnText: {
+    ...TYPOGRAPHY.labelMedium,
+    color: '#000',
+    fontWeight: '700',
+  },
+  modalContent: {
+    flex: 1,
+    padding: SPACING.lg,
+  },
+  limitsCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: SPACING.md,
+    borderRadius: BORDER_RADIUS.lg,
+    borderWidth: 1,
+    gap: SPACING.sm,
+    marginBottom: SPACING.lg,
+  },
+  limitsText: {
+    ...TYPOGRAPHY.bodySmall,
+    flex: 1,
+  },
+  inputGroup: {
+    marginBottom: SPACING.xl,
+  },
+  inputLabel: {
+    ...TYPOGRAPHY.labelMedium,
+    marginBottom: SPACING.sm,
+  },
+  textInput: {
+    ...TYPOGRAPHY.bodyMedium,
+    padding: SPACING.lg,
+    borderRadius: BORDER_RADIUS.lg,
+    borderWidth: 1,
+  },
+  textArea: {
+    ...TYPOGRAPHY.bodyMedium,
+    padding: SPACING.lg,
+    borderRadius: BORDER_RADIUS.lg,
+    borderWidth: 1,
+    minHeight: 120,
+  },
+  charCount: {
+    ...TYPOGRAPHY.labelSmall,
+    textAlign: 'right',
+    marginTop: SPACING.xs,
+  },
+  categoryScroll: {
+    marginHorizontal: -SPACING.lg,
+    paddingHorizontal: SPACING.lg,
+  },
+  categoryChip: {
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.sm,
+    borderRadius: BORDER_RADIUS.full,
+    borderWidth: 1,
+    marginRight: SPACING.sm,
+  },
+  categoryChipText: {
+    ...TYPOGRAPHY.labelSmall,
+    fontWeight: '600',
+  },
+  officialNotice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: SPACING.lg,
+    borderRadius: BORDER_RADIUS.lg,
+    borderWidth: 1,
+    gap: SPACING.md,
+    marginTop: SPACING.md,
+  },
+  officialNoticeText: {
+    ...TYPOGRAPHY.bodySmall,
+    flex: 1,
+    lineHeight: 20,
   },
 });

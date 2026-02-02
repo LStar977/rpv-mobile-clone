@@ -33,7 +33,7 @@ import Animated, {
   interpolate,
 } from 'react-native-reanimated';
 import { router } from 'expo-router';
-import { proposalsApi, userApi, uploadsApi, Proposal } from '../../lib/api';
+import { proposalsApi, userApi, uploadsApi, limitsApi, Proposal, UsageLimits } from '../../lib/api';
 import { useAuthStore } from '../../lib/auth';
 import { shareProposal } from '../../lib/share';
 import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS, ANIMATION } from '../../lib/theme';
@@ -459,6 +459,7 @@ export default function ProposalsScreen() {
 
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [usageLimits, setUsageLimits] = useState<UsageLimits | null>(null);
 
   const [userCountry, setUserCountry] = useState('');
   const [userState, setUserState] = useState('');
@@ -571,11 +572,12 @@ export default function ProposalsScreen() {
     async (isRefresh = false) => {
       isRefresh ? setRefreshing(true) : setLoading(true);
       try {
-        const [proposalsRes, claimedRes, votedRes, profileRes] = await Promise.all([
+        const [proposalsRes, claimedRes, votedRes, profileRes, limitsRes] = await Promise.all([
           proposalsApi.getAll(),
           isAuthenticated ? userApi.getClaimedTokens() : Promise.resolve({ data: [], error: null }),
           isAuthenticated ? userApi.getVotedProposals() : Promise.resolve({ data: [], error: null }),
           isAuthenticated ? userApi.getProfile() : Promise.resolve({ data: null, error: null }),
+          isAuthenticated ? limitsApi.getUsageLimits() : Promise.resolve({ data: null, error: null }),
         ]);
 
         if (proposalsRes.data) setProposals(proposalsRes.data);
@@ -593,6 +595,10 @@ export default function ProposalsScreen() {
           setUserState(profileRes.data.state || '');
           setUserCity(profileRes.data.city || '');
           setIsVerified(profileRes.data.verified || false);
+        }
+
+        if (limitsRes.data) {
+          setUsageLimits(limitsRes.data);
         }
       } catch (error) {
         console.error('Error fetching data:', error);
@@ -730,6 +736,29 @@ export default function ProposalsScreen() {
     if (!newProposal.description.trim()) {
       Alert.alert('Error', 'Please enter a proposal description.');
       return;
+    }
+
+    // Check proposal limits (skip for premium users with unlimited)
+    if (usageLimits && usageLimits.proposals.limit !== 'unlimited') {
+      if (usageLimits.proposals.used >= usageLimits.proposals.limit) {
+        const tierUpgrade = usageLimits.tier === 'free' ? 'Get Verified' : 'Go Premium';
+        const resetDate = new Date(usageLimits.proposals.resetDate).toLocaleDateString();
+        Alert.alert(
+          'Proposal Limit Reached',
+          `You've used all ${usageLimits.proposals.limit} of your ${usageLimits.proposals.period}ly proposals. Your limit resets on ${resetDate}.`,
+          [
+            { text: 'Cancel', style: 'cancel' },
+            {
+              text: tierUpgrade,
+              onPress: () => {
+                setShowCreateModal(false);
+                router.push(usageLimits.tier === 'free' ? '/modals/verification-payment' : '/modals/subscription');
+              },
+            },
+          ]
+        );
+        return;
+      }
     }
 
     // Require verification for geo-restricted proposals
@@ -1235,6 +1264,48 @@ export default function ProposalsScreen() {
           </View>
 
           <ScrollView style={styles.formScroll} showsVerticalScrollIndicator={false}>
+            {/* Usage Limits Display */}
+            {usageLimits && (
+              <View style={[styles.limitsCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                <Ionicons name="analytics-outline" size={18} color={colors.gold} />
+                <View style={styles.limitsContent}>
+                  {usageLimits.proposals.limit === 'unlimited' ? (
+                    <Text style={[styles.limitsText, { color: colors.gold }]}>
+                      Unlimited proposals (Premium)
+                    </Text>
+                  ) : (
+                    <>
+                      <Text style={[styles.limitsText, { color: colors.textSecondary }]}>
+                        {usageLimits.proposals.used} of {usageLimits.proposals.limit} proposals this {usageLimits.proposals.period}
+                      </Text>
+                      <View style={[styles.limitsProgressBg, { backgroundColor: `${colors.gold}20` }]}>
+                        <View
+                          style={[
+                            styles.limitsProgressFill,
+                            {
+                              backgroundColor: colors.gold,
+                              width: `${Math.min(100, (usageLimits.proposals.used / (usageLimits.proposals.limit as number)) * 100)}%`,
+                            },
+                          ]}
+                        />
+                      </View>
+                    </>
+                  )}
+                </View>
+                {usageLimits.tier !== 'premium' && (
+                  <TouchableOpacity
+                    onPress={() => {
+                      setShowCreateModal(false);
+                      router.push('/modals/subscription');
+                    }}
+                    style={[styles.upgradeChip, { backgroundColor: `${colors.gold}15` }]}
+                  >
+                    <Text style={[styles.upgradeChipText, { color: colors.gold }]}>Upgrade</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            )}
+
             <View style={styles.formSection}>
               <Text style={[styles.formLabel, { color: colors.gold }]}>Title</Text>
               <TextInput
@@ -1854,4 +1925,40 @@ const styles = StyleSheet.create({
   warningContent: { flex: 1 },
   warningTitle: { ...TYPOGRAPHY.labelMedium, marginBottom: SPACING.xxs },
   warningDesc: { ...TYPOGRAPHY.bodySmall, lineHeight: 20 },
+
+  // Limits Display
+  limitsCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: SPACING.md,
+    borderRadius: BORDER_RADIUS.xl,
+    borderWidth: 1,
+    marginBottom: SPACING.lg,
+    gap: SPACING.md,
+  },
+  limitsContent: {
+    flex: 1,
+  },
+  limitsText: {
+    ...TYPOGRAPHY.bodySmall,
+    marginBottom: SPACING.xs,
+  },
+  limitsProgressBg: {
+    height: 4,
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  limitsProgressFill: {
+    height: '100%',
+    borderRadius: 2,
+  },
+  upgradeChip: {
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.xs,
+    borderRadius: BORDER_RADIUS.full,
+  },
+  upgradeChipText: {
+    ...TYPOGRAPHY.labelSmall,
+    fontWeight: '600',
+  },
 });
