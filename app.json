@@ -44,7 +44,14 @@
       "expo-secure-store",
       "expo-apple-authentication",
       "@react-native-google-signin/google-signin",
-      "expo-image-picker"
+      "expo-image-picker",
+      [
+        "@stripe/stripe-react-native",
+        {
+          "merchantIdentifier": "merchant.com.representwallet.app",
+          "enableGooglePay": true
+        }
+      ]
     ],
     "extra": {
       "router": {
