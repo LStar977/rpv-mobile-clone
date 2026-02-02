@@ -138,6 +138,9 @@ interface ProposalCardProps {
   onPress: () => void;
   index: number;
   isUserVerified: boolean;
+  userCountry: string;
+  userState: string;
+  userCity: string;
 }
 
 function ProposalCard({
@@ -148,10 +151,21 @@ function ProposalCard({
   onPress,
   index,
   isUserVerified,
+  userCountry,
+  userState,
+  userCity,
 }: ProposalCardProps) {
   const { colors } = useTheme();
   const scale = useSharedValue(1);
   const shimmer = useSharedValue(0);
+
+  // Check if user's location matches for voting on geo-restricted proposals
+  const userLocation = [userCountry, userState, userCity].filter(Boolean);
+  const proposalGeo = proposal.geoRestrictions || [];
+  const canVoteByLocation = proposalGeo.length === 0 ||
+    proposalGeo.every((restriction, i) =>
+      userLocation[i]?.toLowerCase() === restriction.toLowerCase()
+    );
 
   useEffect(() => {
     shimmer.value = withRepeat(
@@ -274,6 +288,16 @@ function ProposalCard({
           <Ionicons name="lock-closed" size={12} color={colors.warning} />
           <Text style={[styles.restrictionText, { color: colors.warning }]}>
             Verification required to vote
+          </Text>
+        </View>
+      )}
+
+      {/* Location mismatch badge for verified users outside the proposal's region */}
+      {geoTags.length > 0 && isUserVerified && !canVoteByLocation && (
+        <View style={[styles.restrictionBadge, { backgroundColor: `${colors.error}12` }]}>
+          <Ionicons name="location-outline" size={12} color={colors.error} />
+          <Text style={[styles.restrictionText, { color: colors.error }]}>
+            Not in your region
           </Text>
         </View>
       )}
@@ -592,7 +616,8 @@ export default function ProposalsScreen() {
 
     // Check if proposal has geo restrictions
     const proposal = proposals.find((p) => p.id === proposalId);
-    const hasGeoRestrictions = proposal?.geoRestrictions && proposal.geoRestrictions.length > 0;
+    const proposalGeo = proposal?.geoRestrictions || [];
+    const hasGeoRestrictions = proposalGeo.length > 0;
 
     // Gate geo-restricted proposals for unverified users
     if (hasGeoRestrictions && !isVerified) {
@@ -608,6 +633,30 @@ export default function ProposalsScreen() {
         ]
       );
       return;
+    }
+
+    // For verified users: check if their location matches proposal restrictions
+    if (hasGeoRestrictions && isVerified) {
+      const userLocation = [userCountry, userState, userCity].filter(Boolean);
+
+      // Check hierarchical match: proposal geo must match user's location at each level
+      // proposalGeo = ["Canada", "Alberta", "Calgary"] means only Calgary, AB, Canada can vote
+      // proposalGeo = ["Canada", "Alberta"] means all of Alberta can vote
+      // proposalGeo = ["Canada"] means all of Canada can vote
+      const locationMatches = proposalGeo.every((restriction, index) => {
+        const userLocationAtLevel = userLocation[index];
+        return userLocationAtLevel && userLocationAtLevel.toLowerCase() === restriction.toLowerCase();
+      });
+
+      if (!locationMatches) {
+        const locationDescription = proposalGeo.join(', ');
+        Alert.alert(
+          'Location Restricted',
+          `This proposal is only for voters in ${locationDescription}. Your verified location does not match.`,
+          [{ text: 'OK' }]
+        );
+        return;
+      }
     }
 
     setVotingProposalId(proposalId);
@@ -976,6 +1025,9 @@ export default function ProposalsScreen() {
               onPress={() => openProposal(proposal)}
               index={index}
               isUserVerified={isVerified}
+              userCountry={userCountry}
+              userState={userState}
+              userCity={userCity}
             />
           ))}
           <View style={styles.listSpacer} />
