@@ -1,4 +1,5 @@
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import { useState, useEffect } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -12,7 +13,10 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useAuthStore } from '../../lib/auth';
 import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS, ThemePreference } from '../../lib/theme';
-import { Button } from '../../components/ui';
+import { Button, TierBadge } from '../../components/ui';
+import type { UserTier } from '../../components/ui';
+
+const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://representportal.com';
 
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
@@ -117,7 +121,39 @@ function ThemeChip({
 
 export default function ProfileScreen() {
   const { colors, themePreference, setThemePreference, isDark } = useTheme();
-  const { user, logout } = useAuthStore();
+  const { user, logout, token } = useAuthStore();
+  const [userTier, setUserTier] = useState<UserTier>('free');
+
+  // Fetch user's subscription tier
+  useEffect(() => {
+    const fetchTier = async () => {
+      if (!token) return;
+
+      try {
+        const response = await fetch(`${API_URL}/api/stripe/subscription`, {
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          if (data.tier === 'premium' && data.status === 'active') {
+            setUserTier('premium');
+          } else if (data.verificationPaid || data.tier === 'verified') {
+            setUserTier('verified');
+          } else {
+            setUserTier('free');
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch subscription:', error);
+      }
+    };
+
+    fetchTier();
+  }, [token]);
 
   const handleLogout = () => {
     Alert.alert('Log Out', 'Are you sure you want to log out?', [
@@ -169,6 +205,14 @@ export default function ProfileScreen() {
           <Text style={[styles.userName, { color: colors.text }]}>{user?.name || 'Citizen'}</Text>
           <Text style={[styles.userEmail, { color: colors.textSecondary }]}>{user?.email || ''}</Text>
 
+          <View style={styles.tierBadgeContainer}>
+            <TierBadge
+              tier={userTier}
+              size="md"
+              onPress={() => router.push('/modals/subscription')}
+            />
+          </View>
+
           {getLocationString() && (
             <View style={[styles.locationBadge, { backgroundColor: `${colors.gold}15` }]}>
               <Ionicons name="location" size={14} color={colors.gold} />
@@ -182,11 +226,13 @@ export default function ProfileScreen() {
           entering={FadeInUp.delay(200).duration(400)}
           style={[styles.menuCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
         >
-          <MenuItem icon="card-outline" label="Subscription" onPress={() => navigateTo('/modals/subscription')} delay={300} />
-          <MenuItem icon="wallet-outline" label="Connected Wallet" onPress={() => navigateTo('/modals/wallet')} delay={350} />
-          <MenuItem icon="time-outline" label="Voting History" onPress={() => navigateTo('/modals/voting-history')} delay={400} />
-          <MenuItem icon="trophy-outline" label="Badges & Achievements" onPress={() => navigateTo('/modals/badges')} delay={450} />
-          <MenuItem icon="settings-outline" label="Settings & Privacy" onPress={() => navigateTo('/modals/privacy')} delay={500} showBorder={false} />
+          <MenuItem icon="business-outline" label="My Organizations" onPress={() => navigateTo('/modals/organizations')} delay={300} />
+          <MenuItem icon="card-outline" label="Subscription" onPress={() => navigateTo('/modals/subscription')} delay={350} />
+          <MenuItem icon="wallet-outline" label="Connected Wallet" onPress={() => navigateTo('/modals/wallet')} delay={400} />
+          <MenuItem icon="time-outline" label="Voting History" onPress={() => navigateTo('/modals/voting-history')} delay={450} />
+          <MenuItem icon="analytics-outline" label="Analytics" onPress={() => navigateTo('/modals/analytics')} delay={500} />
+          <MenuItem icon="trophy-outline" label="Badges & Achievements" onPress={() => navigateTo('/modals/badges')} delay={550} />
+          <MenuItem icon="settings-outline" label="Settings & Privacy" onPress={() => navigateTo('/modals/privacy')} delay={600} showBorder={false} />
         </Animated.View>
 
         {/* Theme Card */}
@@ -267,7 +313,10 @@ const styles = StyleSheet.create({
   },
   avatarText: { fontSize: 36, fontWeight: '700' },
   userName: { ...TYPOGRAPHY.headlineLarge, marginBottom: SPACING.xs },
-  userEmail: { ...TYPOGRAPHY.bodyMedium, marginBottom: SPACING.lg },
+  userEmail: { ...TYPOGRAPHY.bodyMedium, marginBottom: SPACING.sm },
+  tierBadgeContainer: {
+    marginBottom: SPACING.lg,
+  },
 
   locationBadge: {
     flexDirection: 'row',

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -23,6 +23,7 @@ import Animated, {
   withTiming,
   Easing,
 } from 'react-native-reanimated';
+import { router } from 'expo-router';
 import { useAuthStore } from '../../lib/auth';
 import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS, ANIMATION } from '../../lib/theme';
 
@@ -230,9 +231,147 @@ function CorrectionCard({
   );
 }
 
+// Premium Upgrade Card Component
+function PremiumUpgradeCard() {
+  const { colors } = useTheme();
+
+  const SENTINEL_FEATURES = [
+    { icon: 'document-text-outline', text: 'Analyze any government document' },
+    { icon: 'shield-checkmark-outline', text: 'Evaluate against 155 governance principles' },
+    { icon: 'bar-chart-outline', text: 'Get detailed category scores' },
+    { icon: 'warning-outline', text: 'Identify principle violations' },
+    { icon: 'construct-outline', text: 'Receive AI-powered correction suggestions' },
+    { icon: 'create-outline', text: 'Auto-generate community proposals' },
+  ];
+
+  const handleUpgrade = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    router.push('/modals/subscription');
+  };
+
+  return (
+    <ScrollView
+      style={styles.scrollView}
+      contentContainerStyle={styles.scrollContent}
+      showsVerticalScrollIndicator={false}
+    >
+      {/* Premium Badge */}
+      <Animated.View
+        entering={FadeInDown.duration(400)}
+        style={[styles.premiumHero, { backgroundColor: `${colors.gold}10` }]}
+      >
+        <View style={[styles.premiumIconBg, { backgroundColor: colors.gold }]}>
+          <Ionicons name="sparkles" size={40} color="#000" />
+        </View>
+        <Text style={[styles.premiumTitle, { color: colors.gold }]}>
+          Sentinel AI
+        </Text>
+        <Text style={[styles.premiumSubtitle, { color: colors.textSecondary }]}>
+          Premium Feature
+        </Text>
+      </Animated.View>
+
+      {/* Description Card */}
+      <Animated.View
+        entering={FadeInUp.delay(100).duration(400)}
+        style={[styles.descriptionCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
+      >
+        <Text style={[styles.descriptionTitle, { color: colors.text }]}>
+          AI-Powered Governance Analysis
+        </Text>
+        <Text style={[styles.descriptionText, { color: colors.textSecondary }]}>
+          Sentinel evaluates government documents, policies, and legislation against 155 principles
+          of proper human governance. Get instant insights, identify violations, and generate
+          proposals to improve civic outcomes.
+        </Text>
+      </Animated.View>
+
+      {/* Features List */}
+      <Animated.View
+        entering={FadeInUp.delay(200).duration(400)}
+        style={[styles.featuresCard, { backgroundColor: colors.surface, borderColor: colors.gold }]}
+      >
+        <LinearGradient
+          colors={[`${colors.gold}08`, 'transparent']}
+          style={StyleSheet.absoluteFill}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+        />
+        <Text style={[styles.featuresTitle, { color: colors.gold }]}>
+          What You Get
+        </Text>
+        {SENTINEL_FEATURES.map((feature, index) => (
+          <Animated.View
+            key={index}
+            entering={FadeInUp.delay(300 + index * 50).duration(300)}
+            style={styles.featureRow}
+          >
+            <View style={[styles.featureIconBg, { backgroundColor: `${colors.gold}15` }]}>
+              <Ionicons name={feature.icon as any} size={18} color={colors.gold} />
+            </View>
+            <Text style={[styles.featureText, { color: colors.text }]}>
+              {feature.text}
+            </Text>
+          </Animated.View>
+        ))}
+      </Animated.View>
+
+      {/* Pricing Card */}
+      <Animated.View
+        entering={FadeInUp.delay(400).duration(400)}
+        style={[styles.pricingCard, { backgroundColor: colors.gold }]}
+      >
+        <View style={styles.pricingContent}>
+          <View style={styles.pricingLeft}>
+            <Text style={styles.pricingLabel}>Premium</Text>
+            <View style={styles.priceRow}>
+              <Text style={styles.priceAmount}>$7.99</Text>
+              <Text style={styles.pricePeriod}>/month</Text>
+            </View>
+          </View>
+          <TouchableOpacity
+            style={styles.upgradeButton}
+            onPress={handleUpgrade}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.upgradeButtonText}>Upgrade Now</Text>
+            <Ionicons name="arrow-forward" size={18} color={colors.gold} />
+          </TouchableOpacity>
+        </View>
+        <Text style={styles.pricingNote}>
+          Includes Sentinel AI, unlimited proposals, analytics, and verification
+        </Text>
+      </Animated.View>
+
+      {/* Stats Preview */}
+      <Animated.View
+        entering={FadeInUp.delay(500).duration(400)}
+        style={styles.statsPreview}
+      >
+        <View style={[styles.previewStatCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <Text style={[styles.previewStatValue, { color: colors.gold }]}>155</Text>
+          <Text style={[styles.previewStatLabel, { color: colors.textSecondary }]}>Principles</Text>
+        </View>
+        <View style={[styles.previewStatCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <Text style={[styles.previewStatValue, { color: colors.gold }]}>11</Text>
+          <Text style={[styles.previewStatLabel, { color: colors.textSecondary }]}>Categories</Text>
+        </View>
+        <View style={[styles.previewStatCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <Text style={[styles.previewStatValue, { color: colors.gold }]}>AI</Text>
+          <Text style={[styles.previewStatLabel, { color: colors.textSecondary }]}>Powered</Text>
+        </View>
+      </Animated.View>
+
+      <View style={styles.bottomPadding} />
+    </ScrollView>
+  );
+}
+
 export default function SentinelScreen() {
   const { colors, isDark } = useTheme();
-  const { user } = useAuthStore();
+  const { user, token } = useAuthStore();
+  const [isPremium, setIsPremium] = useState(false);
+  const [loadingSubscription, setLoadingSubscription] = useState(true);
   const [title, setTitle] = useState('');
   const [text, setText] = useState('');
   const [issueType, setIssueType] = useState('Policy');
@@ -242,6 +381,33 @@ export default function SentinelScreen() {
   const [activeTab, setActiveTab] = useState<'summary' | 'categories' | 'findings' | 'corrections' | 'proposal'>('summary');
   const [creatingProposal, setCreatingProposal] = useState(false);
   const [proposalCreated, setProposalCreated] = useState(false);
+
+  // Check if user has Premium subscription
+  useEffect(() => {
+    const checkSubscription = async () => {
+      if (!token) {
+        setLoadingSubscription(false);
+        return;
+      }
+      try {
+        const response = await fetch(`${API_URL}/api/stripe/subscription`, {
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setIsPremium(data.tier === 'premium' && data.status === 'active');
+        }
+      } catch (error) {
+        console.error('Error checking subscription:', error);
+      } finally {
+        setLoadingSubscription(false);
+      }
+    };
+    checkSubscription();
+  }, [token]);
 
   // Pulse animation for analyzing state
   const pulseScale = useSharedValue(1);
@@ -344,6 +510,55 @@ export default function SentinelScreen() {
     if (verdict === 'At Risk') return 'warning';
     return 'alert-circle';
   };
+
+  // Show loading state while checking subscription
+  if (loadingSubscription) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <View style={[styles.header, { borderBottomColor: colors.border }]}>
+          <View style={styles.headerContent}>
+            <View style={[styles.headerIconBg, { backgroundColor: `${colors.gold}15`, ...SHADOWS.glow }]}>
+              <Ionicons name="sparkles" size={28} color={colors.gold} />
+            </View>
+            <View style={styles.headerText}>
+              <Text style={[styles.headerTitle, { color: colors.gold }]}>Sentinel AI</Text>
+              <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>
+                Governance Analyzer
+              </Text>
+            </View>
+          </View>
+        </View>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.gold} />
+        </View>
+      </View>
+    );
+  }
+
+  // Show Premium upgrade prompt if not Premium
+  if (!isPremium) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <Animated.View
+          entering={FadeInDown.duration(400)}
+          style={[styles.header, { borderBottomColor: colors.border }]}
+        >
+          <View style={styles.headerContent}>
+            <View style={[styles.headerIconBg, { backgroundColor: `${colors.gold}15`, ...SHADOWS.glow }]}>
+              <Ionicons name="sparkles" size={28} color={colors.gold} />
+            </View>
+            <View style={styles.headerText}>
+              <Text style={[styles.headerTitle, { color: colors.gold }]}>Sentinel AI</Text>
+              <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>
+                Governance Analyzer
+              </Text>
+            </View>
+          </View>
+        </Animated.View>
+        <PremiumUpgradeCard />
+      </View>
+    );
+  }
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -779,6 +994,149 @@ export default function SentinelScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  // Premium Upgrade Card Styles
+  premiumHero: {
+    alignItems: 'center',
+    paddingVertical: SPACING.xxxl,
+    borderRadius: BORDER_RADIUS.xxl,
+    marginBottom: SPACING.lg,
+  },
+  premiumIconBg: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: SPACING.lg,
+  },
+  premiumTitle: {
+    ...TYPOGRAPHY.displaySmall,
+    fontWeight: '700',
+    marginBottom: SPACING.xs,
+  },
+  premiumSubtitle: {
+    ...TYPOGRAPHY.bodyLarge,
+  },
+  descriptionCard: {
+    padding: SPACING.xl,
+    borderRadius: BORDER_RADIUS.xxl,
+    borderWidth: 1,
+    marginBottom: SPACING.lg,
+  },
+  descriptionTitle: {
+    ...TYPOGRAPHY.headlineSmall,
+    marginBottom: SPACING.md,
+  },
+  descriptionText: {
+    ...TYPOGRAPHY.bodyMedium,
+    lineHeight: 24,
+  },
+  featuresCard: {
+    padding: SPACING.xl,
+    borderRadius: BORDER_RADIUS.xxl,
+    borderWidth: 1.5,
+    marginBottom: SPACING.lg,
+    overflow: 'hidden',
+  },
+  featuresTitle: {
+    ...TYPOGRAPHY.headlineSmall,
+    marginBottom: SPACING.lg,
+  },
+  featureRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: SPACING.md,
+  },
+  featureIconBg: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: SPACING.md,
+  },
+  featureText: {
+    ...TYPOGRAPHY.bodyMedium,
+    flex: 1,
+  },
+  pricingCard: {
+    padding: SPACING.xl,
+    borderRadius: BORDER_RADIUS.xxl,
+    marginBottom: SPACING.lg,
+  },
+  pricingContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: SPACING.md,
+  },
+  pricingLeft: {},
+  pricingLabel: {
+    ...TYPOGRAPHY.labelMedium,
+    color: '#000',
+    opacity: 0.7,
+    marginBottom: SPACING.xxs,
+  },
+  priceRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+  },
+  priceAmount: {
+    ...TYPOGRAPHY.displaySmall,
+    color: '#000',
+    fontWeight: '700',
+  },
+  pricePeriod: {
+    ...TYPOGRAPHY.bodyMedium,
+    color: '#000',
+    opacity: 0.7,
+    marginLeft: SPACING.xxs,
+  },
+  upgradeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#000',
+    paddingHorizontal: SPACING.xl,
+    paddingVertical: SPACING.md,
+    borderRadius: BORDER_RADIUS.full,
+    gap: SPACING.sm,
+  },
+  upgradeButtonText: {
+    ...TYPOGRAPHY.labelLarge,
+    color: '#fff',
+    fontWeight: '600',
+  },
+  pricingNote: {
+    ...TYPOGRAPHY.bodySmall,
+    color: '#000',
+    opacity: 0.7,
+    textAlign: 'center',
+  },
+  statsPreview: {
+    flexDirection: 'row',
+    gap: SPACING.md,
+    marginBottom: SPACING.lg,
+  },
+  previewStatCard: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: SPACING.lg,
+    borderRadius: BORDER_RADIUS.xl,
+    borderWidth: 1,
+  },
+  previewStatValue: {
+    ...TYPOGRAPHY.headlineLarge,
+    fontWeight: '700',
+  },
+  previewStatLabel: {
+    ...TYPOGRAPHY.labelSmall,
+    marginTop: SPACING.xxs,
   },
   // Header
   header: {

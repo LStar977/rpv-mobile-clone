@@ -153,6 +153,85 @@ export const veriffApi = {
   },
 };
 
+// Organization types
+export interface Organization {
+  id: string;
+  name: string;
+  description: string;
+  logoUrl?: string;
+  memberCount: number;
+  tier: 'starter' | 'professional';
+  verified: boolean;
+  createdAt: string;
+  role?: 'admin' | 'member';
+}
+
+export interface OrganizationProposal extends Proposal {
+  organizationId: string;
+  organizationName: string;
+  isOfficial: boolean;
+}
+
+export const organizationsApi = {
+  async getMyOrganizations(): Promise<ApiResponse<Organization[]>> {
+    const result = await apiRequest<any>('/api/organizations');
+    if (Array.isArray(result.data)) return { data: result.data, error: null };
+    if (result.data?.organizations) return { data: result.data.organizations, error: null };
+    return { data: [], error: result.error };
+  },
+
+  async getOrganization(orgId: string): Promise<ApiResponse<Organization>> {
+    return apiRequest<Organization>(`/api/organizations/${orgId}`);
+  },
+
+  async joinWithInviteCode(inviteCode: string): Promise<ApiResponse<{ success: boolean; organization: Organization }>> {
+    return apiRequest('/api/organizations/join', {
+      method: 'POST',
+      body: JSON.stringify({ inviteCode }),
+    });
+  },
+
+  async leaveOrganization(orgId: string): Promise<ApiResponse<{ success: boolean }>> {
+    return apiRequest(`/api/organizations/${orgId}/leave`, { method: 'POST' });
+  },
+
+  async getOrganizationProposals(orgId: string): Promise<ApiResponse<OrganizationProposal[]>> {
+    const result = await apiRequest<any>(`/api/organizations/${orgId}/proposals`);
+    if (Array.isArray(result.data)) return { data: result.data, error: null };
+    if (result.data?.proposals) return { data: result.data.proposals, error: null };
+    return { data: [], error: result.error };
+  },
+
+  async getOrganizationAnnouncements(orgId: string): Promise<ApiResponse<any[]>> {
+    const result = await apiRequest<any>(`/api/organizations/${orgId}/announcements`);
+    if (Array.isArray(result.data)) return { data: result.data, error: null };
+    if (result.data?.announcements) return { data: result.data.announcements, error: null };
+    return { data: [], error: result.error };
+  },
+
+  async createProposal(orgId: string, data: CreateProposalData): Promise<ApiResponse<OrganizationProposal>> {
+    return apiRequest<OrganizationProposal>(`/api/organizations/${orgId}/proposals`, {
+      method: 'POST',
+      body: JSON.stringify({ ...data, isOfficial: true }),
+    });
+  },
+
+  async getProposalLimits(orgId: string): Promise<ApiResponse<{ created: number; limit: number; period: 'month' | 'week'; resetDate: string }>> {
+    const result = await apiRequest<any>(`/api/organizations/${orgId}/proposal-limits`);
+    if (result.data) return { data: result.data, error: null };
+    // Return default limits if endpoint doesn't exist yet
+    return {
+      data: {
+        created: 0,
+        limit: 10,
+        period: 'month',
+        resetDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+      },
+      error: result.error,
+    };
+  },
+};
+
 export const passportApi = {
   async mint(): Promise<ApiResponse<{ success: boolean; txHash?: string }>> {
     const authState = useAuthStore.getState();
@@ -202,12 +281,94 @@ export const uploadsApi = {
   },
 };
 
+// Analytics types
+export interface ProposalAnalytics {
+  id: number;
+  title: string;
+  views: number;
+  supportVotes: number;
+  opposeVotes: number;
+  engagementRate: number;
+  createdAt: string;
+}
+
+export interface AnalyticsData {
+  totalProposals: number;
+  totalVotes: number;
+  supportVotes: number;
+  opposeVotes: number;
+  proposals: ProposalAnalytics[];
+}
+
+export interface UsageLimits {
+  tier: 'free' | 'verified' | 'premium';
+  proposals: {
+    used: number;
+    limit: number | 'unlimited';
+    period: 'month' | 'week';
+    resetDate: string;
+  };
+  votes: {
+    used: number;
+    limit: number | 'unlimited';
+  };
+}
+
+export const analyticsApi = {
+  async getProposalAnalytics(): Promise<ApiResponse<AnalyticsData>> {
+    const result = await apiRequest<any>('/api/analytics/proposals');
+    if (result.data) {
+      return { data: result.data, error: null };
+    }
+    // Return mock data structure if endpoint doesn't exist yet
+    return {
+      data: {
+        totalProposals: 0,
+        totalVotes: 0,
+        supportVotes: 0,
+        opposeVotes: 0,
+        proposals: [],
+      },
+      error: result.error,
+    };
+  },
+};
+
+export const limitsApi = {
+  async getUsageLimits(): Promise<ApiResponse<UsageLimits>> {
+    const result = await apiRequest<any>('/api/user/limits');
+    if (result.data) {
+      return { data: result.data, error: null };
+    }
+    // Return default free tier limits if endpoint doesn't exist yet
+    return {
+      data: {
+        tier: 'free',
+        proposals: {
+          used: 0,
+          limit: 1,
+          period: 'month',
+          resetDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        },
+        votes: {
+          used: 0,
+          limit: 5,
+        },
+      },
+      error: result.error,
+    };
+  },
+};
+
 export const api = {
   user: userApi,
   proposals: proposalsApi,
   veriff: veriffApi,
   passport: passportApi,
   uploads: uploadsApi,
+  organizations: organizationsApi,
+  analytics: analyticsApi,
+  limits: limitsApi,
 };
 
 export default api;
