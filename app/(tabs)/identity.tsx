@@ -29,6 +29,8 @@ import { useAuthStore } from '../../lib/auth';
 import { userApi, veriffApi } from '../../lib/api';
 import { Button } from '../../components/ui';
 
+const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://representportal.com';
+
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
 type VerificationState = {
@@ -165,7 +167,7 @@ function ShieldBadge({
 
 export default function IdentityScreen() {
   const { colors } = useTheme();
-  const { isAuthenticated, user } = useAuthStore();
+  const { isAuthenticated, user, token } = useAuthStore();
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -179,6 +181,10 @@ export default function IdentityScreen() {
 
   const [profile, setProfile] = useState<ProfileState | null>(null);
   const [startingKyc, setStartingKyc] = useState(false);
+
+  // Payment/subscription state for gating verification
+  const [hasPaidVerification, setHasPaidVerification] = useState(false);
+  const [isPremium, setIsPremium] = useState(false);
 
   const fetchIdentity = useCallback(async () => {
     try {
@@ -202,13 +208,34 @@ export default function IdentityScreen() {
       });
 
       setProfile(p);
+
+      // Check subscription status (for premium users, verification is included)
+      if (isAuthenticated && token) {
+        try {
+          const subResponse = await fetch(`${API_URL}/api/stripe/subscription`, {
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+          });
+          if (subResponse.ok) {
+            const subData = await subResponse.json();
+            const userIsPremium = subData.tier === 'premium' && subData.status === 'active';
+            const userHasPaid = subData.verificationPaid === true || userIsPremium;
+            setIsPremium(userIsPremium);
+            setHasPaidVerification(userHasPaid);
+          }
+        } catch (subError) {
+          console.error('Subscription check error:', subError);
+        }
+      }
     } catch (e) {
       console.error('Identity fetch error:', e);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, token]);
 
   useEffect(() => {
     fetchIdentity();
@@ -273,6 +300,27 @@ export default function IdentityScreen() {
   const handleStartKyc = async () => {
     if (!isAuthenticated) {
       Alert.alert('Sign In Required', 'Please sign in to begin verification.');
+      return;
+    }
+
+    // Check if user has paid for verification or is premium
+    if (!hasPaidVerification && !isPremium) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      Alert.alert(
+        'Payment Required',
+        'Identity verification requires a one-time payment of $4.99, or is included free with Premium membership.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Get Verified ($4.99)',
+            onPress: () => router.push('/modals/verification-payment'),
+          },
+          {
+            text: 'View Premium',
+            onPress: () => router.push('/modals/subscription'),
+          },
+        ]
+      );
       return;
     }
 
