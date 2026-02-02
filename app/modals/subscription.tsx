@@ -2,31 +2,91 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator
 import { useState, useEffect } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
+import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { useAuthStore } from '../../lib/auth';
-import { useTheme } from '../../lib/theme';
+import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS } from '../../lib/theme';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://representportal.com';
 
 interface SubscriptionData {
   subscription: string | null;
+  tier: 'free' | 'verified' | 'premium';
   status: string;
   endDate: string | null;
 }
 
-interface PriceData {
-  priceId: string;
-  amount: number;
-  currency: string;
-  interval: string;
-}
+const TIERS = {
+  free: {
+    name: 'Free',
+    price: '$0',
+    period: 'forever',
+    description: 'Get started with global proposals',
+    icon: 'person-outline' as const,
+    features: [
+      { text: 'Vote on global proposals', included: true },
+      { text: '5 votes per month', included: true },
+      { text: 'Create 1 global proposal/month', included: true },
+      { text: 'Basic profile', included: true },
+      { text: 'Vote on geo-restricted proposals', included: false },
+      { text: 'Create geo-restricted proposals', included: false },
+    ],
+  },
+  verified: {
+    name: 'Verified',
+    price: '$4.99',
+    period: 'one-time',
+    description: 'Unlock all proposals in your region',
+    icon: 'shield-checkmark' as const,
+    features: [
+      { text: 'Vote on ALL proposals', included: true },
+      { text: 'Unlimited voting', included: true },
+      { text: 'Create 1 proposal/week', included: true },
+      { text: 'Verified badge on profile', included: true },
+      { text: 'Access geo-restricted proposals', included: true },
+      { text: 'Identity verified via Veriff', included: true },
+    ],
+  },
+  premium: {
+    name: 'Premium',
+    price: '$7.99',
+    period: '/month',
+    description: 'Full access + analytics',
+    icon: 'star' as const,
+    features: [
+      { text: 'Everything in Verified', included: true },
+      { text: 'Verification fee INCLUDED', included: true },
+      { text: 'Unlimited proposal creation', included: true },
+      { text: 'Analytics dashboard', included: true },
+      { text: 'Priority visibility in feeds', included: true },
+      { text: 'Early access to features', included: true },
+    ],
+  },
+  organization: {
+    name: 'Organizations',
+    price: '$29-99',
+    period: '/month',
+    description: 'For unions, nonprofits & groups',
+    icon: 'business' as const,
+    features: [
+      { text: 'Verified organization badge', included: true },
+      { text: 'Member verification via invite codes', included: true },
+      { text: 'Unlimited official proposals', included: true },
+      { text: 'Full analytics & reporting', included: true },
+      { text: 'Team management', included: true },
+      { text: 'API access (Professional tier)', included: true },
+    ],
+  },
+};
 
 export default function SubscriptionScreen() {
   const { colors } = useTheme();
   const { user, token } = useAuthStore();
   const [loading, setLoading] = useState(true);
-  const [actionLoading, setActionLoading] = useState(false);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [subscription, setSubscription] = useState<SubscriptionData | null>(null);
-  const [priceData, setPriceData] = useState<PriceData | null>(null);
+  const isVerified = user?.verified ?? false;
+  const isPremium = subscription?.tier === 'premium' && subscription?.status === 'active';
 
   useEffect(() => {
     fetchData();
@@ -38,16 +98,9 @@ export default function SubscriptionScreen() {
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
 
-      const [subRes, priceRes] = await Promise.all([
-        fetch(`${API_URL}/api/stripe/subscription`, { headers }),
-        fetch(`${API_URL}/api/stripe/prices`, { headers }),
-      ]);
-
-      if (subRes.ok) {
-        setSubscription(await subRes.json());
-      }
-      if (priceRes.ok) {
-        setPriceData(await priceRes.json());
+      const response = await fetch(`${API_URL}/api/stripe/subscription`, { headers });
+      if (response.ok) {
+        setSubscription(await response.json());
       }
     } catch (error) {
       console.error('Error fetching subscription:', error);
@@ -56,21 +109,19 @@ export default function SubscriptionScreen() {
     }
   };
 
-  const handleSubscribe = async () => {
-    if (!priceData?.priceId) {
-      Alert.alert('Error', 'Unable to load pricing. Please try again.');
-      return;
-    }
+  const handleGetVerified = async () => {
+    router.push('/modals/verification-payment');
+  };
 
-    setActionLoading(true);
+  const handleSubscribePremium = async () => {
+    setActionLoading('premium');
     try {
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
 
-      const response = await fetch(`${API_URL}/api/stripe/checkout`, {
+      const response = await fetch(`${API_URL}/api/stripe/premium-checkout`, {
         method: 'POST',
         headers,
-        body: JSON.stringify({ priceId: priceData.priceId }),
       });
 
       if (response.ok) {
@@ -82,12 +133,12 @@ export default function SubscriptionScreen() {
     } catch (error: any) {
       Alert.alert('Error', error.message || 'Failed to start checkout');
     } finally {
-      setActionLoading(false);
+      setActionLoading(null);
     }
   };
 
   const handleManageBilling = async () => {
-    setActionLoading(true);
+    setActionLoading('manage');
     try {
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
@@ -106,36 +157,195 @@ export default function SubscriptionScreen() {
     } catch (error: any) {
       Alert.alert('Error', error.message || 'Failed to open billing');
     } finally {
-      setActionLoading(false);
+      setActionLoading(null);
     }
   };
 
-  const isActive = subscription?.status === 'active';
+  const handleContactOrganizations = () => {
+    Linking.openURL('mailto:organizations@representportal.com?subject=Organization%20Account%20Inquiry');
+  };
 
-  const FREE_FEATURES = [
-    'Vote on proposals',
-    'Verify your identity',
-    'View voting history',
-    'Join communities',
-  ];
+  const getCurrentTier = (): 'free' | 'verified' | 'premium' => {
+    if (isPremium) return 'premium';
+    if (isVerified) return 'verified';
+    return 'free';
+  };
 
-  const PRO_FEATURES = [
-    'Create unlimited proposals',
-    'Featured proposal slot',
-    'Priority governance access',
-    'Analytics dashboard',
-    'Early access to features',
-    'Monthly rewards & badges',
-  ];
+  const currentTier = getCurrentTier();
+
+  const renderTierCard = (
+    tierKey: 'free' | 'verified' | 'premium' | 'organization',
+    delay: number,
+    isHighlighted: boolean = false
+  ) => {
+    const tier = TIERS[tierKey];
+    const isCurrent = tierKey === currentTier;
+    const isOrgTier = tierKey === 'organization';
+
+    return (
+      <Animated.View
+        key={tierKey}
+        entering={FadeInUp.delay(delay).duration(400)}
+        style={[
+          styles.tierCard,
+          {
+            backgroundColor: colors.surface,
+            borderColor: isHighlighted ? colors.gold : colors.border,
+            borderWidth: isHighlighted ? 2 : 1,
+          },
+        ]}
+      >
+        {isHighlighted && (
+          <View style={[styles.bestValueBadge, { backgroundColor: colors.gold }]}>
+            <Text style={styles.bestValueText}>BEST VALUE</Text>
+          </View>
+        )}
+
+        <View style={styles.tierHeader}>
+          <View style={[
+            styles.tierIconContainer,
+            { backgroundColor: isHighlighted ? `${colors.gold}20` : `${colors.primary}15` }
+          ]}>
+            <Ionicons
+              name={tier.icon}
+              size={24}
+              color={isHighlighted ? colors.gold : colors.primary}
+            />
+          </View>
+          <View style={styles.tierInfo}>
+            <Text style={[styles.tierName, { color: isHighlighted ? colors.gold : colors.text }]}>
+              {tier.name}
+            </Text>
+            <Text style={[styles.tierDescription, { color: colors.textSecondary }]}>
+              {tier.description}
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.priceContainer}>
+          <Text style={[styles.tierPrice, { color: isHighlighted ? colors.gold : colors.text }]}>
+            {tier.price}
+          </Text>
+          <Text style={[styles.tierPeriod, { color: colors.textSecondary }]}>
+            {tier.period}
+          </Text>
+        </View>
+
+        <View style={styles.featuresList}>
+          {tier.features.map((feature, index) => (
+            <View key={index} style={styles.featureRow}>
+              <Ionicons
+                name={feature.included ? 'checkmark-circle' : 'close-circle'}
+                size={18}
+                color={feature.included ? colors.success : colors.textTertiary}
+              />
+              <Text
+                style={[
+                  styles.featureText,
+                  { color: feature.included ? colors.text : colors.textTertiary },
+                ]}
+              >
+                {feature.text}
+              </Text>
+            </View>
+          ))}
+        </View>
+
+        {isCurrent && !isOrgTier && (
+          <View style={[styles.currentBadge, { backgroundColor: `${colors.success}15` }]}>
+            <Ionicons name="checkmark-circle" size={16} color={colors.success} />
+            <Text style={[styles.currentText, { color: colors.success }]}>Current Plan</Text>
+          </View>
+        )}
+
+        {!isCurrent && !isOrgTier && tierKey !== 'free' && (
+          <TouchableOpacity
+            onPress={
+              tierKey === 'verified'
+                ? handleGetVerified
+                : tierKey === 'premium'
+                ? isPremium
+                  ? handleManageBilling
+                  : handleSubscribePremium
+                : undefined
+            }
+            disabled={actionLoading !== null}
+            style={[
+              styles.tierButton,
+              isHighlighted && styles.highlightedButton,
+            ]}
+          >
+            {isHighlighted ? (
+              <LinearGradient
+                colors={[colors.gold, colors.goldDark || '#A68523']}
+                style={styles.gradientButton}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+              >
+                {actionLoading === 'premium' ? (
+                  <ActivityIndicator size="small" color="#000" />
+                ) : (
+                  <>
+                    <Ionicons name="star" size={18} color="#000" />
+                    <Text style={styles.gradientButtonText}>
+                      {isPremium ? 'Manage Billing' : 'Subscribe Now'}
+                    </Text>
+                  </>
+                )}
+              </LinearGradient>
+            ) : (
+              <View
+                style={[
+                  styles.outlineButton,
+                  { borderColor: tierKey === 'verified' ? colors.success : colors.border },
+                ]}
+              >
+                {actionLoading === tierKey ? (
+                  <ActivityIndicator size="small" color={colors.success} />
+                ) : (
+                  <>
+                    <Ionicons
+                      name={tierKey === 'verified' ? 'shield-checkmark' : 'card-outline'}
+                      size={18}
+                      color={tierKey === 'verified' ? colors.success : colors.text}
+                    />
+                    <Text
+                      style={[
+                        styles.outlineButtonText,
+                        { color: tierKey === 'verified' ? colors.success : colors.text },
+                      ]}
+                    >
+                      {tierKey === 'verified' ? 'Get Verified' : 'Subscribe'}
+                    </Text>
+                  </>
+                )}
+              </View>
+            )}
+          </TouchableOpacity>
+        )}
+
+        {isOrgTier && (
+          <TouchableOpacity onPress={handleContactOrganizations} style={styles.tierButton}>
+            <View style={[styles.outlineButton, { borderColor: colors.primary }]}>
+              <Ionicons name="mail-outline" size={18} color={colors.primary} />
+              <Text style={[styles.outlineButtonText, { color: colors.primary }]}>
+                Contact Us
+              </Text>
+            </View>
+          </TouchableOpacity>
+        )}
+      </Animated.View>
+    );
+  };
 
   if (loading) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <View style={styles.header}>
+        <View style={[styles.header, { borderBottomColor: colors.border }]}>
           <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={24} color={colors.gold} />
+            <Ionicons name="close" size={24} color={colors.text} />
           </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: colors.gold }]}>Subscription</Text>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>Choose Your Plan</Text>
           <View style={{ width: 40 }} />
         </View>
         <View style={styles.loadingContainer}>
@@ -147,114 +357,72 @@ export default function SubscriptionScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={styles.header}>
+      <View style={[styles.header, { borderBottomColor: colors.border }]}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color={colors.gold} />
+          <Ionicons name="close" size={24} color={colors.text} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.gold }]}>Subscription</Text>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>Choose Your Plan</Text>
         <View style={{ width: 40 }} />
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {isActive && (
-          <View style={[styles.statusBanner, { backgroundColor: colors.gold + '20', borderColor: colors.gold }]}>
-            <Ionicons name="checkmark-circle" size={24} color={colors.gold} />
-            <Text style={[styles.statusText, { color: colors.gold }]}>Pro Subscription Active</Text>
-          </View>
-        )}
+        <Animated.View entering={FadeInDown.duration(400)} style={styles.heroSection}>
+          <Text style={[styles.heroTitle, { color: colors.text }]}>
+            Unlock Your Full Voice
+          </Text>
+          <Text style={[styles.heroSubtitle, { color: colors.textSecondary }]}>
+            Choose the plan that fits your civic engagement needs
+          </Text>
+        </Animated.View>
 
-        <View style={[styles.planCard, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
-          <Text style={[styles.planName, { color: colors.text }]}>Free</Text>
-          <Text style={[styles.planPrice, { color: colors.gold }]}>$0</Text>
-          <Text style={[styles.planPeriod, { color: colors.textSecondary }]}>Forever free</Text>
-          
-          <View style={styles.featuresList}>
-            {FREE_FEATURES.map((feature, index) => (
-              <View key={index} style={styles.featureRow}>
-                <Ionicons name="checkmark" size={18} color={colors.gold} />
-                <Text style={[styles.featureText, { color: colors.text }]}>{feature}</Text>
-              </View>
-            ))}
-          </View>
+        {renderTierCard('free', 100)}
+        {renderTierCard('verified', 200)}
+        {renderTierCard('premium', 300, true)}
+        {renderTierCard('organization', 400)}
 
-          {!isActive && (
-            <View style={[styles.currentPlanBadge, { backgroundColor: colors.border }]}>
-              <Text style={[styles.currentPlanText, { color: colors.textSecondary }]}>Current Plan</Text>
-            </View>
-          )}
-        </View>
+        {/* FAQ Section */}
+        <Animated.View
+          entering={FadeInUp.delay(500).duration(400)}
+          style={[styles.faqSection, { backgroundColor: colors.surface, borderColor: colors.border }]}
+        >
+          <Text style={[styles.faqTitle, { color: colors.text }]}>Frequently Asked Questions</Text>
 
-        <View style={[styles.planCard, styles.proPlanCard, { backgroundColor: colors.cardBg, borderColor: colors.gold }]}>
-          <View style={[styles.recommendedBadge, { backgroundColor: colors.gold }]}>
-            <Text style={[styles.recommendedText, { color: colors.background }]}>RECOMMENDED</Text>
-          </View>
-          
-          <Text style={[styles.planName, { color: colors.gold }]}>Pro</Text>
-          <View style={styles.priceRow}>
-            <Text style={[styles.planPrice, { color: colors.gold }]}>$10</Text>
-            <Text style={[styles.planPeriod, { color: colors.textSecondary }]}>/month</Text>
-          </View>
-          <Text style={[styles.planDescription, { color: colors.textSecondary }]}>Everything in Free, plus:</Text>
-          
-          <View style={styles.featuresList}>
-            {PRO_FEATURES.map((feature, index) => (
-              <View key={index} style={styles.featureRow}>
-                <Ionicons name="checkmark" size={18} color={colors.gold} />
-                <Text style={[styles.featureText, { color: colors.text }]}>{feature}</Text>
-              </View>
-            ))}
-          </View>
-
-          {isActive ? (
-            <TouchableOpacity
-              style={[styles.actionButton, { backgroundColor: colors.gold }]}
-              onPress={handleManageBilling}
-              disabled={actionLoading}
-            >
-              {actionLoading ? (
-                <ActivityIndicator color={colors.background} />
-              ) : (
-                <>
-                  <Ionicons name="settings-outline" size={20} color={colors.background} />
-                  <Text style={[styles.actionButtonText, { color: colors.background }]}>Manage Billing</Text>
-                </>
-              )}
-            </TouchableOpacity>
-          ) : (
-            <TouchableOpacity
-              style={[styles.actionButton, { backgroundColor: colors.gold }]}
-              onPress={handleSubscribe}
-              disabled={actionLoading}
-            >
-              {actionLoading ? (
-                <ActivityIndicator color={colors.background} />
-              ) : (
-                <>
-                  <Ionicons name="card-outline" size={20} color={colors.background} />
-                  <Text style={[styles.actionButtonText, { color: colors.background }]}>Subscribe Now</Text>
-                </>
-              )}
-            </TouchableOpacity>
-          )}
-        </View>
-
-        <View style={[styles.faqSection, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
-          <Text style={[styles.faqTitle, { color: colors.gold }]}>FAQ</Text>
-          
           <View style={styles.faqItem}>
-            <Text style={[styles.faqQuestion, { color: colors.gold }]}>Can I cancel anytime?</Text>
+            <Text style={[styles.faqQuestion, { color: colors.text }]}>
+              What's the difference between Verified and Premium?
+            </Text>
             <Text style={[styles.faqAnswer, { color: colors.textSecondary }]}>
-              Yes, cancel your subscription anytime with no questions asked.
+              Verified ($4.99 one-time) unlocks geo-restricted voting and proposals. Premium ($7.99/mo) includes verification plus analytics, unlimited proposals, and priority visibility.
             </Text>
           </View>
-          
+
           <View style={styles.faqItem}>
-            <Text style={[styles.faqQuestion, { color: colors.gold }]}>What payment methods?</Text>
+            <Text style={[styles.faqQuestion, { color: colors.text }]}>
+              Can I cancel Premium anytime?
+            </Text>
             <Text style={[styles.faqAnswer, { color: colors.textSecondary }]}>
-              We accept all major credit cards, Apple Pay, and Google Pay.
+              Yes, cancel anytime with no questions asked. You'll keep Verified status after canceling.
             </Text>
           </View>
-        </View>
+
+          <View style={styles.faqItem}>
+            <Text style={[styles.faqQuestion, { color: colors.text }]}>
+              What payment methods do you accept?
+            </Text>
+            <Text style={[styles.faqAnswer, { color: colors.textSecondary }]}>
+              We accept all major credit cards, Apple Pay, and Google Pay via Stripe.
+            </Text>
+          </View>
+
+          <View style={styles.faqItem}>
+            <Text style={[styles.faqQuestion, { color: colors.text }]}>
+              How does organization verification work?
+            </Text>
+            <Text style={[styles.faqAnswer, { color: colors.textSecondary }]}>
+              Organization members verify via invite codes - no individual KYC needed for internal proposals.
+            </Text>
+          </View>
+        </Animated.View>
 
         <View style={{ height: 40 }} />
       </ScrollView>
@@ -263,78 +431,180 @@ export default function SubscriptionScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
+  container: {
+    flex: 1,
+  },
   header: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingTop: 60,
-    paddingBottom: 16,
-  },
-  backButton: { padding: 8 },
-  headerTitle: { fontSize: 20, fontWeight: '700' },
-  content: { flex: 1, paddingHorizontal: 16 },
-  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  statusBanner: {
-    flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    marginBottom: 20,
-    gap: 12,
+    paddingHorizontal: SPACING.lg,
+    paddingTop: SPACING.xl,
+    paddingBottom: SPACING.md,
+    borderBottomWidth: 1,
   },
-  statusText: { fontSize: 16, fontWeight: '600' },
-  planCard: {
-    borderRadius: 16,
-    borderWidth: 1,
-    padding: 20,
-    marginBottom: 16,
+  backButton: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  proPlanCard: { borderWidth: 2, marginTop: 8 },
-  recommendedBadge: {
+  headerTitle: {
+    ...TYPOGRAPHY.headlineSmall,
+  },
+  content: {
+    flex: 1,
+    padding: SPACING.lg,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  heroSection: {
+    alignItems: 'center',
+    marginBottom: SPACING.xl,
+    paddingTop: SPACING.md,
+  },
+  heroTitle: {
+    ...TYPOGRAPHY.headlineLarge,
+    textAlign: 'center',
+    marginBottom: SPACING.xs,
+  },
+  heroSubtitle: {
+    ...TYPOGRAPHY.bodyMedium,
+    textAlign: 'center',
+  },
+  tierCard: {
+    borderRadius: BORDER_RADIUS.xxl,
+    padding: SPACING.lg,
+    marginBottom: SPACING.lg,
+    ...SHADOWS.md,
+  },
+  bestValueBadge: {
     position: 'absolute',
     top: -12,
     alignSelf: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 12,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.xxs,
+    borderRadius: BORDER_RADIUS.full,
   },
-  recommendedText: { fontSize: 12, fontWeight: '700' },
-  planName: { fontSize: 22, fontWeight: '700', marginBottom: 8 },
-  priceRow: { flexDirection: 'row', alignItems: 'baseline' },
-  planPrice: { fontSize: 36, fontWeight: '700' },
-  planPeriod: { fontSize: 16, marginLeft: 4 },
-  planDescription: { fontSize: 14, marginTop: 8, marginBottom: 16 },
-  featuresList: { marginTop: 16, gap: 12 },
-  featureRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  featureText: { fontSize: 15, flex: 1 },
-  currentPlanBadge: {
-    marginTop: 20,
-    paddingVertical: 12,
-    borderRadius: 8,
+  bestValueText: {
+    ...TYPOGRAPHY.labelSmall,
+    color: '#000',
+    fontWeight: '700',
+  },
+  tierHeader: {
+    flexDirection: 'row',
     alignItems: 'center',
+    marginBottom: SPACING.md,
   },
-  currentPlanText: { fontSize: 14, fontWeight: '600' },
-  actionButton: {
+  tierIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: SPACING.md,
+  },
+  tierInfo: {
+    flex: 1,
+  },
+  tierName: {
+    ...TYPOGRAPHY.headlineSmall,
+    marginBottom: 2,
+  },
+  tierDescription: {
+    ...TYPOGRAPHY.bodySmall,
+  },
+  priceContainer: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    marginBottom: SPACING.lg,
+  },
+  tierPrice: {
+    ...TYPOGRAPHY.displaySmall,
+    fontWeight: '700',
+  },
+  tierPeriod: {
+    ...TYPOGRAPHY.bodyMedium,
+    marginLeft: SPACING.xs,
+  },
+  featuresList: {
+    gap: SPACING.sm,
+    marginBottom: SPACING.lg,
+  },
+  featureRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+  },
+  featureText: {
+    ...TYPOGRAPHY.bodySmall,
+    flex: 1,
+  },
+  currentBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 20,
-    paddingVertical: 16,
-    borderRadius: 12,
-    gap: 8,
+    gap: SPACING.xs,
+    paddingVertical: SPACING.md,
+    borderRadius: BORDER_RADIUS.lg,
   },
-  actionButtonText: { fontSize: 16, fontWeight: '700' },
+  currentText: {
+    ...TYPOGRAPHY.labelMedium,
+    fontWeight: '600',
+  },
+  tierButton: {
+    marginTop: SPACING.xs,
+  },
+  highlightedButton: {},
+  gradientButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: SPACING.md,
+    borderRadius: BORDER_RADIUS.lg,
+    gap: SPACING.sm,
+  },
+  gradientButtonText: {
+    ...TYPOGRAPHY.labelLarge,
+    color: '#000',
+    fontWeight: '600',
+  },
+  outlineButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: SPACING.md,
+    borderRadius: BORDER_RADIUS.lg,
+    borderWidth: 1.5,
+    gap: SPACING.sm,
+  },
+  outlineButtonText: {
+    ...TYPOGRAPHY.labelMedium,
+    fontWeight: '600',
+  },
   faqSection: {
-    borderRadius: 16,
+    borderRadius: BORDER_RADIUS.xxl,
     borderWidth: 1,
-    padding: 20,
-    marginTop: 8,
+    padding: SPACING.lg,
+    marginTop: SPACING.md,
   },
-  faqTitle: { fontSize: 18, fontWeight: '700', marginBottom: 16 },
-  faqItem: { marginBottom: 16 },
-  faqQuestion: { fontSize: 15, fontWeight: '600', marginBottom: 4 },
-  faqAnswer: { fontSize: 14, lineHeight: 20 },
+  faqTitle: {
+    ...TYPOGRAPHY.headlineSmall,
+    marginBottom: SPACING.lg,
+  },
+  faqItem: {
+    marginBottom: SPACING.lg,
+  },
+  faqQuestion: {
+    ...TYPOGRAPHY.labelMedium,
+    fontWeight: '600',
+    marginBottom: SPACING.xs,
+  },
+  faqAnswer: {
+    ...TYPOGRAPHY.bodySmall,
+    lineHeight: 20,
+  },
 });
