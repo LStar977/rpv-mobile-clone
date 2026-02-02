@@ -59,3 +59,6 @@ export {
   ProgressStat,
   MetricRow,
 } from './StatCard';
+
+// Overlays & Feedback
+export { VoteConfirmationOverlay } from './VoteConfirmationOverlay';
