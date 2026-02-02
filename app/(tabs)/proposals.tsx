@@ -32,6 +32,7 @@ import Animated, {
   withSequence,
   interpolate,
 } from 'react-native-reanimated';
+import { router } from 'expo-router';
 import { proposalsApi, userApi, uploadsApi, Proposal } from '../../lib/api';
 import { useAuthStore } from '../../lib/auth';
 import { shareProposal } from '../../lib/share';
@@ -136,6 +137,7 @@ interface ProposalCardProps {
   isVoting: boolean;
   onPress: () => void;
   index: number;
+  isUserVerified: boolean;
 }
 
 function ProposalCard({
@@ -145,6 +147,7 @@ function ProposalCard({
   isVoting,
   onPress,
   index,
+  isUserVerified,
 }: ProposalCardProps) {
   const { colors } = useTheme();
   const scale = useSharedValue(1);
@@ -262,6 +265,16 @@ function ProposalCard({
               <Text style={[styles.geoTagText, { color: colors.info }]}>{tag}</Text>
             </View>
           ))}
+        </View>
+      )}
+
+      {/* Verification required badge for unverified users on geo-restricted proposals */}
+      {geoTags.length > 0 && !isUserVerified && (
+        <View style={[styles.restrictionBadge, { backgroundColor: `${colors.warning}12` }]}>
+          <Ionicons name="lock-closed" size={12} color={colors.warning} />
+          <Text style={[styles.restrictionText, { color: colors.warning }]}>
+            Verification required to vote
+          </Text>
         </View>
       )}
 
@@ -442,7 +455,7 @@ export default function ProposalsScreen() {
     country: '',
     state: '',
     city: '',
-    geoScope: 'national' as 'national' | 'state' | 'city',
+    geoScope: 'global' as 'global' | 'national' | 'state' | 'city',
     ageGroup: 'All Ages',
     gender: 'All Genders',
     imageUri: '' as string,
@@ -577,6 +590,26 @@ export default function ProposalsScreen() {
       return;
     }
 
+    // Check if proposal has geo restrictions
+    const proposal = proposals.find((p) => p.id === proposalId);
+    const hasGeoRestrictions = proposal?.geoRestrictions && proposal.geoRestrictions.length > 0;
+
+    // Gate geo-restricted proposals for unverified users
+    if (hasGeoRestrictions && !isVerified) {
+      Alert.alert(
+        'Verification Required',
+        'This proposal is restricted to verified users in specific regions. Complete identity verification to vote.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Get Verified ($4.99)',
+            onPress: () => router.push('/modals/verification-payment')
+          },
+        ]
+      );
+      return;
+    }
+
     setVotingProposalId(proposalId);
     try {
       // First claim the token if not already claimed
@@ -650,10 +683,30 @@ export default function ProposalsScreen() {
       return;
     }
 
+    // Require verification for geo-restricted proposals
+    if (newProposal.geoScope !== 'global' && !isVerified) {
+      Alert.alert(
+        'Verification Required',
+        'You must verify your identity to create geo-restricted proposals. Global proposals are available to all users.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Get Verified ($4.99)',
+            onPress: () => {
+              setShowCreateModal(false);
+              router.push('/modals/verification-payment');
+            }
+          },
+        ]
+      );
+      return;
+    }
+
     setCreating(true);
     try {
+      // Build geo restrictions - empty for global, populated for geo-restricted
       const geoRestrictions: string[] = [];
-      if (userCountry) {
+      if (newProposal.geoScope !== 'global' && userCountry) {
         geoRestrictions.push(userCountry);
         if ((newProposal.geoScope === 'state' || newProposal.geoScope === 'city') && userState) {
           geoRestrictions.push(userState);
@@ -702,7 +755,7 @@ export default function ProposalsScreen() {
         country: userCountry,
         state: userState,
         city: userCity,
-        geoScope: 'national',
+        geoScope: 'global',
         ageGroup: 'All Ages',
         gender: 'All Genders',
         imageUri: '',
@@ -922,6 +975,7 @@ export default function ProposalsScreen() {
               isVoting={votingProposalId === proposal.id}
               onPress={() => openProposal(proposal)}
               index={index}
+              isUserVerified={isVerified}
             />
           ))}
           <View style={styles.listSpacer} />
@@ -1208,45 +1262,62 @@ export default function ProposalsScreen() {
               <Text style={[styles.formDividerLabel, { color: colors.gold }]}>Geographic Scope</Text>
             </View>
 
+            {/* Global scope - available to all users */}
+            <View style={styles.scopeGrid}>
+              <TouchableOpacity
+                style={[
+                  styles.scopeCard,
+                  {
+                    backgroundColor: newProposal.geoScope === 'global' ? `${colors.gold}15` : colors.surface,
+                    borderColor: newProposal.geoScope === 'global' ? colors.gold : colors.border,
+                  },
+                ]}
+                onPress={() => setNewProposal((p) => ({ ...p, geoScope: 'global' }))}
+              >
+                <Ionicons
+                  name="earth-outline"
+                  size={24}
+                  color={newProposal.geoScope === 'global' ? colors.gold : colors.textSecondary}
+                />
+                <Text
+                  style={[
+                    styles.scopeTitle,
+                    { color: newProposal.geoScope === 'global' ? colors.gold : colors.text },
+                  ]}
+                >
+                  Global
+                </Text>
+                <Text style={[styles.scopeDesc, { color: colors.textTertiary }]}>Anyone can vote</Text>
+              </TouchableOpacity>
+
             {userCountry ? (
               <>
-                <Text style={[styles.formHelper, { color: colors.textSecondary }]}>
-                  Based on your verified location:
-                </Text>
-
-                <View style={[styles.locationBadge, { backgroundColor: colors.surface, borderColor: colors.gold }]}>
-                  <Ionicons name="location" size={16} color={colors.gold} />
-                  <Text style={[styles.locationText, { color: colors.text }]}>
-                    {[userCity, userState, userCountry].filter(Boolean).join(', ')}
-                  </Text>
-                </View>
-
-                <View style={styles.scopeGrid}>
-                  <TouchableOpacity
+                {/* Geo-restricted options for verified users */}
+                <TouchableOpacity
+                  style={[
+                    styles.scopeCard,
+                    {
+                      backgroundColor: newProposal.geoScope === 'national' ? `${colors.gold}15` : colors.surface,
+                      borderColor: newProposal.geoScope === 'national' ? colors.gold : colors.border,
+                    },
+                  ]}
+                  onPress={() => setNewProposal((p) => ({ ...p, geoScope: 'national' }))}
+                >
+                  <Ionicons
+                    name="globe-outline"
+                    size={24}
+                    color={newProposal.geoScope === 'national' ? colors.gold : colors.textSecondary}
+                  />
+                  <Text
                     style={[
-                      styles.scopeCard,
-                      {
-                        backgroundColor: newProposal.geoScope === 'national' ? `${colors.gold}15` : colors.surface,
-                        borderColor: newProposal.geoScope === 'national' ? colors.gold : colors.border,
-                      },
+                      styles.scopeTitle,
+                      { color: newProposal.geoScope === 'national' ? colors.gold : colors.text },
                     ]}
-                    onPress={() => setNewProposal((p) => ({ ...p, geoScope: 'national' }))}
                   >
-                    <Ionicons
-                      name="globe-outline"
-                      size={24}
-                      color={newProposal.geoScope === 'national' ? colors.gold : colors.textSecondary}
-                    />
-                    <Text
-                      style={[
-                        styles.scopeTitle,
-                        { color: newProposal.geoScope === 'national' ? colors.gold : colors.text },
-                      ]}
-                    >
-                      National
-                    </Text>
-                    <Text style={[styles.scopeDesc, { color: colors.textTertiary }]}>All of {userCountry}</Text>
-                  </TouchableOpacity>
+                    National
+                  </Text>
+                  <Text style={[styles.scopeDesc, { color: colors.textTertiary }]}>All of {userCountry}</Text>
+                </TouchableOpacity>
 
                   {userState && (
                     <TouchableOpacity
@@ -1303,19 +1374,20 @@ export default function ProposalsScreen() {
                       <Text style={[styles.scopeDesc, { color: colors.textTertiary }]}>{userCity} only</Text>
                     </TouchableOpacity>
                   )}
-                </View>
               </>
             ) : (
-              <View style={[styles.warningBanner, { backgroundColor: `${colors.warning}12`, borderColor: `${colors.warning}30` }]}>
-                <Ionicons name="warning-outline" size={20} color={colors.warning} />
+              /* Unverified users only see Global option with upgrade prompt */
+              <View style={[styles.infoBanner, { backgroundColor: `${colors.info}10`, borderColor: `${colors.info}25` }]}>
+                <Ionicons name="information-circle-outline" size={20} color={colors.info} />
                 <View style={styles.warningContent}>
-                  <Text style={[styles.warningTitle, { color: colors.warning }]}>Location Not Verified</Text>
+                  <Text style={[styles.infoTitle, { color: colors.info }]}>Global Proposals Only</Text>
                   <Text style={[styles.warningDesc, { color: colors.textSecondary }]}>
-                    Complete identity verification to create geo-restricted proposals.
+                    Verify your identity ($4.99) to create proposals for your specific region.
                   </Text>
                 </View>
               </View>
             )}
+            </View>
 
             <View style={[styles.formDivider, { borderTopColor: colors.border }]}>
               <View style={[styles.formDividerIcon, { backgroundColor: `${colors.gold}15` }]}>
@@ -1513,6 +1585,17 @@ const styles = StyleSheet.create({
     borderRadius: BORDER_RADIUS.full,
   },
   geoTagText: { ...TYPOGRAPHY.labelSmall, fontSize: 10 },
+  restrictionBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.xs,
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: SPACING.xs,
+    borderRadius: BORDER_RADIUS.full,
+    marginBottom: SPACING.sm,
+    alignSelf: 'flex-start',
+  },
+  restrictionText: { ...TYPOGRAPHY.labelSmall, fontSize: 11 },
   cardTitle: { ...TYPOGRAPHY.headlineSmall, marginBottom: SPACING.sm },
   cardDesc: { ...TYPOGRAPHY.bodyMedium, lineHeight: 22, marginBottom: SPACING.lg },
 
@@ -1706,6 +1789,16 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     marginBottom: SPACING.lg,
   },
+  infoBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: SPACING.md,
+    padding: SPACING.lg,
+    borderRadius: BORDER_RADIUS.xl,
+    borderWidth: 1,
+    marginTop: SPACING.md,
+  },
+  infoTitle: { ...TYPOGRAPHY.labelMedium, marginBottom: SPACING.xxs },
   warningContent: { flex: 1 },
   warningTitle: { ...TYPOGRAPHY.labelMedium, marginBottom: SPACING.xxs },
   warningDesc: { ...TYPOGRAPHY.bodySmall, lineHeight: 20 },
