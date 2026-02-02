@@ -36,6 +36,9 @@ import { proposalsApi, userApi, uploadsApi, Proposal } from '../../lib/api';
 import { useAuthStore } from '../../lib/auth';
 import { shareProposal } from '../../lib/share';
 import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS, ANIMATION } from '../../lib/theme';
+import { authenticateForVoting } from '../../lib/biometrics';
+import { showVoteConfirmation } from '../../lib/notifications';
+import { VoteConfirmationOverlay } from '../../components/ui';
 import * as ImagePicker from 'expo-image-picker';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -429,6 +432,10 @@ export default function ProposalsScreen() {
   const [selectedProposal, setSelectedProposal] = useState<Proposal | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
 
+  // Vote confirmation overlay state
+  const [showVoteOverlay, setShowVoteOverlay] = useState(false);
+  const [lastVoteType, setLastVoteType] = useState<'support' | 'oppose'>('support');
+
   const [newProposal, setNewProposal] = useState({
     title: '',
     description: '',
@@ -570,6 +577,16 @@ export default function ProposalsScreen() {
       Alert.alert('Sign In Required', 'Please sign in to vote.');
       return;
     }
+
+    // Biometric authentication before voting
+    const bioResult = await authenticateForVoting();
+    if (!bioResult.success) {
+      if (bioResult.error && bioResult.error !== 'user_cancel') {
+        Alert.alert('Authentication Failed', bioResult.error);
+      }
+      return;
+    }
+
     setVotingProposalId(proposalId);
     try {
       // First claim the token if not already claimed
@@ -614,8 +631,18 @@ export default function ProposalsScreen() {
         };
       });
 
+      // Get proposal title for notification
+      const proposal = proposals.find((p) => p.id === proposalId);
+      const proposalTitle = proposal?.title || 'Proposal';
+
+      // Show vote confirmation notification
+      showVoteConfirmation(proposalTitle, vote);
+
+      // Show animated confirmation overlay
+      setLastVoteType(vote);
+      setShowVoteOverlay(true);
+
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      Alert.alert('Vote Recorded', `Your ${vote} vote has been recorded.`);
     } catch {
       Alert.alert('Error', 'Failed to submit vote. Please try again.');
     } finally {
@@ -1343,6 +1370,13 @@ export default function ProposalsScreen() {
           </ScrollView>
         </KeyboardAvoidingView>
       </Modal>
+
+      {/* Vote Confirmation Overlay */}
+      <VoteConfirmationOverlay
+        visible={showVoteOverlay}
+        voteType={lastVoteType}
+        onDismiss={() => setShowVoteOverlay(false)}
+      />
     </View>
   );
 }
