@@ -36,7 +36,6 @@ import { proposalsApi, userApi, uploadsApi, Proposal } from '../../lib/api';
 import { useAuthStore } from '../../lib/auth';
 import { shareProposal } from '../../lib/share';
 import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS, ANIMATION } from '../../lib/theme';
-import { authenticateForVoting } from '../../lib/biometrics';
 import { showVoteConfirmation } from '../../lib/notifications';
 import { VoteConfirmationOverlay } from '../../components/ui';
 import * as ImagePicker from 'expo-image-picker';
@@ -575,15 +574,6 @@ export default function ProposalsScreen() {
   const handleVote = async (proposalId: number, vote: 'support' | 'oppose') => {
     if (!isAuthenticated) {
       Alert.alert('Sign In Required', 'Please sign in to vote.');
-      return;
-    }
-
-    // Biometric authentication before voting
-    const bioResult = await authenticateForVoting();
-    if (!bioResult.success) {
-      if (bioResult.error && bioResult.error !== 'user_cancel') {
-        Alert.alert('Authentication Failed', bioResult.error);
-      }
       return;
     }
 
