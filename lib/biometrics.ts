@@ -85,3 +85,31 @@ export async function authenticateForSensitiveAction(
   const biometricType = await getBiometricType();
   return authenticateWithBiometrics(`Use ${biometricType} to ${action}`);
 }
+
+// Authenticate specifically for voting
+export async function authenticateForVoting(): Promise<BiometricResult> {
+  const enabled = await isBiometricEnabled();
+  if (!enabled) {
+    return { success: true }; // Skip if biometric not enabled
+  }
+  const available = await isBiometricAvailable();
+  if (!available) {
+    return { success: true }; // Skip if not available
+  }
+  const biometricType = await getBiometricType();
+  return authenticateWithBiometrics(`Use ${biometricType} to confirm your vote`);
+}
+
+// Authenticate for app unlock (on launch)
+export async function authenticateForAppUnlock(): Promise<BiometricResult> {
+  const enabled = await isBiometricEnabled();
+  if (!enabled) {
+    return { success: true }; // Skip if biometric not enabled
+  }
+  const available = await isBiometricAvailable();
+  if (!available) {
+    return { success: true }; // Skip if not available
+  }
+  const biometricType = await getBiometricType();
+  return authenticateWithBiometrics(`Use ${biometricType} to unlock Represent`);
+}
