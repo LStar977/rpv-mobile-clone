@@ -55,6 +55,22 @@ type ActivityItem = {
   color: string;
 };
 
+// Country-themed gradient colors for community cards
+const countryThemes: Record<string, { primary: string; secondary?: string }> = {
+  'Canada': { primary: '#FF0000', secondary: '#FFFFFF' },
+  'United States': { primary: '#3C3B6E', secondary: '#B22234' },
+  'United Kingdom': { primary: '#012169', secondary: '#C8102E' },
+  'Australia': { primary: '#00843D', secondary: '#FFCD00' },
+  'Germany': { primary: '#000000', secondary: '#FFCC00' },
+  'France': { primary: '#0055A4', secondary: '#EF4135' },
+  'Japan': { primary: '#BC002D', secondary: '#FFFFFF' },
+  'India': { primary: '#FF9933', secondary: '#138808' },
+  'Brazil': { primary: '#009C3B', secondary: '#FFDF00' },
+  'Mexico': { primary: '#006847', secondary: '#CE1126' },
+  'Spain': { primary: '#AA151B', secondary: '#F1BF00' },
+  'Italy': { primary: '#009246', secondary: '#CE2B37' },
+};
+
 // --- Premium Stat Card ---
 function StatCard({
   icon,
@@ -412,6 +428,11 @@ function CommunityHeroCard({
   const { colors } = useTheme();
   const progressWidth = useSharedValue(0);
 
+  // Get country-specific theme colors
+  const theme = countryThemes[community.name] || { primary: colors.gold };
+  const themeColor = theme.primary;
+  const secondaryColor = theme.secondary || theme.primary;
+
   const votedPercent = community.proposalCount > 0
     ? Math.round(((community.proposalCount - community.unvotedCount) / community.proposalCount) * 100)
     : 0;
@@ -438,7 +459,7 @@ function CommunityHeroCard({
       activeOpacity={0.9}
     >
       <LinearGradient
-        colors={[`${colors.gold}10`, 'transparent']}
+        colors={[`${themeColor}12`, 'transparent', `${secondaryColor}08`]}
         style={StyleSheet.absoluteFill}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
@@ -456,8 +477,8 @@ function CommunityHeroCard({
           </View>
         </View>
         {community.unvotedCount > 0 && (
-          <View style={[styles.communityHeroBadge, { backgroundColor: colors.gold }]}>
-            <Text style={[styles.communityHeroBadgeText, { color: colors.background }]}>
+          <View style={[styles.communityHeroBadge, { backgroundColor: themeColor }]}>
+            <Text style={[styles.communityHeroBadgeText, { color: '#FFFFFF' }]}>
               {community.unvotedCount}
             </Text>
           </View>
@@ -504,7 +525,7 @@ function CommunityHeroCard({
       {/* Progress bar */}
       <View style={[styles.communityHeroProgressBg, { backgroundColor: colors.border }]}>
         <Animated.View
-          style={[styles.communityHeroProgressFill, { backgroundColor: colors.gold }, animatedProgressStyle]}
+          style={[styles.communityHeroProgressFill, { backgroundColor: themeColor }, animatedProgressStyle]}
         />
       </View>
 
