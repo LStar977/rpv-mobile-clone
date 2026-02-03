@@ -1676,26 +1676,26 @@ export default function ProposalsScreen() {
                 )).reverse()}
               </View>
 
-              {/* Vote Buttons - Outside gesture detector for tap reliability */}
+              {/* Vote Buttons - Overlaid at bottom of swipe area */}
               {visibleSwipeCards.length > 0 && !isProposalEnded(visibleSwipeCards[0]) && (
-                <View style={styles.swipeActionsContainer}>
-                  <Text style={styles.swipeTapHintSubtle}>Tap card for details</Text>
+                <View style={styles.swipeButtonsOverlay}>
                   <View style={styles.swipeButtonsRow}>
                     <TouchableOpacity
-                      style={[styles.swipeActionButton, { backgroundColor: 'rgba(255,59,48,0.15)', borderColor: 'rgba(255,59,48,0.3)', borderWidth: 1 }]}
+                      style={[styles.swipeActionButton, { backgroundColor: 'rgba(255,59,48,0.2)', borderColor: 'rgba(255,59,48,0.4)', borderWidth: 2 }]}
                       onPress={() => handleSwipeVote(visibleSwipeCards[0], 'oppose')}
                       activeOpacity={0.7}
                     >
-                      <Ionicons name="close" size={28} color="#FF3B30" />
+                      <Ionicons name="close" size={32} color="#FF3B30" />
                     </TouchableOpacity>
                     <TouchableOpacity
-                      style={[styles.swipeActionButton, { backgroundColor: 'rgba(52,199,89,0.15)', borderColor: 'rgba(52,199,89,0.3)', borderWidth: 1 }]}
+                      style={[styles.swipeActionButton, { backgroundColor: 'rgba(52,199,89,0.2)', borderColor: 'rgba(52,199,89,0.4)', borderWidth: 2 }]}
                       onPress={() => handleSwipeVote(visibleSwipeCards[0], 'support')}
                       activeOpacity={0.7}
                     >
-                      <Ionicons name="checkmark" size={28} color="#34C759" />
+                      <Ionicons name="checkmark" size={32} color="#34C759" />
                     </TouchableOpacity>
                   </View>
+                  <Text style={styles.swipeTapHintSubtle}>or swipe left/right</Text>
                 </View>
               )}
             </>
@@ -2693,10 +2693,10 @@ const styles = StyleSheet.create({
 
   // Card Stack
   cardStack: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'flex-start',
     paddingHorizontal: SPACING.lg,
-    height: CARD_HEIGHT + 30, // Fixed height for absolute positioned cards
   },
 
   // Swipe Card
@@ -3093,11 +3093,14 @@ const styles = StyleSheet.create({
   },
 
   // Swipe Actions (Buttons)
-  swipeActionsContainer: {
+  swipeButtonsOverlay: {
+    position: 'absolute',
+    bottom: 100, // Above tab bar
+    left: 0,
+    right: 0,
     alignItems: 'center',
     gap: SPACING.sm,
-    paddingTop: SPACING.xl,
-    paddingBottom: SPACING.xxl,
+    zIndex: 200,
   },
   swipeTapHintSubtle: {
     color: 'rgba(255,255,255,0.5)',
@@ -3112,13 +3115,13 @@ const styles = StyleSheet.create({
     gap: SPACING.xl,
   },
   swipeActionButton: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
-    backgroundColor: 'rgba(0,0,0,0.3)',
+    backgroundColor: 'rgba(0,0,0,0.5)',
   },
   swipeOpposeButton: {},
   swipeSupportButton: {},
