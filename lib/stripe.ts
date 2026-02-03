@@ -70,6 +70,30 @@ export async function fetchPremiumPaymentIntent(token: string | null): Promise<P
 }
 
 /**
+ * Fetch payment intent for organization subscription ($29-99/month)
+ */
+export async function fetchOrganizationPaymentIntent(
+  token: string | null,
+  tier: 'community' | 'professional' | 'enterprise'
+): Promise<PaymentIntentResponse & { paymentIntentId?: string }> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  const response = await fetch(`${API_URL}/api/stripe/organization-payment-intent`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ tier }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || 'Failed to create payment intent');
+  }
+
+  return response.json();
+}
+
+/**
  * Legacy checkout URL fetchers for backwards compatibility
  */
 export async function fetchVerificationCheckoutUrl(token: string | null): Promise<string> {

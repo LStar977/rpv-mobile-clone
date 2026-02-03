@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator, RefreshControl, Modal, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator, RefreshControl, Modal, TextInput, KeyboardAvoidingView, Platform, Switch, Clipboard } from 'react-native';
 import { useState, useEffect, useCallback } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -11,7 +11,7 @@ import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS } from '../../lib
 
 const CATEGORIES = ['Transportation', 'Environment', 'Housing', 'Education', 'Healthcare', 'Economy', 'Public Safety', 'Infrastructure', 'Other'];
 
-type TabType = 'proposals' | 'announcements' | 'about';
+type TabType = 'proposals' | 'announcements' | 'about' | 'admin';
 
 // Tab Button Component
 function TabButton({
@@ -146,6 +146,15 @@ export default function OrganizationDetailScreen() {
     category: 'Other',
   });
 
+  // Admin panel state
+  const [members, setMembers] = useState<any[]>([]);
+  const [inviteCodes, setInviteCodes] = useState<any[]>([]);
+  const [adminLoading, setAdminLoading] = useState(false);
+  const [generatingCode, setGeneratingCode] = useState(false);
+  const [showAnnouncementModal, setShowAnnouncementModal] = useState(false);
+  const [creatingAnnouncement, setCreatingAnnouncement] = useState(false);
+  const [newAnnouncement, setNewAnnouncement] = useState({ title: '', content: '', pinned: false });
+
   const fetchData = useCallback(async () => {
     if (!token || !params.orgId) {
       setLoading(false);
@@ -181,6 +190,32 @@ export default function OrganizationDetailScreen() {
     setRefreshing(true);
     fetchData();
   }, [fetchData]);
+
+  // Fetch admin data when Admin tab is selected
+  const fetchAdminData = useCallback(async () => {
+    if (!params.orgId || organization?.role !== 'admin') return;
+
+    setAdminLoading(true);
+    try {
+      const [membersResult, codesResult] = await Promise.all([
+        organizationsApi.getMembers(params.orgId),
+        organizationsApi.getInviteCodes(params.orgId),
+      ]);
+
+      if (membersResult.data) setMembers(membersResult.data);
+      if (codesResult.data) setInviteCodes(codesResult.data);
+    } catch (error) {
+      console.error('Failed to fetch admin data:', error);
+    } finally {
+      setAdminLoading(false);
+    }
+  }, [params.orgId, organization?.role]);
+
+  useEffect(() => {
+    if (activeTab === 'admin' && organization?.role === 'admin') {
+      fetchAdminData();
+    }
+  }, [activeTab, fetchAdminData, organization?.role]);
 
   const handleLeaveOrganization = () => {
     if (!organization) return;
@@ -259,6 +294,133 @@ export default function OrganizationDetailScreen() {
     } finally {
       setCreating(false);
     }
+  };
+
+  // Admin handlers
+  const handleGenerateInviteCode = async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setGeneratingCode(true);
+
+    try {
+      const result = await organizationsApi.generateInviteCode(params.orgId);
+      if (result.error) {
+        Alert.alert('Error', result.error);
+        return;
+      }
+
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      fetchAdminData();
+    } catch (error) {
+      Alert.alert('Error', 'Failed to generate invite code.');
+    } finally {
+      setGeneratingCode(false);
+    }
+  };
+
+  const handleCopyCode = (code: string) => {
+    Clipboard.setString(code);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    Alert.alert('Copied', 'Invite code copied to clipboard.');
+  };
+
+  const handleRevokeCode = (code: string) => {
+    Alert.alert('Revoke Code', `Are you sure you want to revoke the invite code "${code}"?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Revoke',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await organizationsApi.revokeInviteCode(params.orgId, code);
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            fetchAdminData();
+          } catch (error) {
+            Alert.alert('Error', 'Failed to revoke code.');
+          }
+        },
+      },
+    ]);
+  };
+
+  const handleRemoveMember = (userId: string, name: string) => {
+    Alert.alert('Remove Member', `Are you sure you want to remove ${name} from this organization?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Remove',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await organizationsApi.removeMember(params.orgId, userId);
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            fetchAdminData();
+          } catch (error) {
+            Alert.alert('Error', 'Failed to remove member.');
+          }
+        },
+      },
+    ]);
+  };
+
+  const handleToggleMemberRole = async (userId: string, currentRole: string) => {
+    const newRole = currentRole === 'admin' ? 'member' : 'admin';
+    try {
+      await organizationsApi.updateMemberRole(params.orgId, userId, newRole);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      fetchAdminData();
+    } catch (error) {
+      Alert.alert('Error', 'Failed to update role.');
+    }
+  };
+
+  const handleCreateAnnouncement = async () => {
+    if (!newAnnouncement.title.trim() || !newAnnouncement.content.trim()) {
+      Alert.alert('Missing Fields', 'Please fill in both title and content.');
+      return;
+    }
+
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setCreatingAnnouncement(true);
+
+    try {
+      const result = await organizationsApi.createAnnouncement(params.orgId, {
+        title: newAnnouncement.title.trim(),
+        content: newAnnouncement.content.trim(),
+        pinned: newAnnouncement.pinned,
+      });
+
+      if (result.error) {
+        Alert.alert('Error', result.error);
+        return;
+      }
+
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setShowAnnouncementModal(false);
+      setNewAnnouncement({ title: '', content: '', pinned: false });
+      fetchData(); // Refresh announcements
+    } catch (error) {
+      Alert.alert('Error', 'Failed to create announcement.');
+    } finally {
+      setCreatingAnnouncement(false);
+    }
+  };
+
+  const handleDeleteAnnouncement = (announcementId: string, title: string) => {
+    Alert.alert('Delete Announcement', `Are you sure you want to delete "${title}"?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await organizationsApi.deleteAnnouncement(params.orgId, announcementId);
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            fetchData();
+          } catch (error) {
+            Alert.alert('Error', 'Failed to delete announcement.');
+          }
+        },
+      },
+    ]);
   };
 
   const getTierBadge = () => {
@@ -391,6 +553,14 @@ export default function OrganizationDetailScreen() {
             active={activeTab === 'about'}
             onPress={() => setActiveTab('about')}
           />
+          {organization?.role === 'admin' && (
+            <TabButton
+              label="Admin"
+              icon="settings-outline"
+              active={activeTab === 'admin'}
+              onPress={() => setActiveTab('admin')}
+            />
+          )}
         </View>
 
         {/* Tab Content */}
@@ -514,6 +684,206 @@ export default function OrganizationDetailScreen() {
           </Animated.View>
         )}
 
+        {/* Admin Tab Content */}
+        {activeTab === 'admin' && organization?.role === 'admin' && (
+          <>
+            {adminLoading ? (
+              <View style={styles.adminLoadingContainer}>
+                <ActivityIndicator size="large" color={colors.gold} />
+              </View>
+            ) : (
+              <>
+                {/* Invite Codes Section */}
+                <Animated.View
+                  entering={FadeInUp.duration(400)}
+                  style={[styles.adminSection, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                >
+                  <View style={styles.adminSectionHeader}>
+                    <View style={styles.adminSectionTitleRow}>
+                      <Ionicons name="key-outline" size={20} color={colors.gold} />
+                      <Text style={[styles.adminSectionTitle, { color: colors.text }]}>Invite Codes</Text>
+                    </View>
+                    <TouchableOpacity
+                      style={[styles.adminActionBtn, { backgroundColor: colors.gold }]}
+                      onPress={handleGenerateInviteCode}
+                      disabled={generatingCode}
+                    >
+                      {generatingCode ? (
+                        <ActivityIndicator size="small" color="#000" />
+                      ) : (
+                        <>
+                          <Ionicons name="add" size={16} color="#000" />
+                          <Text style={styles.adminActionBtnText}>Generate</Text>
+                        </>
+                      )}
+                    </TouchableOpacity>
+                  </View>
+
+                  {inviteCodes.length === 0 ? (
+                    <Text style={[styles.adminEmptyText, { color: colors.textSecondary }]}>
+                      No active invite codes. Generate one to invite members.
+                    </Text>
+                  ) : (
+                    inviteCodes.map((code, index) => (
+                      <View
+                        key={code.code || index}
+                        style={[styles.inviteCodeRow, { borderTopColor: colors.border }]}
+                      >
+                        <View style={styles.inviteCodeInfo}>
+                          <Text style={[styles.inviteCodeText, { color: colors.text }]}>{code.code}</Text>
+                          {code.expiresAt && (
+                            <Text style={[styles.inviteCodeExpiry, { color: colors.textTertiary }]}>
+                              Expires {new Date(code.expiresAt).toLocaleDateString()}
+                            </Text>
+                          )}
+                        </View>
+                        <View style={styles.inviteCodeActions}>
+                          <TouchableOpacity
+                            style={[styles.inviteCodeActionBtn, { backgroundColor: `${colors.info}15` }]}
+                            onPress={() => handleCopyCode(code.code)}
+                          >
+                            <Ionicons name="copy-outline" size={16} color={colors.info} />
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={[styles.inviteCodeActionBtn, { backgroundColor: `${colors.error}15` }]}
+                            onPress={() => handleRevokeCode(code.code)}
+                          >
+                            <Ionicons name="trash-outline" size={16} color={colors.error} />
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    ))
+                  )}
+                </Animated.View>
+
+                {/* Members Section */}
+                <Animated.View
+                  entering={FadeInUp.delay(100).duration(400)}
+                  style={[styles.adminSection, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                >
+                  <View style={styles.adminSectionHeader}>
+                    <View style={styles.adminSectionTitleRow}>
+                      <Ionicons name="people-outline" size={20} color={colors.gold} />
+                      <Text style={[styles.adminSectionTitle, { color: colors.text }]}>
+                        Members ({members.length})
+                      </Text>
+                    </View>
+                  </View>
+
+                  {members.length === 0 ? (
+                    <Text style={[styles.adminEmptyText, { color: colors.textSecondary }]}>
+                      No members yet.
+                    </Text>
+                  ) : (
+                    members.map((member, index) => (
+                      <View
+                        key={member.id || index}
+                        style={[styles.memberRow, { borderTopColor: colors.border }]}
+                      >
+                        <View style={[styles.memberAvatar, { backgroundColor: `${colors.gold}15` }]}>
+                          <Text style={[styles.memberAvatarText, { color: colors.gold }]}>
+                            {(member.name || member.email || 'U')[0].toUpperCase()}
+                          </Text>
+                        </View>
+                        <View style={styles.memberInfo}>
+                          <Text style={[styles.memberName, { color: colors.text }]}>
+                            {member.name || member.email || 'Unknown'}
+                          </Text>
+                          <View style={styles.memberRoleRow}>
+                            <View
+                              style={[
+                                styles.memberRoleBadge,
+                                { backgroundColor: member.role === 'admin' ? `${colors.gold}15` : `${colors.textTertiary}15` },
+                              ]}
+                            >
+                              <Text
+                                style={[
+                                  styles.memberRoleText,
+                                  { color: member.role === 'admin' ? colors.gold : colors.textSecondary },
+                                ]}
+                              >
+                                {member.role === 'admin' ? 'Admin' : 'Member'}
+                              </Text>
+                            </View>
+                          </View>
+                        </View>
+                        <View style={styles.memberActions}>
+                          <TouchableOpacity
+                            style={[styles.memberActionBtn, { backgroundColor: `${colors.info}15` }]}
+                            onPress={() => handleToggleMemberRole(member.id, member.role)}
+                          >
+                            <Ionicons
+                              name={member.role === 'admin' ? 'arrow-down' : 'arrow-up'}
+                              size={14}
+                              color={colors.info}
+                            />
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={[styles.memberActionBtn, { backgroundColor: `${colors.error}15` }]}
+                            onPress={() => handleRemoveMember(member.id, member.name || 'this member')}
+                          >
+                            <Ionicons name="person-remove-outline" size={14} color={colors.error} />
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    ))
+                  )}
+                </Animated.View>
+
+                {/* Announcements Management Section */}
+                <Animated.View
+                  entering={FadeInUp.delay(200).duration(400)}
+                  style={[styles.adminSection, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                >
+                  <View style={styles.adminSectionHeader}>
+                    <View style={styles.adminSectionTitleRow}>
+                      <Ionicons name="megaphone-outline" size={20} color={colors.gold} />
+                      <Text style={[styles.adminSectionTitle, { color: colors.text }]}>Announcements</Text>
+                    </View>
+                    <TouchableOpacity
+                      style={[styles.adminActionBtn, { backgroundColor: colors.gold }]}
+                      onPress={() => setShowAnnouncementModal(true)}
+                    >
+                      <Ionicons name="add" size={16} color="#000" />
+                      <Text style={styles.adminActionBtnText}>New</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {announcements.length === 0 ? (
+                    <Text style={[styles.adminEmptyText, { color: colors.textSecondary }]}>
+                      No announcements. Create one to communicate with members.
+                    </Text>
+                  ) : (
+                    announcements.map((announcement, index) => (
+                      <View
+                        key={announcement.id || index}
+                        style={[styles.announcementManageRow, { borderTopColor: colors.border }]}
+                      >
+                        <View style={styles.announcementManageInfo}>
+                          {announcement.pinned && (
+                            <View style={[styles.pinnedIndicator, { backgroundColor: `${colors.info}15` }]}>
+                              <Ionicons name="pin" size={10} color={colors.info} />
+                            </View>
+                          )}
+                          <Text style={[styles.announcementManageTitle, { color: colors.text }]} numberOfLines={1}>
+                            {announcement.title}
+                          </Text>
+                        </View>
+                        <TouchableOpacity
+                          style={[styles.announcementDeleteBtn, { backgroundColor: `${colors.error}15` }]}
+                          onPress={() => handleDeleteAnnouncement(announcement.id, announcement.title)}
+                        >
+                          <Ionicons name="trash-outline" size={14} color={colors.error} />
+                        </TouchableOpacity>
+                      </View>
+                    ))
+                  )}
+                </Animated.View>
+              </>
+            )}
+          </>
+        )}
+
         <View style={styles.bottomSpacer} />
       </ScrollView>
 
@@ -631,6 +1001,96 @@ export default function OrganizationDetailScreen() {
               <Text style={[styles.officialNoticeText, { color: colors.gold }]}>
                 This proposal will be marked as an official proposal from {organization?.name}
               </Text>
+            </View>
+
+            <View style={{ height: 100 }} />
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Create Announcement Modal */}
+      <Modal
+        visible={showAnnouncementModal}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setShowAnnouncementModal(false)}
+      >
+        <KeyboardAvoidingView
+          style={[styles.modalContainer, { backgroundColor: colors.background }]}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
+          {/* Modal Header */}
+          <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
+            <TouchableOpacity onPress={() => setShowAnnouncementModal(false)} style={styles.modalCloseBtn}>
+              <Ionicons name="close" size={24} color={colors.text} />
+            </TouchableOpacity>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>New Announcement</Text>
+            <TouchableOpacity
+              style={[styles.modalSubmitBtn, { backgroundColor: creatingAnnouncement ? colors.textTertiary : colors.gold }]}
+              onPress={handleCreateAnnouncement}
+              disabled={creatingAnnouncement}
+            >
+              {creatingAnnouncement ? (
+                <ActivityIndicator size="small" color="#000" />
+              ) : (
+                <Text style={styles.modalSubmitBtnText}>Post</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView style={styles.modalContent} showsVerticalScrollIndicator={false}>
+            {/* Title Input */}
+            <View style={styles.inputGroup}>
+              <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>Title</Text>
+              <TextInput
+                style={[styles.textInput, { backgroundColor: colors.surface, borderColor: colors.border, color: colors.text }]}
+                placeholder="Announcement title"
+                placeholderTextColor={colors.textTertiary}
+                value={newAnnouncement.title}
+                onChangeText={(text) => setNewAnnouncement((prev) => ({ ...prev, title: text }))}
+                maxLength={100}
+              />
+              <Text style={[styles.charCount, { color: colors.textTertiary }]}>
+                {newAnnouncement.title.length}/100
+              </Text>
+            </View>
+
+            {/* Content Input */}
+            <View style={styles.inputGroup}>
+              <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>Content</Text>
+              <TextInput
+                style={[styles.textArea, { backgroundColor: colors.surface, borderColor: colors.border, color: colors.text }]}
+                placeholder="Write your announcement..."
+                placeholderTextColor={colors.textTertiary}
+                value={newAnnouncement.content}
+                onChangeText={(text) => setNewAnnouncement((prev) => ({ ...prev, content: text }))}
+                multiline
+                numberOfLines={6}
+                textAlignVertical="top"
+                maxLength={2000}
+              />
+              <Text style={[styles.charCount, { color: colors.textTertiary }]}>
+                {newAnnouncement.content.length}/2000
+              </Text>
+            </View>
+
+            {/* Pin Toggle */}
+            <View style={[styles.pinToggleRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <View style={styles.pinToggleInfo}>
+                <Ionicons name="pin" size={20} color={colors.gold} />
+                <View>
+                  <Text style={[styles.pinToggleLabel, { color: colors.text }]}>Pin Announcement</Text>
+                  <Text style={[styles.pinToggleHint, { color: colors.textSecondary }]}>
+                    Pinned announcements appear at the top
+                  </Text>
+                </View>
+              </View>
+              <Switch
+                value={newAnnouncement.pinned}
+                onValueChange={(value) => setNewAnnouncement((prev) => ({ ...prev, pinned: value }))}
+                trackColor={{ false: colors.border, true: colors.gold }}
+                thumbColor="#fff"
+              />
             </View>
 
             <View style={{ height: 100 }} />
@@ -1070,5 +1530,198 @@ const styles = StyleSheet.create({
     ...TYPOGRAPHY.bodySmall,
     flex: 1,
     lineHeight: 20,
+  },
+
+  // Admin Panel Styles
+  adminLoadingContainer: {
+    paddingVertical: SPACING.xxxl,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  adminSection: {
+    borderRadius: BORDER_RADIUS.xxl,
+    borderWidth: 1,
+    padding: SPACING.lg,
+    marginBottom: SPACING.lg,
+    ...SHADOWS.sm,
+  },
+  adminSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: SPACING.md,
+  },
+  adminSectionTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+  },
+  adminSectionTitle: {
+    ...TYPOGRAPHY.labelLarge,
+    fontWeight: '600',
+  },
+  adminActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    borderRadius: BORDER_RADIUS.full,
+    gap: SPACING.xxs,
+  },
+  adminActionBtnText: {
+    ...TYPOGRAPHY.labelSmall,
+    color: '#000',
+    fontWeight: '600',
+  },
+  adminEmptyText: {
+    ...TYPOGRAPHY.bodySmall,
+    textAlign: 'center',
+    paddingVertical: SPACING.lg,
+  },
+
+  // Invite Codes
+  inviteCodeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: SPACING.md,
+    marginTop: SPACING.md,
+    borderTopWidth: 1,
+  },
+  inviteCodeInfo: {
+    flex: 1,
+  },
+  inviteCodeText: {
+    ...TYPOGRAPHY.labelMedium,
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    letterSpacing: 1,
+  },
+  inviteCodeExpiry: {
+    ...TYPOGRAPHY.labelSmall,
+    marginTop: 2,
+  },
+  inviteCodeActions: {
+    flexDirection: 'row',
+    gap: SPACING.sm,
+  },
+  inviteCodeActionBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  // Members
+  memberRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingTop: SPACING.md,
+    marginTop: SPACING.md,
+    borderTopWidth: 1,
+  },
+  memberAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: SPACING.md,
+  },
+  memberAvatarText: {
+    ...TYPOGRAPHY.labelLarge,
+    fontWeight: '600',
+  },
+  memberInfo: {
+    flex: 1,
+  },
+  memberName: {
+    ...TYPOGRAPHY.labelMedium,
+    fontWeight: '500',
+    marginBottom: 2,
+  },
+  memberRoleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  memberRoleBadge: {
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: 2,
+    borderRadius: BORDER_RADIUS.sm,
+  },
+  memberRoleText: {
+    ...TYPOGRAPHY.labelSmall,
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  memberActions: {
+    flexDirection: 'row',
+    gap: SPACING.sm,
+  },
+  memberActionBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  // Announcements Management
+  announcementManageRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: SPACING.md,
+    marginTop: SPACING.md,
+    borderTopWidth: 1,
+  },
+  announcementManageInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    gap: SPACING.sm,
+  },
+  pinnedIndicator: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  announcementManageTitle: {
+    ...TYPOGRAPHY.labelMedium,
+    flex: 1,
+  },
+  announcementDeleteBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  // Pin Toggle in Modal
+  pinToggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: SPACING.lg,
+    borderRadius: BORDER_RADIUS.lg,
+    borderWidth: 1,
+    marginTop: SPACING.md,
+  },
+  pinToggleInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.md,
+    flex: 1,
+  },
+  pinToggleLabel: {
+    ...TYPOGRAPHY.labelMedium,
+    fontWeight: '500',
+  },
+  pinToggleHint: {
+    ...TYPOGRAPHY.labelSmall,
+    marginTop: 2,
   },
 });

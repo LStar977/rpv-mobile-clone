@@ -26,6 +26,7 @@ import Animated, {
 import { router } from 'expo-router';
 import { useAuthStore } from '../../lib/auth';
 import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS, ANIMATION } from '../../lib/theme';
+import { UpgradeModal } from '../../components/ui';
 
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
@@ -381,6 +382,7 @@ export default function SentinelScreen() {
   const [activeTab, setActiveTab] = useState<'summary' | 'categories' | 'findings' | 'corrections' | 'proposal'>('summary');
   const [creatingProposal, setCreatingProposal] = useState(false);
   const [proposalCreated, setProposalCreated] = useState(false);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
   // Check if user has Premium subscription
   useEffect(() => {
@@ -420,6 +422,13 @@ export default function SentinelScreen() {
   }
 
   const handleAnalyze = async () => {
+    // Check premium status first
+    if (!isPremium) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      setShowUpgradeModal(true);
+      return;
+    }
+
     if (!title.trim() || !text.trim()) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
       Alert.alert('Error', 'Please enter a title and text to analyze');
@@ -531,31 +540,6 @@ export default function SentinelScreen() {
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.gold} />
         </View>
-      </View>
-    );
-  }
-
-  // Show Premium upgrade prompt if not Premium
-  if (!isPremium) {
-    return (
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <Animated.View
-          entering={FadeInDown.duration(400)}
-          style={[styles.header, { borderBottomColor: colors.border }]}
-        >
-          <View style={styles.headerContent}>
-            <View style={[styles.headerIconBg, { backgroundColor: `${colors.gold}15`, ...SHADOWS.glow }]}>
-              <Ionicons name="sparkles" size={28} color={colors.gold} />
-            </View>
-            <View style={styles.headerText}>
-              <Text style={[styles.headerTitle, { color: colors.gold }]}>Sentinel AI</Text>
-              <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>
-                Governance Analyzer
-              </Text>
-            </View>
-          </View>
-        </Animated.View>
-        <PremiumUpgradeCard />
       </View>
     );
   }
@@ -987,6 +971,15 @@ export default function SentinelScreen() {
 
         <View style={styles.bottomPadding} />
       </ScrollView>
+
+      {/* Premium Upgrade Modal */}
+      <UpgradeModal
+        visible={showUpgradeModal}
+        onClose={() => setShowUpgradeModal(false)}
+        type="premium"
+        title="Unlock Sentinel AI"
+        message="Upgrade to Premium to analyze government documents against 155 principles of proper human governance. Get instant insights, identify violations, and generate proposals."
+      />
     </View>
   );
 }

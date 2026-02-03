@@ -66,3 +66,6 @@ export { VoteConfirmationOverlay } from './VoteConfirmationOverlay';
 // Tier Badges
 export { TierBadge, TierCard } from './TierBadge';
 export type { UserTier } from './TierBadge';
+
+// Modals
+export { UpgradeModal } from './UpgradeModal';

@@ -83,7 +83,7 @@ function OrganizationCard({
 }
 
 // Empty State Component
-function EmptyState({ onJoinPress }: { onJoinPress: () => void }) {
+function EmptyState({ onJoinPress, onCreatePress }: { onJoinPress: () => void; onCreatePress: () => void }) {
   const { colors } = useTheme();
 
   return (
@@ -105,6 +105,14 @@ function EmptyState({ onJoinPress }: { onJoinPress: () => void }) {
       >
         <Ionicons name="add" size={20} color="#000" />
         <Text style={styles.emptyButtonText}>Join with Invite Code</Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={[styles.emptyCreateButton, { borderColor: colors.gold }]}
+        onPress={onCreatePress}
+        activeOpacity={0.8}
+      >
+        <Ionicons name="business" size={18} color={colors.gold} />
+        <Text style={[styles.emptyCreateButtonText, { color: colors.gold }]}>Create Your Own</Text>
       </TouchableOpacity>
     </Animated.View>
   );
@@ -307,7 +315,13 @@ export default function OrganizationsScreen() {
           }
         >
           {organizations.length === 0 ? (
-            <EmptyState onJoinPress={() => setShowJoinSheet(true)} />
+            <EmptyState
+              onJoinPress={() => setShowJoinSheet(true)}
+              onCreatePress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                router.push('/modals/create-organization');
+              }}
+            />
           ) : (
             <>
               {/* Stats Row */}
@@ -358,9 +372,12 @@ export default function OrganizationsScreen() {
                 </View>
                 <TouchableOpacity
                   style={[styles.upsellButton, { borderColor: colors.gold }]}
-                  onPress={() => router.push('/modals/subscription')}
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                    router.push('/modals/create-organization');
+                  }}
                 >
-                  <Text style={[styles.upsellButtonText, { color: colors.gold }]}>Learn More</Text>
+                  <Text style={[styles.upsellButtonText, { color: colors.gold }]}>Get Started</Text>
                   <Ionicons name="arrow-forward" size={16} color={colors.gold} />
                 </TouchableOpacity>
               </Animated.View>
@@ -562,6 +579,20 @@ const styles = StyleSheet.create({
   emptyButtonText: {
     ...TYPOGRAPHY.labelMedium,
     color: '#000',
+    fontWeight: '600',
+  },
+  emptyCreateButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: SPACING.xl,
+    paddingVertical: SPACING.md,
+    borderRadius: BORDER_RADIUS.full,
+    borderWidth: 1.5,
+    gap: SPACING.sm,
+    marginTop: SPACING.md,
+  },
+  emptyCreateButtonText: {
+    ...TYPOGRAPHY.labelMedium,
     fontWeight: '600',
   },
 

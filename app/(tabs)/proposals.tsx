@@ -38,7 +38,8 @@ import { useAuthStore } from '../../lib/auth';
 import { shareProposal } from '../../lib/share';
 import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS, ANIMATION } from '../../lib/theme';
 import { showVoteConfirmation } from '../../lib/notifications';
-import { VoteConfirmationOverlay } from '../../components/ui';
+import { VoteConfirmationOverlay, UpgradeModal } from '../../components/ui';
+import { checkForNewBadges } from '../../lib/badgeNotification';
 import * as ImagePicker from 'expo-image-picker';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -468,6 +469,9 @@ export default function ProposalsScreen() {
 
   const [selectedProposal, setSelectedProposal] = useState<Proposal | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
+  const [showVerificationModal, setShowVerificationModal] = useState(false);
+  const [verificationModalType, setVerificationModalType] = useState<'vote' | 'proposal' | 'limit'>('vote');
+  const [pendingLimitTier, setPendingLimitTier] = useState<'free' | 'verified'>('free');
 
   // Vote confirmation overlay state
   const [showVoteOverlay, setShowVoteOverlay] = useState(false);
@@ -627,17 +631,9 @@ export default function ProposalsScreen() {
 
     // Gate geo-restricted proposals for unverified users
     if (hasGeoRestrictions && !isVerified) {
-      Alert.alert(
-        'Verification Required',
-        'This proposal is restricted to verified users in specific regions. Complete identity verification to vote.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Get Verified ($4.99)',
-            onPress: () => router.push('/modals/verification-payment')
-          },
-        ]
-      );
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      setVerificationModalType('vote');
+      setShowVerificationModal(true);
       return;
     }
 
@@ -721,6 +717,9 @@ export default function ProposalsScreen() {
       setShowVoteOverlay(true);
 
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+      // Check for newly earned badges (async, non-blocking)
+      setTimeout(() => checkForNewBadges(), 1500);
     } catch {
       Alert.alert('Error', 'Failed to submit vote. Please try again.');
     } finally {
@@ -741,42 +740,21 @@ export default function ProposalsScreen() {
     // Check proposal limits (skip for premium users with unlimited)
     if (usageLimits && usageLimits.proposals.limit !== 'unlimited') {
       if (usageLimits.proposals.used >= usageLimits.proposals.limit) {
-        const tierUpgrade = usageLimits.tier === 'free' ? 'Get Verified' : 'Go Premium';
-        const resetDate = new Date(usageLimits.proposals.resetDate).toLocaleDateString();
-        Alert.alert(
-          'Proposal Limit Reached',
-          `You've used all ${usageLimits.proposals.limit} of your ${usageLimits.proposals.period}ly proposals. Your limit resets on ${resetDate}.`,
-          [
-            { text: 'Cancel', style: 'cancel' },
-            {
-              text: tierUpgrade,
-              onPress: () => {
-                setShowCreateModal(false);
-                router.push(usageLimits.tier === 'free' ? '/modals/verification-payment' : '/modals/subscription');
-              },
-            },
-          ]
-        );
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        setVerificationModalType('limit');
+        setPendingLimitTier(usageLimits.tier === 'free' ? 'free' : 'verified');
+        setShowCreateModal(false);
+        setShowVerificationModal(true);
         return;
       }
     }
 
     // Require verification for geo-restricted proposals
     if (newProposal.geoScope !== 'global' && !isVerified) {
-      Alert.alert(
-        'Verification Required',
-        'You must verify your identity to create geo-restricted proposals. Global proposals are available to all users.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Get Verified ($4.99)',
-            onPress: () => {
-              setShowCreateModal(false);
-              router.push('/modals/verification-payment');
-            }
-          },
-        ]
-      );
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      setVerificationModalType('proposal');
+      setShowCreateModal(false);
+      setShowVerificationModal(true);
       return;
     }
 
@@ -839,6 +817,9 @@ export default function ProposalsScreen() {
         imageUri: '',
       });
       fetchData(true);
+
+      // Check for newly earned badges (async, non-blocking)
+      setTimeout(() => checkForNewBadges(), 1500);
     } catch {
       Alert.alert('Error', 'Failed to create proposal. Please try again.');
     } finally {
@@ -1561,6 +1542,29 @@ export default function ProposalsScreen() {
         visible={showVoteOverlay}
         voteType={lastVoteType}
         onDismiss={() => setShowVoteOverlay(false)}
+      />
+
+      {/* Verification/Upgrade Modal */}
+      <UpgradeModal
+        visible={showVerificationModal}
+        onClose={() => setShowVerificationModal(false)}
+        type={verificationModalType === 'limit' && pendingLimitTier === 'verified' ? 'premium' : 'verification'}
+        title={
+          verificationModalType === 'vote'
+            ? 'Verification Required'
+            : verificationModalType === 'proposal'
+            ? 'Verification Required'
+            : 'Proposal Limit Reached'
+        }
+        message={
+          verificationModalType === 'vote'
+            ? 'This proposal is restricted to verified users in specific regions. Complete identity verification to vote on geo-restricted proposals.'
+            : verificationModalType === 'proposal'
+            ? 'You must verify your identity to create geo-restricted proposals. Global proposals are available to all users.'
+            : pendingLimitTier === 'free'
+            ? "You've reached your monthly proposal limit. Get verified to create more proposals each week."
+            : "You've reached your weekly proposal limit. Upgrade to Premium for unlimited proposals."
+        }
       />
     </View>
   );
