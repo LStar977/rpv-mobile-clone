@@ -277,6 +277,20 @@ export const organizationsApi = {
   async revokeInviteCode(orgId: string, code: string): Promise<ApiResponse<{ success: boolean }>> {
     return apiRequest(`/api/organizations/${orgId}/invite-codes/${code}`, { method: 'DELETE' });
   },
+
+  // Create organization
+  async createOrganization(data: {
+    name: string;
+    description: string;
+    logoUrl?: string;
+    tier: 'community' | 'professional' | 'enterprise';
+    paymentIntentId?: string;
+  }): Promise<ApiResponse<Organization>> {
+    return apiRequest<Organization>('/api/organizations', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
 };
 
 export const passportApi = {
