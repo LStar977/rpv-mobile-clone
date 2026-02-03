@@ -431,7 +431,7 @@ interface SwipeCardProps {
 }
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
-const CARD_HEIGHT = SCREEN_HEIGHT - 360; // Full screen minus header, search, progress, tabs
+const CARD_HEIGHT = SCREEN_HEIGHT - 420; // Shorter card with space below for tab bar
 
 function SwipeCard({ proposal, onSwipeLeft, onSwipeRight, onTap, isTopCard, cardIndex }: SwipeCardProps) {
   const { colors } = useTheme();
@@ -536,6 +536,20 @@ function SwipeCard({ proposal, onSwipeLeft, onSwipeRight, onTap, isTopCard, card
           </View>
         )}
 
+        {/* Geo scope badge - top left */}
+        <View style={[styles.swipeGeoBadgeTopLeft, { backgroundColor: 'rgba(0,0,0,0.6)' }]}>
+          <Ionicons
+            name={proposal.geoRestrictions && proposal.geoRestrictions.length > 0 ? 'location' : 'globe-outline'}
+            size={14}
+            color="#fff"
+          />
+          <Text style={styles.swipeGeoText}>
+            {proposal.geoRestrictions && proposal.geoRestrictions.length > 0
+              ? proposal.geoRestrictions[proposal.geoRestrictions.length - 1]
+              : 'Global'}
+          </Text>
+        </View>
+
         {/* Swipe Indicators */}
         {isTopCard && !isEnded && (
           <>
@@ -556,7 +570,7 @@ function SwipeCard({ proposal, onSwipeLeft, onSwipeRight, onTap, isTopCard, card
 
         {/* Content Overlay at Bottom */}
         <View style={styles.swipeCardContentOverlay}>
-          {/* Category, Time & Geo badges */}
+          {/* Category & Time badges */}
           <View style={styles.swipeCardBadgeRow}>
             <View style={[styles.swipeCategoryBadgeLarge, { backgroundColor: theme.primary }]}>
               <Ionicons name={theme.icon as any} size={14} color="#fff" />
@@ -568,19 +582,6 @@ function SwipeCard({ proposal, onSwipeLeft, onSwipeRight, onTap, isTopCard, card
                 <Text style={styles.swipeTimeTextLight}>{timeRemaining}</Text>
               </View>
             )}
-            {/* Geo scope badge */}
-            <View style={[styles.swipeGeoBadge, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
-              <Ionicons
-                name={proposal.geoRestrictions && proposal.geoRestrictions.length > 0 ? 'location' : 'globe-outline'}
-                size={14}
-                color="#fff"
-              />
-              <Text style={styles.swipeGeoText}>
-                {proposal.geoRestrictions && proposal.geoRestrictions.length > 0
-                  ? proposal.geoRestrictions[proposal.geoRestrictions.length - 1]
-                  : 'Global'}
-              </Text>
-            </View>
           </View>
 
           {/* Title */}
@@ -2758,8 +2759,9 @@ const styles = StyleSheet.create({
   cardStack: {
     flex: 1,
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
     paddingHorizontal: SPACING.lg,
+    paddingBottom: SPACING.xxxl,
   },
 
   // Swipe Card
@@ -3072,6 +3074,18 @@ const styles = StyleSheet.create({
     color: '#fff',
     ...TYPOGRAPHY.labelSmall,
     fontWeight: '500',
+  },
+  swipeGeoBadgeTopLeft: {
+    position: 'absolute',
+    top: SPACING.md,
+    left: SPACING.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    borderRadius: BORDER_RADIUS.full,
+    zIndex: 5,
   },
   swipeCardTitleLarge: {
     color: '#fff',
