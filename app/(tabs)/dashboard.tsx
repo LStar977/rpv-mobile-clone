@@ -20,7 +20,6 @@ import Animated, {
   Easing,
   runOnJS,
 } from 'react-native-reanimated';
-import Svg, { Circle, Defs, LinearGradient as SvgLinearGradient, Stop } from 'react-native-svg';
 import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS, ANIMATION } from '../../lib/theme';
 import { useAuthStore } from '../../lib/auth';
 import { proposalsApi, userApi } from '../../lib/api';
@@ -29,7 +28,6 @@ import { SkeletonStats, SkeletonListItem, SkeletonWelcome } from '../../componen
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
-const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
 type Community = {
   id: string;
@@ -48,7 +46,7 @@ type UrgentProposal = {
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// IMPACT HERO - Animated participation ring with civic score
+// IMPACT HERO - Animated participation display (no SVG required)
 // ═══════════════════════════════════════════════════════════════════════════════
 function ImpactHero({
   votesCount,
@@ -62,75 +60,39 @@ function ImpactHero({
   onPress: () => void;
 }) {
   const { colors } = useTheme();
-  const ringProgress = useSharedValue(0);
   const pulseScale = useSharedValue(1);
-  const counterValue = useSharedValue(0);
-  const [displayCount, setDisplayCount] = useState(0);
-
-  // Ring animation
-  const RING_SIZE = 140;
-  const STROKE_WIDTH = 10;
-  const RADIUS = (RING_SIZE - STROKE_WIDTH) / 2;
-  const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
+  const progressWidth = useSharedValue(0);
 
   // Calculate progress (votes out of votes + pending)
   const total = votesCount + pendingCount;
   const progress = total > 0 ? votesCount / total : 0;
+  const progressPercent = Math.round(progress * 100);
 
   useEffect(() => {
-    // Animate ring filling
-    ringProgress.value = withDelay(
+    // Animate progress bar
+    progressWidth.value = withDelay(
       300,
-      withTiming(progress, { duration: 1500, easing: Easing.bezierFn(0.4, 0, 0.2, 1) })
+      withTiming(progress, { duration: 1200, easing: Easing.bezierFn(0.4, 0, 0.2, 1) })
     );
 
-    // Pulse animation
+    // Pulse animation for the vote count
     pulseScale.value = withRepeat(
       withSequence(
-        withTiming(1.05, { duration: 1500 }),
-        withTiming(1, { duration: 1500 })
+        withTiming(1.03, { duration: 2000 }),
+        withTiming(1, { duration: 2000 })
       ),
       -1,
       true
     );
-
-    // Counter animation
-    counterValue.value = withTiming(votesCount, {
-      duration: 1500,
-      easing: Easing.bezierFn(0.4, 0, 0.2, 1),
-    });
   }, [progress, votesCount]);
-
-  // Update display count from animation
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const currentProgress = ringProgress.value;
-      setDisplayCount(Math.round(currentProgress * total));
-    }, 50);
-
-    const timeout = setTimeout(() => {
-      clearInterval(interval);
-      setDisplayCount(votesCount);
-    }, 1600);
-
-    return () => {
-      clearInterval(interval);
-      clearTimeout(timeout);
-    };
-  }, [votesCount, total]);
-
-  const animatedRingStyle = useAnimatedStyle(() => {
-    const strokeDashoffset = CIRCUMFERENCE * (1 - ringProgress.value);
-    return {
-      strokeDashoffset,
-    };
-  });
 
   const animatedPulseStyle = useAnimatedStyle(() => ({
     transform: [{ scale: pulseScale.value }],
   }));
 
-  const progressPercent = Math.round(progress * 100);
+  const animatedProgressStyle = useAnimatedStyle(() => ({
+    width: `${progressWidth.value * 100}%` as any,
+  }));
 
   return (
     <AnimatedTouchable
@@ -151,46 +113,18 @@ function ImpactHero({
       />
 
       <View style={styles.impactContent}>
-        {/* Left side - Ring */}
-        <View style={styles.ringContainer}>
-          <Animated.View style={animatedPulseStyle}>
-            <Svg width={RING_SIZE} height={RING_SIZE}>
-              <Defs>
-                <SvgLinearGradient id="ringGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <Stop offset="0%" stopColor={colors.goldLight || colors.gold} />
-                  <Stop offset="100%" stopColor={colors.goldDark || colors.gold} />
-                </SvgLinearGradient>
-              </Defs>
-              {/* Background ring */}
-              <Circle
-                cx={RING_SIZE / 2}
-                cy={RING_SIZE / 2}
-                r={RADIUS}
-                stroke={colors.border}
-                strokeWidth={STROKE_WIDTH}
-                fill="transparent"
-              />
-              {/* Progress ring */}
-              <AnimatedCircle
-                cx={RING_SIZE / 2}
-                cy={RING_SIZE / 2}
-                r={RADIUS}
-                stroke="url(#ringGradient)"
-                strokeWidth={STROKE_WIDTH}
-                fill="transparent"
-                strokeLinecap="round"
-                strokeDasharray={CIRCUMFERENCE}
-                style={animatedRingStyle}
-                transform={`rotate(-90 ${RING_SIZE / 2} ${RING_SIZE / 2})`}
-              />
-            </Svg>
-            {/* Center content */}
-            <View style={styles.ringCenter}>
-              <Text style={[styles.ringValue, { color: colors.text }]}>{displayCount}</Text>
-              <Text style={[styles.ringLabel, { color: colors.textTertiary }]}>votes cast</Text>
-            </View>
-          </Animated.View>
-        </View>
+        {/* Left side - Big Vote Count */}
+        <Animated.View style={[styles.voteCountContainer, animatedPulseStyle]}>
+          <LinearGradient
+            colors={[colors.gold, colors.goldDark || colors.gold]}
+            style={styles.voteCountGradient}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+          >
+            <Text style={styles.voteCountValue}>{votesCount}</Text>
+            <Text style={styles.voteCountLabel}>votes cast</Text>
+          </LinearGradient>
+        </Animated.View>
 
         {/* Right side - Stats */}
         <View style={styles.impactStats}>
@@ -225,6 +159,17 @@ function ImpactHero({
             </View>
           )}
         </View>
+      </View>
+
+      {/* Progress Bar */}
+      <View style={[styles.progressBarContainer, { backgroundColor: colors.border }]}>
+        <Animated.View
+          style={[
+            styles.progressBarFill,
+            { backgroundColor: colors.gold },
+            animatedProgressStyle,
+          ]}
+        />
       </View>
 
       {/* Bottom action hint */}
@@ -837,25 +782,40 @@ const styles = StyleSheet.create({
     padding: SPACING.xl,
     gap: SPACING.xl,
   },
-  ringContainer: {
+  voteCountContainer: {
     alignItems: 'center',
     justifyContent: 'center',
   },
-  ringCenter: {
-    position: 'absolute',
+  voteCountGradient: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
     alignItems: 'center',
     justifyContent: 'center',
-    width: '100%',
-    height: '100%',
   },
-  ringValue: {
-    fontSize: 32,
+  voteCountValue: {
+    fontSize: 36,
     fontWeight: '700',
+    color: '#000',
     letterSpacing: -1,
   },
-  ringLabel: {
-    ...TYPOGRAPHY.labelSmall,
+  voteCountLabel: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#000',
+    opacity: 0.7,
     marginTop: 2,
+  },
+  progressBarContainer: {
+    height: 4,
+    marginHorizontal: SPACING.xl,
+    marginBottom: SPACING.md,
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  progressBarFill: {
+    height: '100%',
+    borderRadius: 2,
   },
   impactStats: {
     flex: 1,
