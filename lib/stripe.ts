@@ -1,13 +1,29 @@
 import { Alert, Platform } from 'react-native';
-import {
-  initPaymentSheet,
-  presentPaymentSheet,
-  PaymentSheetError,
-  ApplePay,
-  GooglePay,
-} from '@stripe/stripe-react-native';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://representportal.com';
+
+// Conditionally import Stripe native modules to handle missing native module (e.g., in Expo Go)
+let initPaymentSheet: any = null;
+let presentPaymentSheet: any = null;
+let PaymentSheetError: any = { Canceled: 'Canceled' };
+let ApplePay: any = null;
+let GooglePay: any = null;
+let stripeAvailable = false;
+
+try {
+  const stripe = require('@stripe/stripe-react-native');
+  initPaymentSheet = stripe.initPaymentSheet;
+  presentPaymentSheet = stripe.presentPaymentSheet;
+  PaymentSheetError = stripe.PaymentSheetError;
+  ApplePay = stripe.ApplePay;
+  GooglePay = stripe.GooglePay;
+  stripeAvailable = true;
+} catch (e) {
+  // Stripe native module not available
+  console.log('Stripe native module not available - payment features disabled');
+}
+
+export { stripeAvailable };
 
 // Stripe publishable key
 export const STRIPE_PUBLISHABLE_KEY = process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY || 'pk_live_51SXWK5D2jsTroGJyzClzoHiUPBego83bH9EwfQncDVt9D7ArUNiB6KzIJRlTT0CiGBaPKKVlyOP2DaltuuFf8T1o00xmHM5kGX';
@@ -143,7 +159,11 @@ export async function initializePaymentSheet(params: {
   customerId: string;
   merchantDisplayName?: string;
   allowsDelayedPaymentMethods?: boolean;
-}): Promise<{ error?: PaymentSheetError }> {
+}): Promise<{ error?: any }> {
+  if (!stripeAvailable || !initPaymentSheet) {
+    return { error: { message: 'Stripe is not available. Please use a production build.' } };
+  }
+
   const {
     clientSecret,
     ephemeralKey,
@@ -191,6 +211,10 @@ export async function initializePaymentSheet(params: {
  * Present the Payment Sheet and handle the result
  */
 export async function presentPayment(): Promise<PaymentResult> {
+  if (!stripeAvailable || !presentPaymentSheet) {
+    return { success: false, error: 'Stripe is not available. Please use a production build.' };
+  }
+
   const { error } = await presentPaymentSheet();
 
   if (error) {
@@ -227,11 +251,11 @@ export async function processPayment(params: {
  * Check if Apple Pay is available
  */
 export async function isApplePaySupported(): Promise<boolean> {
-  if (Platform.OS !== 'ios') return false;
+  if (Platform.OS !== 'ios' || !stripeAvailable || !ApplePay) return false;
 
   try {
-    const { isApplePaySupported } = await ApplePay.isApplePaySupported();
-    return isApplePaySupported;
+    const result = await ApplePay.isApplePaySupported();
+    return result.isApplePaySupported;
   } catch {
     return false;
   }
@@ -241,7 +265,7 @@ export async function isApplePaySupported(): Promise<boolean> {
  * Check if Google Pay is available
  */
 export async function isGooglePaySupported(): Promise<boolean> {
-  if (Platform.OS !== 'android') return false;
+  if (Platform.OS !== 'android' || !stripeAvailable || !GooglePay) return false;
 
   try {
     const { isReady } = await GooglePay.isGooglePaySupported({
