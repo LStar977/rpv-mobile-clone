@@ -188,7 +188,7 @@ export default function SubscriptionScreen() {
   };
 
   const handleContactOrganizations = () => {
-    Linking.openURL('mailto:organizations@representportal.com?subject=Organization%20Account%20Inquiry');
+    router.push('/modals/create-organization');
   };
 
   const getCurrentTier = (): 'free' | 'verified' | 'premium' => {
@@ -352,10 +352,10 @@ export default function SubscriptionScreen() {
 
         {isOrgTier && (
           <TouchableOpacity onPress={handleContactOrganizations} style={styles.tierButton}>
-            <View style={[styles.outlineButton, { borderColor: colors.primary }]}>
-              <Ionicons name="mail-outline" size={18} color={colors.primary} />
-              <Text style={[styles.outlineButtonText, { color: colors.primary }]}>
-                Contact Us
+            <View style={[styles.outlineButton, { borderColor: colors.gold }]}>
+              <Ionicons name="arrow-forward" size={18} color={colors.gold} />
+              <Text style={[styles.outlineButtonText, { color: colors.gold }]}>
+                Get Started
               </Text>
             </View>
           </TouchableOpacity>
