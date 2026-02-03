@@ -1681,21 +1681,20 @@ export default function ProposalsScreen() {
                 <View style={styles.swipeButtonsOverlay}>
                   <View style={styles.swipeButtonsRow}>
                     <TouchableOpacity
-                      style={[styles.swipeActionButton, { backgroundColor: 'rgba(255,59,48,0.2)', borderColor: 'rgba(255,59,48,0.4)', borderWidth: 2 }]}
+                      style={[styles.swipeActionButton, styles.opposeButton]}
                       onPress={() => handleSwipeVote(visibleSwipeCards[0], 'oppose')}
-                      activeOpacity={0.7}
+                      activeOpacity={0.8}
                     >
-                      <Ionicons name="close" size={32} color="#FF3B30" />
+                      <Ionicons name="close" size={28} color="#E85D5D" />
                     </TouchableOpacity>
                     <TouchableOpacity
-                      style={[styles.swipeActionButton, { backgroundColor: 'rgba(52,199,89,0.2)', borderColor: 'rgba(52,199,89,0.4)', borderWidth: 2 }]}
+                      style={[styles.swipeActionButton, styles.supportButton]}
                       onPress={() => handleSwipeVote(visibleSwipeCards[0], 'support')}
-                      activeOpacity={0.7}
+                      activeOpacity={0.8}
                     >
-                      <Ionicons name="checkmark" size={32} color="#34C759" />
+                      <Ionicons name="checkmark" size={28} color="#4CAF7C" />
                     </TouchableOpacity>
                   </View>
-                  <Text style={styles.swipeTapHintSubtle}>or swipe left/right</Text>
                 </View>
               )}
             </>
@@ -3095,18 +3094,11 @@ const styles = StyleSheet.create({
   // Swipe Actions (Buttons)
   swipeButtonsOverlay: {
     position: 'absolute',
-    bottom: 100, // Above tab bar
+    bottom: 90,
     left: 0,
     right: 0,
     alignItems: 'center',
-    gap: SPACING.sm,
     zIndex: 200,
-  },
-  swipeTapHintSubtle: {
-    color: 'rgba(255,255,255,0.5)',
-    ...TYPOGRAPHY.labelSmall,
-    fontStyle: 'italic',
-    marginBottom: SPACING.xs,
   },
   swipeButtonsRow: {
     flexDirection: 'row',
@@ -3115,16 +3107,20 @@ const styles = StyleSheet.create({
     gap: SPACING.xl,
   },
   swipeActionButton: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+    width: 70,
+    height: 70,
+    borderRadius: 35,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    borderColor: 'rgba(212,175,55,0.4)', // Gold accent ring
   },
-  swipeOpposeButton: {},
-  swipeSupportButton: {},
+  opposeButton: {
+    backgroundColor: 'rgba(232,93,93,0.15)',
+  },
+  supportButton: {
+    backgroundColor: 'rgba(76,175,124,0.15)',
+  },
 
   // Creator Info
   swipeCreatorRow: {
