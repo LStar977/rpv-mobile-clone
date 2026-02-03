@@ -308,7 +308,7 @@ export default function CreateOrganizationScreen() {
         name: name.trim(),
         description: description.trim(),
         logoUrl: logoUri || undefined,
-        tier: selectedTier,
+        type: selectedTier,
       });
 
       if (createResult.error || !createResult.data?.id) {

@@ -283,8 +283,7 @@ export const organizationsApi = {
     name: string;
     description: string;
     logoUrl?: string;
-    tier: 'community' | 'professional' | 'enterprise';
-    paymentIntentId?: string;
+    type: 'community' | 'professional' | 'enterprise';
   }): Promise<ApiResponse<Organization>> {
     return apiRequest<Organization>('/api/organizations', {
       method: 'POST',
