@@ -101,6 +101,7 @@ const MOCK_PROPOSALS: Proposal[] = [
     deadline: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
     createdAt: new Date().toISOString(),
     creatorId: 'demo-user',
+    imageUrl: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=800&h=1200&fit=crop',
   },
   {
     id: 'mock-2',
@@ -112,6 +113,7 @@ const MOCK_PROPOSALS: Proposal[] = [
     deadline: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
     createdAt: new Date().toISOString(),
     creatorId: 'demo-user',
+    imageUrl: 'https://images.unsplash.com/photo-1621451537084-482c73073a0f?w=800&h=1200&fit=crop',
   },
   {
     id: 'mock-3',
@@ -123,6 +125,7 @@ const MOCK_PROPOSALS: Proposal[] = [
     deadline: new Date(Date.now() + 21 * 24 * 60 * 60 * 1000).toISOString(),
     createdAt: new Date().toISOString(),
     creatorId: 'demo-user',
+    imageUrl: 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=800&h=1200&fit=crop',
   },
   {
     id: 'mock-4',
@@ -134,6 +137,7 @@ const MOCK_PROPOSALS: Proposal[] = [
     deadline: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString(),
     createdAt: new Date().toISOString(),
     creatorId: 'demo-user',
+    imageUrl: 'https://images.unsplash.com/photo-1523050854058-8df90110c9f1?w=800&h=1200&fit=crop',
   },
   {
     id: 'mock-5',
@@ -145,6 +149,7 @@ const MOCK_PROPOSALS: Proposal[] = [
     deadline: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(),
     createdAt: new Date().toISOString(),
     creatorId: 'demo-user',
+    imageUrl: 'https://images.unsplash.com/photo-1588776814546-1ffcf47267a5?w=800&h=1200&fit=crop',
   },
   {
     id: 'mock-6',
@@ -156,6 +161,7 @@ const MOCK_PROPOSALS: Proposal[] = [
     deadline: new Date(Date.now() + 12 * 24 * 60 * 60 * 1000).toISOString(),
     createdAt: new Date().toISOString(),
     creatorId: 'demo-user',
+    imageUrl: 'https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=800&h=1200&fit=crop',
   },
   {
     id: 'mock-7',
@@ -167,6 +173,7 @@ const MOCK_PROPOSALS: Proposal[] = [
     deadline: new Date(Date.now() + 8 * 24 * 60 * 60 * 1000).toISOString(),
     createdAt: new Date().toISOString(),
     creatorId: 'demo-user',
+    imageUrl: 'https://images.unsplash.com/photo-1519331379826-f10be5486c6f?w=800&h=1200&fit=crop',
   },
   {
     id: 'mock-8',
@@ -178,6 +185,7 @@ const MOCK_PROPOSALS: Proposal[] = [
     deadline: new Date(Date.now() + 18 * 24 * 60 * 60 * 1000).toISOString(),
     createdAt: new Date().toISOString(),
     creatorId: 'demo-user',
+    imageUrl: 'https://images.unsplash.com/photo-1477959858617-67f85cf4f1df?w=800&h=1200&fit=crop',
   },
   {
     id: 'mock-9',
@@ -189,6 +197,7 @@ const MOCK_PROPOSALS: Proposal[] = [
     deadline: new Date(Date.now() + 9 * 24 * 60 * 60 * 1000).toISOString(),
     createdAt: new Date().toISOString(),
     creatorId: 'demo-user',
+    imageUrl: 'https://images.unsplash.com/photo-1570125909232-eb263c188f7e?w=800&h=1200&fit=crop',
   },
   {
     id: 'mock-10',
@@ -200,6 +209,7 @@ const MOCK_PROPOSALS: Proposal[] = [
     deadline: new Date(Date.now() + 25 * 24 * 60 * 60 * 1000).toISOString(),
     createdAt: new Date().toISOString(),
     creatorId: 'demo-user',
+    imageUrl: 'https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?w=800&h=1200&fit=crop',
   },
   {
     id: 'mock-11',
@@ -211,6 +221,7 @@ const MOCK_PROPOSALS: Proposal[] = [
     deadline: new Date(Date.now() + 6 * 24 * 60 * 60 * 1000).toISOString(),
     createdAt: new Date().toISOString(),
     creatorId: 'demo-user',
+    imageUrl: 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=800&h=1200&fit=crop',
   },
   {
     id: 'mock-12',
@@ -222,6 +233,7 @@ const MOCK_PROPOSALS: Proposal[] = [
     deadline: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString(),
     createdAt: new Date().toISOString(),
     creatorId: 'demo-user',
+    imageUrl: 'https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=800&h=1200&fit=crop',
   },
   {
     id: 'mock-13',
@@ -233,6 +245,7 @@ const MOCK_PROPOSALS: Proposal[] = [
     deadline: new Date(Date.now() + 11 * 24 * 60 * 60 * 1000).toISOString(),
     createdAt: new Date().toISOString(),
     creatorId: 'demo-user',
+    imageUrl: 'https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?w=800&h=1200&fit=crop',
   },
   {
     id: 'mock-14',
@@ -244,6 +257,7 @@ const MOCK_PROPOSALS: Proposal[] = [
     deadline: new Date(Date.now() + 20 * 24 * 60 * 60 * 1000).toISOString(),
     createdAt: new Date().toISOString(),
     creatorId: 'demo-user',
+    imageUrl: 'https://images.unsplash.com/photo-1556740738-b6a63e27c4df?w=800&h=1200&fit=crop',
   },
   {
     id: 'mock-15',
@@ -255,6 +269,7 @@ const MOCK_PROPOSALS: Proposal[] = [
     deadline: new Date(Date.now() + 13 * 24 * 60 * 60 * 1000).toISOString(),
     createdAt: new Date().toISOString(),
     creatorId: 'demo-user',
+    imageUrl: 'https://images.unsplash.com/photo-1517457373958-b7bdd4587205?w=800&h=1200&fit=crop',
   },
   {
     id: 'mock-16',
@@ -266,6 +281,7 @@ const MOCK_PROPOSALS: Proposal[] = [
     deadline: new Date(Date.now() + 22 * 24 * 60 * 60 * 1000).toISOString(),
     createdAt: new Date().toISOString(),
     creatorId: 'demo-user',
+    imageUrl: 'https://images.unsplash.com/photo-1581244277943-fe4a9c777189?w=800&h=1200&fit=crop',
   },
   {
     id: 'mock-17',
@@ -277,6 +293,7 @@ const MOCK_PROPOSALS: Proposal[] = [
     deadline: new Date(Date.now() + 16 * 24 * 60 * 60 * 1000).toISOString(),
     createdAt: new Date().toISOString(),
     creatorId: 'demo-user',
+    imageUrl: 'https://images.unsplash.com/photo-1593941707882-a5bba14938c7?w=800&h=1200&fit=crop',
   },
   {
     id: 'mock-18',
@@ -288,6 +305,7 @@ const MOCK_PROPOSALS: Proposal[] = [
     deadline: new Date(Date.now() + 19 * 24 * 60 * 60 * 1000).toISOString(),
     createdAt: new Date().toISOString(),
     creatorId: 'demo-user',
+    imageUrl: 'https://images.unsplash.com/photo-1509391366360-2e959784a276?w=800&h=1200&fit=crop',
   },
   {
     id: 'mock-19',
@@ -299,6 +317,7 @@ const MOCK_PROPOSALS: Proposal[] = [
     deadline: new Date(Date.now() + 17 * 24 * 60 * 60 * 1000).toISOString(),
     createdAt: new Date().toISOString(),
     creatorId: 'demo-user',
+    imageUrl: 'https://images.unsplash.com/photo-1560184897-ae75f418493e?w=800&h=1200&fit=crop',
   },
   {
     id: 'mock-20',
@@ -310,6 +329,7 @@ const MOCK_PROPOSALS: Proposal[] = [
     deadline: new Date(Date.now() + 24 * 24 * 60 * 60 * 1000).toISOString(),
     createdAt: new Date().toISOString(),
     creatorId: 'demo-user',
+    imageUrl: 'https://images.unsplash.com/photo-1577962917302-cd874c4e31d2?w=800&h=1200&fit=crop',
   },
 ];
 
@@ -380,7 +400,7 @@ function FilterChip({
   );
 }
 
-// --- Swipe Card Component ---
+// --- Swipe Card Component (Full-Screen Tinder-Style) ---
 interface SwipeCardProps {
   proposal: Proposal;
   onSwipeLeft: () => void;
@@ -390,12 +410,15 @@ interface SwipeCardProps {
   cardIndex: number;
 }
 
+const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+const CARD_HEIGHT = SCREEN_HEIGHT - 280; // Full screen minus header, progress, tabs
+
 function SwipeCard({ proposal, onSwipeLeft, onSwipeRight, onTap, isTopCard, cardIndex }: SwipeCardProps) {
   const { colors } = useTheme();
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
   const rotation = useSharedValue(0);
-  const scale = useSharedValue(isTopCard ? 1 : 0.95 - cardIndex * 0.03);
+  const scale = useSharedValue(isTopCard ? 1 : 0.95 - cardIndex * 0.02);
 
   const category = proposal.category || 'General';
   const theme = categoryThemes[category] || categoryThemes['General'];
@@ -405,31 +428,28 @@ function SwipeCard({ proposal, onSwipeLeft, onSwipeRight, onTap, isTopCard, card
   const supportPercent = totalVotes > 0 ? Math.round(((proposal.supportVotes || 0) / totalVotes) * 100) : 50;
 
   useEffect(() => {
-    scale.value = withSpring(isTopCard ? 1 : 0.95 - cardIndex * 0.03, { damping: 15 });
+    scale.value = withSpring(isTopCard ? 1 : 0.95 - cardIndex * 0.02, { damping: 15 });
   }, [isTopCard, cardIndex]);
 
   const gesture = Gesture.Pan()
     .enabled(isTopCard && !isEnded)
     .onUpdate((event) => {
       translateX.value = event.translationX;
-      translateY.value = event.translationY * 0.3;
-      rotation.value = interpolate(event.translationX, [-SCREEN_WIDTH, 0, SCREEN_WIDTH], [-15, 0, 15]);
+      translateY.value = event.translationY * 0.2;
+      rotation.value = interpolate(event.translationX, [-SCREEN_WIDTH, 0, SCREEN_WIDTH], [-12, 0, 12]);
     })
     .onEnd((event) => {
       if (event.translationX > SWIPE_THRESHOLD) {
-        // Swipe right - Support
         translateX.value = withTiming(SCREEN_WIDTH * 1.5, { duration: 300 });
-        rotation.value = withTiming(30, { duration: 300 });
+        rotation.value = withTiming(20, { duration: 300 });
         runOnJS(Haptics.notificationAsync)(Haptics.NotificationFeedbackType.Success);
         runOnJS(onSwipeRight)();
       } else if (event.translationX < -SWIPE_THRESHOLD) {
-        // Swipe left - Oppose
         translateX.value = withTiming(-SCREEN_WIDTH * 1.5, { duration: 300 });
-        rotation.value = withTiming(-30, { duration: 300 });
+        rotation.value = withTiming(-20, { duration: 300 });
         runOnJS(Haptics.notificationAsync)(Haptics.NotificationFeedbackType.Warning);
         runOnJS(onSwipeLeft)();
       } else {
-        // Reset
         translateX.value = withSpring(0, { damping: 15 });
         translateY.value = withSpring(0, { damping: 15 });
         rotation.value = withSpring(0, { damping: 15 });
@@ -448,137 +468,128 @@ function SwipeCard({ proposal, onSwipeLeft, onSwipeRight, onTap, isTopCard, card
   const cardStyle = useAnimatedStyle(() => ({
     transform: [
       { translateX: translateX.value },
-      { translateY: translateY.value + cardIndex * 8 },
+      { translateY: translateY.value + cardIndex * 6 },
       { rotate: `${rotation.value}deg` },
       { scale: scale.value },
     ],
     zIndex: 100 - cardIndex,
   }));
 
-  // Support indicator opacity (right swipe)
   const supportIndicatorStyle = useAnimatedStyle(() => ({
     opacity: interpolate(translateX.value, [0, SWIPE_THRESHOLD], [0, 1], Extrapolation.CLAMP),
   }));
 
-  // Oppose indicator opacity (left swipe)
   const opposeIndicatorStyle = useAnimatedStyle(() => ({
     opacity: interpolate(translateX.value, [-SWIPE_THRESHOLD, 0], [1, 0], Extrapolation.CLAMP),
   }));
 
   return (
     <GestureDetector gesture={composedGesture}>
-      <Animated.View style={[styles.swipeCard, { backgroundColor: colors.surface, borderColor: colors.border }, cardStyle]}>
-        {/* Category-themed gradient background */}
-        <LinearGradient
-          colors={[`${theme.primary}25`, `${theme.primary}10`, 'transparent']}
-          style={StyleSheet.absoluteFill}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-        />
-        <LinearGradient
-          colors={['transparent', `${theme.secondary}15`]}
-          style={StyleSheet.absoluteFill}
-          start={{ x: 1, y: 0 }}
-          end={{ x: 0, y: 1 }}
-        />
+      <Animated.View style={[styles.swipeCard, { backgroundColor: colors.surface, borderColor: colors.border, height: CARD_HEIGHT }, cardStyle]}>
+        {/* Hero Image */}
+        {proposal.imageUrl ? (
+          <View style={styles.swipeCardImageContainer}>
+            <Image source={{ uri: proposal.imageUrl }} style={styles.swipeCardImage} resizeMode="cover" />
+            {/* Category-themed gradient overlay on image */}
+            <LinearGradient
+              colors={[`${theme.primary}40`, 'transparent']}
+              style={styles.swipeCardImageOverlayTop}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 0, y: 1 }}
+            />
+            <LinearGradient
+              colors={['transparent', 'rgba(0,0,0,0.8)']}
+              style={styles.swipeCardImageOverlay}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 0, y: 1 }}
+            />
+          </View>
+        ) : (
+          <View style={[styles.swipeCardImageContainer, { backgroundColor: theme.primary + '20' }]}>
+            <LinearGradient
+              colors={[`${theme.primary}30`, `${theme.secondary}20`]}
+              style={StyleSheet.absoluteFill}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+            />
+            <Ionicons name={theme.icon as any} size={80} color={`${theme.primary}50`} />
+          </View>
+        )}
 
-        {/* Swipe indicators */}
+        {/* Swipe Indicators */}
         {isTopCard && !isEnded && (
           <>
-            <Animated.View style={[styles.swipeIndicator, styles.swipeIndicatorRight, supportIndicatorStyle]}>
-              <LinearGradient
-                colors={[colors.success, '#16A34A']}
-                style={styles.swipeIndicatorGradient}
-              >
-                <Ionicons name="checkmark-circle" size={32} color="#fff" />
-                <Text style={styles.swipeIndicatorText}>SUPPORT</Text>
-              </LinearGradient>
+            <Animated.View style={[styles.swipeIndicatorFullScreen, styles.swipeIndicatorRight, supportIndicatorStyle]}>
+              <View style={[styles.swipeIndicatorCircle, { backgroundColor: colors.success }]}>
+                <Ionicons name="checkmark" size={48} color="#fff" />
+              </View>
+              <Text style={[styles.swipeIndicatorTextLarge, { color: colors.success }]}>SUPPORT</Text>
             </Animated.View>
-            <Animated.View style={[styles.swipeIndicator, styles.swipeIndicatorLeft, opposeIndicatorStyle]}>
-              <LinearGradient
-                colors={[colors.error, '#DC2626']}
-                style={styles.swipeIndicatorGradient}
-              >
-                <Ionicons name="close-circle" size={32} color="#fff" />
-                <Text style={styles.swipeIndicatorText}>OPPOSE</Text>
-              </LinearGradient>
+            <Animated.View style={[styles.swipeIndicatorFullScreen, styles.swipeIndicatorLeft, opposeIndicatorStyle]}>
+              <View style={[styles.swipeIndicatorCircle, { backgroundColor: colors.error }]}>
+                <Ionicons name="close" size={48} color="#fff" />
+              </View>
+              <Text style={[styles.swipeIndicatorTextLarge, { color: colors.error }]}>OPPOSE</Text>
             </Animated.View>
           </>
         )}
 
-        {/* Card Content */}
-        <View style={styles.swipeCardContent}>
-          {/* Header */}
-          <View style={styles.swipeCardHeader}>
-            <View style={[styles.swipeCategoryBadge, { backgroundColor: `${theme.primary}20` }]}>
-              <Ionicons name={theme.icon as any} size={14} color={theme.primary} />
-              <Text style={[styles.swipeCategoryText, { color: theme.primary }]}>{category}</Text>
+        {/* Content Overlay at Bottom */}
+        <View style={styles.swipeCardContentOverlay}>
+          {/* Category & Time badges */}
+          <View style={styles.swipeCardBadgeRow}>
+            <View style={[styles.swipeCategoryBadgeLarge, { backgroundColor: theme.primary }]}>
+              <Ionicons name={theme.icon as any} size={14} color="#fff" />
+              <Text style={styles.swipeCategoryTextLight}>{category}</Text>
             </View>
             {timeRemaining && (
-              <View style={[styles.swipeTimeBadge, { backgroundColor: isEnded ? `${colors.error}15` : `${colors.gold}15` }]}>
-                <Ionicons name="time-outline" size={12} color={isEnded ? colors.error : colors.gold} />
-                <Text style={[styles.swipeTimeText, { color: isEnded ? colors.error : colors.gold }]}>{timeRemaining}</Text>
+              <View style={[styles.swipeTimeBadgeLarge, { backgroundColor: isEnded ? colors.error : 'rgba(255,255,255,0.2)' }]}>
+                <Ionicons name="time-outline" size={14} color="#fff" />
+                <Text style={styles.swipeTimeTextLight}>{timeRemaining}</Text>
               </View>
             )}
           </View>
 
-          {/* Geo tags */}
-          {(proposal.geoRestrictions || []).length > 0 && (
-            <View style={styles.swipeGeoTags}>
-              {(proposal.geoRestrictions || []).slice(0, 2).map((tag, i) => (
-                <View key={i} style={[styles.swipeGeoTag, { backgroundColor: `${colors.info}12` }]}>
-                  <Ionicons name="location-outline" size={10} color={colors.info} />
-                  <Text style={[styles.swipeGeoTagText, { color: colors.info }]}>{tag}</Text>
-                </View>
-              ))}
-            </View>
-          )}
+          {/* Title */}
+          <Text style={styles.swipeCardTitleLarge} numberOfLines={2}>{proposal.title}</Text>
 
-          {/* Title & Description */}
-          <Text style={[styles.swipeCardTitle, { color: colors.text }]} numberOfLines={2}>{proposal.title}</Text>
-          <Text style={[styles.swipeCardDesc, { color: colors.textSecondary }]} numberOfLines={4}>{proposal.description}</Text>
-
-          {/* Image */}
-          {proposal.imageUrl && (
-            <View style={styles.swipeImageWrapper}>
-              <Image source={{ uri: proposal.imageUrl }} style={styles.swipeImage} resizeMode="cover" />
-            </View>
-          )}
+          {/* Description */}
+          <Text style={styles.swipeCardDescLarge} numberOfLines={3}>{proposal.description}</Text>
 
           {/* Vote Progress */}
-          <View style={styles.swipeVoteSection}>
-            <View style={[styles.swipeVoteBarBg, { backgroundColor: colors.error }]}>
-              <View style={[styles.swipeVoteBarFill, { width: `${supportPercent}%`, backgroundColor: colors.success }]} />
+          <View style={styles.swipeVoteSectionLarge}>
+            <View style={styles.swipeVoteBarBgLarge}>
+              <View style={[styles.swipeVoteBarFillLarge, { width: `${supportPercent}%`, backgroundColor: colors.success }]} />
             </View>
-            <View style={styles.swipeVoteStats}>
-              <View style={styles.swipeVoteStat}>
-                <Ionicons name="thumbs-up" size={14} color={colors.success} />
-                <Text style={[styles.swipeVoteCount, { color: colors.success }]}>{(proposal.supportVotes || 0).toLocaleString()}</Text>
+            <View style={styles.swipeVoteStatsLarge}>
+              <View style={styles.swipeVoteStatLarge}>
+                <Ionicons name="thumbs-up" size={18} color={colors.success} />
+                <Text style={[styles.swipeVoteCountLarge, { color: colors.success }]}>{(proposal.supportVotes || 0).toLocaleString()}</Text>
               </View>
-              <Text style={[styles.swipeVotePercent, { color: colors.textSecondary }]}>{supportPercent}% support</Text>
-              <View style={styles.swipeVoteStat}>
-                <Ionicons name="thumbs-down" size={14} color={colors.error} />
-                <Text style={[styles.swipeVoteCount, { color: colors.error }]}>{(proposal.opposeVotes || 0).toLocaleString()}</Text>
+              <Text style={styles.swipeVotePercentLarge}>{supportPercent}% support</Text>
+              <View style={styles.swipeVoteStatLarge}>
+                <Ionicons name="thumbs-down" size={18} color={colors.error} />
+                <Text style={[styles.swipeVoteCountLarge, { color: colors.error }]}>{(proposal.opposeVotes || 0).toLocaleString()}</Text>
               </View>
             </View>
           </View>
 
-          {/* Ended/Instructions */}
+          {/* Swipe Instructions */}
           {isEnded ? (
-            <View style={[styles.swipeEndedBanner, { backgroundColor: `${colors.error}15` }]}>
-              <Ionicons name="flag-outline" size={16} color={colors.error} />
-              <Text style={[styles.swipeEndedText, { color: colors.error }]}>Voting has ended</Text>
+            <View style={styles.swipeEndedBannerLarge}>
+              <Ionicons name="flag-outline" size={18} color="#fff" />
+              <Text style={styles.swipeEndedTextLarge}>Voting has ended</Text>
             </View>
           ) : isTopCard && (
-            <View style={styles.swipeInstructions}>
-              <View style={styles.swipeInstruction}>
-                <Ionicons name="arrow-back" size={16} color={colors.error} />
-                <Text style={[styles.swipeInstructionText, { color: colors.textTertiary }]}>Oppose</Text>
+            <View style={styles.swipeInstructionsLarge}>
+              <View style={styles.swipeInstructionLarge}>
+                <Ionicons name="arrow-back" size={20} color={colors.error} />
+                <Text style={styles.swipeInstructionTextLarge}>Oppose</Text>
               </View>
-              <Text style={[styles.swipeTapHint, { color: colors.textTertiary }]}>Tap for details</Text>
-              <View style={styles.swipeInstruction}>
-                <Text style={[styles.swipeInstructionText, { color: colors.textTertiary }]}>Support</Text>
-                <Ionicons name="arrow-forward" size={16} color={colors.success} />
+              <Text style={styles.swipeTapHintLarge}>Tap for details</Text>
+              <View style={styles.swipeInstructionLarge}>
+                <Text style={styles.swipeInstructionTextLarge}>Support</Text>
+                <Ionicons name="arrow-forward" size={20} color={colors.success} />
               </View>
             </View>
           )}
@@ -2946,5 +2957,187 @@ const styles = StyleSheet.create({
   swipeRefreshText: {
     ...TYPOGRAPHY.labelMedium,
     fontWeight: '500',
+  },
+
+  // Full-Screen Swipe Card Styles
+  swipeCardImageContainer: {
+    width: '100%',
+    height: '55%',
+    position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  swipeCardImage: {
+    width: '100%',
+    height: '100%',
+  },
+  swipeCardImageOverlayTop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: '40%',
+  },
+  swipeCardImageOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: '70%',
+  },
+  swipeCardContentOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: SPACING.xl,
+    paddingBottom: SPACING.lg,
+  },
+  swipeCardBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+    marginBottom: SPACING.md,
+  },
+  swipeCategoryBadgeLarge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    borderRadius: BORDER_RADIUS.full,
+  },
+  swipeCategoryTextLight: {
+    color: '#fff',
+    ...TYPOGRAPHY.labelSmall,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  swipeTimeBadgeLarge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    borderRadius: BORDER_RADIUS.full,
+  },
+  swipeTimeTextLight: {
+    color: '#fff',
+    ...TYPOGRAPHY.labelSmall,
+    fontWeight: '500',
+  },
+  swipeCardTitleLarge: {
+    color: '#fff',
+    ...TYPOGRAPHY.headlineMedium,
+    fontSize: 24,
+    fontWeight: '700',
+    marginBottom: SPACING.sm,
+    textShadowColor: 'rgba(0,0,0,0.5)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
+  },
+  swipeCardDescLarge: {
+    color: 'rgba(255,255,255,0.9)',
+    ...TYPOGRAPHY.bodyMedium,
+    lineHeight: 22,
+    marginBottom: SPACING.lg,
+    textShadowColor: 'rgba(0,0,0,0.3)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+  swipeVoteSectionLarge: {
+    marginBottom: SPACING.md,
+  },
+  swipeVoteBarBgLarge: {
+    height: 8,
+    borderRadius: BORDER_RADIUS.full,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    overflow: 'hidden',
+    marginBottom: SPACING.sm,
+  },
+  swipeVoteBarFillLarge: {
+    height: '100%',
+    borderRadius: BORDER_RADIUS.full,
+  },
+  swipeVoteStatsLarge: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  swipeVoteStatLarge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.xs,
+  },
+  swipeVoteCountLarge: {
+    ...TYPOGRAPHY.labelMedium,
+    fontWeight: '600',
+  },
+  swipeVotePercentLarge: {
+    color: '#fff',
+    ...TYPOGRAPHY.labelSmall,
+    fontWeight: '500',
+  },
+  swipeEndedBannerLarge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: SPACING.md,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderRadius: BORDER_RADIUS.xl,
+    gap: SPACING.sm,
+  },
+  swipeEndedTextLarge: {
+    color: '#fff',
+    ...TYPOGRAPHY.labelMedium,
+    fontWeight: '500',
+  },
+  swipeInstructionsLarge: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingTop: SPACING.sm,
+  },
+  swipeInstructionLarge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.xs,
+  },
+  swipeInstructionTextLarge: {
+    color: 'rgba(255,255,255,0.8)',
+    ...TYPOGRAPHY.labelSmall,
+    fontWeight: '500',
+  },
+  swipeTapHintLarge: {
+    color: 'rgba(255,255,255,0.6)',
+    ...TYPOGRAPHY.labelSmall,
+    fontStyle: 'italic',
+  },
+
+  // Full-Screen Swipe Indicators
+  swipeIndicatorFullScreen: {
+    position: 'absolute',
+    top: '25%',
+    zIndex: 10,
+    alignItems: 'center',
+    gap: SPACING.sm,
+  },
+  swipeIndicatorCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 4,
+    borderColor: '#fff',
+  },
+  swipeIndicatorTextLarge: {
+    ...TYPOGRAPHY.labelLarge,
+    fontWeight: '800',
+    letterSpacing: 2,
+    textShadowColor: 'rgba(0,0,0,0.5)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
   },
 });
