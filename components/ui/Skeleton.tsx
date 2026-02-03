@@ -1,12 +1,11 @@
 import React, { useEffect } from 'react';
-import { View, StyleSheet, ViewStyle, DimensionValue } from 'react-native';
+import { View, StyleSheet, ViewStyle, DimensionValue, LayoutChangeEvent } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withRepeat,
   withTiming,
-  interpolate,
   Easing,
 } from 'react-native-reanimated';
 import { useTheme, RADIUS, SPACING } from '../../lib/theme';
@@ -28,6 +27,7 @@ export function Skeleton({
 }: SkeletonProps) {
   const { colors, isDark } = useTheme();
   const shimmerValue = useSharedValue(0);
+  const containerWidthValue = useSharedValue(200);
 
   useEffect(() => {
     shimmerValue.value = withRepeat(
@@ -37,15 +37,20 @@ export function Skeleton({
     );
   }, []);
 
+  const onLayout = (event: LayoutChangeEvent) => {
+    const { width: measuredWidth } = event.nativeEvent.layout;
+    if (measuredWidth > 0) {
+      containerWidthValue.value = measuredWidth;
+    }
+  };
+
   const animatedStyle = useAnimatedStyle(() => {
-    const translateX = interpolate(
-      shimmerValue.value,
-      [0, 1],
-      [-100, 100]
-    );
+    // Use pixel values - animate from -100% to +100% of container width
+    const w = containerWidthValue.value;
+    const translateX = -w + (shimmerValue.value * w * 2);
 
     return {
-      transform: [{ translateX: `${translateX}%` as any }],
+      transform: [{ translateX }],
     };
   });
 
@@ -63,6 +68,7 @@ export function Skeleton({
 
   return (
     <View
+      onLayout={onLayout}
       style={[
         styles.skeleton,
         {
