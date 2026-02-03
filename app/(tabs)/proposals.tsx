@@ -488,11 +488,12 @@ function SwipeCard({ proposal, onSwipeLeft, onSwipeRight, onTap, isTopCard, card
   const cardStyle = useAnimatedStyle(() => ({
     transform: [
       { translateX: translateX.value },
-      { translateY: translateY.value + cardIndex * 6 },
+      { translateY: translateY.value + cardIndex * 12 },
       { rotate: `${rotation.value}deg` },
       { scale: scale.value },
     ],
     zIndex: 100 - cardIndex,
+    opacity: isTopCard ? 1 : 0.85 - cardIndex * 0.15,
   }));
 
   const supportIndicatorStyle = useAnimatedStyle(() => ({
@@ -518,7 +519,8 @@ function SwipeCard({ proposal, onSwipeLeft, onSwipeRight, onTap, isTopCard, card
               end={{ x: 0, y: 1 }}
             />
             <LinearGradient
-              colors={['transparent', 'rgba(0,0,0,0.8)']}
+              colors={['transparent', 'rgba(0,0,0,0.5)', 'rgba(0,0,0,0.9)']}
+              locations={[0, 0.5, 1]}
               style={styles.swipeCardImageOverlay}
               start={{ x: 0, y: 0 }}
               end={{ x: 0, y: 1 }}
@@ -587,13 +589,22 @@ function SwipeCard({ proposal, onSwipeLeft, onSwipeRight, onTap, isTopCard, card
           {/* Title */}
           <Text style={styles.swipeCardTitleLarge} numberOfLines={2}>{proposal.title}</Text>
 
+          {/* Creator info */}
+          <View style={styles.swipeCreatorRow}>
+            <Ionicons name="person-circle-outline" size={14} color="rgba(255,255,255,0.6)" />
+            <Text style={styles.swipeCreatorText}>
+              Proposed by Community Member
+            </Text>
+          </View>
+
           {/* Description */}
-          <Text style={styles.swipeCardDescLarge} numberOfLines={3}>{proposal.description}</Text>
+          <Text style={styles.swipeCardDescLarge} numberOfLines={2}>{proposal.description}</Text>
 
           {/* Vote Progress */}
           <View style={styles.swipeVoteSectionLarge}>
             <View style={styles.swipeVoteBarBgLarge}>
               <View style={[styles.swipeVoteBarFillLarge, { width: `${supportPercent}%`, backgroundColor: colors.success }]} />
+              <View style={[styles.swipeVoteBarOpposeSection, { width: `${100 - supportPercent}%`, backgroundColor: colors.error }]} />
             </View>
             <View style={styles.swipeVoteStatsLarge}>
               <View style={styles.swipeVoteStatLarge}>
@@ -608,51 +619,46 @@ function SwipeCard({ proposal, onSwipeLeft, onSwipeRight, onTap, isTopCard, card
             </View>
           </View>
 
-          {/* Swipe Instructions */}
+          {/* Swipe Instructions & Buttons */}
           {isEnded ? (
             <View style={styles.swipeEndedBannerLarge}>
               <Ionicons name="flag-outline" size={18} color="#fff" />
               <Text style={styles.swipeEndedTextLarge}>Voting has ended</Text>
             </View>
           ) : isTopCard && (
-            <View style={styles.swipeInstructionsLarge}>
-              <View style={styles.swipeInstructionLarge}>
-                <Ionicons name="arrow-back" size={20} color={colors.error} />
-                <Text style={styles.swipeInstructionTextLarge}>Oppose</Text>
-              </View>
-              <Text style={styles.swipeTapHintLarge}>Tap for details</Text>
-              <View style={styles.swipeInstructionLarge}>
-                <Text style={styles.swipeInstructionTextLarge}>Support</Text>
-                <Ionicons name="arrow-forward" size={20} color={colors.success} />
+            <View style={styles.swipeActionsContainer}>
+              {/* Swipe hint text */}
+              <Text style={styles.swipeTapHintSubtle}>Tap card for details</Text>
+
+              {/* Action buttons for accessibility */}
+              <View style={styles.swipeButtonsRow}>
+                <TouchableOpacity
+                  style={[styles.swipeActionButton, styles.swipeOpposeButton, { borderColor: colors.error }]}
+                  onPress={() => {
+                    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+                    onSwipeLeft();
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="close" size={28} color={colors.error} />
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.swipeActionButton, styles.swipeSupportButton, { borderColor: colors.success }]}
+                  onPress={() => {
+                    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                    onSwipeRight();
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="checkmark" size={28} color={colors.success} />
+                </TouchableOpacity>
               </View>
             </View>
           )}
         </View>
       </Animated.View>
     </GestureDetector>
-  );
-}
-
-// --- Undo Button Component ---
-function UndoButton({ onUndo, visible, voteType }: { onUndo: () => void; visible: boolean; voteType: 'support' | 'oppose' }) {
-  const { colors } = useTheme();
-
-  if (!visible) return null;
-
-  return (
-    <Animated.View entering={FadeInUp.duration(200)} exiting={FadeOut.duration(200)} style={styles.undoContainer}>
-      <TouchableOpacity
-        style={[styles.undoButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
-        onPress={() => {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-          onUndo();
-        }}
-        activeOpacity={0.8}
-      >
-        <Ionicons name="arrow-undo" size={20} color={colors.text} />
-        <Text style={[styles.undoText, { color: colors.text }]}>Undo {voteType}</Text>
-      </TouchableOpacity>
-    </Animated.View>
   );
 }
 
@@ -1027,9 +1033,6 @@ export default function ProposalsScreen() {
   // Swipe mode state
   const [viewMode, setViewMode] = useState<'swipe' | 'list'>('swipe');
   const [swipeIndex, setSwipeIndex] = useState(0);
-  const [lastSwipedProposal, setLastSwipedProposal] = useState<{ proposal: Proposal; voteType: 'support' | 'oppose' } | null>(null);
-  const [showUndo, setShowUndo] = useState(false);
-  const undoTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const [newProposal, setNewProposal] = useState({
     title: '',
@@ -1347,65 +1350,12 @@ export default function ProposalsScreen() {
 
   // Swipe vote handler
   const handleSwipeVote = useCallback(async (proposal: Proposal, vote: 'support' | 'oppose') => {
-    // Store for potential undo
-    setLastSwipedProposal({ proposal, voteType: vote });
-    setShowUndo(true);
-
-    // Clear any existing undo timeout
-    if (undoTimeoutRef.current) {
-      clearTimeout(undoTimeoutRef.current);
-    }
-
-    // Set 5 second undo window
-    undoTimeoutRef.current = setTimeout(() => {
-      setShowUndo(false);
-      setLastSwipedProposal(null);
-    }, 5000);
-
     // Move to next card
     setSwipeIndex((prev) => prev + 1);
 
-    // Submit the vote
+    // Submit the vote (blockchain transaction - cannot be undone)
     await handleVote(proposal.id as number, vote);
   }, [handleVote]);
-
-  // Undo handler
-  const handleUndo = useCallback(() => {
-    if (!lastSwipedProposal) return;
-
-    // Clear timeout
-    if (undoTimeoutRef.current) {
-      clearTimeout(undoTimeoutRef.current);
-    }
-
-    // Move back to previous card
-    setSwipeIndex((prev) => Math.max(0, prev - 1));
-
-    // Remove from voted set and revert vote count
-    const proposalId = lastSwipedProposal.proposal.id as number;
-    setVotedProposals((prev) => {
-      const newSet = new Set(prev);
-      newSet.delete(proposalId);
-      return newSet;
-    });
-
-    // Revert vote counts in UI
-    setProposals((prev) =>
-      prev.map((p) =>
-        (p.id as number) === proposalId
-          ? {
-              ...p,
-              supportVotes: lastSwipedProposal.voteType === 'support' ? Math.max(0, (p.supportVotes || 0) - 1) : p.supportVotes,
-              opposeVotes: lastSwipedProposal.voteType === 'oppose' ? Math.max(0, (p.opposeVotes || 0) - 1) : p.opposeVotes,
-            }
-          : p
-      )
-    );
-
-    setShowUndo(false);
-    setLastSwipedProposal(null);
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-  }, [lastSwipedProposal]);
 
   // Get current cards to display in stack (max 3)
   const visibleSwipeCards = useMemo(() => {
@@ -1755,13 +1705,6 @@ export default function ProposalsScreen() {
                   />
                 )).reverse()}
               </View>
-
-              {/* Undo button */}
-              <UndoButton
-                visible={showUndo}
-                voteType={lastSwipedProposal?.voteType || 'support'}
-                onUndo={handleUndo}
-              />
             </>
           )}
         </GestureHandlerRootView>
@@ -2933,29 +2876,6 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
 
-  // Undo Button
-  undoContainer: {
-    position: 'absolute',
-    bottom: 100,
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-  },
-  undoButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: SPACING.xl,
-    paddingVertical: SPACING.md,
-    borderRadius: BORDER_RADIUS.full,
-    borderWidth: 1,
-    gap: SPACING.sm,
-    ...SHADOWS.md,
-  },
-  undoText: {
-    ...TYPOGRAPHY.labelMedium,
-    fontWeight: '500',
-  },
-
   // Swipe Empty State
   swipeEmptyState: {
     flex: 1,
@@ -3115,8 +3035,13 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.2)',
     overflow: 'hidden',
     marginBottom: SPACING.sm,
+    flexDirection: 'row',
   },
   swipeVoteBarFillLarge: {
+    height: '100%',
+    borderRadius: BORDER_RADIUS.full,
+  },
+  swipeVoteBarOpposeSection: {
     height: '100%',
     borderRadius: BORDER_RADIUS.full,
   },
@@ -3173,6 +3098,47 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.6)',
     ...TYPOGRAPHY.labelSmall,
     fontStyle: 'italic',
+  },
+
+  // Swipe Actions (Buttons)
+  swipeActionsContainer: {
+    alignItems: 'center',
+    gap: SPACING.sm,
+  },
+  swipeTapHintSubtle: {
+    color: 'rgba(255,255,255,0.5)',
+    ...TYPOGRAPHY.labelSmall,
+    fontStyle: 'italic',
+    marginBottom: SPACING.xs,
+  },
+  swipeButtonsRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: SPACING.xl,
+  },
+  swipeActionButton: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+  },
+  swipeOpposeButton: {},
+  swipeSupportButton: {},
+
+  // Creator Info
+  swipeCreatorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.xs,
+    marginBottom: SPACING.sm,
+  },
+  swipeCreatorText: {
+    color: 'rgba(255,255,255,0.6)',
+    ...TYPOGRAPHY.labelSmall,
   },
 
   // Full-Screen Swipe Indicators
