@@ -54,15 +54,38 @@ type ProfileState = {
   city?: string;
 };
 
-// Civic badge definitions
-const CIVIC_BADGES = [
-  { id: 'verified', icon: 'shield-checkmark', label: 'Verified', description: 'Identity verified', color: '#34C759' },
-  { id: 'first_vote', icon: 'checkmark-circle', label: 'First Vote', description: 'Cast your first vote', color: '#007AFF' },
-  { id: 'voice', icon: 'megaphone', label: 'Voice', description: 'Create a proposal', color: '#FF9500' },
-  { id: 'engaged', icon: 'flame', label: 'Engaged', description: '10+ votes cast', color: '#FF3B30' },
-  { id: 'local', icon: 'location', label: 'Local Hero', description: 'Vote on local issues', color: '#5856D6' },
-  { id: 'global', icon: 'globe', label: 'Global Citizen', description: 'Vote on global issues', color: '#00C7BE' },
+// Badge tier colors matching the badges modal
+const TIER_COLORS = {
+  common: { bg: '#6b7280', glow: 'rgba(107, 114, 128, 0.3)' },
+  rare: { bg: '#3b82f6', glow: 'rgba(59, 130, 246, 0.4)' },
+  epic: { bg: '#8b5cf6', glow: 'rgba(139, 92, 246, 0.5)' },
+  legendary: { bg: '#f59e0b', glow: 'rgba(245, 158, 11, 0.6)' },
+};
+
+// All badges - same as badges modal for consistency
+const ALL_BADGES = [
+  { id: 'first_vote', name: 'First Vote', description: 'Cast your first vote on a proposal', icon: '🗳️', tier: 'common' as const, category: 'voting' },
+  { id: 'first_vote_country', name: 'National Voice', description: 'Cast your first vote on a national proposal', icon: '🏛️', tier: 'common' as const, category: 'voting' },
+  { id: 'first_vote_state', name: 'State Advocate', description: 'Cast your first vote on a state proposal', icon: '🗺️', tier: 'rare' as const, category: 'voting' },
+  { id: 'first_vote_city', name: 'Local Champion', description: 'Cast your first vote on a city proposal', icon: '🏙️', tier: 'rare' as const, category: 'voting' },
+  { id: 'vote_streak_5', name: 'Consistent Voter', description: 'Vote on 5 different proposals', icon: '🔥', tier: 'common' as const, category: 'streak' },
+  { id: 'vote_streak_25', name: 'Dedicated Citizen', description: 'Vote on 25 different proposals', icon: '⭐', tier: 'rare' as const, category: 'streak' },
+  { id: 'vote_streak_100', name: 'Democracy Hero', description: 'Vote on 100 different proposals', icon: '🏆', tier: 'legendary' as const, category: 'streak' },
+  { id: 'first_proposal', name: 'Proposal Pioneer', description: 'Create your first proposal', icon: '📝', tier: 'common' as const, category: 'creator' },
+  { id: 'proposal_5', name: 'Active Legislator', description: 'Create 5 proposals', icon: '📋', tier: 'epic' as const, category: 'creator' },
+  { id: 'referral_5', name: 'Community Builder', description: 'Refer 5 new users', icon: '🤝', tier: 'rare' as const, category: 'social' },
+  { id: 'referral_20', name: 'Movement Leader', description: 'Refer 20 new users', icon: '👥', tier: 'epic' as const, category: 'social' },
+  { id: 'passport_minted', name: 'Verified Citizen', description: 'Mint your Represent Passport NFT', icon: '🛂', tier: 'epic' as const, category: 'identity' },
+  { id: 'early_adopter', name: 'Early Adopter', description: 'Join during the beta period', icon: '🚀', tier: 'legendary' as const, category: 'special' },
+  { id: 'democratic_spirit', name: 'Democratic Spirit', description: 'Vote on both sides of the aisle', icon: '⚖️', tier: 'rare' as const, category: 'special' },
+  { id: 'global_citizen', name: 'Global Citizen', description: 'Participate in governance across multiple regions', icon: '🌍', tier: 'legendary' as const, category: 'special' },
 ];
+
+// Show first 6 badges on identity page (sorted by tier importance)
+const PREVIEW_BADGES = [...ALL_BADGES].sort((a, b) => {
+  const tierOrder = { legendary: 0, epic: 1, rare: 2, common: 3 };
+  return tierOrder[a.tier] - tierOrder[b.tier];
+}).slice(0, 6);
 
 function formatDate(iso?: string | null) {
   if (!iso) return null;
@@ -258,19 +281,25 @@ function CivicBadge({
   earned,
   onPress,
 }: {
-  badge: typeof CIVIC_BADGES[0];
+  badge: typeof ALL_BADGES[0];
   earned: boolean;
   onPress?: () => void;
 }) {
   const { colors } = useTheme();
+  const tierColor = TIER_COLORS[badge.tier];
 
   return (
     <TouchableOpacity
       style={[
         styles.civicBadge,
         {
-          backgroundColor: earned ? `${badge.color}15` : colors.surface,
-          borderColor: earned ? `${badge.color}30` : colors.border,
+          backgroundColor: earned ? `${tierColor.bg}15` : colors.surface,
+          borderColor: earned ? `${tierColor.bg}40` : colors.border,
+          shadowColor: earned ? tierColor.bg : 'transparent',
+          shadowOpacity: earned ? 0.4 : 0,
+          shadowRadius: 8,
+          shadowOffset: { width: 0, height: 0 },
+          elevation: earned ? 4 : 0,
         },
       ]}
       onPress={onPress}
@@ -278,20 +307,23 @@ function CivicBadge({
     >
       <View style={[
         styles.badgeIconContainer,
-        { backgroundColor: earned ? `${badge.color}20` : `${colors.textTertiary}15` },
+        { backgroundColor: earned ? `${tierColor.bg}20` : `${colors.textTertiary}10` },
       ]}>
-        <Ionicons
-          name={badge.icon as any}
-          size={20}
-          color={earned ? badge.color : colors.textTertiary}
-        />
+        <Text style={[styles.badgeEmoji, { opacity: earned ? 1 : 0.4 }]}>
+          {badge.icon}
+        </Text>
       </View>
       <Text style={[
         styles.badgeLabel,
         { color: earned ? colors.text : colors.textTertiary },
-      ]}>
-        {badge.label}
+      ]} numberOfLines={1}>
+        {badge.name}
       </Text>
+      <View style={[styles.tierBadge, { backgroundColor: `${tierColor.bg}${earned ? '30' : '15'}` }]}>
+        <Text style={[styles.tierText, { color: earned ? tierColor.bg : colors.textTertiary }]}>
+          {badge.tier.toUpperCase()}
+        </Text>
+      </View>
       {!earned && (
         <View style={styles.badgeLock}>
           <Ionicons name="lock-closed" size={10} color={colors.textTertiary} />
@@ -486,17 +518,47 @@ export default function IdentityScreen() {
   };
 
   // Calculate earned badges
+  // State for API-fetched earned badges
+  const [apiBadges, setApiBadges] = useState<Set<string>>(new Set());
+
+  // Fetch earned badges from API
+  useEffect(() => {
+    const fetchBadges = async () => {
+      if (!isAuthenticated || !user?.id || !token) return;
+      try {
+        const response = await fetch(`${API_URL}/api/badges/user/${user.id}`, {
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+        });
+        if (response.ok) {
+          const earnedBadgesData = await response.json();
+          const earnedIds = new Set<string>(
+            earnedBadgesData.map((b: any) => b.badgeId || b.badge?.id || b.id)
+          );
+          setApiBadges(earnedIds);
+        }
+      } catch (error) {
+        console.error('Error fetching badges:', error);
+      }
+    };
+    fetchBadges();
+  }, [isAuthenticated, user?.id, token]);
+
+  // Combine API badges with local computed badges
   const earnedBadges = useMemo(() => {
-    const earned = new Set<string>();
-    if (verification.verified) earned.add('verified');
+    const earned = new Set<string>(apiBadges);
+    // Add computed badges based on stats
     if (stats.votes >= 1) earned.add('first_vote');
-    if (stats.proposals >= 1) earned.add('voice');
-    if (stats.votes >= 10) earned.add('engaged');
-    // Mock some badges for demo
-    if (stats.votes >= 5) earned.add('local');
-    if (stats.votes >= 15) earned.add('global');
+    if (stats.votes >= 5) earned.add('vote_streak_5');
+    if (stats.votes >= 25) earned.add('vote_streak_25');
+    if (stats.votes >= 100) earned.add('vote_streak_100');
+    if (stats.proposals >= 1) earned.add('first_proposal');
+    if (stats.proposals >= 5) earned.add('proposal_5');
+    if (verification.verified) earned.add('passport_minted');
     return earned;
-  }, [verification.verified, stats]);
+  }, [verification.verified, stats, apiBadges]);
 
   // Loading state
   if (loading) {
@@ -638,14 +700,20 @@ export default function IdentityScreen() {
           style={styles.badgesSection}
         >
           <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>Civic Badges</Text>
-            <Text style={[styles.sectionSubtitle, { color: colors.textTertiary }]}>
-              {earnedBadges.size}/{CIVIC_BADGES.length} earned
-            </Text>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Achievements</Text>
+            <TouchableOpacity
+              onPress={() => router.push('/modals/badges')}
+              style={styles.viewAllButton}
+            >
+              <Text style={[styles.viewAllText, { color: colors.gold }]}>
+                View All {ALL_BADGES.length}
+              </Text>
+              <Ionicons name="chevron-forward" size={14} color={colors.gold} />
+            </TouchableOpacity>
           </View>
 
           <View style={styles.badgesGrid}>
-            {CIVIC_BADGES.map((badge) => (
+            {PREVIEW_BADGES.map((badge) => (
               <CivicBadge
                 key={badge.id}
                 badge={badge}
@@ -653,7 +721,7 @@ export default function IdentityScreen() {
                 onPress={() => {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                   Alert.alert(
-                    badge.label,
+                    badge.name,
                     earnedBadges.has(badge.id)
                       ? `You've earned this badge! ${badge.description}`
                       : `${badge.description} to earn this badge.`
@@ -661,6 +729,27 @@ export default function IdentityScreen() {
                 }}
               />
             ))}
+          </View>
+
+          {/* Progress summary */}
+          <View style={[styles.badgeProgress, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <View style={styles.badgeProgressInfo}>
+              <Text style={[styles.badgeProgressLabel, { color: colors.textSecondary }]}>Progress</Text>
+              <Text style={[styles.badgeProgressValue, { color: colors.text }]}>
+                {earnedBadges.size}/{ALL_BADGES.length} badges earned
+              </Text>
+            </View>
+            <View style={[styles.badgeProgressBar, { backgroundColor: colors.border }]}>
+              <View
+                style={[
+                  styles.badgeProgressFill,
+                  {
+                    backgroundColor: colors.gold,
+                    width: `${(earnedBadges.size / ALL_BADGES.length) * 100}%`
+                  }
+                ]}
+              />
+            </View>
           </View>
         </Animated.View>
 
@@ -1017,11 +1106,63 @@ const styles = StyleSheet.create({
   badgeLabel: {
     ...TYPOGRAPHY.labelSmall,
     textAlign: 'center',
+    marginTop: SPACING.xs,
+  },
+  badgeEmoji: {
+    fontSize: 28,
+  },
+  tierBadge: {
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: 2,
+    borderRadius: BORDER_RADIUS.full,
+    marginTop: SPACING.xs,
+  },
+  tierText: {
+    fontSize: 8,
+    fontWeight: '700',
+    letterSpacing: 0.5,
   },
   badgeLock: {
     position: 'absolute',
     top: SPACING.sm,
     right: SPACING.sm,
+  },
+  viewAllButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+  },
+  viewAllText: {
+    ...TYPOGRAPHY.labelSmall,
+    fontWeight: '600',
+  },
+  badgeProgress: {
+    marginTop: SPACING.md,
+    padding: SPACING.md,
+    borderRadius: BORDER_RADIUS.lg,
+    borderWidth: 1,
+  },
+  badgeProgressInfo: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: SPACING.sm,
+  },
+  badgeProgressLabel: {
+    ...TYPOGRAPHY.labelSmall,
+  },
+  badgeProgressValue: {
+    ...TYPOGRAPHY.labelSmall,
+    fontWeight: '600',
+  },
+  badgeProgressBar: {
+    height: 6,
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  badgeProgressFill: {
+    height: '100%',
+    borderRadius: 3,
   },
 
   // Details Card

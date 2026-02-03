@@ -2693,11 +2693,10 @@ const styles = StyleSheet.create({
 
   // Card Stack
   cardStack: {
-    flex: 1,
     alignItems: 'center',
     justifyContent: 'flex-start',
     paddingHorizontal: SPACING.lg,
-    paddingBottom: SPACING.xxxl,
+    height: CARD_HEIGHT + 30, // Fixed height for absolute positioned cards
   },
 
   // Swipe Card
@@ -3097,6 +3096,8 @@ const styles = StyleSheet.create({
   swipeActionsContainer: {
     alignItems: 'center',
     gap: SPACING.sm,
+    paddingTop: SPACING.xl,
+    paddingBottom: SPACING.xxl,
   },
   swipeTapHintSubtle: {
     color: 'rgba(255,255,255,0.5)',
