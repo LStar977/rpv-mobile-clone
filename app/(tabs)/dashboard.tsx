@@ -458,11 +458,18 @@ function CommunityHeroCard({
       }}
       activeOpacity={0.9}
     >
+      {/* Country-themed gradient background */}
       <LinearGradient
-        colors={[`${themeColor}12`, 'transparent', `${secondaryColor}08`]}
+        colors={[`${themeColor}30`, `${themeColor}15`, 'transparent']}
         style={StyleSheet.absoluteFill}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
+      />
+      <LinearGradient
+        colors={['transparent', `${secondaryColor}20`]}
+        style={StyleSheet.absoluteFill}
+        start={{ x: 1, y: 0 }}
+        end={{ x: 0, y: 1 }}
       />
 
       {/* Header row */}
