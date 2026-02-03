@@ -36,6 +36,54 @@ const API_URL = 'https://representportal.com';
 const STORAGE_KEY = 'sentinel_analysis_history';
 const ISSUE_TYPES = ['Law', 'Policy', 'Regulation', 'Executive Order', 'Budget Decision', 'Other'];
 
+// Sample demo analysis for non-premium users to preview the UI
+const DEMO_ANALYSIS: Analysis = {
+  id: 'demo',
+  title: 'Sample: Public Safety Reform Act 2026',
+  issueType: 'Law',
+  timestamp: 'Demo',
+  analysis: {
+    summary: 'This legislation proposes significant changes to public safety protocols, including increased community oversight and revised use-of-force guidelines. While the intent aligns with transparency principles, several provisions lack adequate due process protections and citizen appeal mechanisms.',
+    reasoning: 'The analysis identified strong alignment with community engagement principles but found gaps in accountability structures and privacy safeguards that need addressing before implementation.',
+    categoryScores: [
+      { category: 'Individual Rights', score: 82 },
+      { category: 'Due Process', score: 65 },
+      { category: 'Transparency', score: 88 },
+      { category: 'Accountability', score: 71 },
+      { category: 'Privacy Protection', score: 58 },
+      { category: 'Community Engagement', score: 91 },
+    ],
+    overallVerdict: 'At Risk',
+    flaggedPrinciples: [
+      {
+        principleId: 'P-47',
+        name: 'Right to Appeal',
+        status: 'Partially Violated',
+        explanation: 'The legislation does not provide clear mechanisms for citizens to appeal decisions made under the new protocols.',
+      },
+      {
+        principleId: 'P-112',
+        name: 'Data Privacy Standards',
+        status: 'Violated',
+        explanation: 'Collection of biometric data lacks proper consent frameworks and retention limits.',
+      },
+      {
+        principleId: 'P-23',
+        name: 'Public Transparency',
+        status: 'Aligned',
+        explanation: 'Reporting requirements meet transparency standards with quarterly public disclosures.',
+      },
+    ],
+    sentinelCorrections: [
+      'Add Section 4.2: Citizen Appeal Process with 30-day response requirement',
+      'Amend Section 7: Include data retention limits of 90 days for non-criminal records',
+      'Insert privacy consent requirements in Section 3.1 for biometric collection',
+      'Establish independent oversight committee with citizen representatives',
+    ],
+    mainProposal: 'Amend Public Safety Reform Act to include citizen appeal rights and privacy protections',
+  },
+};
+
 // Grade colors
 const GRADE_COLORS = {
   A: '#34C759',
@@ -277,7 +325,14 @@ function ReportCard({
           <Ionicons name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
         <View style={styles.reportHeaderText}>
-          <Text style={[styles.reportHeaderTitle, { color: colors.gold }]}>Report Card</Text>
+          <View style={styles.reportTitleRow}>
+            <Text style={[styles.reportHeaderTitle, { color: colors.gold }]}>Report Card</Text>
+            {analysis.id === 'demo' && (
+              <View style={[styles.demoBadge, { backgroundColor: colors.warning }]}>
+                <Text style={styles.demoBadgeText}>DEMO</Text>
+              </View>
+            )}
+          </View>
           <Text style={[styles.reportHeaderSubtitle, { color: colors.textSecondary }]} numberOfLines={1}>
             {analysis.title}
           </Text>
@@ -475,10 +530,17 @@ export default function SentinelScreen() {
     checkSubscription();
   }, [token]);
 
+  // Show demo report card for non-premium users
+  const handleTryDemo = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setSelectedReport(DEMO_ANALYSIS);
+    setProposalCreated(false);
+  };
+
   const handleAnalyze = async () => {
+    // For non-premium users, show demo instead
     if (!isPremium) {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      setShowUpgradeModal(true);
+      handleTryDemo();
       return;
     }
 
@@ -540,6 +602,20 @@ export default function SentinelScreen() {
   };
 
   const handleCreateProposal = async () => {
+    // Check if this is a demo report
+    if (selectedReport?.id === 'demo') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      Alert.alert(
+        'Premium Feature',
+        'Upgrade to Premium to analyze your own documents and create proposals from the results.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Upgrade', onPress: () => router.push('/modals/subscription') },
+        ]
+      );
+      return;
+    }
+
     if (!selectedReport || !user?.id) {
       Alert.alert('Error', 'Please sign in to create a proposal');
       return;
@@ -755,8 +831,10 @@ export default function SentinelScreen() {
               </>
             ) : (
               <>
-                <Ionicons name="sparkles" size={20} color="#000" />
-                <Text style={styles.analyzeButtonText}>Generate Report Card</Text>
+                <Ionicons name={isPremium ? 'sparkles' : 'eye'} size={20} color="#000" />
+                <Text style={styles.analyzeButtonText}>
+                  {isPremium ? 'Generate Report Card' : 'Try Demo Report Card'}
+                </Text>
               </>
             )}
           </TouchableOpacity>
@@ -1086,6 +1164,22 @@ const styles = StyleSheet.create({
   reportHeaderSubtitle: {
     ...TYPOGRAPHY.bodyMedium,
     marginTop: SPACING.xxs,
+  },
+  reportTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+  },
+  demoBadge: {
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: 2,
+    borderRadius: BORDER_RADIUS.sm,
+  },
+  demoBadgeText: {
+    ...TYPOGRAPHY.labelSmall,
+    color: '#000',
+    fontWeight: '700',
+    fontSize: 10,
   },
 
   // Grade Hero
