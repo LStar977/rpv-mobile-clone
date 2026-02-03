@@ -20,9 +20,46 @@ import { router } from 'expo-router';
 import { useAuthStore } from '../../lib/auth';
 import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS } from '../../lib/theme';
 import { analyticsApi, AnalyticsData, ProposalAnalytics } from '../../lib/api';
-import { FeaturedStat, StatsGrid, ProgressStat } from '../../components/ui';
+import { FeaturedStat, StatsGrid, ProgressStat, UpgradeModal } from '../../components/ui';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://representportal.com';
+
+// Sample data for non-premium users to see what the dashboard looks like
+const SAMPLE_ANALYTICS: AnalyticsData = {
+  totalProposals: 12,
+  totalVotes: 847,
+  supportVotes: 523,
+  opposeVotes: 324,
+  proposals: [
+    {
+      id: 1,
+      title: 'Community Park Renovation Project',
+      views: 1250,
+      supportVotes: 234,
+      opposeVotes: 89,
+      engagementRate: 0.258,
+      createdAt: '2024-01-15',
+    },
+    {
+      id: 2,
+      title: 'Local Transit Improvement Initiative',
+      views: 890,
+      supportVotes: 156,
+      opposeVotes: 112,
+      engagementRate: 0.301,
+      createdAt: '2024-01-10',
+    },
+    {
+      id: 3,
+      title: 'Green Energy Incentive Program',
+      views: 678,
+      supportVotes: 133,
+      opposeVotes: 123,
+      engagementRate: 0.378,
+      createdAt: '2024-01-05',
+    },
+  ],
+};
 
 // Premium Upgrade Card Component
 function PremiumUpgradeCard() {
@@ -200,9 +237,10 @@ export default function AnalyticsScreen() {
 
   const [isPremium, setIsPremium] = useState(false);
   const [loadingSubscription, setLoadingSubscription] = useState(true);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
   // Check if user has Premium subscription
   useEffect(() => {
@@ -247,14 +285,28 @@ export default function AnalyticsScreen() {
 
   useEffect(() => {
     if (isPremium) {
+      setLoading(true);
       fetchAnalytics();
     }
   }, [isPremium, fetchAnalytics]);
 
   const onRefresh = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (!isPremium) {
+      setShowUpgradeModal(true);
+      return;
+    }
     setRefreshing(true);
     fetchAnalytics();
+  };
+
+  const handlePremiumAction = () => {
+    if (!isPremium) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      setShowUpgradeModal(true);
+      return false;
+    }
+    return true;
   };
 
   // Show loading state while checking subscription
@@ -268,17 +320,8 @@ export default function AnalyticsScreen() {
     );
   }
 
-  // Show Premium upgrade prompt if not Premium
-  if (!isPremium) {
-    return (
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <PremiumUpgradeCard />
-      </View>
-    );
-  }
-
-  // Show loading state while fetching analytics
-  if (loading) {
+  // Show loading state while fetching analytics (only for premium users)
+  if (isPremium && loading) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={styles.loadingContainer}>
@@ -291,8 +334,11 @@ export default function AnalyticsScreen() {
     );
   }
 
-  const supportPercent = analytics && analytics.totalVotes > 0
-    ? Math.round((analytics.supportVotes / analytics.totalVotes) * 100)
+  // Use real data for premium, sample data for non-premium
+  const displayData = isPremium ? analytics : SAMPLE_ANALYTICS;
+
+  const supportPercent = displayData && displayData.totalVotes > 0
+    ? Math.round((displayData.supportVotes / displayData.totalVotes) * 100)
     : 50;
 
   return (
@@ -308,10 +354,29 @@ export default function AnalyticsScreen() {
           />
         }
       >
+        {/* Premium Banner for non-premium users */}
+        {!isPremium && (
+          <Animated.View entering={FadeInDown.duration(300)}>
+            <TouchableOpacity
+              style={[styles.premiumBanner, { backgroundColor: colors.gold }]}
+              onPress={() => setShowUpgradeModal(true)}
+              activeOpacity={0.9}
+            >
+              <View style={styles.premiumBannerContent}>
+                <Ionicons name="sparkles" size={20} color="#000" />
+                <Text style={styles.premiumBannerText}>
+                  Sample Data - Upgrade to see your real analytics
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color="#000" />
+            </TouchableOpacity>
+          </Animated.View>
+        )}
+
         {/* Hero Stats */}
         <Animated.View entering={FadeInDown.duration(400)}>
           <FeaturedStat
-            value={analytics?.totalVotes || 0}
+            value={displayData?.totalVotes || 0}
             label="Total Votes Received"
             description="Across all your proposals"
             icon="checkmark-done-circle"
@@ -325,19 +390,19 @@ export default function AnalyticsScreen() {
           <StatsGrid
             stats={[
               {
-                value: analytics?.totalProposals || 0,
+                value: displayData?.totalProposals || 0,
                 label: 'Proposals',
                 icon: 'document-text-outline',
                 iconColor: colors.info,
               },
               {
-                value: analytics?.supportVotes || 0,
+                value: displayData?.supportVotes || 0,
                 label: 'Support',
                 icon: 'thumbs-up-outline',
                 iconColor: colors.success,
               },
               {
-                value: analytics?.opposeVotes || 0,
+                value: displayData?.opposeVotes || 0,
                 label: 'Oppose',
                 icon: 'thumbs-down-outline',
                 iconColor: colors.error,
@@ -356,8 +421,8 @@ export default function AnalyticsScreen() {
         >
           <Text style={[styles.ratioTitle, { color: colors.text }]}>Support Ratio</Text>
           <ProgressStat
-            value={analytics?.supportVotes || 0}
-            max={analytics?.totalVotes || 1}
+            value={displayData?.supportVotes || 0}
+            max={displayData?.totalVotes || 1}
             label="Support vs Total Votes"
             color={colors.success}
             size="lg"
@@ -379,19 +444,19 @@ export default function AnalyticsScreen() {
         </Animated.View>
 
         {/* Per-Proposal Analytics */}
-        {analytics?.proposals && analytics.proposals.length > 0 && (
+        {displayData?.proposals && displayData.proposals.length > 0 && (
           <Animated.View entering={FadeInUp.delay(300).duration(400)}>
             <Text style={[styles.sectionTitle, { color: colors.text }]}>
               Proposal Performance
             </Text>
-            {analytics.proposals.map((proposal, index) => (
+            {displayData.proposals.map((proposal, index) => (
               <ProposalAnalyticsCard key={proposal.id} proposal={proposal} index={index} />
             ))}
           </Animated.View>
         )}
 
-        {/* Empty State */}
-        {(!analytics?.proposals || analytics.proposals.length === 0) && (
+        {/* Empty State - only for premium users with no data */}
+        {isPremium && (!displayData?.proposals || displayData.proposals.length === 0) && (
           <Animated.View
             entering={FadeIn.delay(300).duration(400)}
             style={styles.emptyState}
@@ -417,6 +482,15 @@ export default function AnalyticsScreen() {
 
         <View style={styles.bottomPadding} />
       </ScrollView>
+
+      {/* Upgrade Modal */}
+      <UpgradeModal
+        visible={showUpgradeModal}
+        onClose={() => setShowUpgradeModal(false)}
+        type="premium"
+        title="Unlock Analytics"
+        message="Get detailed insights into your proposal performance with Premium. Track votes, engagement rates, and see what resonates with your community."
+      />
     </View>
   );
 }
@@ -442,6 +516,27 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: SPACING.lg,
+  },
+  premiumBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.lg,
+    borderRadius: BORDER_RADIUS.lg,
+    marginBottom: SPACING.lg,
+  },
+  premiumBannerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+    flex: 1,
+  },
+  premiumBannerText: {
+    ...TYPOGRAPHY.labelMedium,
+    color: '#000',
+    fontWeight: '600',
+    flex: 1,
   },
 
   // Premium Upgrade Card Styles
