@@ -311,12 +311,12 @@ export default function CreateOrganizationScreen() {
         type: selectedTier,
       });
 
-      if (createResult.error || !createResult.data?.id) {
+      if (createResult.error || !createResult.data?.organization?.id) {
         Alert.alert('Error', createResult.error || 'Failed to create organization');
         return;
       }
 
-      const organizationId = createResult.data.id;
+      const organizationId = createResult.data.organization.id;
 
       // STEP 2: Get payment intent with org ID
       const paymentIntent = await fetchOrganizationPaymentIntent(
