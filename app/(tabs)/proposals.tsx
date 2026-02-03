@@ -102,6 +102,7 @@ const MOCK_PROPOSALS: Proposal[] = [
     createdAt: new Date().toISOString(),
     creatorId: 'demo-user',
     imageUrl: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=800&h=1200&fit=crop',
+    geoRestrictions: ['Canada', 'Ontario', 'Toronto'],
   },
   {
     id: 'mock-2',
@@ -114,6 +115,7 @@ const MOCK_PROPOSALS: Proposal[] = [
     createdAt: new Date().toISOString(),
     creatorId: 'demo-user',
     imageUrl: 'https://images.unsplash.com/photo-1621451537084-482c73073a0f?w=800&h=1200&fit=crop',
+    geoRestrictions: ['Canada'],
   },
   {
     id: 'mock-3',
@@ -126,6 +128,7 @@ const MOCK_PROPOSALS: Proposal[] = [
     createdAt: new Date().toISOString(),
     creatorId: 'demo-user',
     imageUrl: 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=800&h=1200&fit=crop',
+    geoRestrictions: ['United States', 'California'],
   },
   {
     id: 'mock-4',
@@ -138,6 +141,7 @@ const MOCK_PROPOSALS: Proposal[] = [
     createdAt: new Date().toISOString(),
     creatorId: 'demo-user',
     imageUrl: 'https://images.unsplash.com/photo-1523050854058-8df90110c9f1?w=800&h=1200&fit=crop',
+    geoRestrictions: ['United States'],
   },
   {
     id: 'mock-5',
@@ -150,6 +154,7 @@ const MOCK_PROPOSALS: Proposal[] = [
     createdAt: new Date().toISOString(),
     creatorId: 'demo-user',
     imageUrl: 'https://images.unsplash.com/photo-1588776814546-1ffcf47267a5?w=800&h=1200&fit=crop',
+    geoRestrictions: ['Canada', 'Ontario'],
   },
   {
     id: 'mock-6',
@@ -162,6 +167,7 @@ const MOCK_PROPOSALS: Proposal[] = [
     createdAt: new Date().toISOString(),
     creatorId: 'demo-user',
     imageUrl: 'https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=800&h=1200&fit=crop',
+    geoRestrictions: ['United States', 'New York'],
   },
   {
     id: 'mock-7',
@@ -174,6 +180,7 @@ const MOCK_PROPOSALS: Proposal[] = [
     createdAt: new Date().toISOString(),
     creatorId: 'demo-user',
     imageUrl: 'https://images.unsplash.com/photo-1519331379826-f10be5486c6f?w=800&h=1200&fit=crop',
+    geoRestrictions: ['Japan', 'Tokyo'],
   },
   {
     id: 'mock-8',
@@ -186,6 +193,7 @@ const MOCK_PROPOSALS: Proposal[] = [
     createdAt: new Date().toISOString(),
     creatorId: 'demo-user',
     imageUrl: 'https://images.unsplash.com/photo-1477959858617-67f85cf4f1df?w=800&h=1200&fit=crop',
+    geoRestrictions: [],
   },
   {
     id: 'mock-9',
@@ -198,6 +206,7 @@ const MOCK_PROPOSALS: Proposal[] = [
     createdAt: new Date().toISOString(),
     creatorId: 'demo-user',
     imageUrl: 'https://images.unsplash.com/photo-1570125909232-eb263c188f7e?w=800&h=1200&fit=crop',
+    geoRestrictions: ['Canada', 'British Columbia', 'Vancouver'],
   },
   {
     id: 'mock-10',
@@ -210,6 +219,7 @@ const MOCK_PROPOSALS: Proposal[] = [
     createdAt: new Date().toISOString(),
     creatorId: 'demo-user',
     imageUrl: 'https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?w=800&h=1200&fit=crop',
+    geoRestrictions: [],
   },
   {
     id: 'mock-11',
@@ -222,6 +232,7 @@ const MOCK_PROPOSALS: Proposal[] = [
     createdAt: new Date().toISOString(),
     creatorId: 'demo-user',
     imageUrl: 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=800&h=1200&fit=crop',
+    geoRestrictions: ['United States', 'California', 'San Francisco'],
   },
   {
     id: 'mock-12',
@@ -234,6 +245,7 @@ const MOCK_PROPOSALS: Proposal[] = [
     createdAt: new Date().toISOString(),
     creatorId: 'demo-user',
     imageUrl: 'https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=800&h=1200&fit=crop',
+    geoRestrictions: ['Canada', 'Alberta'],
   },
   {
     id: 'mock-13',
@@ -246,6 +258,7 @@ const MOCK_PROPOSALS: Proposal[] = [
     createdAt: new Date().toISOString(),
     creatorId: 'demo-user',
     imageUrl: 'https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?w=800&h=1200&fit=crop',
+    geoRestrictions: ['United Kingdom'],
   },
   {
     id: 'mock-14',
@@ -258,6 +271,7 @@ const MOCK_PROPOSALS: Proposal[] = [
     createdAt: new Date().toISOString(),
     creatorId: 'demo-user',
     imageUrl: 'https://images.unsplash.com/photo-1556740738-b6a63e27c4df?w=800&h=1200&fit=crop',
+    geoRestrictions: ['Australia'],
   },
   {
     id: 'mock-15',
@@ -270,6 +284,7 @@ const MOCK_PROPOSALS: Proposal[] = [
     createdAt: new Date().toISOString(),
     creatorId: 'demo-user',
     imageUrl: 'https://images.unsplash.com/photo-1517457373958-b7bdd4587205?w=800&h=1200&fit=crop',
+    geoRestrictions: ['United States', 'Texas', 'Austin'],
   },
   {
     id: 'mock-16',
@@ -282,6 +297,7 @@ const MOCK_PROPOSALS: Proposal[] = [
     createdAt: new Date().toISOString(),
     creatorId: 'demo-user',
     imageUrl: 'https://images.unsplash.com/photo-1581244277943-fe4a9c777189?w=800&h=1200&fit=crop',
+    geoRestrictions: ['Mexico'],
   },
   {
     id: 'mock-17',
@@ -294,6 +310,7 @@ const MOCK_PROPOSALS: Proposal[] = [
     createdAt: new Date().toISOString(),
     creatorId: 'demo-user',
     imageUrl: 'https://images.unsplash.com/photo-1593941707882-a5bba14938c7?w=800&h=1200&fit=crop',
+    geoRestrictions: ['Germany'],
   },
   {
     id: 'mock-18',
@@ -306,6 +323,7 @@ const MOCK_PROPOSALS: Proposal[] = [
     createdAt: new Date().toISOString(),
     creatorId: 'demo-user',
     imageUrl: 'https://images.unsplash.com/photo-1509391366360-2e959784a276?w=800&h=1200&fit=crop',
+    geoRestrictions: [],
   },
   {
     id: 'mock-19',
@@ -318,6 +336,7 @@ const MOCK_PROPOSALS: Proposal[] = [
     createdAt: new Date().toISOString(),
     creatorId: 'demo-user',
     imageUrl: 'https://images.unsplash.com/photo-1560184897-ae75f418493e?w=800&h=1200&fit=crop',
+    geoRestrictions: ['Canada', 'Quebec', 'Montreal'],
   },
   {
     id: 'mock-20',
@@ -330,6 +349,7 @@ const MOCK_PROPOSALS: Proposal[] = [
     createdAt: new Date().toISOString(),
     creatorId: 'demo-user',
     imageUrl: 'https://images.unsplash.com/photo-1577962917302-cd874c4e31d2?w=800&h=1200&fit=crop',
+    geoRestrictions: ['France'],
   },
 ];
 
@@ -411,7 +431,7 @@ interface SwipeCardProps {
 }
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
-const CARD_HEIGHT = SCREEN_HEIGHT - 280; // Full screen minus header, progress, tabs
+const CARD_HEIGHT = SCREEN_HEIGHT - 360; // Full screen minus header, search, progress, tabs
 
 function SwipeCard({ proposal, onSwipeLeft, onSwipeRight, onTap, isTopCard, cardIndex }: SwipeCardProps) {
   const { colors } = useTheme();
@@ -536,7 +556,7 @@ function SwipeCard({ proposal, onSwipeLeft, onSwipeRight, onTap, isTopCard, card
 
         {/* Content Overlay at Bottom */}
         <View style={styles.swipeCardContentOverlay}>
-          {/* Category & Time badges */}
+          {/* Category, Time & Geo badges */}
           <View style={styles.swipeCardBadgeRow}>
             <View style={[styles.swipeCategoryBadgeLarge, { backgroundColor: theme.primary }]}>
               <Ionicons name={theme.icon as any} size={14} color="#fff" />
@@ -548,6 +568,19 @@ function SwipeCard({ proposal, onSwipeLeft, onSwipeRight, onTap, isTopCard, card
                 <Text style={styles.swipeTimeTextLight}>{timeRemaining}</Text>
               </View>
             )}
+            {/* Geo scope badge */}
+            <View style={[styles.swipeGeoBadge, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
+              <Ionicons
+                name={proposal.geoRestrictions && proposal.geoRestrictions.length > 0 ? 'location' : 'globe-outline'}
+                size={14}
+                color="#fff"
+              />
+              <Text style={styles.swipeGeoText}>
+                {proposal.geoRestrictions && proposal.geoRestrictions.length > 0
+                  ? proposal.geoRestrictions[proposal.geoRestrictions.length - 1]
+                  : 'Global'}
+              </Text>
+            </View>
           </View>
 
           {/* Title */}
@@ -3023,6 +3056,19 @@ const styles = StyleSheet.create({
     borderRadius: BORDER_RADIUS.full,
   },
   swipeTimeTextLight: {
+    color: '#fff',
+    ...TYPOGRAPHY.labelSmall,
+    fontWeight: '500',
+  },
+  swipeGeoBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    borderRadius: BORDER_RADIUS.full,
+  },
+  swipeGeoText: {
     color: '#fff',
     ...TYPOGRAPHY.labelSmall,
     fontWeight: '500',
