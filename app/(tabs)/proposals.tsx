@@ -619,41 +619,11 @@ function SwipeCard({ proposal, onSwipeLeft, onSwipeRight, onTap, isTopCard, card
             </View>
           </View>
 
-          {/* Swipe Instructions & Buttons */}
-          {isEnded ? (
+          {/* Ended Banner (shown inside card) */}
+          {isEnded && (
             <View style={styles.swipeEndedBannerLarge}>
               <Ionicons name="flag-outline" size={18} color="#fff" />
               <Text style={styles.swipeEndedTextLarge}>Voting has ended</Text>
-            </View>
-          ) : isTopCard && (
-            <View style={styles.swipeActionsContainer}>
-              {/* Swipe hint text */}
-              <Text style={styles.swipeTapHintSubtle}>Tap card for details</Text>
-
-              {/* Action buttons for accessibility */}
-              <View style={styles.swipeButtonsRow}>
-                <TouchableOpacity
-                  style={[styles.swipeActionButton, styles.swipeOpposeButton, { borderColor: colors.error }]}
-                  onPress={() => {
-                    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-                    onSwipeLeft();
-                  }}
-                  activeOpacity={0.8}
-                >
-                  <Ionicons name="close" size={28} color={colors.error} />
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[styles.swipeActionButton, styles.swipeSupportButton, { borderColor: colors.success }]}
-                  onPress={() => {
-                    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                    onSwipeRight();
-                  }}
-                  activeOpacity={0.8}
-                >
-                  <Ionicons name="checkmark" size={28} color={colors.success} />
-                </TouchableOpacity>
-              </View>
             </View>
           )}
         </View>
@@ -1705,6 +1675,29 @@ export default function ProposalsScreen() {
                   />
                 )).reverse()}
               </View>
+
+              {/* Vote Buttons - Outside gesture detector for tap reliability */}
+              {visibleSwipeCards.length > 0 && !isProposalEnded(visibleSwipeCards[0]) && (
+                <View style={styles.swipeActionsContainer}>
+                  <Text style={styles.swipeTapHintSubtle}>Tap card for details</Text>
+                  <View style={styles.swipeButtonsRow}>
+                    <TouchableOpacity
+                      style={[styles.swipeActionButton, { backgroundColor: 'rgba(255,59,48,0.15)', borderColor: 'rgba(255,59,48,0.3)', borderWidth: 1 }]}
+                      onPress={() => handleSwipeVote(visibleSwipeCards[0], 'oppose')}
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons name="close" size={28} color="#FF3B30" />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.swipeActionButton, { backgroundColor: 'rgba(52,199,89,0.15)', borderColor: 'rgba(52,199,89,0.3)', borderWidth: 1 }]}
+                      onPress={() => handleSwipeVote(visibleSwipeCards[0], 'support')}
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons name="checkmark" size={28} color="#34C759" />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
             </>
           )}
         </GestureHandlerRootView>
