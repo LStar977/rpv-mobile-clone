@@ -230,6 +230,53 @@ export const organizationsApi = {
       error: result.error,
     };
   },
+
+  // Member management
+  async getMembers(orgId: string): Promise<ApiResponse<any[]>> {
+    const result = await apiRequest<any>(`/api/organizations/${orgId}/members`);
+    if (Array.isArray(result.data)) return { data: result.data, error: null };
+    if (result.data?.members) return { data: result.data.members, error: null };
+    return { data: [], error: result.error };
+  },
+
+  async removeMember(orgId: string, userId: string): Promise<ApiResponse<{ success: boolean }>> {
+    return apiRequest(`/api/organizations/${orgId}/members/${userId}`, { method: 'DELETE' });
+  },
+
+  async updateMemberRole(orgId: string, userId: string, role: 'admin' | 'member'): Promise<ApiResponse<{ success: boolean }>> {
+    return apiRequest(`/api/organizations/${orgId}/members/${userId}/role`, {
+      method: 'PUT',
+      body: JSON.stringify({ role }),
+    });
+  },
+
+  // Announcements
+  async createAnnouncement(orgId: string, data: { title: string; content: string; pinned?: boolean }): Promise<ApiResponse<any>> {
+    return apiRequest(`/api/organizations/${orgId}/announcements`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async deleteAnnouncement(orgId: string, announcementId: string): Promise<ApiResponse<{ success: boolean }>> {
+    return apiRequest(`/api/organizations/${orgId}/announcements/${announcementId}`, { method: 'DELETE' });
+  },
+
+  // Invite codes
+  async getInviteCodes(orgId: string): Promise<ApiResponse<any[]>> {
+    const result = await apiRequest<any>(`/api/organizations/${orgId}/invite-codes`);
+    if (Array.isArray(result.data)) return { data: result.data, error: null };
+    if (result.data?.codes) return { data: result.data.codes, error: null };
+    return { data: [], error: result.error };
+  },
+
+  async generateInviteCode(orgId: string): Promise<ApiResponse<{ code: string; expiresAt: string }>> {
+    return apiRequest(`/api/organizations/${orgId}/invite-codes`, { method: 'POST' });
+  },
+
+  async revokeInviteCode(orgId: string, code: string): Promise<ApiResponse<{ success: boolean }>> {
+    return apiRequest(`/api/organizations/${orgId}/invite-codes/${code}`, { method: 'DELETE' });
+  },
 };
 
 export const passportApi = {
@@ -360,6 +407,19 @@ export const limitsApi = {
   },
 };
 
+export const badgesApi = {
+  async getUserBadges(): Promise<ApiResponse<any[]>> {
+    const authState = useAuthStore.getState();
+    const userId = authState.user?.id;
+    if (!userId) return { data: [], error: 'Not authenticated' };
+    return apiRequest(`/api/badges/user/${userId}`);
+  },
+
+  async checkNewBadges(): Promise<ApiResponse<{ newBadges: any[] }>> {
+    return apiRequest('/api/badges/check', { method: 'POST' });
+  },
+};
+
 export const api = {
   user: userApi,
   proposals: proposalsApi,
@@ -369,6 +429,7 @@ export const api = {
   organizations: organizationsApi,
   analytics: analyticsApi,
   limits: limitsApi,
+  badges: badgesApi,
 };
 
 export default api;
