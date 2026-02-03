@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   TextInput,
   ActivityIndicator,
   Alert,
+  Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -19,19 +20,30 @@ import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withSpring,
-  withRepeat,
   withTiming,
   Easing,
 } from 'react-native-reanimated';
 import { router } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuthStore } from '../../lib/auth';
-import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS, ANIMATION } from '../../lib/theme';
+import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS } from '../../lib/theme';
 import { UpgradeModal } from '../../components/ui';
 
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
 const API_URL = 'https://representportal.com';
+const STORAGE_KEY = 'sentinel_analysis_history';
 const ISSUE_TYPES = ['Law', 'Policy', 'Regulation', 'Executive Order', 'Budget Decision', 'Other'];
+
+// Grade colors
+const GRADE_COLORS = {
+  A: '#34C759',
+  B: '#007AFF',
+  C: '#FF9500',
+  D: '#FF3B30',
+  F: '#8E8E93',
+};
 
 type AnalysisResult = {
   summary: string;
@@ -56,312 +68,336 @@ type Analysis = {
   analysis: AnalysisResult;
 };
 
-// Animated Tab Component
-function TabButton({
-  label,
-  icon,
-  active,
+// Calculate letter grade from average score
+function calculateLetterGrade(categoryScores: { score: number }[]): string {
+  if (!categoryScores || categoryScores.length === 0) return 'N/A';
+  const avg = categoryScores.reduce((sum, c) => sum + c.score, 0) / categoryScores.length;
+  if (avg >= 90) return 'A';
+  if (avg >= 80) return 'B';
+  if (avg >= 70) return 'C';
+  if (avg >= 60) return 'D';
+  return 'F';
+}
+
+// Get grade color
+function getGradeColor(grade: string): string {
+  return GRADE_COLORS[grade as keyof typeof GRADE_COLORS] || GRADE_COLORS.F;
+}
+
+// Get verdict icon
+function getVerdictIcon(verdict: string): string {
+  if (verdict === 'Aligned') return 'checkmark-circle';
+  if (verdict === 'At Risk') return 'warning';
+  return 'alert-circle';
+}
+
+// Letter Grade Badge Component
+function LetterGradeBadge({ grade, size = 'large' }: { grade: string; size?: 'small' | 'large' }) {
+  const color = getGradeColor(grade);
+  const isLarge = size === 'large';
+
+  return (
+    <View style={[
+      styles.gradeBadge,
+      isLarge ? styles.gradeBadgeLarge : styles.gradeBadgeSmall,
+      { backgroundColor: `${color}20`, borderColor: color }
+    ]}>
+      <Text style={[
+        styles.gradeText,
+        isLarge ? styles.gradeTextLarge : styles.gradeTextSmall,
+        { color }
+      ]}>
+        {grade}
+      </Text>
+    </View>
+  );
+}
+
+// Quick Stats Row Component
+function QuickStatsRow({ analyses }: { analyses: Analysis[] }) {
+  const { colors } = useTheme();
+  const total = analyses.length;
+  const atRisk = analyses.filter(a => a.analysis.overallVerdict === 'At Risk').length;
+  const violating = analyses.filter(a => a.analysis.overallVerdict === 'Violating').length;
+  const aligned = analyses.filter(a => a.analysis.overallVerdict === 'Aligned').length;
+
+  return (
+    <View style={styles.statsRow}>
+      <View style={[styles.statCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        <Text style={[styles.statValue, { color: colors.gold }]}>{total}</Text>
+        <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Analyzed</Text>
+      </View>
+      <View style={[styles.statCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        <Text style={[styles.statValue, { color: GRADE_COLORS.C }]}>{atRisk + violating}</Text>
+        <Text style={[styles.statLabel, { color: colors.textSecondary }]}>At Risk</Text>
+      </View>
+      <View style={[styles.statCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        <Text style={[styles.statValue, { color: GRADE_COLORS.A }]}>{aligned}</Text>
+        <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Aligned</Text>
+      </View>
+    </View>
+  );
+}
+
+// Analysis History Card Component
+function AnalysisHistoryCard({
+  analysis,
   onPress,
+  index,
 }: {
-  label: string;
-  icon: string;
-  active: boolean;
+  analysis: Analysis;
   onPress: () => void;
-}) {
-  const { colors } = useTheme();
-  const scale = useSharedValue(1);
-
-  const handlePressIn = () => {
-    Haptics.selectionAsync();
-    scale.value = withSpring(0.95, { damping: 15, stiffness: 300 });
-  };
-
-  const handlePressOut = () => {
-    scale.value = withSpring(1, { damping: 15, stiffness: 300 });
-  };
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-  }));
-
-  return (
-    <AnimatedTouchable
-      style={[
-        styles.tab,
-        {
-          backgroundColor: active ? colors.gold : 'transparent',
-          borderColor: active ? colors.gold : colors.border,
-        },
-        animatedStyle,
-      ]}
-      onPress={onPress}
-      onPressIn={handlePressIn}
-      onPressOut={handlePressOut}
-      activeOpacity={1}
-    >
-      <Text style={styles.tabIcon}>{icon}</Text>
-      <Text style={[styles.tabText, { color: active ? '#000' : colors.text }]}>{label}</Text>
-    </AnimatedTouchable>
-  );
-}
-
-// Score Bar Component
-function ScoreBar({
-  category,
-  score,
-  index,
-}: {
-  category: string;
-  score: number;
   index: number;
 }) {
   const { colors } = useTheme();
-  const progress = useSharedValue(0);
-
-  const getScoreColor = () => {
-    if (score >= 70) return colors.success;
-    if (score >= 40) return colors.warning;
-    return colors.error;
-  };
-
-  // Animate the progress bar
-  progress.value = withTiming(score / 100, {
-    duration: 800,
-    easing: Easing.out(Easing.cubic),
-  });
-
-  const animatedWidth = useAnimatedStyle(() => ({
-    width: `${progress.value * 100}%`,
-  }));
+  const grade = calculateLetterGrade(analysis.analysis.categoryScores);
+  const verdictColor = analysis.analysis.overallVerdict === 'Aligned'
+    ? colors.success
+    : analysis.analysis.overallVerdict === 'At Risk'
+      ? colors.warning
+      : colors.error;
 
   return (
-    <Animated.View
-      entering={FadeInUp.delay(index * 80).duration(400)}
-      style={[styles.scoreItem, { backgroundColor: colors.surfaceHighlight, borderColor: colors.border }]}
-    >
-      <View style={styles.scoreHeader}>
-        <Text style={[styles.scoreName, { color: colors.text }]} numberOfLines={1}>
-          {category}
-        </Text>
-        <View style={[styles.scoreBadge, { backgroundColor: `${getScoreColor()}20` }]}>
-          <Text style={[styles.scoreValue, { color: getScoreColor() }]}>{score}</Text>
-        </View>
-      </View>
-      <View style={[styles.progressTrack, { backgroundColor: colors.border }]}>
-        <Animated.View
-          style={[styles.progressFill, { backgroundColor: getScoreColor() }, animatedWidth]}
-        />
-      </View>
-    </Animated.View>
-  );
-}
-
-// Finding Card Component
-function FindingCard({
-  finding,
-  index,
-}: {
-  finding: {
-    principleId: string;
-    name: string;
-    status: string;
-    explanation: string;
-  };
-  index: number;
-}) {
-  const { colors } = useTheme();
-
-  const getStatusColor = () => {
-    if (finding.status === 'Aligned') return colors.success;
-    if (finding.status === 'Partially Violated') return colors.warning;
-    return colors.error;
-  };
-
-  const getStatusIcon = () => {
-    if (finding.status === 'Aligned') return 'checkmark-circle';
-    if (finding.status === 'Partially Violated') return 'warning';
-    return 'alert-circle';
-  };
-
-  return (
-    <Animated.View
-      entering={FadeInUp.delay(index * 80).duration(400)}
-      style={[styles.findingCard, { backgroundColor: colors.surfaceHighlight, borderColor: colors.border }]}
-    >
-      <View style={styles.findingHeader}>
-        <View style={[styles.findingIconBg, { backgroundColor: `${getStatusColor()}20` }]}>
-          <Ionicons name={getStatusIcon()} size={18} color={getStatusColor()} />
-        </View>
-        <View style={styles.findingInfo}>
-          <View style={styles.findingTitleRow}>
-            <Text style={[styles.principleId, { color: colors.gold }]}>{finding.principleId}</Text>
-            <View style={[styles.statusBadge, { backgroundColor: `${getStatusColor()}20` }]}>
-              <Text style={[styles.statusText, { color: getStatusColor() }]}>{finding.status}</Text>
+    <Animated.View entering={FadeInUp.delay(index * 80).duration(300)}>
+      <TouchableOpacity
+        style={[styles.historyCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
+        onPress={onPress}
+        activeOpacity={0.7}
+      >
+        <View style={styles.historyCardContent}>
+          <View style={styles.historyCardLeft}>
+            <Text style={[styles.historyTitle, { color: colors.text }]} numberOfLines={1}>
+              {analysis.title}
+            </Text>
+            <View style={styles.historyMeta}>
+              <View style={[styles.verdictPill, { backgroundColor: `${verdictColor}20` }]}>
+                <Ionicons name={getVerdictIcon(analysis.analysis.overallVerdict) as any} size={12} color={verdictColor} />
+                <Text style={[styles.verdictPillText, { color: verdictColor }]}>
+                  {analysis.analysis.overallVerdict}
+                </Text>
+              </View>
+              <Text style={[styles.historyDate, { color: colors.textTertiary }]}>
+                {analysis.timestamp}
+              </Text>
             </View>
           </View>
-          <Text style={[styles.principleName, { color: colors.text }]}>{finding.name}</Text>
+          <LetterGradeBadge grade={grade} size="small" />
         </View>
-      </View>
-      <Text style={[styles.findingExplanation, { color: colors.textSecondary }]}>
-        {finding.explanation}
-      </Text>
+        <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
+      </TouchableOpacity>
     </Animated.View>
   );
 }
 
-// Correction Card Component
-function CorrectionCard({
-  correction,
-  index,
-}: {
-  correction: string;
-  index: number;
-}) {
+// Category Score Bar Component
+function CategoryScoreBar({ category, score, index }: { category: string; score: number; index: number }) {
   const { colors } = useTheme();
+  const grade = score >= 90 ? 'A' : score >= 80 ? 'B' : score >= 70 ? 'C' : score >= 60 ? 'D' : 'F';
+  const color = getGradeColor(grade);
 
   return (
     <Animated.View
-      entering={FadeInUp.delay(index * 80).duration(400)}
-      style={[styles.correctionCard, { backgroundColor: `${colors.warning}15`, borderColor: `${colors.warning}40` }]}
+      entering={FadeInUp.delay(index * 60).duration(300)}
+      style={styles.scoreBarContainer}
     >
-      <View style={[styles.correctionNumber, { backgroundColor: colors.warning }]}>
-        <Text style={styles.correctionNumberText}>{index + 1}</Text>
+      <View style={styles.scoreBarHeader}>
+        <Text style={[styles.scoreBarCategory, { color: colors.text }]} numberOfLines={1}>
+          {category}
+        </Text>
+        <View style={styles.scoreBarRight}>
+          <Text style={[styles.scoreBarGrade, { color }]}>{grade}</Text>
+          <Text style={[styles.scoreBarValue, { color: colors.textSecondary }]}>{score}</Text>
+        </View>
       </View>
-      <Text style={[styles.correctionText, { color: colors.text }]}>{correction}</Text>
+      <View style={[styles.scoreBarTrack, { backgroundColor: colors.border }]}>
+        <View style={[styles.scoreBarFill, { width: `${score}%`, backgroundColor: color }]} />
+      </View>
     </Animated.View>
   );
 }
 
-// Premium Upgrade Card Component
-function PremiumUpgradeCard() {
+// Finding Item Component
+function FindingItem({ finding, index }: { finding: Analysis['analysis']['flaggedPrinciples'][0]; index: number }) {
   const { colors } = useTheme();
-
-  const SENTINEL_FEATURES = [
-    { icon: 'document-text-outline', text: 'Analyze any government document' },
-    { icon: 'shield-checkmark-outline', text: 'Evaluate against 155 governance principles' },
-    { icon: 'bar-chart-outline', text: 'Get detailed category scores' },
-    { icon: 'warning-outline', text: 'Identify principle violations' },
-    { icon: 'construct-outline', text: 'Receive AI-powered correction suggestions' },
-    { icon: 'create-outline', text: 'Auto-generate community proposals' },
-  ];
-
-  const handleUpgrade = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    router.push('/modals/subscription');
-  };
+  const statusColor = finding.status === 'Aligned'
+    ? colors.success
+    : finding.status === 'Partially Violated'
+      ? colors.warning
+      : colors.error;
+  const statusIcon = finding.status === 'Aligned'
+    ? 'checkmark-circle'
+    : finding.status === 'Partially Violated'
+      ? 'warning'
+      : 'close-circle';
 
   return (
-    <ScrollView
-      style={styles.scrollView}
-      contentContainerStyle={styles.scrollContent}
-      showsVerticalScrollIndicator={false}
+    <Animated.View
+      entering={FadeInUp.delay(index * 60).duration(300)}
+      style={[styles.findingItem, { backgroundColor: colors.surfaceHighlight, borderColor: colors.border }]}
     >
-      {/* Premium Badge */}
-      <Animated.View
-        entering={FadeInDown.duration(400)}
-        style={[styles.premiumHero, { backgroundColor: `${colors.gold}10` }]}
-      >
-        <View style={[styles.premiumIconBg, { backgroundColor: colors.gold }]}>
-          <Ionicons name="sparkles" size={40} color="#000" />
+      <Ionicons name={statusIcon as any} size={18} color={statusColor} style={styles.findingIcon} />
+      <View style={styles.findingContent}>
+        <Text style={[styles.findingName, { color: colors.text }]}>{finding.name}</Text>
+        <Text style={[styles.findingExplanation, { color: colors.textSecondary }]} numberOfLines={2}>
+          {finding.explanation}
+        </Text>
+      </View>
+    </Animated.View>
+  );
+}
+
+// Report Card Component
+function ReportCard({
+  analysis,
+  onClose,
+  onCreateProposal,
+  creatingProposal,
+  proposalCreated,
+}: {
+  analysis: Analysis;
+  onClose: () => void;
+  onCreateProposal: () => void;
+  creatingProposal: boolean;
+  proposalCreated: boolean;
+}) {
+  const { colors } = useTheme();
+  const grade = calculateLetterGrade(analysis.analysis.categoryScores);
+  const gradeColor = getGradeColor(grade);
+  const verdictColor = analysis.analysis.overallVerdict === 'Aligned'
+    ? colors.success
+    : analysis.analysis.overallVerdict === 'At Risk'
+      ? colors.warning
+      : colors.error;
+
+  return (
+    <ScrollView style={styles.reportCardScroll} showsVerticalScrollIndicator={false}>
+      {/* Header */}
+      <View style={styles.reportHeader}>
+        <TouchableOpacity onPress={onClose} style={styles.reportBackButton}>
+          <Ionicons name="arrow-back" size={24} color={colors.text} />
+        </TouchableOpacity>
+        <View style={styles.reportHeaderText}>
+          <Text style={[styles.reportHeaderTitle, { color: colors.gold }]}>Report Card</Text>
+          <Text style={[styles.reportHeaderSubtitle, { color: colors.textSecondary }]} numberOfLines={1}>
+            {analysis.title}
+          </Text>
         </View>
-        <Text style={[styles.premiumTitle, { color: colors.gold }]}>
-          Sentinel AI
-        </Text>
-        <Text style={[styles.premiumSubtitle, { color: colors.textSecondary }]}>
-          Premium Feature
-        </Text>
-      </Animated.View>
+      </View>
 
-      {/* Description Card */}
+      {/* Grade Hero */}
       <Animated.View
-        entering={FadeInUp.delay(100).duration(400)}
-        style={[styles.descriptionCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
-      >
-        <Text style={[styles.descriptionTitle, { color: colors.text }]}>
-          AI-Powered Governance Analysis
-        </Text>
-        <Text style={[styles.descriptionText, { color: colors.textSecondary }]}>
-          Sentinel evaluates government documents, policies, and legislation against 155 principles
-          of proper human governance. Get instant insights, identify violations, and generate
-          proposals to improve civic outcomes.
-        </Text>
-      </Animated.View>
-
-      {/* Features List */}
-      <Animated.View
-        entering={FadeInUp.delay(200).duration(400)}
-        style={[styles.featuresCard, { backgroundColor: colors.surface, borderColor: colors.gold }]}
+        entering={FadeIn.duration(500)}
+        style={[styles.gradeHero, { backgroundColor: `${gradeColor}10`, borderColor: gradeColor }]}
       >
         <LinearGradient
-          colors={[`${colors.gold}08`, 'transparent']}
+          colors={[`${gradeColor}15`, 'transparent']}
           style={StyleSheet.absoluteFill}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
         />
-        <Text style={[styles.featuresTitle, { color: colors.gold }]}>
-          What You Get
-        </Text>
-        {SENTINEL_FEATURES.map((feature, index) => (
-          <Animated.View
-            key={index}
-            entering={FadeInUp.delay(300 + index * 50).duration(300)}
-            style={styles.featureRow}
-          >
-            <View style={[styles.featureIconBg, { backgroundColor: `${colors.gold}15` }]}>
-              <Ionicons name={feature.icon as any} size={18} color={colors.gold} />
-            </View>
-            <Text style={[styles.featureText, { color: colors.text }]}>
-              {feature.text}
-            </Text>
-          </Animated.View>
-        ))}
+        <Text style={[styles.gradeHeroLabel, { color: colors.textSecondary }]}>OVERALL GRADE</Text>
+        <Text style={[styles.gradeHeroGrade, { color: gradeColor }]}>{grade}</Text>
+        <View style={[styles.verdictBadge, { backgroundColor: `${verdictColor}20`, borderColor: verdictColor }]}>
+          <Ionicons name={getVerdictIcon(analysis.analysis.overallVerdict) as any} size={16} color={verdictColor} />
+          <Text style={[styles.verdictBadgeText, { color: verdictColor }]}>
+            {analysis.analysis.overallVerdict}
+          </Text>
+        </View>
       </Animated.View>
 
-      {/* Pricing Card */}
-      <Animated.View
-        entering={FadeInUp.delay(400).duration(400)}
-        style={[styles.pricingCard, { backgroundColor: colors.gold }]}
-      >
-        <View style={styles.pricingContent}>
-          <View style={styles.pricingLeft}>
-            <Text style={styles.pricingLabel}>Premium</Text>
-            <View style={styles.priceRow}>
-              <Text style={styles.priceAmount}>$7.99</Text>
-              <Text style={styles.pricePeriod}>/month</Text>
-            </View>
+      {/* Category Scores */}
+      <View style={[styles.reportSection, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        <View style={styles.sectionHeader}>
+          <Ionicons name="bar-chart-outline" size={18} color={colors.gold} />
+          <Text style={[styles.sectionTitle, { color: colors.gold }]}>Category Scores</Text>
+        </View>
+        {analysis.analysis.categoryScores.length > 0 ? (
+          analysis.analysis.categoryScores.map((cat, i) => (
+            <CategoryScoreBar key={cat.category} category={cat.category} score={cat.score} index={i} />
+          ))
+        ) : (
+          <Text style={[styles.emptyText, { color: colors.textSecondary }]}>No scores available</Text>
+        )}
+      </View>
+
+      {/* Key Findings */}
+      <View style={[styles.reportSection, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        <View style={styles.sectionHeader}>
+          <Ionicons name="search-outline" size={18} color={colors.gold} />
+          <Text style={[styles.sectionTitle, { color: colors.gold }]}>Key Findings</Text>
+        </View>
+        {analysis.analysis.flaggedPrinciples.length > 0 ? (
+          analysis.analysis.flaggedPrinciples.slice(0, 5).map((finding, i) => (
+            <FindingItem key={finding.principleId} finding={finding} index={i} />
+          ))
+        ) : (
+          <View style={styles.emptyState}>
+            <Ionicons name="shield-checkmark" size={32} color={colors.success} />
+            <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+              No issues found - document is aligned
+            </Text>
           </View>
+        )}
+      </View>
+
+      {/* Recommended Fixes */}
+      {analysis.analysis.sentinelCorrections.length > 0 && (
+        <View style={[styles.reportSection, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <View style={styles.sectionHeader}>
+            <Ionicons name="construct-outline" size={18} color={colors.gold} />
+            <Text style={[styles.sectionTitle, { color: colors.gold }]}>Recommended Fixes</Text>
+          </View>
+          {analysis.analysis.sentinelCorrections.map((fix, i) => (
+            <Animated.View
+              key={i}
+              entering={FadeInUp.delay(i * 60).duration(300)}
+              style={[styles.fixItem, { backgroundColor: `${colors.warning}10`, borderColor: `${colors.warning}30` }]}
+            >
+              <View style={[styles.fixNumber, { backgroundColor: colors.warning }]}>
+                <Text style={styles.fixNumberText}>{i + 1}</Text>
+              </View>
+              <Text style={[styles.fixText, { color: colors.text }]}>{fix}</Text>
+            </Animated.View>
+          ))}
+        </View>
+      )}
+
+      {/* Summary */}
+      <View style={[styles.reportSection, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        <View style={styles.sectionHeader}>
+          <Ionicons name="document-text-outline" size={18} color={colors.gold} />
+          <Text style={[styles.sectionTitle, { color: colors.gold }]}>Summary</Text>
+        </View>
+        <Text style={[styles.summaryText, { color: colors.text }]}>
+          {analysis.analysis.summary}
+        </Text>
+      </View>
+
+      {/* Actions */}
+      <View style={styles.reportActions}>
+        {proposalCreated ? (
+          <View style={[styles.successBanner, { backgroundColor: `${colors.success}15`, borderColor: colors.success }]}>
+            <Ionicons name="checkmark-circle" size={24} color={colors.success} />
+            <Text style={[styles.successText, { color: colors.success }]}>Proposal Created!</Text>
+          </View>
+        ) : (
           <TouchableOpacity
-            style={styles.upgradeButton}
-            onPress={handleUpgrade}
+            style={[styles.createProposalButton, { backgroundColor: colors.gold }]}
+            onPress={onCreateProposal}
+            disabled={creatingProposal}
             activeOpacity={0.8}
           >
-            <Text style={styles.upgradeButtonText}>Upgrade Now</Text>
-            <Ionicons name="arrow-forward" size={18} color={colors.gold} />
+            {creatingProposal ? (
+              <ActivityIndicator size="small" color="#000" />
+            ) : (
+              <Ionicons name="add-circle" size={20} color="#000" />
+            )}
+            <Text style={styles.createProposalText}>
+              {creatingProposal ? 'Creating...' : 'Create Proposal from Analysis'}
+            </Text>
           </TouchableOpacity>
-        </View>
-        <Text style={styles.pricingNote}>
-          Includes Sentinel AI, unlimited proposals, analytics, and verification
-        </Text>
-      </Animated.View>
-
-      {/* Stats Preview */}
-      <Animated.View
-        entering={FadeInUp.delay(500).duration(400)}
-        style={styles.statsPreview}
-      >
-        <View style={[styles.previewStatCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <Text style={[styles.previewStatValue, { color: colors.gold }]}>155</Text>
-          <Text style={[styles.previewStatLabel, { color: colors.textSecondary }]}>Principles</Text>
-        </View>
-        <View style={[styles.previewStatCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <Text style={[styles.previewStatValue, { color: colors.gold }]}>11</Text>
-          <Text style={[styles.previewStatLabel, { color: colors.textSecondary }]}>Categories</Text>
-        </View>
-        <View style={[styles.previewStatCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <Text style={[styles.previewStatValue, { color: colors.gold }]}>AI</Text>
-          <Text style={[styles.previewStatLabel, { color: colors.textSecondary }]}>Powered</Text>
-        </View>
-      </Animated.View>
+        )}
+      </View>
 
       <View style={styles.bottomPadding} />
     </ScrollView>
@@ -369,22 +405,50 @@ function PremiumUpgradeCard() {
 }
 
 export default function SentinelScreen() {
-  const { colors, isDark } = useTheme();
+  const { colors } = useTheme();
   const { user, token } = useAuthStore();
   const [isPremium, setIsPremium] = useState(false);
   const [loadingSubscription, setLoadingSubscription] = useState(true);
+
+  // Form state
   const [title, setTitle] = useState('');
   const [text, setText] = useState('');
   const [issueType, setIssueType] = useState('Policy');
   const [showIssueTypePicker, setShowIssueTypePicker] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
-  const [selectedAnalysis, setSelectedAnalysis] = useState<Analysis | null>(null);
-  const [activeTab, setActiveTab] = useState<'summary' | 'categories' | 'findings' | 'corrections' | 'proposal'>('summary');
+
+  // History and report state
+  const [analysisHistory, setAnalysisHistory] = useState<Analysis[]>([]);
+  const [selectedReport, setSelectedReport] = useState<Analysis | null>(null);
   const [creatingProposal, setCreatingProposal] = useState(false);
   const [proposalCreated, setProposalCreated] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
-  // Check if user has Premium subscription
+  // Load history from storage
+  useEffect(() => {
+    const loadHistory = async () => {
+      try {
+        const stored = await AsyncStorage.getItem(STORAGE_KEY);
+        if (stored) {
+          setAnalysisHistory(JSON.parse(stored));
+        }
+      } catch (error) {
+        console.error('Error loading history:', error);
+      }
+    };
+    loadHistory();
+  }, []);
+
+  // Save history to storage
+  const saveHistory = useCallback(async (history: Analysis[]) => {
+    try {
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(history));
+    } catch (error) {
+      console.error('Error saving history:', error);
+    }
+  }, []);
+
+  // Check subscription
   useEffect(() => {
     const checkSubscription = async () => {
       if (!token) {
@@ -411,18 +475,7 @@ export default function SentinelScreen() {
     checkSubscription();
   }, [token]);
 
-  // Pulse animation for analyzing state
-  const pulseScale = useSharedValue(1);
-  if (analyzing) {
-    pulseScale.value = withRepeat(
-      withTiming(1.05, { duration: 1000, easing: Easing.inOut(Easing.ease) }),
-      -1,
-      true
-    );
-  }
-
   const handleAnalyze = async () => {
-    // Check premium status first
     if (!isPremium) {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       setShowUpgradeModal(true);
@@ -434,15 +487,19 @@ export default function SentinelScreen() {
       Alert.alert('Error', 'Please enter a title and text to analyze');
       return;
     }
+
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setAnalyzing(true);
+
     try {
       const response = await fetch(`${API_URL}/api/sentinel/analyze`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title, text, issueType }),
       });
+
       if (!response.ok) throw new Error('Analysis failed');
+
       const data = await response.json();
       const analysis = {
         ...data.analysis,
@@ -451,6 +508,7 @@ export default function SentinelScreen() {
         sentinelCorrections: data.analysis.sentinelCorrections || [],
         mainProposal: data.analysis.mainProposal || '',
       };
+
       const newAnalysis: Analysis = {
         id: Date.now().toString(),
         title,
@@ -462,149 +520,153 @@ export default function SentinelScreen() {
         }),
         analysis,
       };
-      setSelectedAnalysis(newAnalysis);
-      setActiveTab('summary');
+
+      const updatedHistory = [newAnalysis, ...analysisHistory].slice(0, 20); // Keep last 20
+      setAnalysisHistory(updatedHistory);
+      saveHistory(updatedHistory);
+
+      setSelectedReport(newAnalysis);
+      setProposalCreated(false);
       setTitle('');
       setText('');
+
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      Alert.alert('Analysis Complete', 'Swipe the tabs below to see Scores, Findings, Fixes, and Proposal!');
     } catch (error) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      Alert.alert('Error', 'Failed to analyze document.');
+      Alert.alert('Error', 'Failed to analyze document. Please try again.');
     } finally {
       setAnalyzing(false);
     }
   };
 
   const handleCreateProposal = async () => {
-    if (!selectedAnalysis || !user?.id) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+    if (!selectedReport || !user?.id) {
       Alert.alert('Error', 'Please sign in to create a proposal');
       return;
     }
+
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setCreatingProposal(true);
+
     try {
       const response = await fetch(`${API_URL}/api/proposals`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          title: selectedAnalysis.analysis.mainProposal,
-          description: `Governance proposal generated by Sentinel analysis of: ${selectedAnalysis.title}\n\nVerdict: ${selectedAnalysis.analysis.overallVerdict}\n\nSummary: ${selectedAnalysis.analysis.summary}`,
+          title: selectedReport.analysis.mainProposal || `Reform: ${selectedReport.title}`,
+          description: `Governance proposal generated by Sentinel analysis.\n\nOriginal Document: ${selectedReport.title}\nVerdict: ${selectedReport.analysis.overallVerdict}\n\nSummary: ${selectedReport.analysis.summary}`,
           category: 'governance',
           geoScope: 'global',
           geoRestrictions: [],
         }),
       });
+
       if (!response.ok) throw new Error('Failed to create proposal');
+
       setProposalCreated(true);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      Alert.alert('Success', 'Your proposal has been created!');
+      Alert.alert('Success', 'Your proposal has been created and is now live for voting!');
     } catch (error) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      Alert.alert('Error', 'Failed to create proposal.');
+      Alert.alert('Error', 'Failed to create proposal. Please try again.');
     } finally {
       setCreatingProposal(false);
     }
   };
 
-  const getVerdictColor = (verdict: string) => {
-    if (verdict === 'Aligned') return colors.success;
-    if (verdict === 'At Risk') return colors.warning;
-    return colors.error;
-  };
-
-  const getVerdictIcon = (verdict: string) => {
-    if (verdict === 'Aligned') return 'checkmark-circle';
-    if (verdict === 'At Risk') return 'warning';
-    return 'alert-circle';
-  };
-
-  // Show loading state while checking subscription
+  // Loading state
   if (loadingSubscription) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <View style={[styles.header, { borderBottomColor: colors.border }]}>
-          <View style={styles.headerContent}>
-            <View style={[styles.headerIconBg, { backgroundColor: `${colors.gold}15`, ...SHADOWS.glow }]}>
-              <Ionicons name="sparkles" size={28} color={colors.gold} />
-            </View>
-            <View style={styles.headerText}>
-              <Text style={[styles.headerTitle, { color: colors.gold }]}>Sentinel AI</Text>
-              <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>
-                Governance Analyzer
-              </Text>
-            </View>
-          </View>
-        </View>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.gold} />
+          <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading Sentinel...</Text>
         </View>
+      </View>
+    );
+  }
+
+  // Show Report Card if selected
+  if (selectedReport) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <ReportCard
+          analysis={selectedReport}
+          onClose={() => {
+            setSelectedReport(null);
+            setProposalCreated(false);
+          }}
+          onCreateProposal={handleCreateProposal}
+          creatingProposal={creatingProposal}
+          proposalCreated={proposalCreated}
+        />
       </View>
     );
   }
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Header */}
-      <Animated.View
-        entering={FadeInDown.duration(400)}
-        style={[styles.header, { borderBottomColor: colors.border }]}
-      >
-        <View style={styles.headerContent}>
-          <View style={[styles.headerIconBg, { backgroundColor: `${colors.gold}15`, ...SHADOWS.glow }]}>
-            <Ionicons name="sparkles" size={28} color={colors.gold} />
-          </View>
-          <View style={styles.headerText}>
-            <Text style={[styles.headerTitle, { color: colors.gold }]}>Sentinel AI</Text>
-            <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>
-              Governance Analyzer
-            </Text>
-          </View>
-        </View>
-      </Animated.View>
-
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Info Card */}
-        <Animated.View
-          entering={FadeInDown.delay(100).duration(400)}
-          style={[styles.infoCard, { backgroundColor: `${colors.gold}15`, borderColor: colors.gold }]}
-        >
-          <LinearGradient
-            colors={[`${colors.gold}15`, 'transparent']}
-            style={StyleSheet.absoluteFill}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-          />
-          <Ionicons name="information-circle" size={20} color={colors.gold} />
-          <Text style={[styles.infoText, { color: colors.text }]}>
-            Sentinel evaluates government documents against 155 principles of proper human governance.
-          </Text>
+        {/* Header */}
+        <Animated.View entering={FadeInDown.duration(400)} style={styles.header}>
+          <View style={[styles.headerIconBg, { backgroundColor: `${colors.gold}15` }]}>
+            <Ionicons name="sparkles" size={28} color={colors.gold} />
+          </View>
+          <View style={styles.headerText}>
+            <Text style={[styles.headerTitle, { color: colors.gold }]}>Sentinel AI</Text>
+            <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>
+              Governance Report Cards
+            </Text>
+          </View>
+          {!isPremium && (
+            <TouchableOpacity
+              style={[styles.premiumBadge, { backgroundColor: colors.gold }]}
+              onPress={() => router.push('/modals/subscription')}
+            >
+              <Text style={styles.premiumBadgeText}>Premium</Text>
+            </TouchableOpacity>
+          )}
         </Animated.View>
 
-        {/* Stats Row */}
-        <Animated.View
-          entering={FadeInDown.delay(200).duration(400)}
-          style={styles.statsRow}
-        >
-          <View style={[styles.statCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <Text style={[styles.statValue, { color: colors.gold }]}>155</Text>
-            <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Principles</Text>
-          </View>
-          <View style={[styles.statCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <Text style={[styles.statValue, { color: colors.gold }]}>11</Text>
-            <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Categories</Text>
-          </View>
+        {/* Quick Stats */}
+        <Animated.View entering={FadeInUp.delay(100).duration(400)}>
+          <QuickStatsRow analyses={analysisHistory} />
         </Animated.View>
 
-        {/* Submit Document Card */}
+        {/* Recent Analyses */}
+        {analysisHistory.length > 0 && (
+          <Animated.View entering={FadeInUp.delay(200).duration(400)} style={styles.historySection}>
+            <View style={styles.historySectionHeader}>
+              <Text style={[styles.historySectionTitle, { color: colors.text }]}>Recent Analyses</Text>
+              {analysisHistory.length > 3 && (
+                <Text style={[styles.historyCount, { color: colors.textTertiary }]}>
+                  {analysisHistory.length} total
+                </Text>
+              )}
+            </View>
+            {analysisHistory.slice(0, 5).map((analysis, index) => (
+              <AnalysisHistoryCard
+                key={analysis.id}
+                analysis={analysis}
+                index={index}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  setSelectedReport(analysis);
+                  setProposalCreated(false);
+                }}
+              />
+            ))}
+          </Animated.View>
+        )}
+
+        {/* New Analysis Form */}
         <Animated.View
           entering={FadeInUp.delay(300).duration(400)}
-          style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.gold }]}
+          style={[styles.formCard, { backgroundColor: colors.surface, borderColor: colors.gold }]}
         >
           <LinearGradient
             colors={[`${colors.gold}08`, 'transparent']}
@@ -613,22 +675,19 @@ export default function SentinelScreen() {
             end={{ x: 1, y: 1 }}
           />
 
-          <View style={styles.cardHeader}>
-            <View style={[styles.cardIconBg, { backgroundColor: `${colors.gold}15` }]}>
-              <Ionicons name="document-text-outline" size={20} color={colors.gold} />
+          <View style={styles.formHeader}>
+            <View style={[styles.formIconBg, { backgroundColor: `${colors.gold}15` }]}>
+              <Ionicons name="add-circle-outline" size={20} color={colors.gold} />
             </View>
-            <Text style={[styles.cardTitle, { color: colors.gold }]}>Submit Document</Text>
+            <Text style={[styles.formTitle, { color: colors.gold }]}>New Analysis</Text>
           </View>
 
           {/* Title Input */}
           <View style={styles.inputGroup}>
-            <Text style={[styles.inputLabel, { color: colors.gold }]}>Title</Text>
+            <Text style={[styles.inputLabel, { color: colors.gold }]}>Document Title</Text>
             <TextInput
-              style={[
-                styles.input,
-                { backgroundColor: colors.surfaceHighlight, borderColor: colors.border, color: colors.text },
-              ]}
-              placeholder="e.g., Public Safety Act 2024"
+              style={[styles.input, { backgroundColor: colors.surfaceHighlight, borderColor: colors.border, color: colors.text }]}
+              placeholder="e.g., Tax Reform Act 2026"
               placeholderTextColor={colors.textTertiary}
               value={title}
               onChangeText={setTitle}
@@ -639,43 +698,28 @@ export default function SentinelScreen() {
           <View style={styles.inputGroup}>
             <Text style={[styles.inputLabel, { color: colors.gold }]}>Issue Type</Text>
             <TouchableOpacity
-              style={[
-                styles.picker,
-                { backgroundColor: colors.surfaceHighlight, borderColor: colors.border },
-              ]}
+              style={[styles.picker, { backgroundColor: colors.surfaceHighlight, borderColor: colors.border }]}
               onPress={() => setShowIssueTypePicker(!showIssueTypePicker)}
             >
               <Text style={[styles.pickerText, { color: colors.text }]}>{issueType}</Text>
-              <Ionicons
-                name={showIssueTypePicker ? 'chevron-up' : 'chevron-down'}
-                size={20}
-                color={colors.gold}
-              />
+              <Ionicons name={showIssueTypePicker ? 'chevron-up' : 'chevron-down'} size={20} color={colors.gold} />
             </TouchableOpacity>
             {showIssueTypePicker && (
               <Animated.View
                 entering={FadeIn.duration(200)}
-                style={[
-                  styles.pickerDropdown,
-                  { backgroundColor: colors.surface, borderColor: colors.border },
-                ]}
+                style={[styles.pickerDropdown, { backgroundColor: colors.surface, borderColor: colors.border }]}
               >
                 {ISSUE_TYPES.map((type) => (
                   <TouchableOpacity
                     key={type}
-                    style={[
-                      styles.pickerOption,
-                      issueType === type && { backgroundColor: `${colors.gold}15` },
-                    ]}
+                    style={[styles.pickerOption, issueType === type && { backgroundColor: `${colors.gold}15` }]}
                     onPress={() => {
                       setIssueType(type);
                       setShowIssueTypePicker(false);
                     }}
                   >
                     <Text style={[styles.pickerOptionText, { color: colors.text }]}>{type}</Text>
-                    {issueType === type && (
-                      <Ionicons name="checkmark" size={18} color={colors.gold} />
-                    )}
+                    {issueType === type && <Ionicons name="checkmark" size={18} color={colors.gold} />}
                   </TouchableOpacity>
                 ))}
               </Animated.View>
@@ -684,13 +728,10 @@ export default function SentinelScreen() {
 
           {/* Text Input */}
           <View style={styles.inputGroup}>
-            <Text style={[styles.inputLabel, { color: colors.gold }]}>Text</Text>
+            <Text style={[styles.inputLabel, { color: colors.gold }]}>Document Text</Text>
             <TextInput
-              style={[
-                styles.textArea,
-                { backgroundColor: colors.surfaceHighlight, borderColor: colors.border, color: colors.text },
-              ]}
-              placeholder="Paste governance text here..."
+              style={[styles.textArea, { backgroundColor: colors.surfaceHighlight, borderColor: colors.border, color: colors.text }]}
+              placeholder="Paste the governance text to analyze..."
               placeholderTextColor={colors.textTertiary}
               value={text}
               onChangeText={setText}
@@ -702,11 +743,7 @@ export default function SentinelScreen() {
 
           {/* Analyze Button */}
           <TouchableOpacity
-            style={[
-              styles.analyzeButton,
-              { backgroundColor: colors.gold, ...SHADOWS.glow },
-              analyzing && styles.buttonDisabled,
-            ]}
+            style={[styles.analyzeButton, { backgroundColor: colors.gold }, analyzing && styles.buttonDisabled]}
             onPress={handleAnalyze}
             disabled={analyzing}
             activeOpacity={0.8}
@@ -714,260 +751,27 @@ export default function SentinelScreen() {
             {analyzing ? (
               <>
                 <ActivityIndicator size="small" color="#000" />
-                <Text style={styles.analyzeButtonText}>Analyzing...</Text>
+                <Text style={styles.analyzeButtonText}>Generating Report Card...</Text>
               </>
             ) : (
               <>
                 <Ionicons name="sparkles" size={20} color="#000" />
-                <Text style={styles.analyzeButtonText}>Analyze with Sentinel</Text>
+                <Text style={styles.analyzeButtonText}>Generate Report Card</Text>
               </>
             )}
           </TouchableOpacity>
         </Animated.View>
 
-        {/* Analysis Results */}
-        {selectedAnalysis && (
-          <Animated.View
-            entering={FadeInUp.duration(500)}
-            style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.gold }]}
-          >
-            <LinearGradient
-              colors={[`${colors.gold}08`, 'transparent']}
-              style={StyleSheet.absoluteFill}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-            />
-
-            {/* Analysis Header */}
-            <View style={styles.analysisHeader}>
-              <View style={styles.analysisInfo}>
-                <View style={[styles.cardIconBg, { backgroundColor: `${colors.success}15` }]}>
-                  <Ionicons name="checkmark-done" size={20} color={colors.success} />
-                </View>
-                <View style={styles.analysisText}>
-                  <Text style={[styles.cardTitle, { color: colors.gold }]}>Analysis Result</Text>
-                  <Text style={[styles.analysisSubtitle, { color: colors.textSecondary }]}>
-                    {selectedAnalysis.title}
-                  </Text>
-                </View>
-              </View>
-              <View
-                style={[
-                  styles.verdictBadge,
-                  {
-                    backgroundColor: `${getVerdictColor(selectedAnalysis.analysis.overallVerdict)}20`,
-                    borderColor: getVerdictColor(selectedAnalysis.analysis.overallVerdict),
-                  },
-                ]}
-              >
-                <Ionicons
-                  name={getVerdictIcon(selectedAnalysis.analysis.overallVerdict)}
-                  size={14}
-                  color={getVerdictColor(selectedAnalysis.analysis.overallVerdict)}
-                />
-                <Text
-                  style={[
-                    styles.verdictText,
-                    { color: getVerdictColor(selectedAnalysis.analysis.overallVerdict) },
-                  ]}
-                >
-                  {selectedAnalysis.analysis.overallVerdict}
-                </Text>
-              </View>
-            </View>
-
-            {/* Tabs */}
-            <Text style={[styles.tabHint, { color: colors.textTertiary }]}>
-              Tap to explore sections:
-            </Text>
-            <View style={[styles.tabsWrapper, { backgroundColor: colors.surfaceHighlight }]}>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.tabsContent}
-              >
-                <TabButton
-                  label="Summary"
-                  icon="📋"
-                  active={activeTab === 'summary'}
-                  onPress={() => setActiveTab('summary')}
-                />
-                <TabButton
-                  label="Scores"
-                  icon="📊"
-                  active={activeTab === 'categories'}
-                  onPress={() => setActiveTab('categories')}
-                />
-                <TabButton
-                  label="Findings"
-                  icon="🔍"
-                  active={activeTab === 'findings'}
-                  onPress={() => setActiveTab('findings')}
-                />
-                <TabButton
-                  label="Fixes"
-                  icon="✏️"
-                  active={activeTab === 'corrections'}
-                  onPress={() => setActiveTab('corrections')}
-                />
-                <TabButton
-                  label="Proposal"
-                  icon="📝"
-                  active={activeTab === 'proposal'}
-                  onPress={() => setActiveTab('proposal')}
-                />
-              </ScrollView>
-            </View>
-
-            {/* Tab Content */}
-            <View style={styles.tabContent}>
-              {activeTab === 'summary' && (
-                <Animated.View entering={FadeIn.duration(300)} style={styles.tabPane}>
-                  <View style={[styles.summaryBox, { backgroundColor: colors.surfaceHighlight, borderColor: colors.gold }]}>
-                    <View style={styles.summaryHeader}>
-                      <Ionicons name="document-text" size={16} color={colors.gold} />
-                      <Text style={[styles.summaryLabel, { color: colors.gold }]}>Summary</Text>
-                    </View>
-                    <Text style={[styles.summaryText, { color: colors.text }]}>
-                      {selectedAnalysis.analysis.summary}
-                    </Text>
-                  </View>
-                  {selectedAnalysis.analysis.reasoning && (
-                    <View style={[styles.summaryBox, { backgroundColor: colors.surfaceHighlight, borderColor: colors.border }]}>
-                      <View style={styles.summaryHeader}>
-                        <Ionicons name="bulb-outline" size={16} color={colors.gold} />
-                        <Text style={[styles.summaryLabel, { color: colors.gold }]}>Reasoning</Text>
-                      </View>
-                      <Text style={[styles.summaryText, { color: colors.text }]}>
-                        {selectedAnalysis.analysis.reasoning}
-                      </Text>
-                    </View>
-                  )}
-                </Animated.View>
-              )}
-
-              {activeTab === 'categories' && (
-                <View style={styles.tabPane}>
-                  {selectedAnalysis.analysis.categoryScores.length === 0 ? (
-                    <View style={styles.emptyState}>
-                      <Ionicons name="bar-chart-outline" size={40} color={colors.textTertiary} />
-                      <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-                        No category scores available
-                      </Text>
-                    </View>
-                  ) : (
-                    selectedAnalysis.analysis.categoryScores.map((cat, index) => (
-                      <ScoreBar key={cat.category} category={cat.category} score={cat.score} index={index} />
-                    ))
-                  )}
-                </View>
-              )}
-
-              {activeTab === 'findings' && (
-                <View style={styles.tabPane}>
-                  {selectedAnalysis.analysis.flaggedPrinciples.length === 0 ? (
-                    <View style={styles.emptyState}>
-                      <Ionicons name="shield-checkmark-outline" size={40} color={colors.success} />
-                      <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-                        No flagged principles - Document is fully aligned
-                      </Text>
-                    </View>
-                  ) : (
-                    selectedAnalysis.analysis.flaggedPrinciples.map((finding, index) => (
-                      <FindingCard key={finding.principleId} finding={finding} index={index} />
-                    ))
-                  )}
-                </View>
-              )}
-
-              {activeTab === 'corrections' && (
-                <View style={styles.tabPane}>
-                  <View style={styles.correctionsHeader}>
-                    <View style={[styles.correctionsIconBg, { backgroundColor: `${colors.warning}15` }]}>
-                      <Ionicons name="construct-outline" size={18} color={colors.warning} />
-                    </View>
-                    <Text style={[styles.correctionsTitle, { color: colors.gold }]}>
-                      Sentinel Corrections
-                    </Text>
-                  </View>
-                  {selectedAnalysis.analysis.sentinelCorrections.length === 0 ? (
-                    <View style={styles.emptyState}>
-                      <Ionicons name="checkmark-done-circle-outline" size={40} color={colors.success} />
-                      <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-                        No corrections needed
-                      </Text>
-                    </View>
-                  ) : (
-                    selectedAnalysis.analysis.sentinelCorrections.map((correction, index) => (
-                      <CorrectionCard key={index} correction={correction} index={index} />
-                    ))
-                  )}
-                </View>
-              )}
-
-              {activeTab === 'proposal' && (
-                <View style={styles.tabPane}>
-                  {proposalCreated ? (
-                    <Animated.View
-                      entering={FadeIn.duration(400)}
-                      style={[styles.successBox, { backgroundColor: `${colors.success}15`, borderColor: colors.success }]}
-                    >
-                      <View style={[styles.successIconBg, { backgroundColor: colors.success }]}>
-                        <Ionicons name="checkmark" size={24} color="#fff" />
-                      </View>
-                      <View style={styles.successContent}>
-                        <Text style={[styles.successTitle, { color: colors.success }]}>
-                          Proposal Created!
-                        </Text>
-                        <Text style={[styles.successText, { color: colors.textSecondary }]}>
-                          Your proposal is now live for community voting.
-                        </Text>
-                      </View>
-                    </Animated.View>
-                  ) : (
-                    <>
-                      <View style={[styles.proposalBox, { backgroundColor: colors.surfaceHighlight, borderColor: colors.gold }]}>
-                        <View style={styles.proposalHeader}>
-                          <View style={[styles.proposalIconBg, { backgroundColor: `${colors.gold}15` }]}>
-                            <Ionicons name="document-text" size={18} color={colors.gold} />
-                          </View>
-                          <Text style={[styles.proposalLabel, { color: colors.gold }]}>
-                            Generated Proposal
-                          </Text>
-                        </View>
-                        <Text style={[styles.proposalText, { color: colors.text }]}>
-                          {selectedAnalysis.analysis.mainProposal || 'No proposal generated'}
-                        </Text>
-                      </View>
-                      <TouchableOpacity
-                        style={[
-                          styles.createProposalButton,
-                          { backgroundColor: colors.gold, ...SHADOWS.glow },
-                          creatingProposal && styles.buttonDisabled,
-                        ]}
-                        onPress={handleCreateProposal}
-                        disabled={creatingProposal}
-                        activeOpacity={0.8}
-                      >
-                        {creatingProposal ? (
-                          <>
-                            <ActivityIndicator size="small" color="#000" />
-                            <Text style={styles.createProposalButtonText}>Creating...</Text>
-                          </>
-                        ) : (
-                          <>
-                            <Ionicons name="add-circle" size={20} color="#000" />
-                            <Text style={styles.createProposalButtonText}>Create Proposal</Text>
-                          </>
-                        )}
-                      </TouchableOpacity>
-                    </>
-                  )}
-                </View>
-              )}
-            </View>
-          </Animated.View>
-        )}
+        {/* Info Card */}
+        <Animated.View
+          entering={FadeInUp.delay(400).duration(400)}
+          style={[styles.infoCard, { backgroundColor: `${colors.gold}10`, borderColor: colors.gold }]}
+        >
+          <Ionicons name="information-circle" size={20} color={colors.gold} />
+          <Text style={[styles.infoText, { color: colors.text }]}>
+            Sentinel evaluates documents against 155 principles of proper human governance and generates a report card with grades.
+          </Text>
+        </Animated.View>
 
         <View style={styles.bottomPadding} />
       </ScrollView>
@@ -978,7 +782,7 @@ export default function SentinelScreen() {
         onClose={() => setShowUpgradeModal(false)}
         type="premium"
         title="Unlock Sentinel AI"
-        message="Upgrade to Premium to analyze government documents against 155 principles of proper human governance. Get instant insights, identify violations, and generate proposals."
+        message="Upgrade to Premium to analyze government documents and get detailed governance report cards with grades."
       />
     </View>
   );
@@ -992,155 +796,24 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  // Premium Upgrade Card Styles
-  premiumHero: {
-    alignItems: 'center',
-    paddingVertical: SPACING.xxxl,
-    borderRadius: BORDER_RADIUS.xxl,
-    marginBottom: SPACING.lg,
-  },
-  premiumIconBg: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: SPACING.lg,
-  },
-  premiumTitle: {
-    ...TYPOGRAPHY.displaySmall,
-    fontWeight: '700',
-    marginBottom: SPACING.xs,
-  },
-  premiumSubtitle: {
-    ...TYPOGRAPHY.bodyLarge,
-  },
-  descriptionCard: {
-    padding: SPACING.xl,
-    borderRadius: BORDER_RADIUS.xxl,
-    borderWidth: 1,
-    marginBottom: SPACING.lg,
-  },
-  descriptionTitle: {
-    ...TYPOGRAPHY.headlineSmall,
-    marginBottom: SPACING.md,
-  },
-  descriptionText: {
-    ...TYPOGRAPHY.bodyMedium,
-    lineHeight: 24,
-  },
-  featuresCard: {
-    padding: SPACING.xl,
-    borderRadius: BORDER_RADIUS.xxl,
-    borderWidth: 1.5,
-    marginBottom: SPACING.lg,
-    overflow: 'hidden',
-  },
-  featuresTitle: {
-    ...TYPOGRAPHY.headlineSmall,
-    marginBottom: SPACING.lg,
-  },
-  featureRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: SPACING.md,
-  },
-  featureIconBg: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: SPACING.md,
-  },
-  featureText: {
-    ...TYPOGRAPHY.bodyMedium,
-    flex: 1,
-  },
-  pricingCard: {
-    padding: SPACING.xl,
-    borderRadius: BORDER_RADIUS.xxl,
-    marginBottom: SPACING.lg,
-  },
-  pricingContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: SPACING.md,
-  },
-  pricingLeft: {},
-  pricingLabel: {
-    ...TYPOGRAPHY.labelMedium,
-    color: '#000',
-    opacity: 0.7,
-    marginBottom: SPACING.xxs,
-  },
-  priceRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-  },
-  priceAmount: {
-    ...TYPOGRAPHY.displaySmall,
-    color: '#000',
-    fontWeight: '700',
-  },
-  pricePeriod: {
-    ...TYPOGRAPHY.bodyMedium,
-    color: '#000',
-    opacity: 0.7,
-    marginLeft: SPACING.xxs,
-  },
-  upgradeButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#000',
-    paddingHorizontal: SPACING.xl,
-    paddingVertical: SPACING.md,
-    borderRadius: BORDER_RADIUS.full,
-    gap: SPACING.sm,
-  },
-  upgradeButtonText: {
-    ...TYPOGRAPHY.labelLarge,
-    color: '#fff',
-    fontWeight: '600',
-  },
-  pricingNote: {
-    ...TYPOGRAPHY.bodySmall,
-    color: '#000',
-    opacity: 0.7,
-    textAlign: 'center',
-  },
-  statsPreview: {
-    flexDirection: 'row',
     gap: SPACING.md,
-    marginBottom: SPACING.lg,
   },
-  previewStatCard: {
+  loadingText: {
+    ...TYPOGRAPHY.bodyMedium,
+  },
+  scrollView: {
     flex: 1,
-    alignItems: 'center',
-    paddingVertical: SPACING.lg,
-    borderRadius: BORDER_RADIUS.xl,
-    borderWidth: 1,
   },
-  previewStatValue: {
-    ...TYPOGRAPHY.headlineLarge,
-    fontWeight: '700',
+  scrollContent: {
+    paddingTop: 60,
+    paddingHorizontal: SPACING.lg,
   },
-  previewStatLabel: {
-    ...TYPOGRAPHY.labelSmall,
-    marginTop: SPACING.xxs,
-  },
+
   // Header
   header: {
-    paddingHorizontal: SPACING.lg,
-    paddingTop: 60,
-    paddingBottom: SPACING.lg,
-    borderBottomWidth: 1,
-  },
-  headerContent: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginBottom: SPACING.xl,
   },
   headerIconBg: {
     width: 56,
@@ -1160,34 +833,22 @@ const styles = StyleSheet.create({
     ...TYPOGRAPHY.bodyMedium,
     marginTop: SPACING.xxs,
   },
-  // Scroll
-  scrollView: {
-    flex: 1,
+  premiumBadge: {
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    borderRadius: BORDER_RADIUS.full,
   },
-  scrollContent: {
-    padding: SPACING.lg,
+  premiumBadgeText: {
+    ...TYPOGRAPHY.labelSmall,
+    color: '#000',
+    fontWeight: '700',
   },
-  // Info Card
-  infoCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: SPACING.lg,
-    borderRadius: BORDER_RADIUS.xl,
-    borderWidth: 1,
-    marginBottom: SPACING.lg,
-    gap: SPACING.md,
-    overflow: 'hidden',
-  },
-  infoText: {
-    ...TYPOGRAPHY.bodyMedium,
-    flex: 1,
-    lineHeight: 22,
-  },
-  // Stats
+
+  // Stats Row
   statsRow: {
     flexDirection: 'row',
     gap: SPACING.md,
-    marginBottom: SPACING.lg,
+    marginBottom: SPACING.xl,
   },
   statCard: {
     flex: 1,
@@ -1197,14 +858,101 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   statValue: {
-    ...TYPOGRAPHY.displaySmall,
+    ...TYPOGRAPHY.headlineLarge,
+    fontWeight: '700',
   },
   statLabel: {
-    ...TYPOGRAPHY.labelMedium,
-    marginTop: SPACING.xs,
+    ...TYPOGRAPHY.labelSmall,
+    marginTop: SPACING.xxs,
   },
-  // Card
-  card: {
+
+  // History Section
+  historySection: {
+    marginBottom: SPACING.xl,
+  },
+  historySectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: SPACING.md,
+  },
+  historySectionTitle: {
+    ...TYPOGRAPHY.headlineSmall,
+  },
+  historyCount: {
+    ...TYPOGRAPHY.labelSmall,
+  },
+  historyCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: SPACING.md,
+    borderRadius: BORDER_RADIUS.xl,
+    borderWidth: 1,
+    marginBottom: SPACING.sm,
+  },
+  historyCardContent: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: SPACING.sm,
+  },
+  historyCardLeft: {
+    flex: 1,
+    marginRight: SPACING.md,
+  },
+  historyTitle: {
+    ...TYPOGRAPHY.labelLarge,
+    marginBottom: SPACING.xs,
+  },
+  historyMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+  },
+  verdictPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: 2,
+    borderRadius: BORDER_RADIUS.full,
+    gap: 4,
+  },
+  verdictPillText: {
+    ...TYPOGRAPHY.labelSmall,
+    fontWeight: '600',
+  },
+  historyDate: {
+    ...TYPOGRAPHY.labelSmall,
+  },
+
+  // Grade Badge
+  gradeBadge: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+  },
+  gradeBadgeLarge: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+  },
+  gradeBadgeSmall: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+  },
+  gradeText: {
+    fontWeight: '700',
+  },
+  gradeTextLarge: {
+    fontSize: 36,
+  },
+  gradeTextSmall: {
+    fontSize: 18,
+  },
+
+  // Form Card
+  formCard: {
     borderRadius: BORDER_RADIUS.xxl,
     padding: SPACING.xl,
     marginBottom: SPACING.lg,
@@ -1212,12 +960,12 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     ...SHADOWS.md,
   },
-  cardHeader: {
+  formHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: SPACING.xl,
   },
-  cardIconBg: {
+  formIconBg: {
     width: 40,
     height: 40,
     borderRadius: BORDER_RADIUS.lg,
@@ -1225,10 +973,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginRight: SPACING.md,
   },
-  cardTitle: {
+  formTitle: {
     ...TYPOGRAPHY.headlineSmall,
   },
-  // Input
   inputGroup: {
     marginBottom: SPACING.lg,
   },
@@ -1249,9 +996,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.lg,
     paddingVertical: SPACING.md,
     ...TYPOGRAPHY.bodyMedium,
-    minHeight: 140,
+    minHeight: 120,
   },
-  // Picker
   picker: {
     borderWidth: 1,
     borderRadius: BORDER_RADIUS.lg,
@@ -1280,7 +1026,6 @@ const styles = StyleSheet.create({
   pickerOptionText: {
     ...TYPOGRAPHY.bodyMedium,
   },
-  // Buttons
   analyzeButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1298,259 +1043,202 @@ const styles = StyleSheet.create({
   buttonDisabled: {
     opacity: 0.6,
   },
-  // Analysis Header
-  analysisHeader: {
+
+  // Info Card
+  infoCard: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: SPACING.lg,
+    alignItems: 'center',
+    padding: SPACING.lg,
+    borderRadius: BORDER_RADIUS.xl,
+    borderWidth: 1,
+    gap: SPACING.md,
   },
-  analysisInfo: {
-    flexDirection: 'row',
-    flex: 1,
-  },
-  analysisText: {
-    flex: 1,
-  },
-  analysisSubtitle: {
+  infoText: {
     ...TYPOGRAPHY.bodySmall,
+    flex: 1,
+    lineHeight: 20,
+  },
+
+  // Report Card
+  reportCardScroll: {
+    flex: 1,
+  },
+  reportHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingTop: 60,
+    paddingHorizontal: SPACING.lg,
+    paddingBottom: SPACING.lg,
+  },
+  reportBackButton: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: SPACING.sm,
+  },
+  reportHeaderText: {
+    flex: 1,
+  },
+  reportHeaderTitle: {
+    ...TYPOGRAPHY.headlineLarge,
+  },
+  reportHeaderSubtitle: {
+    ...TYPOGRAPHY.bodyMedium,
     marginTop: SPACING.xxs,
+  },
+
+  // Grade Hero
+  gradeHero: {
+    alignItems: 'center',
+    paddingVertical: SPACING.xxl,
+    marginHorizontal: SPACING.lg,
+    borderRadius: BORDER_RADIUS.xxl,
+    borderWidth: 1.5,
+    marginBottom: SPACING.lg,
+    overflow: 'hidden',
+  },
+  gradeHeroLabel: {
+    ...TYPOGRAPHY.labelMedium,
+    letterSpacing: 2,
+    marginBottom: SPACING.sm,
+  },
+  gradeHeroGrade: {
+    fontSize: 72,
+    fontWeight: '700',
+    marginBottom: SPACING.md,
   },
   verdictBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: SPACING.md,
+    paddingHorizontal: SPACING.lg,
     paddingVertical: SPACING.sm,
     borderRadius: BORDER_RADIUS.full,
     borderWidth: 1,
-    gap: SPACING.xs,
-    marginLeft: SPACING.sm,
+    gap: SPACING.sm,
   },
-  verdictText: {
-    ...TYPOGRAPHY.labelSmall,
+  verdictBadgeText: {
+    ...TYPOGRAPHY.labelMedium,
     fontWeight: '600',
   },
-  // Tabs
-  tabHint: {
-    ...TYPOGRAPHY.bodySmall,
-    marginBottom: SPACING.sm,
+
+  // Report Sections
+  reportSection: {
+    marginHorizontal: SPACING.lg,
+    marginBottom: SPACING.lg,
+    padding: SPACING.lg,
+    borderRadius: BORDER_RADIUS.xxl,
+    borderWidth: 1,
   },
-  tabsWrapper: {
-    borderRadius: BORDER_RADIUS.xl,
-    padding: SPACING.sm,
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
     marginBottom: SPACING.lg,
   },
-  tabsContent: {
-    gap: SPACING.sm,
-    paddingRight: SPACING.sm,
-  },
-  tab: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
-    borderRadius: BORDER_RADIUS.full,
-    borderWidth: 1,
-    gap: SPACING.xs,
-  },
-  tabIcon: {
-    fontSize: 14,
-  },
-  tabText: {
-    ...TYPOGRAPHY.labelSmall,
+  sectionTitle: {
+    ...TYPOGRAPHY.labelLarge,
     fontWeight: '600',
   },
-  // Tab Content
-  tabContent: {
-    minHeight: 200,
-  },
-  tabPane: {},
-  emptyState: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: SPACING.xxxl,
-    gap: SPACING.md,
-  },
-  emptyText: {
-    ...TYPOGRAPHY.bodyMedium,
-    textAlign: 'center',
-  },
-  // Summary
-  summaryBox: {
-    borderRadius: BORDER_RADIUS.xl,
-    padding: SPACING.lg,
-    marginBottom: SPACING.md,
-    borderWidth: 1,
-  },
-  summaryHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.sm,
+
+  // Score Bars
+  scoreBarContainer: {
     marginBottom: SPACING.md,
   },
-  summaryLabel: {
-    ...TYPOGRAPHY.labelMedium,
-  },
-  summaryText: {
-    ...TYPOGRAPHY.bodyMedium,
-    lineHeight: 24,
-  },
-  // Score
-  scoreItem: {
-    borderRadius: BORDER_RADIUS.lg,
-    padding: SPACING.lg,
-    marginBottom: SPACING.sm,
-    borderWidth: 1,
-  },
-  scoreHeader: {
+  scoreBarHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: SPACING.sm,
+    marginBottom: SPACING.xs,
   },
-  scoreName: {
-    ...TYPOGRAPHY.labelMedium,
+  scoreBarCategory: {
+    ...TYPOGRAPHY.bodyMedium,
     flex: 1,
-    marginRight: SPACING.sm,
+    marginRight: SPACING.md,
   },
-  scoreBadge: {
-    paddingHorizontal: SPACING.sm,
-    paddingVertical: SPACING.xxs,
-    borderRadius: BORDER_RADIUS.sm,
+  scoreBarRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
   },
-  scoreValue: {
+  scoreBarGrade: {
     ...TYPOGRAPHY.labelMedium,
     fontWeight: '700',
   },
-  progressTrack: {
+  scoreBarValue: {
+    ...TYPOGRAPHY.labelSmall,
+  },
+  scoreBarTrack: {
     height: 8,
-    borderRadius: BORDER_RADIUS.full,
+    borderRadius: 4,
     overflow: 'hidden',
   },
-  progressFill: {
+  scoreBarFill: {
     height: '100%',
-    borderRadius: BORDER_RADIUS.full,
+    borderRadius: 4,
   },
-  // Finding
-  findingCard: {
-    borderRadius: BORDER_RADIUS.xl,
-    padding: SPACING.lg,
-    marginBottom: SPACING.md,
-    borderWidth: 1,
-  },
-  findingHeader: {
+
+  // Findings
+  findingItem: {
     flexDirection: 'row',
-    marginBottom: SPACING.md,
-  },
-  findingIconBg: {
-    width: 36,
-    height: 36,
+    padding: SPACING.md,
     borderRadius: BORDER_RADIUS.lg,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: SPACING.md,
+    borderWidth: 1,
+    marginBottom: SPACING.sm,
   },
-  findingInfo: {
+  findingIcon: {
+    marginRight: SPACING.md,
+    marginTop: 2,
+  },
+  findingContent: {
     flex: 1,
   },
-  findingTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: SPACING.xs,
-  },
-  principleId: {
-    ...TYPOGRAPHY.labelSmall,
-    fontWeight: '600',
-    marginRight: SPACING.sm,
-  },
-  statusBadge: {
-    paddingHorizontal: SPACING.sm,
-    paddingVertical: SPACING.xxs,
-    borderRadius: BORDER_RADIUS.sm,
-  },
-  statusText: {
-    ...TYPOGRAPHY.labelSmall,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    fontSize: 10,
-  },
-  principleName: {
-    ...TYPOGRAPHY.bodyMedium,
-    fontWeight: '600',
+  findingName: {
+    ...TYPOGRAPHY.labelMedium,
+    marginBottom: SPACING.xxs,
   },
   findingExplanation: {
     ...TYPOGRAPHY.bodySmall,
-    lineHeight: 20,
+    lineHeight: 18,
   },
-  // Corrections
-  correctionsHeader: {
+
+  // Fixes
+  fixItem: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: SPACING.lg,
-  },
-  correctionsIconBg: {
-    width: 36,
-    height: 36,
+    padding: SPACING.md,
     borderRadius: BORDER_RADIUS.lg,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: SPACING.md,
-  },
-  correctionsTitle: {
-    ...TYPOGRAPHY.headlineSmall,
-    fontSize: 16,
-  },
-  correctionCard: {
-    flexDirection: 'row',
-    borderRadius: BORDER_RADIUS.lg,
-    padding: SPACING.lg,
-    marginBottom: SPACING.md,
     borderWidth: 1,
+    marginBottom: SPACING.sm,
   },
-  correctionNumber: {
-    width: 28,
-    height: 28,
-    borderRadius: BORDER_RADIUS.full,
+  fixNumber: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: SPACING.md,
   },
-  correctionNumberText: {
-    ...TYPOGRAPHY.labelMedium,
+  fixNumberText: {
+    ...TYPOGRAPHY.labelSmall,
     color: '#fff',
     fontWeight: '700',
   },
-  correctionText: {
+  fixText: {
     ...TYPOGRAPHY.bodyMedium,
     flex: 1,
     lineHeight: 22,
   },
-  // Proposal
-  proposalBox: {
-    borderRadius: BORDER_RADIUS.xl,
-    padding: SPACING.lg,
-    marginBottom: SPACING.lg,
-    borderWidth: 1,
-  },
-  proposalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: SPACING.md,
-  },
-  proposalIconBg: {
-    width: 32,
-    height: 32,
-    borderRadius: BORDER_RADIUS.lg,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: SPACING.sm,
-  },
-  proposalLabel: {
-    ...TYPOGRAPHY.labelMedium,
-  },
-  proposalText: {
+
+  // Summary
+  summaryText: {
     ...TYPOGRAPHY.bodyMedium,
     lineHeight: 24,
+  },
+
+  // Actions
+  reportActions: {
+    paddingHorizontal: SPACING.lg,
+    marginBottom: SPACING.lg,
   },
   createProposalButton: {
     flexDirection: 'row',
@@ -1560,37 +1248,36 @@ const styles = StyleSheet.create({
     borderRadius: BORDER_RADIUS.full,
     gap: SPACING.sm,
   },
-  createProposalButtonText: {
+  createProposalText: {
     ...TYPOGRAPHY.labelLarge,
     color: '#000',
     fontWeight: '600',
   },
-  // Success
-  successBox: {
+  successBanner: {
     flexDirection: 'row',
-    borderRadius: BORDER_RADIUS.xl,
-    padding: SPACING.xl,
-    borderWidth: 1,
-    alignItems: 'center',
-  },
-  successIconBg: {
-    width: 48,
-    height: 48,
-    borderRadius: BORDER_RADIUS.full,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: SPACING.lg,
-  },
-  successContent: {
-    flex: 1,
-  },
-  successTitle: {
-    ...TYPOGRAPHY.headlineSmall,
-    marginBottom: SPACING.xs,
+    paddingVertical: SPACING.lg,
+    borderRadius: BORDER_RADIUS.full,
+    borderWidth: 1,
+    gap: SPACING.sm,
   },
   successText: {
-    ...TYPOGRAPHY.bodyMedium,
+    ...TYPOGRAPHY.labelLarge,
+    fontWeight: '600',
   },
+
+  // Empty States
+  emptyState: {
+    alignItems: 'center',
+    paddingVertical: SPACING.xl,
+    gap: SPACING.sm,
+  },
+  emptyText: {
+    ...TYPOGRAPHY.bodyMedium,
+    textAlign: 'center',
+  },
+
   bottomPadding: {
     height: 100,
   },
