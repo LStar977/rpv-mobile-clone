@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -23,6 +23,10 @@ import Animated, {
   FadeInDown,
   FadeInUp,
   FadeInRight,
+  FadeOut,
+  SlideInRight,
+  SlideOutLeft,
+  SlideOutRight,
   useAnimatedStyle,
   useSharedValue,
   withSpring,
@@ -31,7 +35,10 @@ import Animated, {
   withRepeat,
   withSequence,
   interpolate,
+  runOnJS,
+  Extrapolation,
 } from 'react-native-reanimated';
+import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import { router } from 'expo-router';
 import { proposalsApi, userApi, uploadsApi, limitsApi, Proposal, UsageLimits } from '../../lib/api';
 import { useAuthStore } from '../../lib/auth';
@@ -62,6 +69,22 @@ const GEO_LEVELS = ['All', 'National', 'State/Province', 'City/Local'];
 const COUNTRIES = ['Canada', 'United States', 'United Kingdom', 'Australia'];
 const AGE_GROUPS = ['All Ages', '18-25', '26-35', '36-45', '46-55', '56-65', '65+'];
 const GENDERS = ['All Genders', 'Male', 'Female'];
+
+// Category-themed gradient colors for proposal cards
+const categoryThemes: Record<string, { primary: string; secondary: string; icon: string }> = {
+  'Transportation': { primary: '#3B82F6', secondary: '#1D4ED8', icon: 'car-outline' },
+  'Environment': { primary: '#22C55E', secondary: '#15803D', icon: 'leaf-outline' },
+  'Housing': { primary: '#F59E0B', secondary: '#D97706', icon: 'home-outline' },
+  'Education': { primary: '#8B5CF6', secondary: '#6D28D9', icon: 'school-outline' },
+  'Healthcare': { primary: '#EF4444', secondary: '#DC2626', icon: 'medkit-outline' },
+  'Economy': { primary: '#10B981', secondary: '#059669', icon: 'trending-up-outline' },
+  'Public Safety': { primary: '#F97316', secondary: '#EA580C', icon: 'shield-checkmark-outline' },
+  'Infrastructure': { primary: '#6366F1', secondary: '#4F46E5', icon: 'construct-outline' },
+  'Other': { primary: '#D4AF37', secondary: '#A68523', icon: 'ellipsis-horizontal-outline' },
+  'General': { primary: '#D4AF37', secondary: '#A68523', icon: 'ellipsis-horizontal-outline' },
+};
+
+const SWIPE_THRESHOLD = 120;
 
 function getTimeRemaining(deadline: string | null): string {
   if (!deadline) return '';
@@ -127,6 +150,258 @@ function FilterChip({
         {label}
       </Text>
     </AnimatedTouchable>
+  );
+}
+
+// --- Swipe Card Component ---
+interface SwipeCardProps {
+  proposal: Proposal;
+  onSwipeLeft: () => void;
+  onSwipeRight: () => void;
+  onTap: () => void;
+  isTopCard: boolean;
+  cardIndex: number;
+}
+
+function SwipeCard({ proposal, onSwipeLeft, onSwipeRight, onTap, isTopCard, cardIndex }: SwipeCardProps) {
+  const { colors } = useTheme();
+  const translateX = useSharedValue(0);
+  const translateY = useSharedValue(0);
+  const rotation = useSharedValue(0);
+  const scale = useSharedValue(isTopCard ? 1 : 0.95 - cardIndex * 0.03);
+
+  const category = proposal.category || 'General';
+  const theme = categoryThemes[category] || categoryThemes['General'];
+  const timeRemaining = getTimeRemaining(proposal.deadline);
+  const isEnded = timeRemaining === 'Ended';
+  const totalVotes = (proposal.supportVotes || 0) + (proposal.opposeVotes || 0);
+  const supportPercent = totalVotes > 0 ? Math.round(((proposal.supportVotes || 0) / totalVotes) * 100) : 50;
+
+  useEffect(() => {
+    scale.value = withSpring(isTopCard ? 1 : 0.95 - cardIndex * 0.03, { damping: 15 });
+  }, [isTopCard, cardIndex]);
+
+  const gesture = Gesture.Pan()
+    .enabled(isTopCard && !isEnded)
+    .onUpdate((event) => {
+      translateX.value = event.translationX;
+      translateY.value = event.translationY * 0.3;
+      rotation.value = interpolate(event.translationX, [-SCREEN_WIDTH, 0, SCREEN_WIDTH], [-15, 0, 15]);
+    })
+    .onEnd((event) => {
+      if (event.translationX > SWIPE_THRESHOLD) {
+        // Swipe right - Support
+        translateX.value = withTiming(SCREEN_WIDTH * 1.5, { duration: 300 });
+        rotation.value = withTiming(30, { duration: 300 });
+        runOnJS(Haptics.notificationAsync)(Haptics.NotificationFeedbackType.Success);
+        runOnJS(onSwipeRight)();
+      } else if (event.translationX < -SWIPE_THRESHOLD) {
+        // Swipe left - Oppose
+        translateX.value = withTiming(-SCREEN_WIDTH * 1.5, { duration: 300 });
+        rotation.value = withTiming(-30, { duration: 300 });
+        runOnJS(Haptics.notificationAsync)(Haptics.NotificationFeedbackType.Warning);
+        runOnJS(onSwipeLeft)();
+      } else {
+        // Reset
+        translateX.value = withSpring(0, { damping: 15 });
+        translateY.value = withSpring(0, { damping: 15 });
+        rotation.value = withSpring(0, { damping: 15 });
+      }
+    });
+
+  const tapGesture = Gesture.Tap()
+    .enabled(isTopCard)
+    .onEnd(() => {
+      runOnJS(Haptics.impactAsync)(Haptics.ImpactFeedbackStyle.Light);
+      runOnJS(onTap)();
+    });
+
+  const composedGesture = Gesture.Race(gesture, tapGesture);
+
+  const cardStyle = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: translateX.value },
+      { translateY: translateY.value + cardIndex * 8 },
+      { rotate: `${rotation.value}deg` },
+      { scale: scale.value },
+    ],
+    zIndex: 100 - cardIndex,
+  }));
+
+  // Support indicator opacity (right swipe)
+  const supportIndicatorStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(translateX.value, [0, SWIPE_THRESHOLD], [0, 1], Extrapolation.CLAMP),
+  }));
+
+  // Oppose indicator opacity (left swipe)
+  const opposeIndicatorStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(translateX.value, [-SWIPE_THRESHOLD, 0], [1, 0], Extrapolation.CLAMP),
+  }));
+
+  return (
+    <GestureDetector gesture={composedGesture}>
+      <Animated.View style={[styles.swipeCard, { backgroundColor: colors.surface, borderColor: colors.border }, cardStyle]}>
+        {/* Category-themed gradient background */}
+        <LinearGradient
+          colors={[`${theme.primary}25`, `${theme.primary}10`, 'transparent']}
+          style={StyleSheet.absoluteFill}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+        />
+        <LinearGradient
+          colors={['transparent', `${theme.secondary}15`]}
+          style={StyleSheet.absoluteFill}
+          start={{ x: 1, y: 0 }}
+          end={{ x: 0, y: 1 }}
+        />
+
+        {/* Swipe indicators */}
+        {isTopCard && !isEnded && (
+          <>
+            <Animated.View style={[styles.swipeIndicator, styles.swipeIndicatorRight, supportIndicatorStyle]}>
+              <LinearGradient
+                colors={[colors.success, '#16A34A']}
+                style={styles.swipeIndicatorGradient}
+              >
+                <Ionicons name="checkmark-circle" size={32} color="#fff" />
+                <Text style={styles.swipeIndicatorText}>SUPPORT</Text>
+              </LinearGradient>
+            </Animated.View>
+            <Animated.View style={[styles.swipeIndicator, styles.swipeIndicatorLeft, opposeIndicatorStyle]}>
+              <LinearGradient
+                colors={[colors.error, '#DC2626']}
+                style={styles.swipeIndicatorGradient}
+              >
+                <Ionicons name="close-circle" size={32} color="#fff" />
+                <Text style={styles.swipeIndicatorText}>OPPOSE</Text>
+              </LinearGradient>
+            </Animated.View>
+          </>
+        )}
+
+        {/* Card Content */}
+        <View style={styles.swipeCardContent}>
+          {/* Header */}
+          <View style={styles.swipeCardHeader}>
+            <View style={[styles.swipeCategoryBadge, { backgroundColor: `${theme.primary}20` }]}>
+              <Ionicons name={theme.icon as any} size={14} color={theme.primary} />
+              <Text style={[styles.swipeCategoryText, { color: theme.primary }]}>{category}</Text>
+            </View>
+            {timeRemaining && (
+              <View style={[styles.swipeTimeBadge, { backgroundColor: isEnded ? `${colors.error}15` : `${colors.gold}15` }]}>
+                <Ionicons name="time-outline" size={12} color={isEnded ? colors.error : colors.gold} />
+                <Text style={[styles.swipeTimeText, { color: isEnded ? colors.error : colors.gold }]}>{timeRemaining}</Text>
+              </View>
+            )}
+          </View>
+
+          {/* Geo tags */}
+          {(proposal.geoRestrictions || []).length > 0 && (
+            <View style={styles.swipeGeoTags}>
+              {(proposal.geoRestrictions || []).slice(0, 2).map((tag, i) => (
+                <View key={i} style={[styles.swipeGeoTag, { backgroundColor: `${colors.info}12` }]}>
+                  <Ionicons name="location-outline" size={10} color={colors.info} />
+                  <Text style={[styles.swipeGeoTagText, { color: colors.info }]}>{tag}</Text>
+                </View>
+              ))}
+            </View>
+          )}
+
+          {/* Title & Description */}
+          <Text style={[styles.swipeCardTitle, { color: colors.text }]} numberOfLines={2}>{proposal.title}</Text>
+          <Text style={[styles.swipeCardDesc, { color: colors.textSecondary }]} numberOfLines={4}>{proposal.description}</Text>
+
+          {/* Image */}
+          {proposal.imageUrl && (
+            <View style={styles.swipeImageWrapper}>
+              <Image source={{ uri: proposal.imageUrl }} style={styles.swipeImage} resizeMode="cover" />
+            </View>
+          )}
+
+          {/* Vote Progress */}
+          <View style={styles.swipeVoteSection}>
+            <View style={[styles.swipeVoteBarBg, { backgroundColor: colors.error }]}>
+              <View style={[styles.swipeVoteBarFill, { width: `${supportPercent}%`, backgroundColor: colors.success }]} />
+            </View>
+            <View style={styles.swipeVoteStats}>
+              <View style={styles.swipeVoteStat}>
+                <Ionicons name="thumbs-up" size={14} color={colors.success} />
+                <Text style={[styles.swipeVoteCount, { color: colors.success }]}>{(proposal.supportVotes || 0).toLocaleString()}</Text>
+              </View>
+              <Text style={[styles.swipeVotePercent, { color: colors.textSecondary }]}>{supportPercent}% support</Text>
+              <View style={styles.swipeVoteStat}>
+                <Ionicons name="thumbs-down" size={14} color={colors.error} />
+                <Text style={[styles.swipeVoteCount, { color: colors.error }]}>{(proposal.opposeVotes || 0).toLocaleString()}</Text>
+              </View>
+            </View>
+          </View>
+
+          {/* Ended/Instructions */}
+          {isEnded ? (
+            <View style={[styles.swipeEndedBanner, { backgroundColor: `${colors.error}15` }]}>
+              <Ionicons name="flag-outline" size={16} color={colors.error} />
+              <Text style={[styles.swipeEndedText, { color: colors.error }]}>Voting has ended</Text>
+            </View>
+          ) : isTopCard && (
+            <View style={styles.swipeInstructions}>
+              <View style={styles.swipeInstruction}>
+                <Ionicons name="arrow-back" size={16} color={colors.error} />
+                <Text style={[styles.swipeInstructionText, { color: colors.textTertiary }]}>Oppose</Text>
+              </View>
+              <Text style={[styles.swipeTapHint, { color: colors.textTertiary }]}>Tap for details</Text>
+              <View style={styles.swipeInstruction}>
+                <Text style={[styles.swipeInstructionText, { color: colors.textTertiary }]}>Support</Text>
+                <Ionicons name="arrow-forward" size={16} color={colors.success} />
+              </View>
+            </View>
+          )}
+        </View>
+      </Animated.View>
+    </GestureDetector>
+  );
+}
+
+// --- Undo Button Component ---
+function UndoButton({ onUndo, visible, voteType }: { onUndo: () => void; visible: boolean; voteType: 'support' | 'oppose' }) {
+  const { colors } = useTheme();
+
+  if (!visible) return null;
+
+  return (
+    <Animated.View entering={FadeInUp.duration(200)} exiting={FadeOut.duration(200)} style={styles.undoContainer}>
+      <TouchableOpacity
+        style={[styles.undoButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
+        onPress={() => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+          onUndo();
+        }}
+        activeOpacity={0.8}
+      >
+        <Ionicons name="arrow-undo" size={20} color={colors.text} />
+        <Text style={[styles.undoText, { color: colors.text }]}>Undo {voteType}</Text>
+      </TouchableOpacity>
+    </Animated.View>
+  );
+}
+
+// --- View Mode Toggle ---
+function ViewModeToggle({ mode, onToggle }: { mode: 'swipe' | 'list'; onToggle: () => void }) {
+  const { colors } = useTheme();
+
+  return (
+    <TouchableOpacity
+      style={[styles.viewModeBtn, { backgroundColor: colors.surface, borderColor: colors.border }]}
+      onPress={() => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        onToggle();
+      }}
+    >
+      <Ionicons
+        name={mode === 'swipe' ? 'list-outline' : 'layers-outline'}
+        size={18}
+        color={colors.text}
+      />
+    </TouchableOpacity>
   );
 }
 
@@ -477,6 +752,13 @@ export default function ProposalsScreen() {
   const [showVoteOverlay, setShowVoteOverlay] = useState(false);
   const [lastVoteType, setLastVoteType] = useState<'support' | 'oppose'>('support');
 
+  // Swipe mode state
+  const [viewMode, setViewMode] = useState<'swipe' | 'list'>('swipe');
+  const [swipeIndex, setSwipeIndex] = useState(0);
+  const [lastSwipedProposal, setLastSwipedProposal] = useState<{ proposal: Proposal; voteType: 'support' | 'oppose' } | null>(null);
+  const [showUndo, setShowUndo] = useState(false);
+  const undoTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   const [newProposal, setNewProposal] = useState({
     title: '',
     description: '',
@@ -571,6 +853,20 @@ export default function ProposalsScreen() {
   ]);
 
   const activeCount = useMemo(() => filteredProposals.filter((p) => !isProposalEnded(p)).length, [filteredProposals]);
+
+  // Proposals available for swiping (not voted, not ended)
+  const swipeableProposals = useMemo(() => {
+    return filteredProposals.filter((p) => {
+      const hasVoted = votedProposals.has(p.id as number);
+      const isEnded = isProposalEnded(p);
+      return !hasVoted && !isEnded;
+    });
+  }, [filteredProposals, votedProposals]);
+
+  // Reset swipe index when filters change or proposals update
+  useEffect(() => {
+    setSwipeIndex(0);
+  }, [selectedCategory, selectedStatus, selectedGeoLevel, searchQuery]);
 
   const fetchData = useCallback(
     async (isRefresh = false) => {
@@ -727,6 +1023,73 @@ export default function ProposalsScreen() {
     }
   };
 
+  // Swipe vote handler
+  const handleSwipeVote = useCallback(async (proposal: Proposal, vote: 'support' | 'oppose') => {
+    // Store for potential undo
+    setLastSwipedProposal({ proposal, voteType: vote });
+    setShowUndo(true);
+
+    // Clear any existing undo timeout
+    if (undoTimeoutRef.current) {
+      clearTimeout(undoTimeoutRef.current);
+    }
+
+    // Set 5 second undo window
+    undoTimeoutRef.current = setTimeout(() => {
+      setShowUndo(false);
+      setLastSwipedProposal(null);
+    }, 5000);
+
+    // Move to next card
+    setSwipeIndex((prev) => prev + 1);
+
+    // Submit the vote
+    await handleVote(proposal.id as number, vote);
+  }, [handleVote]);
+
+  // Undo handler
+  const handleUndo = useCallback(() => {
+    if (!lastSwipedProposal) return;
+
+    // Clear timeout
+    if (undoTimeoutRef.current) {
+      clearTimeout(undoTimeoutRef.current);
+    }
+
+    // Move back to previous card
+    setSwipeIndex((prev) => Math.max(0, prev - 1));
+
+    // Remove from voted set and revert vote count
+    const proposalId = lastSwipedProposal.proposal.id as number;
+    setVotedProposals((prev) => {
+      const newSet = new Set(prev);
+      newSet.delete(proposalId);
+      return newSet;
+    });
+
+    // Revert vote counts in UI
+    setProposals((prev) =>
+      prev.map((p) =>
+        (p.id as number) === proposalId
+          ? {
+              ...p,
+              supportVotes: lastSwipedProposal.voteType === 'support' ? Math.max(0, (p.supportVotes || 0) - 1) : p.supportVotes,
+              opposeVotes: lastSwipedProposal.voteType === 'oppose' ? Math.max(0, (p.opposeVotes || 0) - 1) : p.opposeVotes,
+            }
+          : p
+      )
+    );
+
+    setShowUndo(false);
+    setLastSwipedProposal(null);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  }, [lastSwipedProposal]);
+
+  // Get current cards to display in stack (max 3)
+  const visibleSwipeCards = useMemo(() => {
+    return swipeableProposals.slice(swipeIndex, swipeIndex + 3);
+  }, [swipeableProposals, swipeIndex]);
+
   const handleCreateProposal = async () => {
     if (!newProposal.title.trim()) {
       Alert.alert('Error', 'Please enter a proposal title.');
@@ -873,6 +1236,11 @@ export default function ProposalsScreen() {
           </View>
 
           <View style={styles.headerActions}>
+            <ViewModeToggle
+              mode={viewMode}
+              onToggle={() => setViewMode((m) => (m === 'swipe' ? 'list' : 'swipe'))}
+            />
+
             <TouchableOpacity
               style={[
                 styles.filterBtn,
@@ -1011,7 +1379,72 @@ export default function ProposalsScreen() {
             </TouchableOpacity>
           )}
         </Animated.View>
+      ) : viewMode === 'swipe' ? (
+        /* Swipe Mode */
+        <GestureHandlerRootView style={styles.swipeContainer}>
+          {visibleSwipeCards.length === 0 ? (
+            <Animated.View entering={FadeIn.duration(400)} style={styles.swipeEmptyState}>
+              <View style={[styles.swipeEmptyIcon, { backgroundColor: `${colors.success}15` }]}>
+                <Ionicons name="checkmark-done-circle" size={64} color={colors.success} />
+              </View>
+              <Text style={[styles.swipeEmptyTitle, { color: colors.text }]}>All caught up!</Text>
+              <Text style={[styles.swipeEmptyDesc, { color: colors.textSecondary }]}>
+                You've voted on all available proposals.{'\n'}Check back later for new ones.
+              </Text>
+              <TouchableOpacity
+                style={[styles.swipeRefreshBtn, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                  fetchData(true);
+                }}
+              >
+                <Ionicons name="refresh-outline" size={20} color={colors.text} />
+                <Text style={[styles.swipeRefreshText, { color: colors.text }]}>Refresh</Text>
+              </TouchableOpacity>
+            </Animated.View>
+          ) : (
+            <>
+              {/* Progress indicator */}
+              <View style={styles.swipeProgress}>
+                <Text style={[styles.swipeProgressText, { color: colors.textTertiary }]}>
+                  {swipeIndex + 1} of {swipeableProposals.length} proposals
+                </Text>
+                <View style={[styles.swipeProgressBar, { backgroundColor: colors.border }]}>
+                  <View
+                    style={[
+                      styles.swipeProgressFill,
+                      { backgroundColor: colors.gold, width: `${((swipeIndex + 1) / swipeableProposals.length) * 100}%` },
+                    ]}
+                  />
+                </View>
+              </View>
+
+              {/* Card stack */}
+              <View style={styles.cardStack}>
+                {visibleSwipeCards.map((proposal, idx) => (
+                  <SwipeCard
+                    key={proposal.id}
+                    proposal={proposal}
+                    onSwipeLeft={() => handleSwipeVote(proposal, 'oppose')}
+                    onSwipeRight={() => handleSwipeVote(proposal, 'support')}
+                    onTap={() => openProposal(proposal)}
+                    isTopCard={idx === 0}
+                    cardIndex={idx}
+                  />
+                )).reverse()}
+              </View>
+
+              {/* Undo button */}
+              <UndoButton
+                visible={showUndo}
+                voteType={lastSwipedProposal?.voteType || 'support'}
+                onUndo={handleUndo}
+              />
+            </>
+          )}
+        </GestureHandlerRootView>
       ) : (
+        /* List Mode */
         <ScrollView
           style={styles.list}
           contentContainerStyle={styles.listContent}
@@ -1964,5 +2397,277 @@ const styles = StyleSheet.create({
   upgradeChipText: {
     ...TYPOGRAPHY.labelSmall,
     fontWeight: '600',
+  },
+
+  // View Mode Toggle
+  viewModeBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+  },
+
+  // Swipe Container
+  swipeContainer: {
+    flex: 1,
+    paddingTop: SPACING.md,
+  },
+  swipeProgress: {
+    paddingHorizontal: SPACING.lg,
+    marginBottom: SPACING.md,
+  },
+  swipeProgressText: {
+    ...TYPOGRAPHY.labelSmall,
+    textAlign: 'center',
+    marginBottom: SPACING.xs,
+  },
+  swipeProgressBar: {
+    height: 3,
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  swipeProgressFill: {
+    height: '100%',
+    borderRadius: 2,
+  },
+
+  // Card Stack
+  cardStack: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: SPACING.lg,
+  },
+
+  // Swipe Card
+  swipeCard: {
+    position: 'absolute',
+    width: SCREEN_WIDTH - SPACING.lg * 2,
+    borderRadius: BORDER_RADIUS.xxl,
+    borderWidth: 1,
+    overflow: 'hidden',
+    ...SHADOWS.lg,
+  },
+  swipeCardContent: {
+    padding: SPACING.xl,
+  },
+  swipeCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: SPACING.md,
+  },
+  swipeCategoryBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    borderRadius: BORDER_RADIUS.full,
+  },
+  swipeCategoryText: {
+    ...TYPOGRAPHY.labelSmall,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  swipeTimeBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: SPACING.xs,
+    borderRadius: BORDER_RADIUS.full,
+  },
+  swipeTimeText: {
+    ...TYPOGRAPHY.labelSmall,
+    fontWeight: '500',
+  },
+  swipeGeoTags: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: SPACING.xs,
+    marginBottom: SPACING.sm,
+  },
+  swipeGeoTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: 3,
+    borderRadius: BORDER_RADIUS.full,
+  },
+  swipeGeoTagText: {
+    ...TYPOGRAPHY.labelSmall,
+    fontSize: 10,
+  },
+  swipeCardTitle: {
+    ...TYPOGRAPHY.headlineMedium,
+    marginBottom: SPACING.sm,
+  },
+  swipeCardDesc: {
+    ...TYPOGRAPHY.bodyMedium,
+    lineHeight: 22,
+    marginBottom: SPACING.lg,
+  },
+  swipeImageWrapper: {
+    borderRadius: BORDER_RADIUS.xl,
+    overflow: 'hidden',
+    marginBottom: SPACING.lg,
+  },
+  swipeImage: {
+    width: '100%',
+    height: 160,
+  },
+  swipeVoteSection: {
+    marginBottom: SPACING.lg,
+  },
+  swipeVoteBarBg: {
+    height: 10,
+    borderRadius: BORDER_RADIUS.full,
+    overflow: 'hidden',
+    marginBottom: SPACING.sm,
+  },
+  swipeVoteBarFill: {
+    height: '100%',
+    borderRadius: BORDER_RADIUS.full,
+  },
+  swipeVoteStats: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  swipeVoteStat: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.xs,
+  },
+  swipeVoteCount: {
+    ...TYPOGRAPHY.labelMedium,
+    fontWeight: '600',
+  },
+  swipeVotePercent: {
+    ...TYPOGRAPHY.labelSmall,
+  },
+  swipeEndedBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: SPACING.md,
+    borderRadius: BORDER_RADIUS.xl,
+    gap: SPACING.sm,
+  },
+  swipeEndedText: {
+    ...TYPOGRAPHY.labelMedium,
+    fontWeight: '500',
+  },
+  swipeInstructions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingTop: SPACING.sm,
+  },
+  swipeInstruction: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.xs,
+  },
+  swipeInstructionText: {
+    ...TYPOGRAPHY.labelSmall,
+  },
+  swipeTapHint: {
+    ...TYPOGRAPHY.labelSmall,
+    fontStyle: 'italic',
+  },
+
+  // Swipe Indicators
+  swipeIndicator: {
+    position: 'absolute',
+    top: SPACING.xl,
+    zIndex: 10,
+    borderRadius: BORDER_RADIUS.xl,
+    overflow: 'hidden',
+  },
+  swipeIndicatorLeft: {
+    right: SPACING.xl,
+  },
+  swipeIndicatorRight: {
+    left: SPACING.xl,
+  },
+  swipeIndicatorGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.md,
+    gap: SPACING.sm,
+  },
+  swipeIndicatorText: {
+    color: '#fff',
+    ...TYPOGRAPHY.labelLarge,
+    fontWeight: '700',
+    letterSpacing: 1,
+  },
+
+  // Undo Button
+  undoContainer: {
+    position: 'absolute',
+    bottom: 100,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+  },
+  undoButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: SPACING.xl,
+    paddingVertical: SPACING.md,
+    borderRadius: BORDER_RADIUS.full,
+    borderWidth: 1,
+    gap: SPACING.sm,
+    ...SHADOWS.md,
+  },
+  undoText: {
+    ...TYPOGRAPHY.labelMedium,
+    fontWeight: '500',
+  },
+
+  // Swipe Empty State
+  swipeEmptyState: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: SPACING.xxxl,
+  },
+  swipeEmptyIcon: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: SPACING.xl,
+  },
+  swipeEmptyTitle: {
+    ...TYPOGRAPHY.headlineMedium,
+    marginBottom: SPACING.sm,
+  },
+  swipeEmptyDesc: {
+    ...TYPOGRAPHY.bodyMedium,
+    textAlign: 'center',
+    marginBottom: SPACING.xl,
+  },
+  swipeRefreshBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: SPACING.xl,
+    paddingVertical: SPACING.md,
+    borderRadius: BORDER_RADIUS.full,
+    borderWidth: 1,
+    gap: SPACING.sm,
+  },
+  swipeRefreshText: {
+    ...TYPOGRAPHY.labelMedium,
+    fontWeight: '500',
   },
 });
