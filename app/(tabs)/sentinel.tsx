@@ -84,7 +84,24 @@ const DEMO_ANALYSIS: Analysis = {
   },
 };
 
-// Grade colors
+// Score-based colors (credit score style)
+const getScoreColor = (score: number): string => {
+  if (score >= 80) return '#34C759'; // Green - Excellent
+  if (score >= 65) return '#30D158'; // Light green - Good
+  if (score >= 50) return '#FF9500'; // Orange - Fair
+  if (score >= 35) return '#FF6B35'; // Dark orange - Poor
+  return '#FF3B30'; // Red - Critical
+};
+
+const getScoreLabel = (score: number): string => {
+  if (score >= 80) return 'Excellent';
+  if (score >= 65) return 'Good';
+  if (score >= 50) return 'Fair';
+  if (score >= 35) return 'Poor';
+  return 'Critical';
+};
+
+// Legacy grade colors for backwards compatibility
 const GRADE_COLORS = {
   A: '#34C759',
   B: '#007AFF',
@@ -116,7 +133,13 @@ type Analysis = {
   analysis: AnalysisResult;
 };
 
-// Calculate letter grade from average score
+// Calculate average score from category scores
+function calculateAverageScore(categoryScores: { score: number }[]): number {
+  if (!categoryScores || categoryScores.length === 0) return 0;
+  return Math.round(categoryScores.reduce((sum, c) => sum + c.score, 0) / categoryScores.length);
+}
+
+// Calculate letter grade from average score (kept for history cards)
 function calculateLetterGrade(categoryScores: { score: number }[]): string {
   if (!categoryScores || categoryScores.length === 0) return 'N/A';
   const avg = categoryScores.reduce((sum, c) => sum + c.score, 0) / categoryScores.length;
@@ -139,7 +162,77 @@ function getVerdictIcon(verdict: string): string {
   return 'alert-circle';
 }
 
-// Letter Grade Badge Component
+// Circular Score Gauge Component (Credit Score Style)
+function CircularScoreGauge({ score, size = 'large' }: { score: number; size?: 'small' | 'large' }) {
+  const { colors } = useTheme();
+  const scoreColor = getScoreColor(score);
+  const scoreLabel = getScoreLabel(score);
+  const isLarge = size === 'large';
+
+  if (!isLarge) {
+    // Small badge version for history cards
+    return (
+      <View style={[styles.scoreGaugeSmall, { borderColor: scoreColor }]}>
+        <Text style={[styles.scoreGaugeSmallText, { color: scoreColor }]}>{score}</Text>
+      </View>
+    );
+  }
+
+  // Create tick marks for the gauge
+  const tickCount = 30;
+  const ticks = [];
+  for (let i = 0; i < tickCount; i++) {
+    const angle = (i / tickCount) * 270 - 135; // 270 degree arc starting from bottom-left
+    const isActive = (i / tickCount) <= (score / 100);
+    const tickColor = isActive ? scoreColor : `${colors.border}60`;
+    ticks.push(
+      <View
+        key={i}
+        style={[
+          styles.gaugeTick,
+          {
+            backgroundColor: tickColor,
+            transform: [
+              { rotate: `${angle}deg` },
+              { translateY: -70 },
+            ],
+          },
+        ]}
+      />
+    );
+  }
+
+  return (
+    <View style={styles.circularGaugeContainer}>
+      {/* Gauge ring with ticks */}
+      <View style={styles.gaugeRing}>
+        {ticks}
+        {/* Inner circle */}
+        <View style={[styles.gaugeInner, { backgroundColor: colors.surface }]}>
+          <Text style={[styles.gaugeScore, { color: scoreColor }]}>{score}</Text>
+          <Text style={[styles.gaugeLabel, { color: colors.textSecondary }]}>out of 100</Text>
+        </View>
+      </View>
+
+      {/* Score label below gauge */}
+      <View style={[styles.scoreLabelBadge, { backgroundColor: `${scoreColor}15`, borderColor: `${scoreColor}40` }]}>
+        <Text style={[styles.scoreLabelText, { color: scoreColor }]}>{scoreLabel}</Text>
+      </View>
+    </View>
+  );
+}
+
+// Small Score Badge for history cards
+function ScoreBadge({ score }: { score: number }) {
+  const scoreColor = getScoreColor(score);
+  return (
+    <View style={[styles.scoreBadgeSmall, { backgroundColor: `${scoreColor}15`, borderColor: `${scoreColor}40` }]}>
+      <Text style={[styles.scoreBadgeText, { color: scoreColor }]}>{score}</Text>
+    </View>
+  );
+}
+
+// Letter Grade Badge Component (kept for backwards compat)
 function LetterGradeBadge({ grade, size = 'large' }: { grade: string; size?: 'small' | 'large' }) {
   const color = getGradeColor(grade);
   const isLarge = size === 'large';
@@ -198,7 +291,7 @@ function AnalysisHistoryCard({
   index: number;
 }) {
   const { colors } = useTheme();
-  const grade = calculateLetterGrade(analysis.analysis.categoryScores);
+  const averageScore = calculateAverageScore(analysis.analysis.categoryScores);
   const verdictColor = analysis.analysis.overallVerdict === 'Aligned'
     ? colors.success
     : analysis.analysis.overallVerdict === 'At Risk'
@@ -229,7 +322,7 @@ function AnalysisHistoryCard({
               </Text>
             </View>
           </View>
-          <LetterGradeBadge grade={grade} size="small" />
+          <ScoreBadge score={averageScore} />
         </View>
         <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
       </TouchableOpacity>
@@ -240,8 +333,7 @@ function AnalysisHistoryCard({
 // Category Score Bar Component
 function CategoryScoreBar({ category, score, index }: { category: string; score: number; index: number }) {
   const { colors } = useTheme();
-  const grade = score >= 90 ? 'A' : score >= 80 ? 'B' : score >= 70 ? 'C' : score >= 60 ? 'D' : 'F';
-  const color = getGradeColor(grade);
+  const scoreColor = getScoreColor(score);
 
   return (
     <Animated.View
@@ -252,13 +344,10 @@ function CategoryScoreBar({ category, score, index }: { category: string; score:
         <Text style={[styles.scoreBarCategory, { color: colors.text }]} numberOfLines={1}>
           {category}
         </Text>
-        <View style={styles.scoreBarRight}>
-          <Text style={[styles.scoreBarGrade, { color }]}>{grade}</Text>
-          <Text style={[styles.scoreBarValue, { color: colors.textSecondary }]}>{score}</Text>
-        </View>
+        <Text style={[styles.scoreBarValue, { color: scoreColor, fontWeight: '700' }]}>{score}</Text>
       </View>
-      <View style={[styles.scoreBarTrack, { backgroundColor: colors.border }]}>
-        <View style={[styles.scoreBarFill, { width: `${score}%`, backgroundColor: color }]} />
+      <View style={[styles.scoreBarTrack, { backgroundColor: `${colors.border}80` }]}>
+        <Animated.View style={[styles.scoreBarFill, { width: `${score}%`, backgroundColor: scoreColor }]} />
       </View>
     </Animated.View>
   );
@@ -309,8 +398,8 @@ function ReportCard({
   proposalCreated: boolean;
 }) {
   const { colors } = useTheme();
-  const grade = calculateLetterGrade(analysis.analysis.categoryScores);
-  const gradeColor = getGradeColor(grade);
+  const averageScore = calculateAverageScore(analysis.analysis.categoryScores);
+  const scoreColor = getScoreColor(averageScore);
   const verdictColor = analysis.analysis.overallVerdict === 'Aligned'
     ? colors.success
     : analysis.analysis.overallVerdict === 'At Risk'
@@ -326,7 +415,7 @@ function ReportCard({
         </TouchableOpacity>
         <View style={styles.reportHeaderText}>
           <View style={styles.reportTitleRow}>
-            <Text style={[styles.reportHeaderTitle, { color: colors.gold }]}>Report Card</Text>
+            <Text style={[styles.reportHeaderTitle, { color: colors.gold }]}>Governance Report</Text>
             {analysis.id === 'demo' && (
               <View style={[styles.demoBadge, { backgroundColor: colors.warning }]}>
                 <Text style={styles.demoBadgeText}>DEMO</Text>
@@ -339,20 +428,20 @@ function ReportCard({
         </View>
       </View>
 
-      {/* Grade Hero */}
+      {/* Governance Score Hero */}
       <Animated.View
         entering={FadeIn.duration(500)}
-        style={[styles.gradeHero, { backgroundColor: `${gradeColor}10`, borderColor: gradeColor }]}
+        style={[styles.scoreHero, { backgroundColor: colors.surface, borderColor: colors.gold }]}
       >
         <LinearGradient
-          colors={[`${gradeColor}15`, 'transparent']}
+          colors={[`${colors.gold}10`, 'transparent']}
           style={StyleSheet.absoluteFill}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
         />
-        <Text style={[styles.gradeHeroLabel, { color: colors.textSecondary }]}>OVERALL GRADE</Text>
-        <Text style={[styles.gradeHeroGrade, { color: gradeColor }]}>{grade}</Text>
-        <View style={[styles.verdictBadge, { backgroundColor: `${verdictColor}20`, borderColor: verdictColor }]}>
+        <Text style={[styles.scoreHeroLabel, { color: colors.gold }]}>GOVERNANCE SCORE</Text>
+        <CircularScoreGauge score={averageScore} size="large" />
+        <View style={[styles.verdictBadge, { backgroundColor: `${verdictColor}15`, borderColor: `${verdictColor}40` }]}>
           <Ionicons name={getVerdictIcon(analysis.analysis.overallVerdict) as any} size={16} color={verdictColor} />
           <Text style={[styles.verdictBadgeText, { color: verdictColor }]}>
             {analysis.analysis.overallVerdict}
@@ -1182,7 +1271,100 @@ const styles = StyleSheet.create({
     fontSize: 10,
   },
 
-  // Grade Hero
+  // Score Hero (Circular Gauge)
+  scoreHero: {
+    alignItems: 'center',
+    paddingVertical: SPACING.xl,
+    marginHorizontal: SPACING.lg,
+    borderRadius: BORDER_RADIUS.xxl,
+    borderWidth: 1.5,
+    marginBottom: SPACING.lg,
+    overflow: 'hidden',
+  },
+  scoreHeroLabel: {
+    ...TYPOGRAPHY.labelMedium,
+    letterSpacing: 2,
+    marginBottom: SPACING.lg,
+    fontWeight: '600',
+  },
+
+  // Circular Gauge
+  circularGaugeContainer: {
+    alignItems: 'center',
+  },
+  gaugeRing: {
+    width: 180,
+    height: 180,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  gaugeTick: {
+    position: 'absolute',
+    width: 4,
+    height: 12,
+    borderRadius: 2,
+    top: '50%',
+    left: '50%',
+    marginLeft: -2,
+    marginTop: -6,
+  },
+  gaugeInner: {
+    position: 'absolute',
+    width: 130,
+    height: 130,
+    borderRadius: 65,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  gaugeScore: {
+    fontSize: 48,
+    fontWeight: '700',
+  },
+  gaugeLabel: {
+    ...TYPOGRAPHY.labelSmall,
+    marginTop: 2,
+  },
+  scoreLabelBadge: {
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.sm,
+    borderRadius: BORDER_RADIUS.full,
+    borderWidth: 1,
+    marginTop: SPACING.md,
+  },
+  scoreLabelText: {
+    ...TYPOGRAPHY.labelMedium,
+    fontWeight: '700',
+    letterSpacing: 1,
+  },
+
+  // Score Badge (Small)
+  scoreBadgeSmall: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 2,
+  },
+  scoreBadgeText: {
+    ...TYPOGRAPHY.labelMedium,
+    fontWeight: '700',
+  },
+  scoreGaugeSmall: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  scoreGaugeSmallText: {
+    ...TYPOGRAPHY.labelMedium,
+    fontWeight: '700',
+  },
+
+  // Legacy Grade Hero (kept for reference)
   gradeHero: {
     alignItems: 'center',
     paddingVertical: SPACING.xxl,
