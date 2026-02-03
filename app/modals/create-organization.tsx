@@ -303,11 +303,30 @@ export default function CreateOrganizationScreen() {
     setProcessing(true);
 
     try {
-      // First, get payment intent from backend
-      const paymentIntent = await fetchOrganizationPaymentIntent(token, selectedTier);
+      // STEP 1: Create org first (with pending subscription status)
+      const createResult = await organizationsApi.createOrganization({
+        name: name.trim(),
+        description: description.trim(),
+        logoUrl: logoUri || undefined,
+        tier: selectedTier,
+      });
+
+      if (createResult.error || !createResult.data?.id) {
+        Alert.alert('Error', createResult.error || 'Failed to create organization');
+        return;
+      }
+
+      const organizationId = createResult.data.id;
+
+      // STEP 2: Get payment intent with org ID
+      const paymentIntent = await fetchOrganizationPaymentIntent(
+        token,
+        selectedTier,
+        organizationId
+      );
 
       if (paymentIntent.clientSecret) {
-        // Process payment with native Payment Sheet
+        // STEP 3: Process payment with native Payment Sheet
         const result = await processPayment({
           clientSecret: paymentIntent.clientSecret,
           ephemeralKey: paymentIntent.ephemeralKey,
@@ -316,23 +335,9 @@ export default function CreateOrganizationScreen() {
         });
 
         if (result.success) {
-          // Payment successful, create the organization
-          const createResult = await organizationsApi.createOrganization({
-            name: name.trim(),
-            description: description.trim(),
-            logoUrl: logoUri || undefined,
-            tier: selectedTier,
-            paymentIntentId: paymentIntent.paymentIntentId,
-          });
-
-          if (createResult.error) {
-            Alert.alert('Error', createResult.error);
-            return;
-          }
-
+          // STEP 4: Payment successful - webhook will activate subscription
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
-          // Show success and navigate to the new organization
           Alert.alert(
             'Organization Created!',
             `${name} has been created successfully. You are now the admin.`,
@@ -342,14 +347,19 @@ export default function CreateOrganizationScreen() {
                 onPress: () => {
                   router.replace({
                     pathname: '/modals/organization-detail',
-                    params: { orgId: createResult.data?.id, orgName: name },
+                    params: { orgId: organizationId, orgName: name },
                   });
                 },
               },
             ]
           );
         } else if (result.cancelled) {
-          // User cancelled payment - do nothing
+          // User cancelled - org exists but subscription is pending
+          Alert.alert(
+            'Payment Cancelled',
+            'Your organization has been created but is pending payment. You can complete payment later from your organizations list.',
+            [{ text: 'OK', onPress: () => router.back() }]
+          );
         } else {
           showPaymentError(result.error || 'Payment failed');
         }

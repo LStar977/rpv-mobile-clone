@@ -71,18 +71,20 @@ export async function fetchPremiumPaymentIntent(token: string | null): Promise<P
 
 /**
  * Fetch payment intent for organization subscription ($29-99/month)
+ * Requires organizationId - org must be created first with pending status
  */
 export async function fetchOrganizationPaymentIntent(
   token: string | null,
-  tier: 'community' | 'professional' | 'enterprise'
-): Promise<PaymentIntentResponse & { paymentIntentId?: string }> {
+  tier: 'community' | 'professional' | 'enterprise',
+  organizationId: string
+): Promise<PaymentIntentResponse & { paymentIntentId?: string; subscriptionId?: string }> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (token) headers['Authorization'] = `Bearer ${token}`;
 
   const response = await fetch(`${API_URL}/api/stripe/organization-payment-intent`, {
     method: 'POST',
     headers,
-    body: JSON.stringify({ tier }),
+    body: JSON.stringify({ tier, organizationId }),
   });
 
   if (!response.ok) {
