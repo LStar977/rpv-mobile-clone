@@ -255,12 +255,17 @@ export default function CreateOrganizationScreen() {
       setUploadingLogo(true);
       try {
         // Upload the image
-        const uploadResult = await uploadsApi.uploadImage(result.assets[0].uri);
-        if (uploadResult.data?.url) {
-          setLogoUri(uploadResult.data.url);
+        const asset = result.assets[0];
+        const uploadResult = await uploadsApi.uploadImage({
+          uri: asset.uri,
+          name: asset.fileName || `logo-${Date.now()}.jpg`,
+          type: asset.mimeType || 'image/jpeg',
+        });
+        if (uploadResult) {
+          setLogoUri(uploadResult);
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         } else {
-          throw new Error(uploadResult.error || 'Upload failed');
+          throw new Error('Upload failed');
         }
       } catch (error: any) {
         Alert.alert('Upload Failed', error.message || 'Failed to upload logo. Please try again.');
