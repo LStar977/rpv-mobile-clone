@@ -48,6 +48,7 @@ import { showVoteConfirmation } from '../../lib/notifications';
 import { VoteConfirmationOverlay, UpgradeModal } from '../../components/ui';
 import { checkForNewBadges } from '../../lib/badgeNotification';
 import * as ImagePicker from 'expo-image-picker';
+import { useTutorialTarget } from '../../components/tutorial';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
@@ -1004,6 +1005,9 @@ export default function ProposalsScreen() {
   const [viewMode, setViewMode] = useState<'swipe' | 'list'>('swipe');
   const [swipeIndex, setSwipeIndex] = useState(0);
 
+  // Tutorial target ref
+  const swipeCardRef = useTutorialTarget('swipe-card');
+
   const [newProposal, setNewProposal] = useState({
     title: '',
     description: '',
@@ -1662,7 +1666,7 @@ export default function ProposalsScreen() {
               </View>
 
               {/* Card stack */}
-              <View style={styles.cardStack}>
+              <View ref={swipeCardRef} style={styles.cardStack} collapsable={false}>
                 {visibleSwipeCards.map((proposal, idx) => (
                   <SwipeCard
                     key={proposal.id}
@@ -1676,27 +1680,6 @@ export default function ProposalsScreen() {
                 )).reverse()}
               </View>
 
-              {/* Vote Buttons - Overlaid at bottom of swipe area */}
-              {visibleSwipeCards.length > 0 && !isProposalEnded(visibleSwipeCards[0]) && (
-                <View style={styles.swipeButtonsOverlay}>
-                  <View style={styles.swipeButtonsRow}>
-                    <TouchableOpacity
-                      style={[styles.swipeActionButton, styles.opposeButton]}
-                      onPress={() => handleSwipeVote(visibleSwipeCards[0], 'oppose')}
-                      activeOpacity={0.8}
-                    >
-                      <Ionicons name="close" size={28} color="#E85D5D" />
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[styles.swipeActionButton, styles.supportButton]}
-                      onPress={() => handleSwipeVote(visibleSwipeCards[0], 'support')}
-                      activeOpacity={0.8}
-                    >
-                      <Ionicons name="checkmark" size={28} color="#4CAF7C" />
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              )}
             </>
           )}
         </GestureHandlerRootView>
@@ -3089,37 +3072,6 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.6)',
     ...TYPOGRAPHY.labelSmall,
     fontStyle: 'italic',
-  },
-
-  // Swipe Actions (Buttons)
-  swipeButtonsOverlay: {
-    position: 'absolute',
-    bottom: 90,
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-    zIndex: 200,
-  },
-  swipeButtonsRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: SPACING.xl,
-  },
-  swipeActionButton: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: 'rgba(212,175,55,0.4)', // Gold accent ring
-  },
-  opposeButton: {
-    backgroundColor: 'rgba(232,93,93,0.15)',
-  },
-  supportButton: {
-    backgroundColor: 'rgba(76,175,124,0.15)',
   },
 
   // Creator Info

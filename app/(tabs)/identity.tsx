@@ -31,6 +31,7 @@ import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS } from '../../lib
 import { useAuthStore } from '../../lib/auth';
 import { userApi, veriffApi } from '../../lib/api';
 import { Button } from '../../components/ui';
+import { useTutorialTarget } from '../../components/tutorial';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://representportal.com';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -389,6 +390,10 @@ export default function IdentityScreen() {
   // Mock stats - in real app, fetch from API
   const [stats, setStats] = useState({ votes: 0, proposals: 0, streak: 0 });
 
+  // Tutorial target refs
+  const idCardRef = useTutorialTarget('id-card');
+  const verifyButtonRef = useTutorialTarget('verify-button');
+
   const fetchIdentity = useCallback(async () => {
     try {
       const results = await Promise.allSettled([
@@ -608,15 +613,17 @@ export default function IdentityScreen() {
         </Animated.View>
 
         {/* Digital ID Card */}
-        <Animated.View entering={FadeInUp.delay(100).duration(500)}>
-          <DigitalIDCard
-            name={displayName}
-            location={displayLocation}
-            verified={verification.verified}
-            verifiedAt={verification.verifiedAt}
-            memberSince={memberSince}
-          />
-        </Animated.View>
+        <View ref={idCardRef} collapsable={false}>
+          <Animated.View entering={FadeInUp.delay(100).duration(500)}>
+            <DigitalIDCard
+              name={displayName}
+              location={displayLocation}
+              verified={verification.verified}
+              verifiedAt={verification.verifiedAt}
+              memberSince={memberSince}
+            />
+          </Animated.View>
+        </View>
 
         {/* Verification CTA for unverified users */}
         {!verification.verified && isAuthenticated && (
@@ -646,14 +653,16 @@ export default function IdentityScreen() {
                 </Text>
               </View>
             </View>
-            <Button
-              title={startingKyc ? 'Starting...' : verification.status === 'pending' ? 'Refresh' : 'Verify Now'}
-              onPress={verification.status === 'pending' ? onRefresh : handleStartKyc}
-              variant="primary"
-              size="md"
-              loading={startingKyc}
-              disabled={startingKyc}
-            />
+            <View ref={verifyButtonRef} collapsable={false}>
+              <Button
+                title={startingKyc ? 'Starting...' : verification.status === 'pending' ? 'Refresh' : 'Verify Now'}
+                onPress={verification.status === 'pending' ? onRefresh : handleStartKyc}
+                variant="primary"
+                size="md"
+                loading={startingKyc}
+                disabled={startingKyc}
+              />
+            </View>
           </Animated.View>
         )}
 

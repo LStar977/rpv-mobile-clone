@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { Tabs } from 'expo-router';
 import { View, StyleSheet, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -9,6 +10,7 @@ import Animated, {
   interpolate,
 } from 'react-native-reanimated';
 import { useTheme, SHADOWS, BORDER_RADIUS, SPACING, ANIMATION } from '../../lib/theme';
+import { useTutorialStore } from '../../lib/tutorial';
 
 // Custom Tab Bar Icon with animation
 function TabIcon({
@@ -71,6 +73,21 @@ function TabIcon({
 
 export default function TabLayout() {
   const { colors, isDark } = useTheme();
+  const { checkTutorialStatus, startTutorial, hasCompleted } = useTutorialStore();
+
+  // Check and start tutorial on first launch
+  useEffect(() => {
+    const initTutorial = async () => {
+      const completed = await checkTutorialStatus();
+      if (!completed) {
+        // Small delay to let the UI settle
+        setTimeout(() => {
+          startTutorial();
+        }, 800);
+      }
+    };
+    initTutorial();
+  }, []);
 
   return (
     <Tabs

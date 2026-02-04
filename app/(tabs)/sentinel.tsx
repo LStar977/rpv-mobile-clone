@@ -28,6 +28,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuthStore } from '../../lib/auth';
 import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS } from '../../lib/theme';
 import { UpgradeModal } from '../../components/ui';
+import { useTutorialTarget } from '../../components/tutorial';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
@@ -568,6 +569,10 @@ export default function SentinelScreen() {
   const [proposalCreated, setProposalCreated] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
+  // Tutorial target refs
+  const sentinelHeaderRef = useTutorialTarget('sentinel-header');
+  const sentinelFormRef = useTutorialTarget('sentinel-form');
+
   // Load history from storage
   useEffect(() => {
     const loadHistory = async () => {
@@ -777,25 +782,27 @@ export default function SentinelScreen() {
         showsVerticalScrollIndicator={false}
       >
         {/* Header */}
-        <Animated.View entering={FadeInDown.duration(400)} style={styles.header}>
-          <View style={[styles.headerIconBg, { backgroundColor: `${colors.gold}15` }]}>
-            <Ionicons name="sparkles" size={28} color={colors.gold} />
-          </View>
-          <View style={styles.headerText}>
-            <Text style={[styles.headerTitle, { color: colors.gold }]}>Sentinel AI</Text>
-            <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>
-              Governance Report Cards
-            </Text>
-          </View>
-          {!isPremium && (
-            <TouchableOpacity
-              style={[styles.premiumBadge, { backgroundColor: colors.gold }]}
-              onPress={() => router.push('/modals/subscription')}
-            >
-              <Text style={styles.premiumBadgeText}>Premium</Text>
-            </TouchableOpacity>
-          )}
-        </Animated.View>
+        <View ref={sentinelHeaderRef} collapsable={false}>
+          <Animated.View entering={FadeInDown.duration(400)} style={styles.header}>
+            <View style={[styles.headerIconBg, { backgroundColor: `${colors.gold}15` }]}>
+              <Ionicons name="sparkles" size={28} color={colors.gold} />
+            </View>
+            <View style={styles.headerText}>
+              <Text style={[styles.headerTitle, { color: colors.gold }]}>Sentinel AI</Text>
+              <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>
+                Governance Report Cards
+              </Text>
+            </View>
+            {!isPremium && (
+              <TouchableOpacity
+                style={[styles.premiumBadge, { backgroundColor: colors.gold }]}
+                onPress={() => router.push('/modals/subscription')}
+              >
+                <Text style={styles.premiumBadgeText}>Premium</Text>
+              </TouchableOpacity>
+            )}
+          </Animated.View>
+        </View>
 
         {/* Quick Stats */}
         <Animated.View entering={FadeInUp.delay(100).duration(400)}>
@@ -829,23 +836,24 @@ export default function SentinelScreen() {
         )}
 
         {/* New Analysis Form */}
-        <Animated.View
-          entering={FadeInUp.delay(300).duration(400)}
-          style={[styles.formCard, { backgroundColor: colors.surface, borderColor: colors.gold }]}
-        >
-          <LinearGradient
-            colors={[`${colors.gold}08`, 'transparent']}
-            style={StyleSheet.absoluteFill}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-          />
+        <View ref={sentinelFormRef} collapsable={false}>
+          <Animated.View
+            entering={FadeInUp.delay(300).duration(400)}
+            style={[styles.formCard, { backgroundColor: colors.surface, borderColor: colors.gold }]}
+          >
+            <LinearGradient
+              colors={[`${colors.gold}08`, 'transparent']}
+              style={StyleSheet.absoluteFill}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+            />
 
-          <View style={styles.formHeader}>
-            <View style={[styles.formIconBg, { backgroundColor: `${colors.gold}15` }]}>
-              <Ionicons name="add-circle-outline" size={20} color={colors.gold} />
+            <View style={styles.formHeader}>
+              <View style={[styles.formIconBg, { backgroundColor: `${colors.gold}15` }]}>
+                <Ionicons name="add-circle-outline" size={20} color={colors.gold} />
+              </View>
+              <Text style={[styles.formTitle, { color: colors.gold }]}>New Analysis</Text>
             </View>
-            <Text style={[styles.formTitle, { color: colors.gold }]}>New Analysis</Text>
-          </View>
 
           {/* Title Input */}
           <View style={styles.inputGroup}>
@@ -927,7 +935,8 @@ export default function SentinelScreen() {
               </>
             )}
           </TouchableOpacity>
-        </Animated.View>
+          </Animated.View>
+        </View>
 
         {/* Info Card */}
         <Animated.View
