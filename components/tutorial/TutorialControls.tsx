@@ -55,12 +55,20 @@ export function TutorialControls() {
         </Animated.View>
       )}
 
-      {/* Bottom controls area */}
-      <View style={[styles.bottomContainer, { paddingBottom: insets.bottom + SPACING.lg }]}>
-        {/* Progress bar */}
+      {/* Bottom controls area - transparent background for action steps to show tab bar */}
+      <View
+        style={[
+          styles.bottomContainer,
+          { paddingBottom: insets.bottom + SPACING.lg },
+          isAction && { backgroundColor: 'transparent' }
+        ]}
+        pointerEvents={isAction ? 'box-none' : 'auto'}
+      >
+        {/* Progress bar - no touch handling for action steps */}
         <Animated.View
           entering={FadeInUp.delay(200).duration(400)}
           style={styles.progressContainer}
+          pointerEvents={isAction ? 'none' : 'auto'}
         >
           <View style={[styles.progressBar, { backgroundColor: 'rgba(255, 255, 255, 0.2)' }]}>
             <Animated.View
@@ -109,6 +117,7 @@ export function TutorialControls() {
             <Animated.View
               entering={FadeInUp.delay(400).duration(400)}
               style={styles.hintContainer}
+              pointerEvents="none"
             >
               <View style={[styles.hintBadge, { backgroundColor: 'rgba(234, 186, 88, 0.15)' }]}>
                 <Ionicons
