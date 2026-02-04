@@ -175,7 +175,8 @@ export const useTutorialStore = create<TutorialState>((set, get) => ({
     if (currentStepIndex < steps.length - 1) {
       const newIndex = currentStepIndex + 1;
       console.log('📍 Advancing to step:', { newIndex, stepId: steps[newIndex]?.id });
-      set({ currentStepIndex: newIndex, targetMeasurements: null });
+      // Don't reset targetMeasurements to null - keep old spotlight visible until new measurements ready
+      set({ currentStepIndex: newIndex });
     } else {
       console.log('🏁 Tutorial complete!');
       get().completeTutorial();
@@ -185,7 +186,8 @@ export const useTutorialStore = create<TutorialState>((set, get) => ({
   previousStep: () => {
     const { currentStepIndex } = get();
     if (currentStepIndex > 0) {
-      set({ currentStepIndex: currentStepIndex - 1, targetMeasurements: null });
+      // Don't reset targetMeasurements - keep visible until new measurements ready
+      set({ currentStepIndex: currentStepIndex - 1 });
     }
   },
 
