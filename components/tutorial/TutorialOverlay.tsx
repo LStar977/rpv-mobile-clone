@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { View, StyleSheet, Modal, Dimensions, TouchableWithoutFeedback } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
+import { router, usePathname } from 'expo-router';
 import { useTutorialStore } from '../../lib/tutorial';
 import { useTheme } from '../../lib/theme';
 import { Spotlight } from './Spotlight';
@@ -48,6 +49,7 @@ export async function measureTarget(
 
 export function TutorialOverlay() {
   const { colors } = useTheme();
+  const pathname = usePathname();
   const {
     isActive,
     currentStepIndex,
@@ -61,6 +63,17 @@ export function TutorialOverlay() {
   const isCenterModal = currentStep?.position === 'center';
   const isActionStep = currentStep?.type === 'action';
   const isInfoStep = currentStep?.type === 'info';
+
+  // Auto-navigate to correct tab for current step
+  useEffect(() => {
+    if (!isActive || !currentStep?.targetTab) return;
+
+    const currentTab = pathname.split('/').pop();
+    if (currentTab !== currentStep.targetTab) {
+      // Navigate to the required tab
+      router.push(`/(tabs)/${currentStep.targetTab}`);
+    }
+  }, [isActive, currentStepIndex, currentStep?.targetTab, pathname]);
 
   // Measure target element when step changes
   useEffect(() => {
