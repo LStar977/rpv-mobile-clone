@@ -49,6 +49,7 @@ import { VoteConfirmationOverlay, UpgradeModal } from '../../components/ui';
 import { checkForNewBadges } from '../../lib/badgeNotification';
 import * as ImagePicker from 'expo-image-picker';
 import { useTutorialTarget } from '../../components/tutorial';
+import { useTutorialStore } from '../../lib/tutorial';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
@@ -1008,6 +1009,9 @@ export default function ProposalsScreen() {
   // Tutorial target ref
   const swipeCardRef = useTutorialTarget('swipe-card');
 
+  // Tutorial state for action detection
+  const { isActive: tutorialActive, completeAction: completeTutorialAction } = useTutorialStore();
+
   const [newProposal, setNewProposal] = useState({
     title: '',
     description: '',
@@ -1324,12 +1328,21 @@ export default function ProposalsScreen() {
 
   // Swipe vote handler
   const handleSwipeVote = useCallback(async (proposal: Proposal, vote: 'support' | 'oppose') => {
+    // Check if this is a tutorial action
+    if (tutorialActive) {
+      // Complete the tutorial action (swipe-right or swipe-left)
+      completeTutorialAction(vote === 'support' ? 'swipe-right' : 'swipe-left');
+      // During tutorial, still advance the card but don't submit real vote
+      setSwipeIndex((prev) => prev + 1);
+      return;
+    }
+
     // Move to next card
     setSwipeIndex((prev) => prev + 1);
 
     // Submit the vote (blockchain transaction - cannot be undone)
     await handleVote(proposal.id as number, vote);
-  }, [handleVote]);
+  }, [handleVote, tutorialActive, completeTutorialAction]);
 
   // Get current cards to display in stack (max 3)
   const visibleSwipeCards = useMemo(() => {

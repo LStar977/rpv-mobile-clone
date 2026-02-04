@@ -1,11 +1,13 @@
-import React, { useEffect, useRef, useCallback } from 'react';
-import { View, StyleSheet, Modal, Dimensions } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { View, StyleSheet, Modal, Dimensions, TouchableWithoutFeedback } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { useTutorialStore } from '../../lib/tutorial';
 import { useTheme } from '../../lib/theme';
 import { Spotlight } from './Spotlight';
 import { Tooltip } from './Tooltip';
 import { TutorialControls } from './TutorialControls';
+import { GestureIndicator } from './GestureIndicator';
+import * as Haptics from 'expo-haptics';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -46,11 +48,19 @@ export async function measureTarget(
 
 export function TutorialOverlay() {
   const { colors } = useTheme();
-  const { isActive, currentStepIndex, steps, targetMeasurements, setTargetMeasurements } =
-    useTutorialStore();
+  const {
+    isActive,
+    currentStepIndex,
+    steps,
+    targetMeasurements,
+    setTargetMeasurements,
+    completeAction,
+  } = useTutorialStore();
 
   const currentStep = steps[currentStepIndex];
   const isCenterModal = currentStep?.position === 'center';
+  const isActionStep = currentStep?.type === 'action';
+  const isInfoStep = currentStep?.type === 'info';
 
   // Measure target element when step changes
   useEffect(() => {
@@ -70,6 +80,14 @@ export function TutorialOverlay() {
     measureCurrentTarget();
   }, [isActive, currentStepIndex, currentStep?.targetElement]);
 
+  // Handle tap on overlay (for info steps with tap-anywhere)
+  const handleOverlayTap = () => {
+    if (isInfoStep && currentStep?.requiredAction === 'tap-anywhere') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      completeAction('tap-anywhere');
+    }
+  };
+
   if (!isActive) return null;
 
   return (
@@ -79,21 +97,57 @@ export function TutorialOverlay() {
         exiting={FadeOut.duration(200)}
         style={styles.container}
       >
-        {/* Dark overlay with spotlight cutout */}
-        {!isCenterModal && targetMeasurements ? (
-          <Spotlight
-            targetRect={targetMeasurements}
-            padding={currentStep.highlightPadding || 8}
-          />
-        ) : (
-          // Full dark backdrop for center modals
-          <View style={[styles.backdrop, { backgroundColor: 'rgba(0, 0, 0, 0.9)' }]} />
+        {/* For center modals (intro/complete), full dark backdrop */}
+        {isCenterModal && (
+          <View style={[styles.backdrop, { backgroundColor: 'rgba(0, 0, 0, 0.92)' }]} />
+        )}
+
+        {/* For action/info steps with target, show spotlight with holes */}
+        {!isCenterModal && targetMeasurements && (
+          <>
+            {/* Spotlight creates dark areas around the target */}
+            <Spotlight
+              targetRect={targetMeasurements}
+              padding={currentStep.highlightPadding || 8}
+            />
+
+            {/* For action steps, the target area needs to be touchable */}
+            {isActionStep && (
+              <View
+                style={[
+                  styles.touchableHole,
+                  {
+                    left: targetMeasurements.x - (currentStep.highlightPadding || 8),
+                    top: targetMeasurements.y - (currentStep.highlightPadding || 8),
+                    width: targetMeasurements.width + (currentStep.highlightPadding || 8) * 2,
+                    height: targetMeasurements.height + (currentStep.highlightPadding || 8) * 2,
+                  },
+                ]}
+                pointerEvents="box-none"
+              />
+            )}
+
+            {/* Gesture indicator for action steps */}
+            {isActionStep && currentStep.gesture && (
+              <GestureIndicator
+                gesture={currentStep.gesture}
+                targetRect={targetMeasurements}
+              />
+            )}
+          </>
+        )}
+
+        {/* For info steps, tapping anywhere advances */}
+        {isInfoStep && (
+          <TouchableWithoutFeedback onPress={handleOverlayTap}>
+            <View style={styles.tapAnywhere} />
+          </TouchableWithoutFeedback>
         )}
 
         {/* Tooltip */}
         <Tooltip step={currentStep} targetRect={targetMeasurements} />
 
-        {/* Controls */}
+        {/* Controls (skip button, progress, action buttons for intro/complete) */}
         <TutorialControls />
       </Animated.View>
     </Modal>
@@ -106,6 +160,14 @@ const styles = StyleSheet.create({
   },
   backdrop: {
     ...StyleSheet.absoluteFillObject,
+  },
+  touchableHole: {
+    position: 'absolute',
+    // This view allows touches to pass through to the target below
+  },
+  tapAnywhere: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 1,
   },
 });
 

@@ -32,6 +32,7 @@ import { useAuthStore } from '../../lib/auth';
 import { userApi, veriffApi } from '../../lib/api';
 import { Button } from '../../components/ui';
 import { useTutorialTarget } from '../../components/tutorial';
+import { useTutorialStore } from '../../lib/tutorial';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://representportal.com';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -394,6 +395,9 @@ export default function IdentityScreen() {
   const idCardRef = useTutorialTarget('id-card');
   const verifyButtonRef = useTutorialTarget('verify-button');
 
+  // Tutorial state for action detection
+  const { isActive: tutorialActive, completeAction: completeTutorialAction } = useTutorialStore();
+
   const fetchIdentity = useCallback(async () => {
     try {
       const results = await Promise.allSettled([
@@ -463,6 +467,13 @@ export default function IdentityScreen() {
   }, [fetchIdentity]);
 
   const handleStartKyc = async () => {
+    // Check if this is a tutorial action
+    if (tutorialActive) {
+      completeTutorialAction('tap-button');
+      // Don't actually start verification during tutorial
+      return;
+    }
+
     if (!isAuthenticated) {
       Alert.alert('Sign In Required', 'Please sign in to begin verification.');
       return;

@@ -2,3 +2,4 @@ export { TutorialOverlay, useTutorialTarget, measureTarget } from './TutorialOve
 export { Spotlight } from './Spotlight';
 export { Tooltip } from './Tooltip';
 export { TutorialControls } from './TutorialControls';
+export { GestureIndicator } from './GestureIndicator';
