@@ -103,67 +103,55 @@ export function TutorialOverlay() {
 
   if (!isActive) return null;
 
-  return (
-    <Modal visible={isActive} transparent animationType="none" statusBarTranslucent>
-      <Animated.View
-        entering={FadeIn.duration(300)}
-        exiting={FadeOut.duration(200)}
-        style={styles.container}
-      >
-        {/* For center modals (intro/complete), full dark backdrop */}
-        {isCenterModal && (
+  // For intro/complete steps, use Modal to block all interaction
+  if (isCenterModal) {
+    return (
+      <Modal visible={isActive} transparent animationType="none" statusBarTranslucent>
+        <Animated.View
+          entering={FadeIn.duration(300)}
+          exiting={FadeOut.duration(200)}
+          style={styles.container}
+        >
           <View style={[styles.backdrop, { backgroundColor: 'rgba(0, 0, 0, 0.92)' }]} />
-        )}
+          <Tooltip step={currentStep} targetRect={targetMeasurements} />
+          <TutorialControls />
+        </Animated.View>
+      </Modal>
+    );
+  }
 
-        {/* For action/info steps with target, show spotlight with holes */}
-        {!isCenterModal && targetMeasurements && (
-          <>
-            {/* Spotlight creates dark areas around the target */}
-            <Spotlight
-              targetRect={targetMeasurements}
-              padding={currentStep.highlightPadding || 8}
-            />
+  // For action/info steps, use regular View so touches can pass through to target
+  return (
+    <View style={styles.absoluteFill} pointerEvents="box-none">
+      {/* Spotlight creates dark areas around the target */}
+      {targetMeasurements && (
+        <Spotlight
+          targetRect={targetMeasurements}
+          padding={currentStep.highlightPadding || 8}
+        />
+      )}
 
-            {/* For action steps, the target area needs to be touchable */}
-            {isActionStep && (
-              <View
-                style={[
-                  styles.touchableHole,
-                  {
-                    left: targetMeasurements.x - (currentStep.highlightPadding || 8),
-                    top: targetMeasurements.y - (currentStep.highlightPadding || 8),
-                    width: targetMeasurements.width + (currentStep.highlightPadding || 8) * 2,
-                    height: targetMeasurements.height + (currentStep.highlightPadding || 8) * 2,
-                  },
-                ]}
-                pointerEvents="box-none"
-              />
-            )}
+      {/* Gesture indicator for action steps */}
+      {isActionStep && currentStep.gesture && targetMeasurements && (
+        <GestureIndicator
+          gesture={currentStep.gesture}
+          targetRect={targetMeasurements}
+        />
+      )}
 
-            {/* Gesture indicator for action steps */}
-            {isActionStep && currentStep.gesture && (
-              <GestureIndicator
-                gesture={currentStep.gesture}
-                targetRect={targetMeasurements}
-              />
-            )}
-          </>
-        )}
+      {/* For info steps, tapping anywhere advances */}
+      {isInfoStep && (
+        <TouchableWithoutFeedback onPress={handleOverlayTap}>
+          <View style={styles.tapAnywhere} />
+        </TouchableWithoutFeedback>
+      )}
 
-        {/* For info steps, tapping anywhere advances */}
-        {isInfoStep && (
-          <TouchableWithoutFeedback onPress={handleOverlayTap}>
-            <View style={styles.tapAnywhere} />
-          </TouchableWithoutFeedback>
-        )}
+      {/* Tooltip */}
+      <Tooltip step={currentStep} targetRect={targetMeasurements} />
 
-        {/* Tooltip */}
-        <Tooltip step={currentStep} targetRect={targetMeasurements} />
-
-        {/* Controls (skip button, progress, action buttons for intro/complete) */}
-        <TutorialControls />
-      </Animated.View>
-    </Modal>
+      {/* Controls (skip button, progress, action buttons for intro/complete) */}
+      <TutorialControls />
+    </View>
   );
 }
 
@@ -171,12 +159,12 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  absoluteFill: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 9999,
+  },
   backdrop: {
     ...StyleSheet.absoluteFillObject,
-  },
-  touchableHole: {
-    position: 'absolute',
-    // This view allows touches to pass through to the target below
   },
   tapAnywhere: {
     ...StyleSheet.absoluteFillObject,
