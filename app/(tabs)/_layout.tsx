@@ -78,6 +78,7 @@ export default function TabLayout() {
   const {
     checkTutorialStatus,
     startTutorial,
+    resetTutorial,
     isActive: tutorialActive,
     currentStepIndex,
     steps,
@@ -89,15 +90,14 @@ export default function TabLayout() {
   const sentinelTabRef = useTutorialTarget('tab-sentinel');
 
   // Check and start tutorial on first launch
+  // TESTING: Force reset tutorial to test it fresh
   useEffect(() => {
     const initTutorial = async () => {
-      const completed = await checkTutorialStatus();
-      if (!completed) {
-        // Small delay to let the UI settle
-        setTimeout(() => {
-          startTutorial();
-        }, 800);
-      }
+      // For testing: reset and start fresh
+      await resetTutorial();
+      setTimeout(() => {
+        startTutorial();
+      }, 800);
     };
     initTutorial();
   }, []);
