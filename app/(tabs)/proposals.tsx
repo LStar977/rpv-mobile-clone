@@ -1328,10 +1328,14 @@ export default function ProposalsScreen() {
 
   // Swipe vote handler
   const handleSwipeVote = useCallback(async (proposal: Proposal, vote: 'support' | 'oppose') => {
+    // Get fresh tutorial state directly from store (not from stale closure)
+    const { isActive, completeAction } = useTutorialStore.getState();
+
     // Check if this is a tutorial action
-    if (tutorialActive) {
+    if (isActive) {
       // Complete the tutorial action (swipe-right or swipe-left)
-      completeTutorialAction(vote === 'support' ? 'swipe-right' : 'swipe-left');
+      const action = vote === 'support' ? 'swipe-right' : 'swipe-left';
+      completeAction(action);
       // During tutorial, still advance the card but don't submit real vote
       setSwipeIndex((prev) => prev + 1);
       return;
@@ -1342,7 +1346,7 @@ export default function ProposalsScreen() {
 
     // Submit the vote (blockchain transaction - cannot be undone)
     await handleVote(proposal.id as number, vote);
-  }, [handleVote, tutorialActive, completeTutorialAction]);
+  }, [handleVote]);
 
   // Get current cards to display in stack (max 3)
   const visibleSwipeCards = useMemo(() => {
