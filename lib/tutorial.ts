@@ -171,9 +171,13 @@ export const useTutorialStore = create<TutorialState>((set, get) => ({
 
   nextStep: () => {
     const { currentStepIndex, steps } = get();
+    console.log('➡️ nextStep called:', { currentStepIndex, totalSteps: steps.length });
     if (currentStepIndex < steps.length - 1) {
-      set({ currentStepIndex: currentStepIndex + 1, targetMeasurements: null });
+      const newIndex = currentStepIndex + 1;
+      console.log('📍 Advancing to step:', { newIndex, stepId: steps[newIndex]?.id });
+      set({ currentStepIndex: newIndex, targetMeasurements: null });
     } else {
+      console.log('🏁 Tutorial complete!');
       get().completeTutorial();
     }
   },
@@ -188,12 +192,20 @@ export const useTutorialStore = create<TutorialState>((set, get) => ({
   // Called when user completes a required action
   completeAction: (action: TutorialActionType) => {
     const { currentStepIndex, steps, isActive } = get();
-    if (!isActive) return;
+    console.log('🎯 completeAction called:', { action, isActive, currentStepIndex, requiredAction: steps[currentStepIndex]?.requiredAction });
+
+    if (!isActive) {
+      console.log('❌ Tutorial not active, returning early');
+      return;
+    }
 
     const currentStep = steps[currentStepIndex];
     if (currentStep?.requiredAction === action) {
+      console.log('✅ Action matched! Advancing to next step');
       // Action matches, advance to next step
       get().nextStep();
+    } else {
+      console.log('❌ Action mismatch:', { expected: currentStep?.requiredAction, received: action });
     }
   },
 

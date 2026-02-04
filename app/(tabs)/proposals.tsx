@@ -442,6 +442,17 @@ function SwipeCard({ proposal, onSwipeLeft, onSwipeRight, onTap, isTopCard, card
   const rotation = useSharedValue(0);
   const scale = useSharedValue(isTopCard ? 1 : 0.95 - cardIndex * 0.02);
 
+  // Use refs to avoid stale callback issues with gesture handler worklets
+  const onSwipeRightRef = useRef(onSwipeRight);
+  const onSwipeLeftRef = useRef(onSwipeLeft);
+  const onTapRef = useRef(onTap);
+
+  useEffect(() => {
+    onSwipeRightRef.current = onSwipeRight;
+    onSwipeLeftRef.current = onSwipeLeft;
+    onTapRef.current = onTap;
+  }, [onSwipeRight, onSwipeLeft, onTap]);
+
   const category = proposal.category || 'General';
   const theme = categoryThemes[category] || categoryThemes['General'];
   const timeRemaining = getTimeRemaining(proposal.deadline);
@@ -452,6 +463,21 @@ function SwipeCard({ proposal, onSwipeLeft, onSwipeRight, onTap, isTopCard, card
   useEffect(() => {
     scale.value = withSpring(isTopCard ? 1 : 0.95 - cardIndex * 0.02, { damping: 15 });
   }, [isTopCard, cardIndex]);
+
+  // Wrapper functions that use the refs - prevents stale closure in worklets
+  const handleSwipeRight = useCallback(() => {
+    console.log('🃏 SwipeCard handleSwipeRight called');
+    onSwipeRightRef.current();
+  }, []);
+
+  const handleSwipeLeft = useCallback(() => {
+    console.log('🃏 SwipeCard handleSwipeLeft called');
+    onSwipeLeftRef.current();
+  }, []);
+
+  const handleTap = useCallback(() => {
+    onTapRef.current();
+  }, []);
 
   const gesture = Gesture.Pan()
     .enabled(isTopCard && !isEnded)
@@ -465,12 +491,12 @@ function SwipeCard({ proposal, onSwipeLeft, onSwipeRight, onTap, isTopCard, card
         translateX.value = withTiming(SCREEN_WIDTH * 1.5, { duration: 300 });
         rotation.value = withTiming(20, { duration: 300 });
         runOnJS(Haptics.notificationAsync)(Haptics.NotificationFeedbackType.Success);
-        runOnJS(onSwipeRight)();
+        runOnJS(handleSwipeRight)();
       } else if (event.translationX < -SWIPE_THRESHOLD) {
         translateX.value = withTiming(-SCREEN_WIDTH * 1.5, { duration: 300 });
         rotation.value = withTiming(-20, { duration: 300 });
         runOnJS(Haptics.notificationAsync)(Haptics.NotificationFeedbackType.Warning);
-        runOnJS(onSwipeLeft)();
+        runOnJS(handleSwipeLeft)();
       } else {
         translateX.value = withSpring(0, { damping: 15 });
         translateY.value = withSpring(0, { damping: 15 });
@@ -482,7 +508,7 @@ function SwipeCard({ proposal, onSwipeLeft, onSwipeRight, onTap, isTopCard, card
     .enabled(isTopCard)
     .onEnd(() => {
       runOnJS(Haptics.impactAsync)(Haptics.ImpactFeedbackStyle.Light);
-      runOnJS(onTap)();
+      runOnJS(handleTap)();
     });
 
   const composedGesture = Gesture.Race(gesture, tapGesture);
@@ -1329,12 +1355,14 @@ export default function ProposalsScreen() {
   // Swipe vote handler
   const handleSwipeVote = useCallback(async (proposal: Proposal, vote: 'support' | 'oppose') => {
     // Get fresh tutorial state directly from store (not from stale closure)
-    const { isActive, completeAction } = useTutorialStore.getState();
+    const { isActive, completeAction, currentStepIndex, steps } = useTutorialStore.getState();
+    console.log('📱 handleSwipeVote called:', { vote, isActive, currentStepIndex, requiredAction: steps[currentStepIndex]?.requiredAction });
 
     // Check if this is a tutorial action
     if (isActive) {
       // Complete the tutorial action (swipe-right or swipe-left)
       const action = vote === 'support' ? 'swipe-right' : 'swipe-left';
+      console.log('📤 Calling completeAction with:', action);
       completeAction(action);
       // During tutorial, still advance the card but don't submit real vote
       setSwipeIndex((prev) => prev + 1);
