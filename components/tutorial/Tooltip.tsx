@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { View, Text, StyleSheet, Dimensions, LayoutChangeEvent } from 'react-native';
+import { View, Text, StyleSheet, Dimensions, LayoutChangeEvent, Image } from 'react-native';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS } from '../../lib/theme';
@@ -13,6 +13,9 @@ interface TooltipProps {
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const TOOLTIP_MAX_WIDTH = 320;
 const ARROW_SIZE = 12;
+
+// Import logo
+const logo = require('../../assets/logo.png');
 
 export function Tooltip({ step, targetRect }: TooltipProps) {
   const { colors } = useTheme();
@@ -83,6 +86,7 @@ export function Tooltip({ step, targetRect }: TooltipProps) {
   }, [step, targetRect, tooltipSize, colors]);
 
   const isCentered = step.position === 'center';
+  const isIntroOrComplete = step.type === 'intro' || step.type === 'complete';
 
   return (
     <Animated.View
@@ -111,6 +115,12 @@ export function Tooltip({ step, targetRect }: TooltipProps) {
 
       {/* Content */}
       <View style={styles.content}>
+        {/* Logo for intro/complete steps */}
+        {isIntroOrComplete && (
+          <View style={styles.logoContainer}>
+            <Image source={logo} style={styles.logo} resizeMode="contain" />
+          </View>
+        )}
         <Text style={[styles.title, { color: colors.gold }]}>{step.title}</Text>
         <Text style={[styles.description, { color: colors.textSecondary }]}>
           {step.description}
@@ -148,6 +158,14 @@ const styles = StyleSheet.create({
   description: {
     ...TYPOGRAPHY.bodyMedium,
     lineHeight: 22,
+  },
+  logoContainer: {
+    alignItems: 'center',
+    marginBottom: SPACING.md,
+  },
+  logo: {
+    width: 80,
+    height: 80,
   },
 });
 

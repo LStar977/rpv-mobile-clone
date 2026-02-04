@@ -1360,12 +1360,21 @@ export default function ProposalsScreen() {
 
     // Check if this is a tutorial action
     if (isActive) {
-      // Complete the tutorial action (swipe-right or swipe-left)
-      const action = vote === 'support' ? 'swipe-right' : 'swipe-left';
-      console.log('📤 Calling completeAction with:', action);
-      completeAction(action);
-      // During tutorial, still advance the card but don't submit real vote
+      // During tutorial, show vote confirmation overlay
+      setLastVoteType(vote);
+      setShowVoteOverlay(true);
+
+      // Advance the card
       setSwipeIndex((prev) => prev + 1);
+
+      // Complete the tutorial action after overlay animation (1.7s delay)
+      // This gives user time to see the confirmation before moving to next step
+      const action = vote === 'support' ? 'swipe-right' : 'swipe-left';
+      console.log('📤 Scheduling completeAction with:', action);
+      setTimeout(() => {
+        console.log('⏱️ Executing delayed completeAction');
+        completeAction(action);
+      }, 1700);
       return;
     }
 
