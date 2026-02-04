@@ -120,18 +120,20 @@ export function TutorialOverlay() {
     );
   }
 
-  // For action/info steps, use regular View so touches can pass through to target
+  // For action/info steps, render overlay that allows touches through to target
   return (
-    <View style={styles.absoluteFill} pointerEvents="box-none">
-      {/* Spotlight creates dark areas around the target */}
+    <>
+      {/* Spotlight - purely visual for action steps, doesn't block any touches */}
       {targetMeasurements && (
-        <Spotlight
-          targetRect={targetMeasurements}
-          padding={currentStep.highlightPadding || 8}
-        />
+        <View pointerEvents={isActionStep ? 'none' : 'box-none'} style={StyleSheet.absoluteFillObject}>
+          <Spotlight
+            targetRect={targetMeasurements}
+            padding={currentStep.highlightPadding || 8}
+          />
+        </View>
       )}
 
-      {/* Gesture indicator for action steps */}
+      {/* Gesture indicator for action steps - doesn't block touches */}
       {isActionStep && currentStep.gesture && targetMeasurements && (
         <GestureIndicator
           gesture={currentStep.gesture}
@@ -146,12 +148,14 @@ export function TutorialOverlay() {
         </TouchableWithoutFeedback>
       )}
 
-      {/* Tooltip */}
-      <Tooltip step={currentStep} targetRect={targetMeasurements} />
+      {/* Tooltip - doesn't block touches */}
+      <View pointerEvents="none" style={StyleSheet.absoluteFillObject}>
+        <Tooltip step={currentStep} targetRect={targetMeasurements} />
+      </View>
 
-      {/* Controls (skip button, progress, action buttons for intro/complete) */}
+      {/* Controls (skip button, progress) */}
       <TutorialControls />
-    </View>
+    </>
   );
 }
 
