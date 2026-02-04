@@ -5,6 +5,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, { FadeIn, FadeInUp } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
+import { router } from 'expo-router';
 import { useTutorialStore } from '../../lib/tutorial';
 import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY } from '../../lib/theme';
 
@@ -32,11 +33,20 @@ export function TutorialControls() {
   const handleSkip = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     await skipTutorial();
+    // Navigate to home screen after skipping
+    router.replace('/(tabs)/dashboard');
   };
 
   const handleButtonPress = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     completeAction('button-press');
+
+    // Navigate to home screen after completing tutorial
+    if (isComplete) {
+      setTimeout(() => {
+        router.replace('/(tabs)/dashboard');
+      }, 100);
+    }
   };
 
   return (

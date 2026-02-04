@@ -89,15 +89,16 @@ export default function TabLayout() {
   const identityTabRef = useTutorialTarget('tab-identity');
   const sentinelTabRef = useTutorialTarget('tab-sentinel');
 
-  // Check and start tutorial on first launch
-  // TESTING: Force reset tutorial to test it fresh
+  // Check and start tutorial on first launch (only if not completed)
   useEffect(() => {
     const initTutorial = async () => {
-      // For testing: reset and start fresh
-      await resetTutorial();
-      setTimeout(() => {
-        startTutorial();
-      }, 800);
+      const hasCompleted = await checkTutorialStatus();
+      if (!hasCompleted) {
+        // First time user - start tutorial after brief delay
+        setTimeout(() => {
+          startTutorial();
+        }, 800);
+      }
     };
     initTutorial();
   }, []);
