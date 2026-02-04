@@ -90,8 +90,8 @@ export function TutorialControls() {
           </Text>
         </Animated.View>
 
-        {/* Action-specific controls */}
-        <View style={styles.actionContainer}>
+        {/* Action-specific controls - box-none for action steps to allow tab bar touches */}
+        <View style={styles.actionContainer} pointerEvents={isAction ? 'box-none' : 'auto'}>
           {/* Intro: "Let's Go" button */}
           {isIntro && (
             <Animated.View entering={FadeInUp.delay(400).duration(400)}>
