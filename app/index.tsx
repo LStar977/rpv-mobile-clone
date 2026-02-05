@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -52,37 +52,33 @@ GoogleSignin.configure({
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 const AnimatedLinearGradient = Animated.createAnimatedComponent(LinearGradient);
 
-// Floating Particle Component
-function FloatingParticle({ delay, startX, duration }: { delay: number; startX: number; duration: number }) {
-  const { colors } = useTheme();
-  const translateY = useSharedValue(SCREEN_HEIGHT);
+// Pulsing Ring Component - single expanding ring
+function PulsingRing({ delay, color }: { delay: number; color: string }) {
+  const scale = useSharedValue(0.5);
   const opacity = useSharedValue(0);
-  const scale = useSharedValue(0.5 + Math.random() * 0.5);
 
   useEffect(() => {
-    // Start animation after delay
     const timeout = setTimeout(() => {
-      opacity.value = withTiming(0.6, { duration: 500 });
-      translateY.value = withRepeat(
-        withTiming(-100, { duration, easing: Easing.linear }),
+      scale.value = withRepeat(
+        withTiming(2.5, { duration: 3000, easing: Easing.out(Easing.ease) }),
+        -1,
+        false
+      );
+      opacity.value = withRepeat(
+        withSequence(
+          withTiming(0.4, { duration: 300 }),
+          withTiming(0, { duration: 2700 })
+        ),
         -1,
         false
       );
     }, delay);
-
     return () => clearTimeout(timeout);
   }, []);
 
   const animatedStyle = useAnimatedStyle(() => ({
-    transform: [
-      { translateY: translateY.value },
-      { scale: scale.value },
-    ],
-    opacity: interpolate(
-      translateY.value,
-      [SCREEN_HEIGHT, SCREEN_HEIGHT * 0.7, SCREEN_HEIGHT * 0.3, -100],
-      [0, 0.6, 0.6, 0]
-    ),
+    transform: [{ scale: scale.value }],
+    opacity: opacity.value,
   }));
 
   return (
@@ -90,11 +86,11 @@ function FloatingParticle({ delay, startX, duration }: { delay: number; startX: 
       style={[
         {
           position: 'absolute',
-          left: startX,
-          width: 4 + Math.random() * 4,
-          height: 4 + Math.random() * 4,
-          borderRadius: 4,
-          backgroundColor: colors.gold,
+          width: 140,
+          height: 140,
+          borderRadius: 70,
+          borderWidth: 1,
+          borderColor: color,
         },
         animatedStyle,
       ]}
@@ -102,49 +98,46 @@ function FloatingParticle({ delay, startX, duration }: { delay: number; startX: 
   );
 }
 
-// Floating Particles Container
-function FloatingParticles() {
-  const particles = useMemo(() => {
-    return Array.from({ length: 15 }, (_, i) => ({
-      id: i,
-      delay: Math.random() * 3000,
-      startX: Math.random() * SCREEN_WIDTH,
-      duration: 8000 + Math.random() * 6000,
-    }));
-  }, []);
+// Pulsing Rings Container - expanding circles from logo
+function PulsingRings() {
+  const { colors } = useTheme();
 
   return (
-    <View style={StyleSheet.absoluteFill} pointerEvents="none">
-      {particles.map((particle) => (
-        <FloatingParticle
-          key={particle.id}
-          delay={particle.delay}
-          startX={particle.startX}
-          duration={particle.duration}
-        />
+    <View style={[StyleSheet.absoluteFill, { alignItems: 'center', paddingTop: 130 }]} pointerEvents="none">
+      {[0, 1, 2].map((index) => (
+        <PulsingRing key={index} delay={index * 1000} color={colors.gold} />
       ))}
     </View>
   );
 }
 
-// Animated Aurora Background
+// Animated Aurora Background - enhanced with horizontal movement
 function AuroraBackground() {
   const { colors } = useTheme();
   const translateY = useSharedValue(0);
+  const translateX = useSharedValue(0);
   const opacity = useSharedValue(0.3);
 
   useEffect(() => {
     translateY.value = withRepeat(
       withSequence(
-        withTiming(-50, { duration: 4000, easing: Easing.inOut(Easing.ease) }),
-        withTiming(50, { duration: 4000, easing: Easing.inOut(Easing.ease) })
+        withTiming(-80, { duration: 5000, easing: Easing.inOut(Easing.ease) }),
+        withTiming(80, { duration: 5000, easing: Easing.inOut(Easing.ease) })
+      ),
+      -1,
+      true
+    );
+    translateX.value = withRepeat(
+      withSequence(
+        withTiming(30, { duration: 7000, easing: Easing.inOut(Easing.ease) }),
+        withTiming(-30, { duration: 7000, easing: Easing.inOut(Easing.ease) })
       ),
       -1,
       true
     );
     opacity.value = withRepeat(
       withSequence(
-        withTiming(0.5, { duration: 3000, easing: Easing.inOut(Easing.ease) }),
+        withTiming(0.6, { duration: 3000, easing: Easing.inOut(Easing.ease) }),
         withTiming(0.2, { duration: 3000, easing: Easing.inOut(Easing.ease) })
       ),
       -1,
@@ -153,7 +146,10 @@ function AuroraBackground() {
   }, []);
 
   const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: translateY.value }],
+    transform: [
+      { translateY: translateY.value },
+      { translateX: translateX.value },
+    ],
     opacity: opacity.value,
   }));
 
@@ -162,11 +158,11 @@ function AuroraBackground() {
       <LinearGradient
         colors={[
           'transparent',
-          colors.gold + '15',
-          colors.gold + '08',
+          colors.gold + '20',
+          colors.gold + '10',
           'transparent',
         ]}
-        locations={[0, 0.3, 0.7, 1]}
+        locations={[0, 0.4, 0.6, 1]}
         style={StyleSheet.absoluteFill}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
@@ -555,8 +551,8 @@ export default function AuthScreen() {
         {/* Animated aurora effect */}
         <AuroraBackground />
 
-        {/* Floating particles */}
-        <FloatingParticles />
+        {/* Pulsing rings from logo */}
+        <PulsingRings />
 
         {/* Content */}
         <View style={[styles.welcomeContent, { paddingTop: insets.top + 60 }]}>
