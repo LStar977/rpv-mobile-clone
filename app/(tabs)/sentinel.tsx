@@ -214,11 +214,7 @@ function CircularScoreGauge({ score, size = 'large' }: { score: number; size?: '
           <Text style={[styles.gaugeLabel, { color: colors.textSecondary }]}>out of 100</Text>
         </View>
       </View>
-
-      {/* Score label below gauge */}
-      <View style={[styles.scoreLabelBadge, { backgroundColor: `${scoreColor}15`, borderColor: `${scoreColor}40` }]}>
-        <Text style={[styles.scoreLabelText, { color: scoreColor }]}>{scoreLabel}</Text>
-      </View>
+      {/* Score label badge moved to ReportCard for side-by-side layout with verdict */}
     </View>
   );
 }
@@ -401,6 +397,7 @@ function ReportCard({
   const { colors } = useTheme();
   const averageScore = calculateAverageScore(analysis.analysis.categoryScores);
   const scoreColor = getScoreColor(averageScore);
+  const scoreLabel = getScoreLabel(averageScore);
   const verdictColor = analysis.analysis.overallVerdict === 'Aligned'
     ? colors.success
     : analysis.analysis.overallVerdict === 'At Risk'
@@ -442,11 +439,16 @@ function ReportCard({
         />
         <Text style={[styles.scoreHeroLabel, { color: colors.gold }]}>GOVERNANCE SCORE</Text>
         <CircularScoreGauge score={averageScore} size="large" />
-        <View style={[styles.verdictBadge, { backgroundColor: `${verdictColor}15`, borderColor: `${verdictColor}40` }]}>
-          <Ionicons name={getVerdictIcon(analysis.analysis.overallVerdict) as any} size={16} color={verdictColor} />
-          <Text style={[styles.verdictBadgeText, { color: verdictColor }]}>
-            {analysis.analysis.overallVerdict}
-          </Text>
+        <View style={styles.badgeRow}>
+          <View style={[styles.scoreLabelBadge, { backgroundColor: `${scoreColor}15`, borderColor: `${scoreColor}40` }]}>
+            <Text style={[styles.scoreLabelText, { color: scoreColor }]}>{scoreLabel}</Text>
+          </View>
+          <View style={[styles.verdictBadge, { backgroundColor: `${verdictColor}15`, borderColor: `${verdictColor}40` }]}>
+            <Ionicons name={getVerdictIcon(analysis.analysis.overallVerdict) as any} size={16} color={verdictColor} />
+            <Text style={[styles.verdictBadgeText, { color: verdictColor }]}>
+              {analysis.analysis.overallVerdict}
+            </Text>
+          </View>
         </View>
       </Animated.View>
 
@@ -1339,6 +1341,12 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.sm,
     borderRadius: BORDER_RADIUS.full,
     borderWidth: 1,
+  },
+  badgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SPACING.sm,
     marginTop: SPACING.md,
   },
   scoreLabelText: {

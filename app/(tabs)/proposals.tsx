@@ -1478,6 +1478,7 @@ export default function ProposalsScreen() {
                 style={[styles.swipeRefreshBtn, { backgroundColor: colors.surface, borderColor: colors.border }]}
                 onPress={() => {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                  setSwipeIndex(0);
                   fetchData(true);
                 }}
               >
