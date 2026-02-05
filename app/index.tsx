@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -26,8 +26,10 @@ import Animated, {
   withTiming,
   withDelay,
   withSequence,
+  withRepeat,
   interpolate,
   Extrapolation,
+  Easing,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme, SPACING, RADIUS, TYPOGRAPHY, SHADOWS, EASING } from '../lib/theme';
@@ -48,6 +50,178 @@ GoogleSignin.configure({
 });
 
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
+const AnimatedLinearGradient = Animated.createAnimatedComponent(LinearGradient);
+
+// Floating Particle Component
+function FloatingParticle({ delay, startX, duration }: { delay: number; startX: number; duration: number }) {
+  const { colors } = useTheme();
+  const translateY = useSharedValue(SCREEN_HEIGHT);
+  const opacity = useSharedValue(0);
+  const scale = useSharedValue(0.5 + Math.random() * 0.5);
+
+  useEffect(() => {
+    // Start animation after delay
+    const timeout = setTimeout(() => {
+      opacity.value = withTiming(0.6, { duration: 500 });
+      translateY.value = withRepeat(
+        withTiming(-100, { duration, easing: Easing.linear }),
+        -1,
+        false
+      );
+    }, delay);
+
+    return () => clearTimeout(timeout);
+  }, []);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [
+      { translateY: translateY.value },
+      { scale: scale.value },
+    ],
+    opacity: interpolate(
+      translateY.value,
+      [SCREEN_HEIGHT, SCREEN_HEIGHT * 0.7, SCREEN_HEIGHT * 0.3, -100],
+      [0, 0.6, 0.6, 0]
+    ),
+  }));
+
+  return (
+    <Animated.View
+      style={[
+        {
+          position: 'absolute',
+          left: startX,
+          width: 4 + Math.random() * 4,
+          height: 4 + Math.random() * 4,
+          borderRadius: 4,
+          backgroundColor: colors.gold,
+        },
+        animatedStyle,
+      ]}
+    />
+  );
+}
+
+// Floating Particles Container
+function FloatingParticles() {
+  const particles = useMemo(() => {
+    return Array.from({ length: 15 }, (_, i) => ({
+      id: i,
+      delay: Math.random() * 3000,
+      startX: Math.random() * SCREEN_WIDTH,
+      duration: 8000 + Math.random() * 6000,
+    }));
+  }, []);
+
+  return (
+    <View style={StyleSheet.absoluteFill} pointerEvents="none">
+      {particles.map((particle) => (
+        <FloatingParticle
+          key={particle.id}
+          delay={particle.delay}
+          startX={particle.startX}
+          duration={particle.duration}
+        />
+      ))}
+    </View>
+  );
+}
+
+// Animated Aurora Background
+function AuroraBackground() {
+  const { colors } = useTheme();
+  const translateY = useSharedValue(0);
+  const opacity = useSharedValue(0.3);
+
+  useEffect(() => {
+    translateY.value = withRepeat(
+      withSequence(
+        withTiming(-50, { duration: 4000, easing: Easing.inOut(Easing.ease) }),
+        withTiming(50, { duration: 4000, easing: Easing.inOut(Easing.ease) })
+      ),
+      -1,
+      true
+    );
+    opacity.value = withRepeat(
+      withSequence(
+        withTiming(0.5, { duration: 3000, easing: Easing.inOut(Easing.ease) }),
+        withTiming(0.2, { duration: 3000, easing: Easing.inOut(Easing.ease) })
+      ),
+      -1,
+      true
+    );
+  }, []);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: translateY.value }],
+    opacity: opacity.value,
+  }));
+
+  return (
+    <Animated.View style={[StyleSheet.absoluteFill, animatedStyle]} pointerEvents="none">
+      <LinearGradient
+        colors={[
+          'transparent',
+          colors.gold + '15',
+          colors.gold + '08',
+          'transparent',
+        ]}
+        locations={[0, 0.3, 0.7, 1]}
+        style={StyleSheet.absoluteFill}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+      />
+    </Animated.View>
+  );
+}
+
+// Animated Logo Glow Component
+function PulsingLogoGlow({ color }: { color: string }) {
+  const glowOpacity = useSharedValue(0.15);
+  const glowScale = useSharedValue(1);
+
+  useEffect(() => {
+    glowOpacity.value = withRepeat(
+      withSequence(
+        withTiming(0.3, { duration: 1500, easing: Easing.inOut(Easing.ease) }),
+        withTiming(0.15, { duration: 1500, easing: Easing.inOut(Easing.ease) })
+      ),
+      -1,
+      true
+    );
+    glowScale.value = withRepeat(
+      withSequence(
+        withTiming(1.1, { duration: 1500, easing: Easing.inOut(Easing.ease) }),
+        withTiming(1, { duration: 1500, easing: Easing.inOut(Easing.ease) })
+      ),
+      -1,
+      true
+    );
+  }, []);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    opacity: glowOpacity.value,
+    transform: [{ scale: glowScale.value }],
+  }));
+
+  return (
+    <Animated.View
+      style={[
+        {
+          position: 'absolute',
+          top: 10,
+          left: 10,
+          right: 10,
+          bottom: 10,
+          borderRadius: 70,
+          backgroundColor: color,
+          zIndex: -1,
+        },
+        animatedStyle,
+      ]}
+    />
+  );
+}
 
 // Premium Feature Pill Component
 function FeaturePill({
@@ -378,6 +552,12 @@ export default function AuthScreen() {
           style={styles.backgroundGradient}
         />
 
+        {/* Animated aurora effect */}
+        <AuroraBackground />
+
+        {/* Floating particles */}
+        <FloatingParticles />
+
         {/* Content */}
         <View style={[styles.welcomeContent, { paddingTop: insets.top + 60 }]}>
           {/* Logo */}
@@ -394,7 +574,7 @@ export default function AuthScreen() {
                 />
               </LinearGradient>
             </View>
-            <Animated.View style={[styles.logoGlow, { backgroundColor: colors.gold }]} />
+            <PulsingLogoGlow color={colors.gold} />
           </Animated.View>
 
           {/* Brand */}
