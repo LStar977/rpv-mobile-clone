@@ -88,272 +88,9 @@ const categoryThemes: Record<string, { primary: string; secondary: string; icon:
 
 const SWIPE_THRESHOLD = 120;
 
-// Demo mode flag - set to true to use mock proposals for testing
-const USE_DEMO_MODE = true;
-
-// Mock proposals for testing the swipe feature
-const MOCK_PROPOSALS: Proposal[] = [
-  {
-    id: 'mock-1',
-    title: 'Expand City Bike Lane Network',
-    description: 'Proposal to add 50 miles of protected bike lanes connecting major neighborhoods to downtown, improving safety for cyclists and reducing traffic congestion.',
-    category: 'Transportation',
-    supportVotes: 1247,
-    opposeVotes: 423,
-    deadline: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-    createdAt: new Date().toISOString(),
-    creatorId: 'demo-user',
-    imageUrl: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=800&h=1200&fit=crop',
-    geoRestrictions: ['Canada', 'Ontario', 'Toronto'],
-  },
-  {
-    id: 'mock-2',
-    title: 'Ban Single-Use Plastics in Restaurants',
-    description: 'Require all restaurants and food vendors to use compostable or reusable containers, utensils, and straws. Includes a 2-year transition period for businesses.',
-    category: 'Environment',
-    supportVotes: 2891,
-    opposeVotes: 1156,
-    deadline: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
-    createdAt: new Date().toISOString(),
-    creatorId: 'demo-user',
-    imageUrl: 'https://images.unsplash.com/photo-1621451537084-482c73073a0f?w=800&h=1200&fit=crop',
-    geoRestrictions: ['Canada'],
-  },
-  {
-    id: 'mock-3',
-    title: 'Increase Affordable Housing Zoning',
-    description: 'Rezone 15% of commercial areas to allow mixed-use residential development, with requirements that 30% of new units be designated as affordable housing.',
-    category: 'Housing',
-    supportVotes: 1834,
-    opposeVotes: 967,
-    deadline: new Date(Date.now() + 21 * 24 * 60 * 60 * 1000).toISOString(),
-    createdAt: new Date().toISOString(),
-    creatorId: 'demo-user',
-    imageUrl: 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=800&h=1200&fit=crop',
-    geoRestrictions: ['United States', 'California'],
-  },
-  {
-    id: 'mock-4',
-    title: 'Free Community College Tuition',
-    description: 'Provide free tuition for all residents attending community college, funded through a 0.5% increase in corporate tax rates for businesses with over $10M revenue.',
-    category: 'Education',
-    supportVotes: 3456,
-    opposeVotes: 1289,
-    deadline: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString(),
-    createdAt: new Date().toISOString(),
-    creatorId: 'demo-user',
-    imageUrl: 'https://images.unsplash.com/photo-1523050854058-8df90110c9f1?w=800&h=1200&fit=crop',
-    geoRestrictions: ['United States'],
-  },
-  {
-    id: 'mock-5',
-    title: 'Universal Dental Care Coverage',
-    description: 'Expand public health coverage to include comprehensive dental care for all residents, including preventive care, fillings, and emergency procedures.',
-    category: 'Healthcare',
-    supportVotes: 4123,
-    opposeVotes: 876,
-    deadline: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(),
-    createdAt: new Date().toISOString(),
-    creatorId: 'demo-user',
-    imageUrl: 'https://images.unsplash.com/photo-1588776814546-1ffcf47267a5?w=800&h=1200&fit=crop',
-    geoRestrictions: ['Canada', 'Ontario'],
-  },
-  {
-    id: 'mock-6',
-    title: 'Raise Minimum Wage to $18/Hour',
-    description: 'Incrementally raise the minimum wage to $18/hour over 3 years, with annual adjustments tied to inflation. Includes exemptions for small businesses under 10 employees.',
-    category: 'Economy',
-    supportVotes: 2567,
-    opposeVotes: 1834,
-    deadline: new Date(Date.now() + 12 * 24 * 60 * 60 * 1000).toISOString(),
-    createdAt: new Date().toISOString(),
-    creatorId: 'demo-user',
-    imageUrl: 'https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=800&h=1200&fit=crop',
-    geoRestrictions: ['United States', 'New York'],
-  },
-  {
-    id: 'mock-7',
-    title: 'Increase Street Lighting in Parks',
-    description: 'Install solar-powered LED lighting along all major park pathways to improve safety for evening visitors and reduce energy costs by 40%.',
-    category: 'Public Safety',
-    supportVotes: 1923,
-    opposeVotes: 234,
-    deadline: new Date(Date.now() + 8 * 24 * 60 * 60 * 1000).toISOString(),
-    createdAt: new Date().toISOString(),
-    creatorId: 'demo-user',
-    imageUrl: 'https://images.unsplash.com/photo-1519331379826-f10be5486c6f?w=800&h=1200&fit=crop',
-    geoRestrictions: ['Japan', 'Tokyo'],
-  },
-  {
-    id: 'mock-8',
-    title: 'Repair Aging Bridge Network',
-    description: 'Allocate $500M over 5 years to repair and modernize 47 bridges currently rated as structurally deficient, prioritizing high-traffic commuter routes.',
-    category: 'Infrastructure',
-    supportVotes: 3789,
-    opposeVotes: 445,
-    deadline: new Date(Date.now() + 18 * 24 * 60 * 60 * 1000).toISOString(),
-    createdAt: new Date().toISOString(),
-    creatorId: 'demo-user',
-    imageUrl: 'https://images.unsplash.com/photo-1477959858617-67f85cf4f1df?w=800&h=1200&fit=crop',
-    geoRestrictions: [],
-  },
-  {
-    id: 'mock-9',
-    title: 'Add Weekend Express Bus Routes',
-    description: 'Launch express bus service on weekends connecting suburbs to downtown entertainment districts, with buses every 15 minutes from 6 PM to 2 AM.',
-    category: 'Transportation',
-    supportVotes: 1456,
-    opposeVotes: 678,
-    deadline: new Date(Date.now() + 9 * 24 * 60 * 60 * 1000).toISOString(),
-    createdAt: new Date().toISOString(),
-    creatorId: 'demo-user',
-    imageUrl: 'https://images.unsplash.com/photo-1570125909232-eb263c188f7e?w=800&h=1200&fit=crop',
-    geoRestrictions: ['Canada', 'British Columbia', 'Vancouver'],
-  },
-  {
-    id: 'mock-10',
-    title: 'Plant 10,000 Trees Downtown',
-    description: 'Launch a 3-year urban reforestation initiative to plant 10,000 native trees in the downtown core, reducing heat island effect and improving air quality.',
-    category: 'Environment',
-    supportVotes: 4567,
-    opposeVotes: 123,
-    deadline: new Date(Date.now() + 25 * 24 * 60 * 60 * 1000).toISOString(),
-    createdAt: new Date().toISOString(),
-    creatorId: 'demo-user',
-    imageUrl: 'https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?w=800&h=1200&fit=crop',
-    geoRestrictions: [],
-  },
-  {
-    id: 'mock-11',
-    title: 'Cap Rent Increases at 3% Annually',
-    description: 'Implement rent stabilization limiting annual increases to 3% or inflation rate (whichever is lower) for buildings over 15 years old.',
-    category: 'Housing',
-    supportVotes: 2345,
-    opposeVotes: 1567,
-    deadline: new Date(Date.now() + 6 * 24 * 60 * 60 * 1000).toISOString(),
-    createdAt: new Date().toISOString(),
-    creatorId: 'demo-user',
-    imageUrl: 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=800&h=1200&fit=crop',
-    geoRestrictions: ['United States', 'California', 'San Francisco'],
-  },
-  {
-    id: 'mock-12',
-    title: 'Expand After-School Programs',
-    description: 'Fund free after-school programs at all public elementary schools until 6 PM, including homework help, arts, sports, and STEM activities.',
-    category: 'Education',
-    supportVotes: 3234,
-    opposeVotes: 456,
-    deadline: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString(),
-    createdAt: new Date().toISOString(),
-    creatorId: 'demo-user',
-    imageUrl: 'https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=800&h=1200&fit=crop',
-    geoRestrictions: ['Canada', 'Alberta'],
-  },
-  {
-    id: 'mock-13',
-    title: 'Free Mental Health Counseling',
-    description: 'Provide 12 free counseling sessions per year to all residents through a network of licensed therapists, with no income requirements.',
-    category: 'Healthcare',
-    supportVotes: 5678,
-    opposeVotes: 234,
-    deadline: new Date(Date.now() + 11 * 24 * 60 * 60 * 1000).toISOString(),
-    createdAt: new Date().toISOString(),
-    creatorId: 'demo-user',
-    imageUrl: 'https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?w=800&h=1200&fit=crop',
-    geoRestrictions: ['United Kingdom'],
-  },
-  {
-    id: 'mock-14',
-    title: 'Small Business Tax Relief',
-    description: 'Reduce business license fees by 50% and provide property tax exemptions for small businesses with under $500K annual revenue for the next 3 years.',
-    category: 'Economy',
-    supportVotes: 2890,
-    opposeVotes: 567,
-    deadline: new Date(Date.now() + 20 * 24 * 60 * 60 * 1000).toISOString(),
-    createdAt: new Date().toISOString(),
-    creatorId: 'demo-user',
-    imageUrl: 'https://images.unsplash.com/photo-1556740738-b6a63e27c4df?w=800&h=1200&fit=crop',
-    geoRestrictions: ['Australia'],
-  },
-  {
-    id: 'mock-15',
-    title: 'Community Policing Initiative',
-    description: 'Assign dedicated neighborhood officers to each district who will patrol on foot, attend community meetings, and build relationships with residents.',
-    category: 'Public Safety',
-    supportVotes: 1789,
-    opposeVotes: 890,
-    deadline: new Date(Date.now() + 13 * 24 * 60 * 60 * 1000).toISOString(),
-    createdAt: new Date().toISOString(),
-    creatorId: 'demo-user',
-    imageUrl: 'https://images.unsplash.com/photo-1517457373958-b7bdd4587205?w=800&h=1200&fit=crop',
-    geoRestrictions: ['United States', 'Texas', 'Austin'],
-  },
-  {
-    id: 'mock-16',
-    title: 'Upgrade Water Treatment Facility',
-    description: 'Modernize the central water treatment plant with advanced filtration technology, ensuring cleaner drinking water and 30% reduction in chemical usage.',
-    category: 'Infrastructure',
-    supportVotes: 4321,
-    opposeVotes: 189,
-    deadline: new Date(Date.now() + 22 * 24 * 60 * 60 * 1000).toISOString(),
-    createdAt: new Date().toISOString(),
-    creatorId: 'demo-user',
-    imageUrl: 'https://images.unsplash.com/photo-1581244277943-fe4a9c777189?w=800&h=1200&fit=crop',
-    geoRestrictions: ['Mexico'],
-  },
-  {
-    id: 'mock-17',
-    title: 'Electric Vehicle Charging Stations',
-    description: 'Install 500 public EV charging stations across the city, with at least 20 stations in each neighborhood, powered by renewable energy.',
-    category: 'Transportation',
-    supportVotes: 2134,
-    opposeVotes: 789,
-    deadline: new Date(Date.now() + 16 * 24 * 60 * 60 * 1000).toISOString(),
-    createdAt: new Date().toISOString(),
-    creatorId: 'demo-user',
-    imageUrl: 'https://images.unsplash.com/photo-1593941707882-a5bba14938c7?w=800&h=1200&fit=crop',
-    geoRestrictions: ['Germany'],
-  },
-  {
-    id: 'mock-18',
-    title: 'Solar Panels on Public Buildings',
-    description: 'Install solar panels on all city-owned buildings within 5 years, generating 40% of municipal electricity needs and saving $2M annually.',
-    category: 'Environment',
-    supportVotes: 3890,
-    opposeVotes: 345,
-    deadline: new Date(Date.now() + 19 * 24 * 60 * 60 * 1000).toISOString(),
-    createdAt: new Date().toISOString(),
-    creatorId: 'demo-user',
-    imageUrl: 'https://images.unsplash.com/photo-1509391366360-2e959784a276?w=800&h=1200&fit=crop',
-    geoRestrictions: [],
-  },
-  {
-    id: 'mock-19',
-    title: 'First-Time Homebuyer Assistance',
-    description: 'Provide up to $25,000 in down payment assistance for first-time homebuyers earning under $80,000 annually, forgivable after 5 years of residency.',
-    category: 'Housing',
-    supportVotes: 2678,
-    opposeVotes: 934,
-    deadline: new Date(Date.now() + 17 * 24 * 60 * 60 * 1000).toISOString(),
-    createdAt: new Date().toISOString(),
-    creatorId: 'demo-user',
-    imageUrl: 'https://images.unsplash.com/photo-1560184897-ae75f418493e?w=800&h=1200&fit=crop',
-    geoRestrictions: ['Canada', 'Quebec', 'Montreal'],
-  },
-  {
-    id: 'mock-20',
-    title: 'Quarterly Town Hall Meetings',
-    description: 'Require elected officials to hold quarterly town hall meetings in each district, with live streaming and Q&A sessions for residents who cannot attend.',
-    category: 'Other',
-    supportVotes: 1567,
-    opposeVotes: 234,
-    deadline: new Date(Date.now() + 24 * 24 * 60 * 60 * 1000).toISOString(),
-    createdAt: new Date().toISOString(),
-    creatorId: 'demo-user',
-    imageUrl: 'https://images.unsplash.com/photo-1577962917302-cd874c4e31d2?w=800&h=1200&fit=crop',
-    geoRestrictions: ['France'],
-  },
-];
+// Helper to check if a proposal is a seed proposal (for local-only voting)
+const isSeedProposal = (id: number | string): boolean =>
+  typeof id === 'string' && id.startsWith('seed-');
 
 function getTimeRemaining(deadline: string | null): string {
   if (!deadline) return '';
@@ -1003,8 +740,8 @@ export default function ProposalsScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  const [claimedTokens, setClaimedTokens] = useState<Set<number>>(new Set());
-  const [votedProposals, setVotedProposals] = useState<Set<number>>(new Set());
+  const [claimedTokens, setClaimedTokens] = useState<Set<number | string>>(new Set());
+  const [votedProposals, setVotedProposals] = useState<Set<number | string>>(new Set());
   const [votingProposalId, setVotingProposalId] = useState<number | null>(null);
 
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -1146,17 +883,17 @@ export default function ProposalsScreen() {
     setSwipeIndex(0);
   }, [selectedCategory, selectedStatus, selectedGeoLevel, searchQuery]);
 
-  // Infinite rotation for demo mode - when all proposals swiped, reset
+  // Infinite rotation for seed proposals - when all proposals swiped, reset
   useEffect(() => {
-    if (USE_DEMO_MODE && swipeIndex > 0 && swipeableProposals.length === 0) {
+    const hasSeedProposals = proposals.some((p) => isSeedProposal(p.id));
+    if (hasSeedProposals && swipeIndex > 0 && swipeableProposals.length === 0) {
       // All proposals have been voted on, reset for infinite loop
       const timer = setTimeout(() => {
-        // Clear mock proposal IDs from voted set
+        // Clear seed proposal IDs from voted set, keep real votes
         setVotedProposals((prev) => {
-          const newSet = new Set<number>();
+          const newSet = new Set<number | string>();
           prev.forEach((id) => {
-            // Keep non-mock votes, remove mock votes
-            if (typeof id === 'number' && !String(id).startsWith('mock')) {
+            if (!isSeedProposal(id)) {
               newSet.add(id);
             }
           });
@@ -1166,20 +903,13 @@ export default function ProposalsScreen() {
       }, 500); // Small delay for smooth transition
       return () => clearTimeout(timer);
     }
-  }, [swipeIndex, swipeableProposals.length]);
+  }, [swipeIndex, swipeableProposals.length, proposals]);
 
   const fetchData = useCallback(
     async (isRefresh = false) => {
       isRefresh ? setRefreshing(true) : setLoading(true);
       try {
-        // In demo mode, use mock proposals
-        if (USE_DEMO_MODE) {
-          setProposals(MOCK_PROPOSALS);
-          setLoading(false);
-          setRefreshing(false);
-          return;
-        }
-
+        // Fetch proposals from API (falls back to seed proposals when backend is empty)
         const [proposalsRes, claimedRes, votedRes, profileRes, limitsRes] = await Promise.all([
           proposalsApi.getAll(),
           isAuthenticated ? userApi.getClaimedTokens() : Promise.resolve({ data: [], error: null }),
@@ -1223,8 +953,8 @@ export default function ProposalsScreen() {
   }, [fetchData]);
 
   const handleVote = async (proposalId: number | string, vote: 'support' | 'oppose') => {
-    // Demo mode: skip auth and API calls, just update local state
-    if (USE_DEMO_MODE) {
+    // Seed proposals: local-only voting (no auth/API required)
+    if (isSeedProposal(proposalId)) {
       setVotedProposals((prev) => new Set([...prev, proposalId as any]));
       setProposals((prev) =>
         prev.map((p) =>
@@ -1239,9 +969,11 @@ export default function ProposalsScreen() {
       );
       setLastVoteType(vote);
       setShowVoteOverlay(true);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       return;
     }
 
+    // Real proposals: require authentication
     if (!isAuthenticated) {
       Alert.alert('Sign In Required', 'Please sign in to vote.');
       return;

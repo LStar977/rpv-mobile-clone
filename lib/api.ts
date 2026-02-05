@@ -1,4 +1,5 @@
 import { getAuthToken, useAuthStore } from './auth';
+import { SEED_PROPOSALS } from './seedProposals';
 
 const API_BASE_URL = 'https://representportal.com';
 
@@ -116,9 +117,18 @@ export const userApi = {
 export const proposalsApi = {
   async getAll(): Promise<ApiResponse<Proposal[]>> {
     const result = await apiRequest<any>('/api/proposals');
-    if (Array.isArray(result.data)) return { data: result.data, error: null };
-    if (result.data?.proposals && Array.isArray(result.data.proposals)) return { data: result.data.proposals, error: null };
-    return { data: [], error: result.error };
+
+    // Return backend data if available
+    if (Array.isArray(result.data) && result.data.length > 0) {
+      return { data: result.data, error: null };
+    }
+    if (result.data?.proposals && Array.isArray(result.data.proposals) && result.data.proposals.length > 0) {
+      return { data: result.data.proposals, error: null };
+    }
+
+    // Fallback to seed proposals when backend is empty or unavailable
+    // This ensures users always have content to engage with
+    return { data: SEED_PROPOSALS, error: null };
   },
   async create(data: CreateProposalData): Promise<ApiResponse<Proposal>> {
     return apiRequest<Proposal>('/api/proposals', {
