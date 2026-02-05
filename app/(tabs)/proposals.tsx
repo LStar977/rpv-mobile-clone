@@ -106,7 +106,6 @@ function isProposalEnded(p: Proposal) {
 }
 
 // Check if user can vote on a proposal based on geo restrictions
-// Seed proposals: anyone can vote (local-only)
 // Global proposals (no geo): anyone can vote
 // Geo-restricted: only verified users with matching location
 const canUserVoteOnProposal = (
@@ -116,9 +115,6 @@ const canUserVoteOnProposal = (
   userCity: string,
   isVerified: boolean
 ): boolean => {
-  // Seed proposals: anyone can vote (local-only voting)
-  if (isSeedProposal(proposal.id)) return true;
-
   const proposalGeo = proposal.geoRestrictions || [];
 
   // Global proposals: anyone can vote
@@ -194,6 +190,7 @@ interface SwipeCardProps {
   proposal: Proposal;
   onSwipeLeft: () => void;
   onSwipeRight: () => void;
+  onSwipeUp: () => void;
   onTap: () => void;
   isTopCard: boolean;
   cardIndex: number;
@@ -202,7 +199,7 @@ interface SwipeCardProps {
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const CARD_HEIGHT = SCREEN_HEIGHT - 420; // Shorter card with space below for tab bar
 
-function SwipeCard({ proposal, onSwipeLeft, onSwipeRight, onTap, isTopCard, cardIndex }: SwipeCardProps) {
+function SwipeCard({ proposal, onSwipeLeft, onSwipeRight, onSwipeUp, onTap, isTopCard, cardIndex }: SwipeCardProps) {
   const { colors } = useTheme();
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
@@ -212,13 +209,15 @@ function SwipeCard({ proposal, onSwipeLeft, onSwipeRight, onTap, isTopCard, card
   // Use refs to avoid stale callback issues with gesture handler worklets
   const onSwipeRightRef = useRef(onSwipeRight);
   const onSwipeLeftRef = useRef(onSwipeLeft);
+  const onSwipeUpRef = useRef(onSwipeUp);
   const onTapRef = useRef(onTap);
 
   useEffect(() => {
     onSwipeRightRef.current = onSwipeRight;
     onSwipeLeftRef.current = onSwipeLeft;
+    onSwipeUpRef.current = onSwipeUp;
     onTapRef.current = onTap;
-  }, [onSwipeRight, onSwipeLeft, onTap]);
+  }, [onSwipeRight, onSwipeLeft, onSwipeUp, onTap]);
 
   const category = proposal.category || 'General';
   const theme = categoryThemes[category] || categoryThemes['General'];
@@ -240,6 +239,10 @@ function SwipeCard({ proposal, onSwipeLeft, onSwipeRight, onTap, isTopCard, card
     onSwipeLeftRef.current();
   }, []);
 
+  const handleSwipeUp = useCallback(() => {
+    onSwipeUpRef.current();
+  }, []);
+
   const handleTap = useCallback(() => {
     onTapRef.current();
   }, []);
@@ -248,11 +251,17 @@ function SwipeCard({ proposal, onSwipeLeft, onSwipeRight, onTap, isTopCard, card
     .enabled(isTopCard && !isEnded)
     .onUpdate((event) => {
       translateX.value = event.translationX;
-      translateY.value = event.translationY * 0.2;
+      // Allow full Y movement when swiping up, dampen when swiping down
+      translateY.value = event.translationY < 0 ? event.translationY : event.translationY * 0.2;
       rotation.value = interpolate(event.translationX, [-SCREEN_WIDTH, 0, SCREEN_WIDTH], [-12, 0, 12]);
     })
     .onEnd((event) => {
-      if (event.translationX > SWIPE_THRESHOLD) {
+      // Swipe UP to skip (check first, negative Y = upward)
+      if (event.translationY < -SWIPE_THRESHOLD) {
+        translateY.value = withTiming(-SCREEN_HEIGHT, { duration: 300 });
+        runOnJS(Haptics.impactAsync)(Haptics.ImpactFeedbackStyle.Light);
+        runOnJS(handleSwipeUp)();
+      } else if (event.translationX > SWIPE_THRESHOLD) {
         translateX.value = withTiming(SCREEN_WIDTH * 1.5, { duration: 300 });
         rotation.value = withTiming(20, { duration: 300 });
         runOnJS(Haptics.notificationAsync)(Haptics.NotificationFeedbackType.Success);
@@ -295,6 +304,10 @@ function SwipeCard({ proposal, onSwipeLeft, onSwipeRight, onTap, isTopCard, card
 
   const opposeIndicatorStyle = useAnimatedStyle(() => ({
     opacity: interpolate(translateX.value, [-SWIPE_THRESHOLD, 0], [1, 0], Extrapolation.CLAMP),
+  }));
+
+  const skipIndicatorStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(translateY.value, [-SWIPE_THRESHOLD, 0], [1, 0], Extrapolation.CLAMP),
   }));
 
   return (
@@ -359,6 +372,12 @@ function SwipeCard({ proposal, onSwipeLeft, onSwipeRight, onTap, isTopCard, card
                 <Ionicons name="close" size={48} color="#fff" />
               </View>
               <Text style={[styles.swipeIndicatorTextLarge, { color: colors.error }]}>OPPOSE</Text>
+            </Animated.View>
+            <Animated.View style={[styles.swipeIndicatorFullScreen, styles.swipeIndicatorTop, skipIndicatorStyle]}>
+              <View style={[styles.swipeIndicatorCircle, { backgroundColor: colors.gold }]}>
+                <Ionicons name="arrow-up" size={48} color="#fff" />
+              </View>
+              <Text style={[styles.swipeIndicatorTextLarge, { color: colors.gold }]}>SKIP</Text>
             </Animated.View>
           </>
         )}
@@ -1144,6 +1163,11 @@ export default function ProposalsScreen() {
     await handleVote(proposal.id as number, vote);
   }, [handleVote]);
 
+  // Skip handler - move to next card without voting
+  const handleSkip = useCallback(() => {
+    setSwipeIndex((prev) => prev + 1);
+  }, []);
+
   // Get current cards to display in stack (max 3)
   const visibleSwipeCards = useMemo(() => {
     return swipeableProposals.slice(swipeIndex, swipeIndex + 3);
@@ -1486,6 +1510,7 @@ export default function ProposalsScreen() {
                     proposal={proposal}
                     onSwipeLeft={() => handleSwipeVote(proposal, 'oppose')}
                     onSwipeRight={() => handleSwipeVote(proposal, 'support')}
+                    onSwipeUp={handleSkip}
                     onTap={() => openProposal(proposal)}
                     isTopCard={idx === 0}
                     cardIndex={idx}
@@ -2648,6 +2673,12 @@ const styles = StyleSheet.create({
   },
   swipeIndicatorRight: {
     left: SPACING.xl,
+  },
+  swipeIndicatorTop: {
+    top: SPACING.xl,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
   },
   swipeIndicatorGradient: {
     flexDirection: 'row',
