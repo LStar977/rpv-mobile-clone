@@ -1,4 +1,5 @@
 import { getAuthToken, useAuthStore } from './auth';
+import { SEED_PROPOSALS } from './seedProposals';
 
 const API_BASE_URL = 'https://representportal.com';
 
@@ -55,7 +56,6 @@ async function apiRequest<T>(
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
     }
-    console.log(`API Request: ${options.method || 'GET'} ${API_BASE_URL}${endpoint}`);
     const response = await fetch(`${API_BASE_URL}${endpoint}`, {
       ...options,
       headers,
@@ -117,9 +117,19 @@ export const userApi = {
 export const proposalsApi = {
   async getAll(): Promise<ApiResponse<Proposal[]>> {
     const result = await apiRequest<any>('/api/proposals');
-    if (Array.isArray(result.data)) return { data: result.data, error: null };
-    if (result.data?.proposals && Array.isArray(result.data.proposals)) return { data: result.data.proposals, error: null };
-    return { data: [], error: result.error };
+
+    // Extract backend proposals if available
+    let backendProposals: Proposal[] = [];
+    if (Array.isArray(result.data) && result.data.length > 0) {
+      backendProposals = result.data;
+    } else if (result.data?.proposals && Array.isArray(result.data.proposals)) {
+      backendProposals = result.data.proposals;
+    }
+
+    // Always include seed proposals merged with backend
+    // Seeds first so users see them immediately, then user-created proposals
+    const merged = [...SEED_PROPOSALS, ...backendProposals];
+    return { data: merged, error: null };
   },
   async create(data: CreateProposalData): Promise<ApiResponse<Proposal>> {
     return apiRequest<Proposal>('/api/proposals', {

@@ -1,4 +1,5 @@
-import { Tabs } from 'expo-router';
+import { useEffect, useRef } from 'react';
+import { Tabs, usePathname } from 'expo-router';
 import { View, StyleSheet, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -9,6 +10,8 @@ import Animated, {
   interpolate,
 } from 'react-native-reanimated';
 import { useTheme, SHADOWS, BORDER_RADIUS, SPACING, ANIMATION } from '../../lib/theme';
+import { useTutorialStore } from '../../lib/tutorial';
+import { useTutorialTarget } from '../../components/tutorial';
 
 // Custom Tab Bar Icon with animation
 function TabIcon({
@@ -71,6 +74,52 @@ function TabIcon({
 
 export default function TabLayout() {
   const { colors, isDark } = useTheme();
+  const pathname = usePathname();
+  const {
+    checkTutorialStatus,
+    startTutorial,
+    resetTutorial,
+    isActive: tutorialActive,
+    currentStepIndex,
+    steps,
+    completeAction
+  } = useTutorialStore();
+
+  // Tutorial target refs for tab icons
+  const identityTabRef = useTutorialTarget('tab-identity');
+  const sentinelTabRef = useTutorialTarget('tab-sentinel');
+
+  // Check and start tutorial on first launch (only if not completed)
+  useEffect(() => {
+    const initTutorial = async () => {
+      const hasCompleted = await checkTutorialStatus();
+      if (!hasCompleted) {
+        // First time user - start tutorial after brief delay
+        setTimeout(() => {
+          startTutorial();
+        }, 800);
+      }
+    };
+    initTutorial();
+  }, []);
+
+  // Detect tab navigation for tutorial
+  useEffect(() => {
+    if (!tutorialActive) return;
+
+    const currentStep = steps[currentStepIndex];
+    if (currentStep?.requiredAction !== 'tap-tab') return;
+
+    // Extract current tab name from pathname
+    const currentTab = pathname.split('/').pop();
+
+    // Check if user navigated to the correct tab
+    if (currentStep.id === 'tap-identity' && currentTab === 'identity') {
+      completeAction('tap-tab');
+    } else if (currentStep.id === 'tap-sentinel' && currentTab === 'sentinel') {
+      completeAction('tap-tab');
+    }
+  }, [pathname, tutorialActive, currentStepIndex, steps]);
 
   return (
     <Tabs
@@ -131,7 +180,9 @@ export default function TabLayout() {
         options={{
           title: 'Identity',
           tabBarIcon: ({ color, focused }) => (
-            <TabIcon name="shield-checkmark-outline" color={color} focused={focused} />
+            <View ref={identityTabRef} collapsable={false}>
+              <TabIcon name="shield-checkmark-outline" color={color} focused={focused} />
+            </View>
           ),
         }}
       />
@@ -140,7 +191,9 @@ export default function TabLayout() {
         options={{
           title: 'Sentinel',
           tabBarIcon: ({ color, focused }) => (
-            <TabIcon name="sparkles-outline" color={color} focused={focused} />
+            <View ref={sentinelTabRef} collapsable={false}>
+              <TabIcon name="sparkles-outline" color={color} focused={focused} />
+            </View>
           ),
         }}
       />

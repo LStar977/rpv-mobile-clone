@@ -1,0 +1,904 @@
+import { Proposal } from './api';
+
+// Helper to generate deadline dates
+const daysFromNow = (days: number): string =>
+  new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString();
+
+const now = (): string => new Date().toISOString();
+
+// =============================================================================
+// SEED PROPOSALS - 60 Total (10 Global + 50 Canada)
+// =============================================================================
+
+export const SEED_PROPOSALS: Proposal[] = [
+  // ===========================================================================
+  // GLOBAL PROPOSALS (10) - Everyone sees these
+  // ===========================================================================
+  {
+    id: 'seed-global-1',
+    title: 'International AI Safety Standards',
+    description: 'Establish binding international standards for AI development including mandatory safety testing, transparency requirements, and accountability mechanisms for AI systems used in critical infrastructure, healthcare, and financial services.',
+    category: 'Infrastructure',
+    supportVotes: 4521,
+    opposeVotes: 1234,
+    deadline: daysFromNow(21),
+    createdAt: now(),
+    creatorId: 'system',
+    geoRestrictions: [],
+    imageUrl: 'https://images.unsplash.com/photo-1677442136019-21780ecad995?w=800&h=1200&fit=crop',
+  },
+  {
+    id: 'seed-global-2',
+    title: 'Global Ocean Plastic Cleanup Initiative',
+    description: 'Fund an international effort to remove plastic waste from the five major ocean garbage patches using autonomous cleanup vessels, with participating nations contributing based on GDP. Target: remove 50% of ocean plastic by 2035.',
+    category: 'Environment',
+    supportVotes: 5892,
+    opposeVotes: 567,
+    deadline: daysFromNow(28),
+    createdAt: now(),
+    creatorId: 'system',
+    geoRestrictions: [],
+    imageUrl: 'https://images.unsplash.com/photo-1484291470158-b8f8d608850d?w=800&h=1200&fit=crop',
+  },
+  {
+    id: 'seed-global-3',
+    title: 'Universal Digital Privacy Rights',
+    description: 'Adopt international standards guaranteeing individuals ownership of their personal data, the right to deletion, and mandatory consent for data collection. Companies must provide clear opt-out mechanisms for all tracking.',
+    category: 'Other',
+    supportVotes: 3845,
+    opposeVotes: 1456,
+    deadline: daysFromNow(18),
+    createdAt: now(),
+    creatorId: 'system',
+    geoRestrictions: [],
+    imageUrl: 'https://images.unsplash.com/photo-1563013544-824ae1b704d3?w=800&h=1200&fit=crop',
+  },
+  {
+    id: 'seed-global-4',
+    title: 'International Pandemic Preparedness Fund',
+    description: 'Create a $100 billion global fund for pandemic preparedness including early warning systems, stockpiled medical supplies, and rapid vaccine development infrastructure accessible to all nations.',
+    category: 'Healthcare',
+    supportVotes: 4234,
+    opposeVotes: 789,
+    deadline: daysFromNow(25),
+    createdAt: now(),
+    creatorId: 'system',
+    geoRestrictions: [],
+    imageUrl: 'https://images.unsplash.com/photo-1584036561566-baf8f5f1b144?w=800&h=1200&fit=crop',
+  },
+  {
+    id: 'seed-global-5',
+    title: 'Global Minimum Corporate Tax Rate',
+    description: 'Implement a 15% global minimum corporate tax rate to prevent profit-shifting to tax havens, ensuring multinational corporations pay fair taxes where they operate and generate revenue.',
+    category: 'Economy',
+    supportVotes: 3567,
+    opposeVotes: 2134,
+    deadline: daysFromNow(20),
+    createdAt: now(),
+    creatorId: 'system',
+    geoRestrictions: [],
+    imageUrl: 'https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=800&h=1200&fit=crop',
+  },
+  {
+    id: 'seed-global-6',
+    title: 'Universal Internet Access Initiative',
+    description: 'Establish a global fund to provide basic internet access to underserved regions through satellite networks and infrastructure investment. Goal: connect 2 billion unconnected people by 2030.',
+    category: 'Infrastructure',
+    supportVotes: 4890,
+    opposeVotes: 345,
+    deadline: daysFromNow(30),
+    createdAt: now(),
+    creatorId: 'system',
+    geoRestrictions: [],
+    imageUrl: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=800&h=1200&fit=crop',
+  },
+  {
+    id: 'seed-global-7',
+    title: 'International Climate Migration Framework',
+    description: 'Create legal frameworks to protect climate refugees, establishing clear pathways for resettlement, funding for host countries, and international cooperation for communities displaced by rising seas and extreme weather.',
+    category: 'Environment',
+    supportVotes: 3234,
+    opposeVotes: 1567,
+    deadline: daysFromNow(22),
+    createdAt: now(),
+    creatorId: 'system',
+    geoRestrictions: [],
+    imageUrl: 'https://images.unsplash.com/photo-1569163139599-0f4517e36f51?w=800&h=1200&fit=crop',
+  },
+  {
+    id: 'seed-global-8',
+    title: 'Global Mental Health Awareness Program',
+    description: 'Fund international mental health education campaigns, train community mental health workers in underserved regions, and establish crisis hotlines in all major languages. Target: reduce global suicide rates by 30%.',
+    category: 'Healthcare',
+    supportVotes: 5123,
+    opposeVotes: 234,
+    deadline: daysFromNow(24),
+    createdAt: now(),
+    creatorId: 'system',
+    geoRestrictions: [],
+    imageUrl: 'https://images.unsplash.com/photo-1493836512294-502baa1986e2?w=800&h=1200&fit=crop',
+  },
+  {
+    id: 'seed-global-9',
+    title: 'International Space Debris Cleanup',
+    description: 'Coordinate international efforts to remove dangerous space debris from Earth orbit, requiring all new satellites to include deorbiting capability and funding active debris removal missions.',
+    category: 'Infrastructure',
+    supportVotes: 2890,
+    opposeVotes: 456,
+    deadline: daysFromNow(26),
+    createdAt: now(),
+    creatorId: 'system',
+    geoRestrictions: [],
+    imageUrl: 'https://images.unsplash.com/photo-1446776811953-b23d57bd21aa?w=800&h=1200&fit=crop',
+  },
+  {
+    id: 'seed-global-10',
+    title: 'World Heritage Digital Preservation',
+    description: 'Create comprehensive 3D digital archives of all UNESCO World Heritage sites using advanced scanning technology, ensuring preservation of cultural heritage against natural disasters, conflict, and climate change.',
+    category: 'Other',
+    supportVotes: 3456,
+    opposeVotes: 189,
+    deadline: daysFromNow(27),
+    createdAt: now(),
+    creatorId: 'system',
+    geoRestrictions: [],
+    imageUrl: 'https://images.unsplash.com/photo-1552832230-c0197dd311b5?w=800&h=1200&fit=crop',
+  },
+
+  // ===========================================================================
+  // CANADA NATIONAL PROPOSALS (15)
+  // ===========================================================================
+  {
+    id: 'seed-ca-1',
+    title: 'National Pharmacare Program',
+    description: 'Create universal prescription drug coverage providing essential medications at no cost to all Canadian residents, funded through federal health transfers and bulk purchasing agreements saving $5 billion annually.',
+    category: 'Healthcare',
+    supportVotes: 4567,
+    opposeVotes: 1234,
+    deadline: daysFromNow(19),
+    createdAt: now(),
+    creatorId: 'system',
+    geoRestrictions: ['Canada'],
+    imageUrl: 'https://images.unsplash.com/photo-1585435557343-3b092031a831?w=800&h=1200&fit=crop',
+  },
+  {
+    id: 'seed-ca-2',
+    title: 'Ban Foreign Home Buyers Permanently',
+    description: 'Make the temporary foreign buyer ban permanent for residential properties under $2 million, with exemptions only for permanent residents and refugees. Penalties include forced sale of illegally purchased properties.',
+    category: 'Housing',
+    supportVotes: 3890,
+    opposeVotes: 1567,
+    deadline: daysFromNow(14),
+    createdAt: now(),
+    creatorId: 'system',
+    geoRestrictions: ['Canada'],
+    imageUrl: 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=800&h=1200&fit=crop',
+  },
+  {
+    id: 'seed-ca-3',
+    title: 'High-Speed Rail: Toronto-Montreal Corridor',
+    description: 'Build dedicated high-speed rail connecting Toronto, Ottawa, and Montreal with trains reaching 300 km/h. Journey time: Toronto to Montreal in 2 hours. Estimated cost: $12 billion over 10 years.',
+    category: 'Transportation',
+    supportVotes: 4234,
+    opposeVotes: 1890,
+    deadline: daysFromNow(23),
+    createdAt: now(),
+    creatorId: 'system',
+    geoRestrictions: ['Canada'],
+    imageUrl: 'https://images.unsplash.com/photo-1474487548417-781cb71495f3?w=800&h=1200&fit=crop',
+  },
+  {
+    id: 'seed-ca-4',
+    title: 'National Childcare Fee Cap at $10/Day',
+    description: 'Expand the $10/day childcare program to all provinces and territories by 2026, with federal funding guarantees and workforce investment to create 250,000 new childcare spaces.',
+    category: 'Education',
+    supportVotes: 5123,
+    opposeVotes: 890,
+    deadline: daysFromNow(16),
+    createdAt: now(),
+    creatorId: 'system',
+    geoRestrictions: ['Canada'],
+    imageUrl: 'https://images.unsplash.com/photo-1587654780291-39c9404d746b?w=800&h=1200&fit=crop',
+  },
+  {
+    id: 'seed-ca-5',
+    title: 'Carbon Tax Rebate Increase',
+    description: 'Double the quarterly carbon tax rebate for households while maintaining the carbon pricing system. Average family of four would receive $1,800 annually, fully offsetting fuel costs for most Canadians.',
+    category: 'Environment',
+    supportVotes: 3456,
+    opposeVotes: 2345,
+    deadline: daysFromNow(12),
+    createdAt: now(),
+    creatorId: 'system',
+    geoRestrictions: ['Canada'],
+    imageUrl: 'https://images.unsplash.com/photo-1532601224476-15c79f2f7a51?w=800&h=1200&fit=crop',
+  },
+  {
+    id: 'seed-ca-6',
+    title: 'Federal Dental Care Expansion',
+    description: 'Expand the Canadian Dental Care Plan to cover all residents under $90,000 household income, including orthodontics for children and seniors\' dentures. Full implementation by 2027.',
+    category: 'Healthcare',
+    supportVotes: 4890,
+    opposeVotes: 678,
+    deadline: daysFromNow(17),
+    createdAt: now(),
+    creatorId: 'system',
+    geoRestrictions: ['Canada'],
+    imageUrl: 'https://images.unsplash.com/photo-1606811841689-23dfddce3e95?w=800&h=1200&fit=crop',
+  },
+  {
+    id: 'seed-ca-7',
+    title: 'National Housing Accelerator Fund Expansion',
+    description: 'Triple the Housing Accelerator Fund to $12 billion, with bonuses for municipalities that eliminate exclusionary zoning and approve high-density housing near transit within 60 days.',
+    category: 'Housing',
+    supportVotes: 3678,
+    opposeVotes: 1234,
+    deadline: daysFromNow(20),
+    createdAt: now(),
+    creatorId: 'system',
+    geoRestrictions: ['Canada'],
+    imageUrl: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=800&h=1200&fit=crop',
+  },
+  {
+    id: 'seed-ca-8',
+    title: 'Electric Vehicle Incentive Extension',
+    description: 'Extend and expand the iZEV program with $7,500 rebates for new EVs under $60,000 and $5,000 for used EVs. Include rebates for e-bikes and require 50% of new car sales be zero-emission by 2030.',
+    category: 'Transportation',
+    supportVotes: 3234,
+    opposeVotes: 1567,
+    deadline: daysFromNow(15),
+    createdAt: now(),
+    creatorId: 'system',
+    geoRestrictions: ['Canada'],
+    imageUrl: 'https://images.unsplash.com/photo-1593941707882-a5bba14938c7?w=800&h=1200&fit=crop',
+  },
+  {
+    id: 'seed-ca-9',
+    title: 'National Student Loan Forgiveness',
+    description: 'Forgive up to $20,000 in federal student loans for graduates working in healthcare, education, or skilled trades in underserved communities for at least 3 years.',
+    category: 'Education',
+    supportVotes: 4123,
+    opposeVotes: 1890,
+    deadline: daysFromNow(18),
+    createdAt: now(),
+    creatorId: 'system',
+    geoRestrictions: ['Canada'],
+    imageUrl: 'https://images.unsplash.com/photo-1523050854058-8df90110c9f1?w=800&h=1200&fit=crop',
+  },
+  {
+    id: 'seed-ca-10',
+    title: 'Indigenous Clean Water Guarantee',
+    description: 'Commit $5 billion over 5 years to end all boil-water advisories on First Nations reserves permanently, with ongoing funding for water infrastructure maintenance and operator training.',
+    category: 'Infrastructure',
+    supportVotes: 5678,
+    opposeVotes: 234,
+    deadline: daysFromNow(13),
+    createdAt: now(),
+    creatorId: 'system',
+    geoRestrictions: ['Canada'],
+    imageUrl: 'https://images.unsplash.com/photo-1548839140-29a749e1cf4d?w=800&h=1200&fit=crop',
+  },
+  {
+    id: 'seed-ca-11',
+    title: 'National Grocery Price Cap',
+    description: 'Implement temporary price caps on essential groceries (bread, milk, eggs, produce) for 18 months, with excess profits taxed at 75% and redistributed as grocery rebates to low-income families.',
+    category: 'Economy',
+    supportVotes: 3567,
+    opposeVotes: 2678,
+    deadline: daysFromNow(11),
+    createdAt: now(),
+    creatorId: 'system',
+    geoRestrictions: ['Canada'],
+    imageUrl: 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=800&h=1200&fit=crop',
+  },
+  {
+    id: 'seed-ca-12',
+    title: 'RCMP Body Camera Mandate',
+    description: 'Require all RCMP officers to wear body cameras during interactions with the public, with automatic activation protocols and independent oversight for footage review.',
+    category: 'Public Safety',
+    supportVotes: 4234,
+    opposeVotes: 890,
+    deadline: daysFromNow(14),
+    createdAt: now(),
+    creatorId: 'system',
+    geoRestrictions: ['Canada'],
+    imageUrl: 'https://images.unsplash.com/photo-1453873531674-2151bcd01707?w=800&h=1200&fit=crop',
+  },
+  {
+    id: 'seed-ca-13',
+    title: 'Ban Assault-Style Weapons Buyback',
+    description: 'Implement mandatory buyback of all assault-style firearms at fair market value, with amnesty period for voluntary surrender and strict penalties for non-compliance after deadline.',
+    category: 'Public Safety',
+    supportVotes: 3456,
+    opposeVotes: 2890,
+    deadline: daysFromNow(22),
+    createdAt: now(),
+    creatorId: 'system',
+    geoRestrictions: ['Canada'],
+    imageUrl: 'https://images.unsplash.com/photo-1584831494882-a76f1c6687f0?w=800&h=1200&fit=crop',
+  },
+  {
+    id: 'seed-ca-14',
+    title: 'Universal Basic Income Pilot Expansion',
+    description: 'Expand UBI pilots to 5 additional cities, providing $2,000/month to 10,000 participants for 3 years to study effects on employment, health, and poverty reduction.',
+    category: 'Economy',
+    supportVotes: 3890,
+    opposeVotes: 2123,
+    deadline: daysFromNow(25),
+    createdAt: now(),
+    creatorId: 'system',
+    geoRestrictions: ['Canada'],
+    imageUrl: 'https://images.unsplash.com/photo-1579621970563-ebec7560ff3e?w=800&h=1200&fit=crop',
+  },
+  {
+    id: 'seed-ca-15',
+    title: 'National 4-Day Work Week Trial',
+    description: 'Fund a 2-year pilot program offering tax incentives to 1,000 companies that adopt a 4-day work week without reducing pay, measuring productivity, employee wellbeing, and economic impact.',
+    category: 'Economy',
+    supportVotes: 4567,
+    opposeVotes: 1678,
+    deadline: daysFromNow(19),
+    createdAt: now(),
+    creatorId: 'system',
+    geoRestrictions: ['Canada'],
+    imageUrl: 'https://images.unsplash.com/photo-1497215728101-856f4ea42174?w=800&h=1200&fit=crop',
+  },
+
+  // ===========================================================================
+  // ONTARIO PROPOSALS (6)
+  // ===========================================================================
+  {
+    id: 'seed-on-1',
+    title: 'Ontario Line Subway Acceleration',
+    description: 'Fast-track the Ontario Line subway with 24/7 construction and additional funding to complete by 2030 instead of 2031. Add three new stations in underserved areas of Thorncliffe Park and Flemingdon Park.',
+    category: 'Transportation',
+    supportVotes: 3456,
+    opposeVotes: 789,
+    deadline: daysFromNow(16),
+    createdAt: now(),
+    creatorId: 'system',
+    geoRestrictions: ['Canada', 'Ontario'],
+    imageUrl: 'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=800&h=1200&fit=crop',
+  },
+  {
+    id: 'seed-on-2',
+    title: 'Ontario Rent Control Restoration',
+    description: 'Restore rent control to all rental units including those built after 2018, capping annual increases at 2.5% or inflation rate (whichever is lower) for the next 5 years.',
+    category: 'Housing',
+    supportVotes: 4123,
+    opposeVotes: 1890,
+    deadline: daysFromNow(12),
+    createdAt: now(),
+    creatorId: 'system',
+    geoRestrictions: ['Canada', 'Ontario'],
+    imageUrl: 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=800&h=1200&fit=crop',
+  },
+  {
+    id: 'seed-on-3',
+    title: 'Ontario Hospital Capacity Expansion',
+    description: 'Build 5 new hospitals and expand 15 existing facilities, adding 3,000 beds provincewide over 7 years. Includes recruitment bonuses for nurses and fast-tracked credential recognition for internationally trained doctors.',
+    category: 'Healthcare',
+    supportVotes: 5234,
+    opposeVotes: 456,
+    deadline: daysFromNow(21),
+    createdAt: now(),
+    creatorId: 'system',
+    geoRestrictions: ['Canada', 'Ontario'],
+    imageUrl: 'https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?w=800&h=1200&fit=crop',
+  },
+  {
+    id: 'seed-on-4',
+    title: 'Nuclear Energy Expansion',
+    description: 'Approve construction of small modular reactors at Bruce Power and Darlington to add 4,800 MW of clean baseload power by 2035, creating 10,000 jobs and supporting grid stability for EV adoption.',
+    category: 'Environment',
+    supportVotes: 2890,
+    opposeVotes: 1567,
+    deadline: daysFromNow(24),
+    createdAt: now(),
+    creatorId: 'system',
+    geoRestrictions: ['Canada', 'Ontario'],
+    imageUrl: 'https://images.unsplash.com/photo-1591199074553-9d1c8e9a0377?w=800&h=1200&fit=crop',
+  },
+  {
+    id: 'seed-on-5',
+    title: 'Free Tuition for College Trades Programs',
+    description: 'Eliminate tuition for all skilled trades programs at Ontario colleges, including apprenticeship costs, to address the 100,000 skilled worker shortage in construction, automotive, and manufacturing.',
+    category: 'Education',
+    supportVotes: 3678,
+    opposeVotes: 890,
+    deadline: daysFromNow(17),
+    createdAt: now(),
+    creatorId: 'system',
+    geoRestrictions: ['Canada', 'Ontario'],
+    imageUrl: 'https://images.unsplash.com/photo-1504917595217-d4dc5ebb6122?w=800&h=1200&fit=crop',
+  },
+  {
+    id: 'seed-on-6',
+    title: 'GO Transit All-Day Service',
+    description: 'Implement 15-minute all-day GO train service on all lines, not just rush hour, with reduced fares for off-peak travel and integrated fare structure with local transit systems.',
+    category: 'Transportation',
+    supportVotes: 4567,
+    opposeVotes: 567,
+    deadline: daysFromNow(15),
+    createdAt: now(),
+    creatorId: 'system',
+    geoRestrictions: ['Canada', 'Ontario'],
+    imageUrl: 'https://images.unsplash.com/photo-1527684651119-a54b0ba3c587?w=800&h=1200&fit=crop',
+  },
+
+  // ===========================================================================
+  // BRITISH COLUMBIA PROPOSALS (5)
+  // ===========================================================================
+  {
+    id: 'seed-bc-1',
+    title: 'BC Speculation Tax Expansion',
+    description: 'Expand the speculation and vacancy tax provincewide (not just urban areas) and increase the rate to 3% for foreign owners and 2% for domestic speculators holding empty properties.',
+    category: 'Housing',
+    supportVotes: 3890,
+    opposeVotes: 1234,
+    deadline: daysFromNow(14),
+    createdAt: now(),
+    creatorId: 'system',
+    geoRestrictions: ['Canada', 'British Columbia'],
+    imageUrl: 'https://images.unsplash.com/photo-1559329007-40df8a9345d8?w=800&h=1200&fit=crop',
+  },
+  {
+    id: 'seed-bc-2',
+    title: 'Old-Growth Forest Protection',
+    description: 'Permanently protect all remaining old-growth forests in BC (2.7 million hectares), with $500 million transition fund for forestry workers and communities to shift to sustainable industries.',
+    category: 'Environment',
+    supportVotes: 4567,
+    opposeVotes: 1890,
+    deadline: daysFromNow(20),
+    createdAt: now(),
+    creatorId: 'system',
+    geoRestrictions: ['Canada', 'British Columbia'],
+    imageUrl: 'https://images.unsplash.com/photo-1440581572325-0bea30075d9d?w=800&h=1200&fit=crop',
+  },
+  {
+    id: 'seed-bc-3',
+    title: 'SkyTrain Extension to Langley',
+    description: 'Accelerate the SkyTrain extension to Langley with completion by 2028, adding 8 new stations and park-and-ride facilities to reduce Highway 1 congestion and connect growing suburbs.',
+    category: 'Transportation',
+    supportVotes: 3234,
+    opposeVotes: 678,
+    deadline: daysFromNow(18),
+    createdAt: now(),
+    creatorId: 'system',
+    geoRestrictions: ['Canada', 'British Columbia'],
+    imageUrl: 'https://images.unsplash.com/photo-1569074187119-c87815b476da?w=800&h=1200&fit=crop',
+  },
+  {
+    id: 'seed-bc-4',
+    title: 'BC Safe Drug Supply Program',
+    description: 'Expand the safe drug supply program provincewide to combat overdose deaths, providing pharmaceutical-grade alternatives to street drugs at healthcare facilities and supervised sites.',
+    category: 'Healthcare',
+    supportVotes: 2890,
+    opposeVotes: 2345,
+    deadline: daysFromNow(13),
+    createdAt: now(),
+    creatorId: 'system',
+    geoRestrictions: ['Canada', 'British Columbia'],
+    imageUrl: 'https://images.unsplash.com/photo-1631549916768-4119b2e5f926?w=800&h=1200&fit=crop',
+  },
+  {
+    id: 'seed-bc-5',
+    title: 'BC Tech Sector Tax Credits',
+    description: 'Introduce 30% tax credits for tech companies that hire and train local graduates, with bonuses for companies headquartering in BC and creating remote work opportunities outside Vancouver.',
+    category: 'Economy',
+    supportVotes: 3456,
+    opposeVotes: 890,
+    deadline: daysFromNow(16),
+    createdAt: now(),
+    creatorId: 'system',
+    geoRestrictions: ['Canada', 'British Columbia'],
+    imageUrl: 'https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=800&h=1200&fit=crop',
+  },
+
+  // ===========================================================================
+  // QUEBEC PROPOSALS (4)
+  // ===========================================================================
+  {
+    id: 'seed-qc-1',
+    title: 'Montreal Metro Blue Line Extension',
+    description: 'Complete the long-delayed Blue Line extension to Anjou with 5 new stations, improving transit access for 300,000 residents in Montreal\'s east end. Target completion: 2029.',
+    category: 'Transportation',
+    supportVotes: 3678,
+    opposeVotes: 567,
+    deadline: daysFromNow(19),
+    createdAt: now(),
+    creatorId: 'system',
+    geoRestrictions: ['Canada', 'Quebec'],
+    imageUrl: 'https://images.unsplash.com/photo-1565043666747-69f6646db940?w=800&h=1200&fit=crop',
+  },
+  {
+    id: 'seed-qc-2',
+    title: 'Quebec French Language Digital Rights',
+    description: 'Require all software and digital services with over 100,000 Quebec users to offer full French interfaces, customer support, and documentation within 2 years of reaching that threshold.',
+    category: 'Other',
+    supportVotes: 2890,
+    opposeVotes: 1567,
+    deadline: daysFromNow(15),
+    createdAt: now(),
+    creatorId: 'system',
+    geoRestrictions: ['Canada', 'Quebec'],
+    imageUrl: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=800&h=1200&fit=crop',
+  },
+  {
+    id: 'seed-qc-3',
+    title: 'Quebec Electric School Buses',
+    description: 'Replace all 9,000 school buses in Quebec with electric models by 2030, funded by carbon credit sales and federal transit funding. Creates 2,000 manufacturing jobs at Lion Electric.',
+    category: 'Environment',
+    supportVotes: 4123,
+    opposeVotes: 456,
+    deadline: daysFromNow(22),
+    createdAt: now(),
+    creatorId: 'system',
+    geoRestrictions: ['Canada', 'Quebec'],
+    imageUrl: 'https://images.unsplash.com/photo-1557223562-6c77ef16210f?w=800&h=1200&fit=crop',
+  },
+  {
+    id: 'seed-qc-4',
+    title: 'Quebec Healthcare Wait Time Guarantee',
+    description: 'Guarantee maximum wait times for surgeries (90 days) and specialist appointments (30 days), with patients able to access private clinics at public rates if times are exceeded.',
+    category: 'Healthcare',
+    supportVotes: 3567,
+    opposeVotes: 1234,
+    deadline: daysFromNow(17),
+    createdAt: now(),
+    creatorId: 'system',
+    geoRestrictions: ['Canada', 'Quebec'],
+    imageUrl: 'https://images.unsplash.com/photo-1538108149393-fbbd81895907?w=800&h=1200&fit=crop',
+  },
+
+  // ===========================================================================
+  // ALBERTA PROPOSALS (3)
+  // ===========================================================================
+  {
+    id: 'seed-ab-1',
+    title: 'Alberta Green Hydrogen Hub',
+    description: 'Invest $2 billion in green hydrogen production facilities using Alberta\'s wind and solar resources, creating 15,000 jobs and positioning Alberta as North America\'s clean energy leader.',
+    category: 'Environment',
+    supportVotes: 2890,
+    opposeVotes: 1890,
+    deadline: daysFromNow(21),
+    createdAt: now(),
+    creatorId: 'system',
+    geoRestrictions: ['Canada', 'Alberta'],
+    imageUrl: 'https://images.unsplash.com/photo-1466611653911-95081537e5b7?w=800&h=1200&fit=crop',
+  },
+  {
+    id: 'seed-ab-2',
+    title: 'Alberta Rural Healthcare Access',
+    description: 'Build 20 new rural health clinics and offer $100,000 signing bonuses for doctors committing to 5 years in underserved communities. Include telemedicine hubs in every town over 1,000 people.',
+    category: 'Healthcare',
+    supportVotes: 4234,
+    opposeVotes: 345,
+    deadline: daysFromNow(16),
+    createdAt: now(),
+    creatorId: 'system',
+    geoRestrictions: ['Canada', 'Alberta'],
+    imageUrl: 'https://images.unsplash.com/photo-1579684385127-1ef15d508118?w=800&h=1200&fit=crop',
+  },
+  {
+    id: 'seed-ab-3',
+    title: 'Calgary-Edmonton Hyperloop Study',
+    description: 'Fund a $50 million feasibility study for hyperloop or high-speed rail connecting Calgary and Edmonton in under 30 minutes, potentially extending to Banff for tourism.',
+    category: 'Transportation',
+    supportVotes: 3123,
+    opposeVotes: 1567,
+    deadline: daysFromNow(24),
+    createdAt: now(),
+    creatorId: 'system',
+    geoRestrictions: ['Canada', 'Alberta'],
+    imageUrl: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&h=1200&fit=crop',
+  },
+
+  // ===========================================================================
+  // OTHER PROVINCES PROPOSALS (2)
+  // ===========================================================================
+  {
+    id: 'seed-other-1',
+    title: 'Atlantic Canada Ferry Modernization',
+    description: 'Replace aging ferry fleets connecting Nova Scotia, New Brunswick, PEI, and Newfoundland with electric and hybrid vessels, reducing emissions 80% and improving reliability.',
+    category: 'Transportation',
+    supportVotes: 2567,
+    opposeVotes: 345,
+    deadline: daysFromNow(20),
+    createdAt: now(),
+    creatorId: 'system',
+    geoRestrictions: ['Canada', 'Nova Scotia'],
+    imageUrl: 'https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=800&h=1200&fit=crop',
+  },
+  {
+    id: 'seed-other-2',
+    title: 'Prairie Agricultural Carbon Credits',
+    description: 'Create a provincial carbon credit system rewarding farmers in Manitoba and Saskatchewan for regenerative agriculture practices, cover cropping, and no-till farming that sequester carbon.',
+    category: 'Environment',
+    supportVotes: 3234,
+    opposeVotes: 890,
+    deadline: daysFromNow(18),
+    createdAt: now(),
+    creatorId: 'system',
+    geoRestrictions: ['Canada', 'Manitoba'],
+    imageUrl: 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=800&h=1200&fit=crop',
+  },
+
+  // ===========================================================================
+  // TORONTO PROPOSALS (5)
+  // ===========================================================================
+  {
+    id: 'seed-tor-1',
+    title: 'Toronto Protected Bike Lane Network',
+    description: 'Build 100 km of physically separated bike lanes connecting all neighborhoods to downtown by 2028, with secure bike parking at every TTC station and 500 new Bike Share stations.',
+    category: 'Transportation',
+    supportVotes: 3456,
+    opposeVotes: 1567,
+    deadline: daysFromNow(14),
+    createdAt: now(),
+    creatorId: 'system',
+    geoRestrictions: ['Canada', 'Ontario', 'Toronto'],
+    imageUrl: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=800&h=1200&fit=crop',
+  },
+  {
+    id: 'seed-tor-2',
+    title: 'Toronto Modular Housing Initiative',
+    description: 'Build 5,000 modular housing units on city-owned land within 3 years using factory-built construction, providing affordable rentals at 80% of market rate for essential workers.',
+    category: 'Housing',
+    supportVotes: 4123,
+    opposeVotes: 890,
+    deadline: daysFromNow(17),
+    createdAt: now(),
+    creatorId: 'system',
+    geoRestrictions: ['Canada', 'Ontario', 'Toronto'],
+    imageUrl: 'https://images.unsplash.com/photo-1460317442991-0ec209397118?w=800&h=1200&fit=crop',
+  },
+  {
+    id: 'seed-tor-3',
+    title: 'Gardiner Expressway Removal',
+    description: 'Remove the elevated Gardiner Expressway east of Jarvis Street, replacing it with an 8-lane boulevard and creating 20 hectares of new waterfront parkland and development space.',
+    category: 'Infrastructure',
+    supportVotes: 2890,
+    opposeVotes: 2345,
+    deadline: daysFromNow(25),
+    createdAt: now(),
+    creatorId: 'system',
+    geoRestrictions: ['Canada', 'Ontario', 'Toronto'],
+    imageUrl: 'https://images.unsplash.com/photo-1517090504332-eac35b2cc0d0?w=800&h=1200&fit=crop',
+  },
+  {
+    id: 'seed-tor-4',
+    title: 'Toronto 24-Hour TTC Service',
+    description: 'Implement 24-hour subway service on Line 1 (Yonge-University) on Fridays and Saturdays, with corresponding all-night bus service on major routes throughout the city.',
+    category: 'Transportation',
+    supportVotes: 3678,
+    opposeVotes: 1234,
+    deadline: daysFromNow(13),
+    createdAt: now(),
+    creatorId: 'system',
+    geoRestrictions: ['Canada', 'Ontario', 'Toronto'],
+    imageUrl: 'https://images.unsplash.com/photo-1568515387631-8b650bbcdb90?w=800&h=1200&fit=crop',
+  },
+  {
+    id: 'seed-tor-5',
+    title: 'Toronto Commercial Vacancy Tax',
+    description: 'Implement a 3% annual tax on commercial properties vacant for over 6 months to discourage landlords from keeping storefronts empty while waiting for higher rents.',
+    category: 'Economy',
+    supportVotes: 3234,
+    opposeVotes: 1456,
+    deadline: daysFromNow(16),
+    createdAt: now(),
+    creatorId: 'system',
+    geoRestrictions: ['Canada', 'Ontario', 'Toronto'],
+    imageUrl: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=800&h=1200&fit=crop',
+  },
+
+  // ===========================================================================
+  // VANCOUVER PROPOSALS (4)
+  // ===========================================================================
+  {
+    id: 'seed-van-1',
+    title: 'Vancouver Empty Homes Tax Increase',
+    description: 'Increase the Empty Homes Tax from 3% to 5% of assessed value and close loopholes allowing owners to claim occupancy through minimal stays. Revenue funds affordable housing.',
+    category: 'Housing',
+    supportVotes: 3890,
+    opposeVotes: 1234,
+    deadline: daysFromNow(12),
+    createdAt: now(),
+    creatorId: 'system',
+    geoRestrictions: ['Canada', 'British Columbia', 'Vancouver'],
+    imageUrl: 'https://images.unsplash.com/photo-1609602126247-4bbe88ce84e4?w=800&h=1200&fit=crop',
+  },
+  {
+    id: 'seed-van-2',
+    title: 'Vancouver UBC SkyTrain Extension',
+    description: 'Prioritize the Millennium Line extension to UBC with completion by 2030, adding 5 stations and reducing Broadway bus overcrowding while connecting 80,000 daily campus visitors.',
+    category: 'Transportation',
+    supportVotes: 4234,
+    opposeVotes: 567,
+    deadline: daysFromNow(19),
+    createdAt: now(),
+    creatorId: 'system',
+    geoRestrictions: ['Canada', 'British Columbia', 'Vancouver'],
+    imageUrl: 'https://images.unsplash.com/photo-1517732306149-e8f829eb588a?w=800&h=1200&fit=crop',
+  },
+  {
+    id: 'seed-van-3',
+    title: 'Stanley Park Vehicle-Free Sundays',
+    description: 'Make Stanley Park car-free every Sunday year-round, with free shuttle service from downtown and expanded bike/scooter rentals at park entrances.',
+    category: 'Environment',
+    supportVotes: 2890,
+    opposeVotes: 1678,
+    deadline: daysFromNow(15),
+    createdAt: now(),
+    creatorId: 'system',
+    geoRestrictions: ['Canada', 'British Columbia', 'Vancouver'],
+    imageUrl: 'https://images.unsplash.com/photo-1609825488888-3a766db05542?w=800&h=1200&fit=crop',
+  },
+  {
+    id: 'seed-van-4',
+    title: 'Vancouver Rain City Housing Strategy',
+    description: 'Fast-track 15,000 rental units by allowing 6-story buildings on all arterial roads, eliminating parking minimums near transit, and pre-approving standardized building designs.',
+    category: 'Housing',
+    supportVotes: 3567,
+    opposeVotes: 1890,
+    deadline: daysFromNow(21),
+    createdAt: now(),
+    creatorId: 'system',
+    geoRestrictions: ['Canada', 'British Columbia', 'Vancouver'],
+    imageUrl: 'https://images.unsplash.com/photo-1449824913935-59a10b8d2000?w=800&h=1200&fit=crop',
+  },
+
+  // ===========================================================================
+  // MONTREAL PROPOSALS (3)
+  // ===========================================================================
+  {
+    id: 'seed-mtl-1',
+    title: 'Montreal REM Fare Integration',
+    description: 'Integrate REM fares with STM monthly passes at no extra cost, eliminating the current surcharge that makes the new transit line unaffordable for many commuters.',
+    category: 'Transportation',
+    supportVotes: 4123,
+    opposeVotes: 345,
+    deadline: daysFromNow(11),
+    createdAt: now(),
+    creatorId: 'system',
+    geoRestrictions: ['Canada', 'Quebec', 'Montreal'],
+    imageUrl: 'https://images.unsplash.com/photo-1519501025264-65ba15a82390?w=800&h=1200&fit=crop',
+  },
+  {
+    id: 'seed-mtl-2',
+    title: 'Montreal Winter Cycling Network',
+    description: 'Maintain 200 km of bike lanes year-round with priority snow clearing, heated bike shelters at major intersections, and subsidized studded tires for winter cyclists.',
+    category: 'Transportation',
+    supportVotes: 2678,
+    opposeVotes: 1456,
+    deadline: daysFromNow(18),
+    createdAt: now(),
+    creatorId: 'system',
+    geoRestrictions: ['Canada', 'Quebec', 'Montreal'],
+    imageUrl: 'https://images.unsplash.com/photo-1483664852095-d6cc6870702d?w=800&h=1200&fit=crop',
+  },
+  {
+    id: 'seed-mtl-3',
+    title: 'Montreal Cultural District Protection',
+    description: 'Designate the Plateau, Mile End, and St-Henri as cultural protection zones with rent stabilization for artist studios, music venues, and independent galleries facing displacement.',
+    category: 'Other',
+    supportVotes: 3234,
+    opposeVotes: 890,
+    deadline: daysFromNow(20),
+    createdAt: now(),
+    creatorId: 'system',
+    geoRestrictions: ['Canada', 'Quebec', 'Montreal'],
+    imageUrl: 'https://images.unsplash.com/photo-1559329007-40df8a9345d8?w=800&h=1200&fit=crop',
+  },
+
+  // ===========================================================================
+  // CALGARY PROPOSALS (2)
+  // ===========================================================================
+  {
+    id: 'seed-cal-1',
+    title: 'Calgary Green Line LRT',
+    description: 'Restore full funding for the Green Line LRT connecting North Central to Seton, with 28 stations over 46 km. Largest infrastructure project in Calgary\'s history.',
+    category: 'Transportation',
+    supportVotes: 3567,
+    opposeVotes: 1234,
+    deadline: daysFromNow(22),
+    createdAt: now(),
+    creatorId: 'system',
+    geoRestrictions: ['Canada', 'Alberta', 'Calgary'],
+    imageUrl: 'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=800&h=1200&fit=crop',
+  },
+  {
+    id: 'seed-cal-2',
+    title: 'Calgary Downtown Revival Fund',
+    description: 'Create a $200 million fund to convert vacant downtown office towers into residential units, offering tax breaks and fast-track permits for developers adding 5,000 housing units.',
+    category: 'Housing',
+    supportVotes: 2890,
+    opposeVotes: 678,
+    deadline: daysFromNow(17),
+    createdAt: now(),
+    creatorId: 'system',
+    geoRestrictions: ['Canada', 'Alberta', 'Calgary'],
+    imageUrl: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=800&h=1200&fit=crop',
+  },
+
+  // ===========================================================================
+  // OTTAWA PROPOSAL (1)
+  // ===========================================================================
+  {
+    id: 'seed-ott-1',
+    title: 'Ottawa LRT Reliability Overhaul',
+    description: 'Invest $300 million in LRT system fixes including new train doors, cold-weather modifications, and redundant power systems to achieve 98% reliability. Penalize RTG for past failures.',
+    category: 'Transportation',
+    supportVotes: 4567,
+    opposeVotes: 234,
+    deadline: daysFromNow(14),
+    createdAt: now(),
+    creatorId: 'system',
+    geoRestrictions: ['Canada', 'Ontario', 'Ottawa'],
+    imageUrl: 'https://images.unsplash.com/photo-1527684651119-a54b0ba3c587?w=800&h=1200&fit=crop',
+  },
+];
+
+// =============================================================================
+// HELPER FUNCTIONS
+// =============================================================================
+
+/**
+ * Get seed proposals filtered by user's geographic location
+ * Users see: global + country + province/state + city proposals
+ */
+export function getSeedProposalsForGeo(
+  country?: string,
+  state?: string,
+  city?: string
+): Proposal[] {
+  const userGeo = [country, state, city].filter(Boolean).map(g => g?.toLowerCase());
+
+  return SEED_PROPOSALS.filter((proposal) => {
+    const geo = proposal.geoRestrictions || [];
+
+    // Global proposals - everyone sees
+    if (geo.length === 0) return true;
+
+    // Check hierarchical match: user must match all levels of the restriction
+    // e.g., ['Canada', 'Ontario', 'Toronto'] requires user to be in Toronto
+    return geo.every((restriction, index) => {
+      const userLevel = userGeo[index];
+      return userLevel && userLevel === restriction.toLowerCase();
+    });
+  });
+}
+
+/**
+ * Get all seed proposals (for admin/testing)
+ */
+export function getAllSeedProposals(): Proposal[] {
+  return SEED_PROPOSALS;
+}
+
+/**
+ * Get proposal count by geographic level
+ */
+export function getSeedProposalStats(): {
+  global: number;
+  national: number;
+  provincial: number;
+  city: number;
+  total: number;
+} {
+  let global = 0;
+  let national = 0;
+  let provincial = 0;
+  let city = 0;
+
+  SEED_PROPOSALS.forEach((p) => {
+    const geo = p.geoRestrictions || [];
+    if (geo.length === 0) global++;
+    else if (geo.length === 1) national++;
+    else if (geo.length === 2) provincial++;
+    else if (geo.length === 3) city++;
+  });
+
+  return { global, national, provincial, city, total: SEED_PROPOSALS.length };
+}

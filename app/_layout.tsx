@@ -3,6 +3,7 @@ import { StatusBar } from 'expo-status-bar';
 import { View } from 'react-native';
 import { ThemeProvider, useTheme } from '../lib/theme';
 import { STRIPE_PUBLISHABLE_KEY, MERCHANT_IDENTIFIER } from '../lib/stripe';
+import { TutorialOverlay } from '../components/tutorial';
 
 // Conditionally import StripeProvider to handle missing native module
 let StripeProvider: any = null;
@@ -29,6 +30,7 @@ function ThemedStack() {
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="modals" />
       </Stack>
+      <TutorialOverlay />
     </View>
   );
 }

@@ -55,6 +55,22 @@ type ActivityItem = {
   color: string;
 };
 
+// Country-themed gradient colors for community cards
+const countryThemes: Record<string, { primary: string; secondary?: string }> = {
+  'Canada': { primary: '#FF0000', secondary: '#FFFFFF' },
+  'United States': { primary: '#3C3B6E', secondary: '#B22234' },
+  'United Kingdom': { primary: '#012169', secondary: '#C8102E' },
+  'Australia': { primary: '#00843D', secondary: '#FFCD00' },
+  'Germany': { primary: '#000000', secondary: '#FFCC00' },
+  'France': { primary: '#0055A4', secondary: '#EF4135' },
+  'Japan': { primary: '#BC002D', secondary: '#FFFFFF' },
+  'India': { primary: '#FF9933', secondary: '#138808' },
+  'Brazil': { primary: '#009C3B', secondary: '#FFDF00' },
+  'Mexico': { primary: '#006847', secondary: '#CE1126' },
+  'Spain': { primary: '#AA151B', secondary: '#F1BF00' },
+  'Italy': { primary: '#009246', secondary: '#CE2B37' },
+};
+
 // --- Premium Stat Card ---
 function StatCard({
   icon,
@@ -399,7 +415,140 @@ function UrgentProposalCard({
 }
 
 // --- Community Card ---
-function CommunityCard({
+// --- Community Hero Card (for primary community like country) ---
+function CommunityHeroCard({
+  community,
+  liveVoters,
+  onPress,
+}: {
+  community: Community;
+  liveVoters?: number;
+  onPress: () => void;
+}) {
+  const { colors } = useTheme();
+  const progressWidth = useSharedValue(0);
+
+  // Get country-specific theme colors
+  const theme = countryThemes[community.name] || { primary: colors.gold };
+  const themeColor = theme.primary;
+  const secondaryColor = theme.secondary || theme.primary;
+
+  const votedPercent = community.proposalCount > 0
+    ? Math.round(((community.proposalCount - community.unvotedCount) / community.proposalCount) * 100)
+    : 0;
+
+  useEffect(() => {
+    progressWidth.value = withDelay(
+      200,
+      withTiming(votedPercent / 100, { duration: 1000 })
+    );
+  }, [votedPercent]);
+
+  const animatedProgressStyle = useAnimatedStyle(() => ({
+    width: `${progressWidth.value * 100}%` as any,
+  }));
+
+  return (
+    <AnimatedTouchable
+      entering={FadeInUp.delay(100).duration(400).springify()}
+      style={[styles.communityHero, { backgroundColor: colors.surface, borderColor: colors.border }]}
+      onPress={() => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        onPress();
+      }}
+      activeOpacity={0.9}
+    >
+      {/* Country-themed gradient background */}
+      <LinearGradient
+        colors={[`${themeColor}30`, `${themeColor}15`, 'transparent']}
+        style={StyleSheet.absoluteFill}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+      />
+      <LinearGradient
+        colors={['transparent', `${secondaryColor}20`]}
+        style={StyleSheet.absoluteFill}
+        start={{ x: 1, y: 0 }}
+        end={{ x: 0, y: 1 }}
+      />
+
+      {/* Header row */}
+      <View style={styles.communityHeroHeader}>
+        <View style={styles.communityHeroLeft}>
+          <Text style={styles.communityHeroIcon}>{community.icon}</Text>
+          <View>
+            <Text style={[styles.communityHeroName, { color: colors.text }]}>{community.name}</Text>
+            <Text style={[styles.communityHeroSubtitle, { color: colors.textTertiary }]}>
+              Your primary community
+            </Text>
+          </View>
+        </View>
+        {community.unvotedCount > 0 && (
+          <View style={[styles.communityHeroBadge, { backgroundColor: themeColor }]}>
+            <Text style={[styles.communityHeroBadgeText, { color: '#FFFFFF' }]}>
+              {community.unvotedCount}
+            </Text>
+          </View>
+        )}
+      </View>
+
+      {/* Stats row */}
+      <View style={styles.communityHeroStats}>
+        <View style={styles.communityHeroStat}>
+          <Text style={[styles.communityHeroStatValue, { color: colors.text }]}>
+            {community.proposalCount}
+          </Text>
+          <Text style={[styles.communityHeroStatLabel, { color: colors.textTertiary }]}>
+            proposals
+          </Text>
+        </View>
+        <View style={[styles.communityHeroStatDivider, { backgroundColor: colors.border }]} />
+        <View style={styles.communityHeroStat}>
+          <Text style={[styles.communityHeroStatValue, { color: colors.text }]}>
+            {votedPercent}%
+          </Text>
+          <Text style={[styles.communityHeroStatLabel, { color: colors.textTertiary }]}>
+            voted
+          </Text>
+        </View>
+        {liveVoters && liveVoters > 0 && (
+          <>
+            <View style={[styles.communityHeroStatDivider, { backgroundColor: colors.border }]} />
+            <View style={styles.communityHeroStat}>
+              <View style={styles.communityHeroLive}>
+                <View style={[styles.communityHeroLiveDot, { backgroundColor: colors.success }]} />
+                <Text style={[styles.communityHeroStatValue, { color: colors.text }]}>
+                  {liveVoters}
+                </Text>
+              </View>
+              <Text style={[styles.communityHeroStatLabel, { color: colors.textTertiary }]}>
+                active now
+              </Text>
+            </View>
+          </>
+        )}
+      </View>
+
+      {/* Progress bar */}
+      <View style={[styles.communityHeroProgressBg, { backgroundColor: colors.border }]}>
+        <Animated.View
+          style={[styles.communityHeroProgressFill, { backgroundColor: themeColor }, animatedProgressStyle]}
+        />
+      </View>
+
+      {/* Footer */}
+      <View style={styles.communityHeroFooter}>
+        <Text style={[styles.communityHeroFooterText, { color: colors.textSecondary }]}>
+          Tap to see all proposals
+        </Text>
+        <Ionicons name="arrow-forward" size={16} color={colors.textSecondary} />
+      </View>
+    </AnimatedTouchable>
+  );
+}
+
+// --- Community Grid Card (for secondary communities) ---
+function CommunityGridCard({
   community,
   index,
   onPress,
@@ -410,33 +559,45 @@ function CommunityCard({
 }) {
   const { colors } = useTheme();
 
+  const typeIcons: Record<string, string> = {
+    state: 'business-outline',
+    city: 'location-outline',
+    organization: 'people-outline',
+  };
+
   return (
     <AnimatedTouchable
-      entering={FadeInRight.delay(index * 70).duration(300)}
-      style={[styles.communityCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
+      entering={FadeInUp.delay(200 + index * 80).duration(350).springify()}
+      style={[styles.communityGrid, { backgroundColor: colors.surface, borderColor: colors.border }]}
       onPress={() => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         onPress();
       }}
-      activeOpacity={0.75}
+      activeOpacity={0.8}
     >
-      <View style={[styles.communityIcon, { backgroundColor: `${colors.gold}10` }]}>
-        <Text style={styles.communityIconText}>{community.icon}</Text>
+      <View style={styles.communityGridTop}>
+        <Text style={styles.communityGridIcon}>{community.icon}</Text>
+        {community.unvotedCount > 0 && (
+          <View style={[styles.communityGridBadge, { backgroundColor: colors.gold }]}>
+            <Text style={[styles.communityGridBadgeText, { color: colors.background }]}>
+              {community.unvotedCount}
+            </Text>
+          </View>
+        )}
       </View>
-      <View style={styles.communityContent}>
-        <Text style={[styles.communityName, { color: colors.text }]}>{community.name}</Text>
-        <Text style={[styles.communityMeta, { color: colors.textTertiary }]}>
+      <Text style={[styles.communityGridName, { color: colors.text }]} numberOfLines={1}>
+        {community.name}
+      </Text>
+      <View style={styles.communityGridMeta}>
+        <Ionicons
+          name={typeIcons[community.type] || 'globe-outline'}
+          size={12}
+          color={colors.textTertiary}
+        />
+        <Text style={[styles.communityGridMetaText, { color: colors.textTertiary }]}>
           {community.proposalCount} proposal{community.proposalCount !== 1 ? 's' : ''}
         </Text>
       </View>
-      {community.unvotedCount > 0 && (
-        <View style={[styles.communityBadge, { backgroundColor: colors.gold }]}>
-          <Text style={[styles.communityBadgeText, { color: colors.background }]}>
-            {community.unvotedCount}
-          </Text>
-        </View>
-      )}
-      <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
     </AnimatedTouchable>
   );
 }
@@ -483,6 +644,13 @@ export default function DashboardScreen() {
   const [urgentProposals, setUrgentProposals] = useState<UrgentProposal[]>([]);
   const [activities, setActivities] = useState<ActivityItem[]>([]);
   const [isVerified, setIsVerified] = useState(false);
+  const [liveVoters, setLiveVoters] = useState(0);
+
+  // Separate communities by type for visual hierarchy
+  const primaryCommunity = useMemo(() =>
+    communities.find(c => c.type === 'country'), [communities]);
+  const secondaryCommunities = useMemo(() =>
+    communities.filter(c => c.type !== 'country'), [communities]);
 
   const fetchDashboardData = useCallback(async () => {
     try {
@@ -628,6 +796,9 @@ export default function DashboardScreen() {
       setCommunities(Object.values(communityMap).filter((c) => c.proposalCount > 0));
       setUrgentProposals(urgent.slice(0, 3));
       setIsVerified(verificationRes.data?.verified || false);
+
+      // Simulate live voters (in production, this would come from a real-time service)
+      setLiveVoters(Math.floor(Math.random() * 15) + 3);
 
       const recentActivities: ActivityItem[] = [];
       if (proposals.length > 0) {
@@ -775,18 +946,33 @@ export default function DashboardScreen() {
           </View>
         )}
 
-        {/* Communities */}
+        {/* Communities - Visual Hierarchy */}
         {communities.length > 0 && (
           <View style={styles.section}>
             <SectionHeader title="YOUR COMMUNITIES" style={styles.sectionHeader} />
-            {communities.map((community, idx) => (
-              <CommunityCard
-                key={community.id}
-                community={community}
-                index={idx}
+
+            {/* Primary Community (Country) - Hero Card */}
+            {primaryCommunity && (
+              <CommunityHeroCard
+                community={primaryCommunity}
+                liveVoters={liveVoters}
                 onPress={navigateToProposals}
               />
-            ))}
+            )}
+
+            {/* Secondary Communities (State, City, Org) - Grid */}
+            {secondaryCommunities.length > 0 && (
+              <View style={styles.communityGridContainer}>
+                {secondaryCommunities.map((community, idx) => (
+                  <CommunityGridCard
+                    key={community.id}
+                    community={community}
+                    index={idx}
+                    onPress={navigateToProposals}
+                  />
+                ))}
+              </View>
+            )}
           </View>
         )}
 
@@ -1106,48 +1292,153 @@ const styles = StyleSheet.create({
     marginLeft: SPACING.md,
   },
 
-  // Community Cards
-  communityCard: {
+  // Community Hero Card (Primary - Country)
+  communityHero: {
     marginHorizontal: SPACING.lg,
-    marginBottom: SPACING.md,
+    marginBottom: SPACING.lg,
+    borderRadius: BORDER_RADIUS.xxl,
+    borderWidth: 1,
+    overflow: 'hidden',
+    ...SHADOWS.md,
+  },
+  communityHeroHeader: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: SPACING.lg,
+    paddingBottom: SPACING.md,
+  },
+  communityHeroLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.md,
+  },
+  communityHeroIcon: {
+    fontSize: 36,
+  },
+  communityHeroName: {
+    ...TYPOGRAPHY.headlineSmall,
+  },
+  communityHeroSubtitle: {
+    ...TYPOGRAPHY.labelSmall,
+    marginTop: 2,
+  },
+  communityHeroBadge: {
+    minWidth: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: SPACING.md,
+  },
+  communityHeroBadgeText: {
+    ...TYPOGRAPHY.labelMedium,
+    fontWeight: '700',
+  },
+  communityHeroStats: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-around',
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.md,
+  },
+  communityHeroStat: {
+    alignItems: 'center',
+  },
+  communityHeroStatValue: {
+    ...TYPOGRAPHY.headlineSmall,
+    fontWeight: '700',
+  },
+  communityHeroStatLabel: {
+    ...TYPOGRAPHY.labelSmall,
+    marginTop: 2,
+  },
+  communityHeroStatDivider: {
+    width: 1,
+    height: 32,
+  },
+  communityHeroLive: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  communityHeroLiveDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  communityHeroProgressBg: {
+    height: 4,
+    marginHorizontal: SPACING.lg,
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  communityHeroProgressFill: {
+    height: '100%',
+    borderRadius: 2,
+  },
+  communityHeroFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.lg,
+    gap: SPACING.xs,
+  },
+  communityHeroFooterText: {
+    ...TYPOGRAPHY.labelSmall,
+  },
+
+  // Community Grid Container
+  communityGridContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginHorizontal: SPACING.lg,
+    gap: SPACING.md,
+  },
+
+  // Community Grid Card (Secondary - State/City/Org)
+  communityGrid: {
+    flex: 1,
+    minWidth: (SCREEN_WIDTH - SPACING.lg * 2 - SPACING.md) / 2 - 1,
+    maxWidth: (SCREEN_WIDTH - SPACING.lg * 2 - SPACING.md) / 2 - 1,
     padding: SPACING.lg,
     borderRadius: BORDER_RADIUS.xl,
     borderWidth: 1,
-    gap: SPACING.md,
+    ...SHADOWS.sm,
   },
-  communityIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
+  communityGridTop: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    marginBottom: SPACING.sm,
   },
-  communityIconText: {
-    fontSize: 24,
+  communityGridIcon: {
+    fontSize: 28,
   },
-  communityContent: {
-    flex: 1,
-  },
-  communityName: {
-    ...TYPOGRAPHY.labelLarge,
-  },
-  communityMeta: {
-    ...TYPOGRAPHY.bodySmall,
-    marginTop: 2,
-  },
-  communityBadge: {
-    minWidth: 24,
-    height: 24,
-    borderRadius: 12,
+  communityGridBadge: {
+    minWidth: 22,
+    height: 22,
+    borderRadius: 11,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: SPACING.sm,
   },
-  communityBadgeText: {
-    ...TYPOGRAPHY.labelSmall,
+  communityGridBadgeText: {
+    fontSize: 11,
     fontWeight: '700',
+  },
+  communityGridName: {
+    ...TYPOGRAPHY.labelLarge,
+    marginBottom: SPACING.xs,
+  },
+  communityGridMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  communityGridMetaText: {
+    ...TYPOGRAPHY.labelSmall,
   },
 
   // Activity Cards

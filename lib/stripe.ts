@@ -19,8 +19,7 @@ try {
   GooglePay = stripe.GooglePay;
   stripeAvailable = true;
 } catch (e) {
-  // Stripe native module not available
-  console.log('Stripe native module not available - payment features disabled');
+  // Stripe native module not available - payment features disabled
 }
 
 export { stripeAvailable };

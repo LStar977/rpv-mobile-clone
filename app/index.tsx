@@ -26,19 +26,20 @@ import Animated, {
   withTiming,
   withDelay,
   withSequence,
+  withRepeat,
   interpolate,
   Extrapolation,
+  Easing,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme, SPACING, RADIUS, TYPOGRAPHY, SHADOWS, EASING } from '../lib/theme';
 import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { useAuthStore } from '../lib/auth';
-import { router, useFocusEffect } from 'expo-router';
+import { router } from 'expo-router';
 import { isBiometricAvailable, getBiometricType, authenticateWithBiometrics, isBiometricEnabled } from '../lib/biometrics';
 import { Button, Input, Card, Badge } from '../components/ui';
 import { haptics } from '../lib/haptics';
-import { ONBOARDING_KEY } from './onboarding';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -49,6 +50,174 @@ GoogleSignin.configure({
 });
 
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
+const AnimatedLinearGradient = Animated.createAnimatedComponent(LinearGradient);
+
+// Pulsing Ring Component - single expanding ring
+function PulsingRing({ delay, color }: { delay: number; color: string }) {
+  const scale = useSharedValue(0.5);
+  const opacity = useSharedValue(0);
+
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      scale.value = withRepeat(
+        withTiming(2.5, { duration: 3000, easing: Easing.out(Easing.ease) }),
+        -1,
+        false
+      );
+      opacity.value = withRepeat(
+        withSequence(
+          withTiming(0.4, { duration: 300 }),
+          withTiming(0, { duration: 2700 })
+        ),
+        -1,
+        false
+      );
+    }, delay);
+    return () => clearTimeout(timeout);
+  }, []);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+    opacity: opacity.value,
+  }));
+
+  return (
+    <Animated.View
+      style={[
+        {
+          position: 'absolute',
+          width: 140,
+          height: 140,
+          borderRadius: 70,
+          borderWidth: 1,
+          borderColor: color,
+        },
+        animatedStyle,
+      ]}
+    />
+  );
+}
+
+// Pulsing Rings Container - expanding circles from logo center
+function PulsingRings() {
+  const { colors } = useTheme();
+
+  return (
+    <View style={{ position: 'absolute', alignItems: 'center', justifyContent: 'center', width: 140, height: 140 }} pointerEvents="none">
+      {[0, 1, 2].map((index) => (
+        <PulsingRing key={index} delay={index * 1000} color={colors.gold} />
+      ))}
+    </View>
+  );
+}
+
+// Animated Aurora Background - enhanced with horizontal movement
+function AuroraBackground() {
+  const { colors } = useTheme();
+  const translateY = useSharedValue(0);
+  const translateX = useSharedValue(0);
+  const opacity = useSharedValue(0.3);
+
+  useEffect(() => {
+    translateY.value = withRepeat(
+      withSequence(
+        withTiming(-80, { duration: 5000, easing: Easing.inOut(Easing.ease) }),
+        withTiming(80, { duration: 5000, easing: Easing.inOut(Easing.ease) })
+      ),
+      -1,
+      true
+    );
+    translateX.value = withRepeat(
+      withSequence(
+        withTiming(30, { duration: 7000, easing: Easing.inOut(Easing.ease) }),
+        withTiming(-30, { duration: 7000, easing: Easing.inOut(Easing.ease) })
+      ),
+      -1,
+      true
+    );
+    opacity.value = withRepeat(
+      withSequence(
+        withTiming(0.6, { duration: 3000, easing: Easing.inOut(Easing.ease) }),
+        withTiming(0.2, { duration: 3000, easing: Easing.inOut(Easing.ease) })
+      ),
+      -1,
+      true
+    );
+  }, []);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [
+      { translateY: translateY.value },
+      { translateX: translateX.value },
+    ],
+    opacity: opacity.value,
+  }));
+
+  return (
+    <Animated.View style={[StyleSheet.absoluteFill, animatedStyle]} pointerEvents="none">
+      <LinearGradient
+        colors={[
+          'transparent',
+          colors.gold + '20',
+          colors.gold + '10',
+          'transparent',
+        ]}
+        locations={[0, 0.4, 0.6, 1]}
+        style={StyleSheet.absoluteFill}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+      />
+    </Animated.View>
+  );
+}
+
+// Animated Logo Glow Component
+function PulsingLogoGlow({ color }: { color: string }) {
+  const glowOpacity = useSharedValue(0.15);
+  const glowScale = useSharedValue(1);
+
+  useEffect(() => {
+    glowOpacity.value = withRepeat(
+      withSequence(
+        withTiming(0.3, { duration: 1500, easing: Easing.inOut(Easing.ease) }),
+        withTiming(0.15, { duration: 1500, easing: Easing.inOut(Easing.ease) })
+      ),
+      -1,
+      true
+    );
+    glowScale.value = withRepeat(
+      withSequence(
+        withTiming(1.1, { duration: 1500, easing: Easing.inOut(Easing.ease) }),
+        withTiming(1, { duration: 1500, easing: Easing.inOut(Easing.ease) })
+      ),
+      -1,
+      true
+    );
+  }, []);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    opacity: glowOpacity.value,
+    transform: [{ scale: glowScale.value }],
+  }));
+
+  return (
+    <Animated.View
+      style={[
+        {
+          position: 'absolute',
+          top: 10,
+          left: 10,
+          right: 10,
+          bottom: 10,
+          borderRadius: 70,
+          backgroundColor: color,
+          zIndex: -1,
+        },
+        animatedStyle,
+      ]}
+    />
+  );
+}
 
 // Premium Feature Pill Component
 function FeaturePill({
@@ -216,7 +385,6 @@ export default function AuthScreen() {
   const [appleAvailable, setAppleAvailable] = useState(false);
   const [biometricAvailable, setBiometricAvailable] = useState(false);
   const [biometricType, setBiometricType] = useState('Biometric');
-  const [checkingOnboarding, setCheckingOnboarding] = useState(true);
   const { login, isAuthenticated, checkAuth } = useAuthStore();
 
   // Animations
@@ -234,29 +402,6 @@ export default function AuthScreen() {
     opacity: logoOpacity.value,
     transform: [{ scale: logoScale.value }],
   }));
-
-  const checkOnboardingStatus = useCallback(async () => {
-    setCheckingOnboarding(true);
-    try {
-      const hasCompletedOnboarding = await AsyncStorage.getItem(ONBOARDING_KEY);
-      if (!hasCompletedOnboarding) {
-        setCheckingOnboarding(false);
-        router.replace('/onboarding');
-        return;
-      }
-      setCheckingOnboarding(false);
-    } catch (error) {
-      console.error('Error checking onboarding status:', error);
-      setCheckingOnboarding(false);
-    }
-  }, []);
-
-  // Check onboarding status whenever this screen gains focus
-  useFocusEffect(
-    useCallback(() => {
-      checkOnboardingStatus();
-    }, [checkOnboardingStatus])
-  );
 
   // Check biometric availability
   useEffect(() => {
@@ -392,29 +537,6 @@ export default function AuthScreen() {
     }, 1000);
   };
 
-  // Loading screen
-  if (checkingOnboarding) {
-    return (
-      <View style={[styles.container, styles.loadingContainer, { backgroundColor: colors.background }]}>
-        <View style={[styles.loadingLogo, SHADOWS.glow]}>
-          <LinearGradient
-            colors={[colors.goldLight, colors.gold] as any}
-            style={styles.loadingLogoGradient}
-          >
-            <Image
-              source={require('../assets/logo.png')}
-              style={styles.loadingLogoImage}
-              resizeMode="contain"
-            />
-          </LinearGradient>
-        </View>
-        <View style={[styles.loadingDots, { marginTop: SPACING['2xl'] }]}>
-          <ActivityIndicator size="small" color={colors.gold} />
-        </View>
-      </View>
-    );
-  }
-
   // Welcome Screen
   if (view === 'welcome') {
     return (
@@ -428,8 +550,10 @@ export default function AuthScreen() {
 
         {/* Content */}
         <View style={[styles.welcomeContent, { paddingTop: insets.top + 60 }]}>
-          {/* Logo */}
+          {/* Logo with pulsing rings */}
           <Animated.View style={[styles.logoWrapper, logoAnimatedStyle]}>
+            {/* Pulsing rings emanating from logo */}
+            <PulsingRings />
             <View style={[styles.logoOuter, { borderColor: colors.gold + '30' }]}>
               <LinearGradient
                 colors={[colors.surface, colors.surfaceElevated] as any}
@@ -438,11 +562,11 @@ export default function AuthScreen() {
                 <Image
                   source={require('../assets/logo.png')}
                   style={styles.logoImage}
-                  resizeMode="contain"
+                  resizeMode="cover"
                 />
               </LinearGradient>
             </View>
-            <Animated.View style={[styles.logoGlow, { backgroundColor: colors.gold }]} />
+            <PulsingLogoGlow color={colors.gold} />
           </Animated.View>
 
           {/* Brand */}
@@ -728,8 +852,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   logoImage: {
-    width: 80,
-    height: 80,
+    width: 115,
+    height: 115,
+    borderRadius: 58,
   },
   logoGlow: {
     position: 'absolute',
