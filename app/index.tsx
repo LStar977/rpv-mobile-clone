@@ -34,11 +34,10 @@ import { useTheme, SPACING, RADIUS, TYPOGRAPHY, SHADOWS, EASING } from '../lib/t
 import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { useAuthStore } from '../lib/auth';
-import { router, useFocusEffect } from 'expo-router';
+import { router } from 'expo-router';
 import { isBiometricAvailable, getBiometricType, authenticateWithBiometrics, isBiometricEnabled } from '../lib/biometrics';
 import { Button, Input, Card, Badge } from '../components/ui';
 import { haptics } from '../lib/haptics';
-import { ONBOARDING_KEY } from './onboarding';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -216,7 +215,6 @@ export default function AuthScreen() {
   const [appleAvailable, setAppleAvailable] = useState(false);
   const [biometricAvailable, setBiometricAvailable] = useState(false);
   const [biometricType, setBiometricType] = useState('Biometric');
-  const [checkingOnboarding, setCheckingOnboarding] = useState(true);
   const { login, isAuthenticated, checkAuth } = useAuthStore();
 
   // Animations
@@ -234,29 +232,6 @@ export default function AuthScreen() {
     opacity: logoOpacity.value,
     transform: [{ scale: logoScale.value }],
   }));
-
-  const checkOnboardingStatus = useCallback(async () => {
-    setCheckingOnboarding(true);
-    try {
-      const hasCompletedOnboarding = await AsyncStorage.getItem(ONBOARDING_KEY);
-      if (!hasCompletedOnboarding) {
-        setCheckingOnboarding(false);
-        router.replace('/onboarding');
-        return;
-      }
-      setCheckingOnboarding(false);
-    } catch (error) {
-      console.error('Error checking onboarding status:', error);
-      setCheckingOnboarding(false);
-    }
-  }, []);
-
-  // Check onboarding status whenever this screen gains focus
-  useFocusEffect(
-    useCallback(() => {
-      checkOnboardingStatus();
-    }, [checkOnboardingStatus])
-  );
 
   // Check biometric availability
   useEffect(() => {
@@ -391,29 +366,6 @@ export default function AuthScreen() {
       setError('Email authentication coming soon. Please use Google or Apple.');
     }, 1000);
   };
-
-  // Loading screen
-  if (checkingOnboarding) {
-    return (
-      <View style={[styles.container, styles.loadingContainer, { backgroundColor: colors.background }]}>
-        <View style={[styles.loadingLogo, SHADOWS.glow]}>
-          <LinearGradient
-            colors={[colors.goldLight, colors.gold] as any}
-            style={styles.loadingLogoGradient}
-          >
-            <Image
-              source={require('../assets/logo.png')}
-              style={styles.loadingLogoImage}
-              resizeMode="contain"
-            />
-          </LinearGradient>
-        </View>
-        <View style={[styles.loadingDots, { marginTop: SPACING['2xl'] }]}>
-          <ActivityIndicator size="small" color={colors.gold} />
-        </View>
-      </View>
-    );
-  }
 
   // Welcome Screen
   if (view === 'welcome') {
