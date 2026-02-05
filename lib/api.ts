@@ -55,7 +55,6 @@ async function apiRequest<T>(
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
     }
-    console.log(`API Request: ${options.method || 'GET'} ${API_BASE_URL}${endpoint}`);
     const response = await fetch(`${API_BASE_URL}${endpoint}`, {
       ...options,
       headers,

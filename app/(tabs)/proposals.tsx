@@ -466,12 +466,10 @@ function SwipeCard({ proposal, onSwipeLeft, onSwipeRight, onTap, isTopCard, card
 
   // Wrapper functions that use the refs - prevents stale closure in worklets
   const handleSwipeRight = useCallback(() => {
-    console.log('🃏 SwipeCard handleSwipeRight called');
     onSwipeRightRef.current();
   }, []);
 
   const handleSwipeLeft = useCallback(() => {
-    console.log('🃏 SwipeCard handleSwipeLeft called');
     onSwipeLeftRef.current();
   }, []);
 
@@ -1356,7 +1354,6 @@ export default function ProposalsScreen() {
   const handleSwipeVote = useCallback(async (proposal: Proposal, vote: 'support' | 'oppose') => {
     // Get fresh tutorial state directly from store (not from stale closure)
     const { isActive, completeAction, currentStepIndex, steps } = useTutorialStore.getState();
-    console.log('📱 handleSwipeVote called:', { vote, isActive, currentStepIndex, requiredAction: steps[currentStepIndex]?.requiredAction });
 
     // Check if this is a tutorial action
     if (isActive) {
@@ -1370,9 +1367,7 @@ export default function ProposalsScreen() {
       // Complete the tutorial action after overlay animation (1.7s delay)
       // This gives user time to see the confirmation before moving to next step
       const action = vote === 'support' ? 'swipe-right' : 'swipe-left';
-      console.log('📤 Scheduling completeAction with:', action);
       setTimeout(() => {
-        console.log('⏱️ Executing delayed completeAction');
         completeAction(action);
       }, 1700);
       return;
