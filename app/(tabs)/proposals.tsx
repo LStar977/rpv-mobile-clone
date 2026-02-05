@@ -105,6 +105,36 @@ function isProposalEnded(p: Proposal) {
   return getTimeRemaining(p.deadline) === 'Ended';
 }
 
+// Check if user can vote on a proposal based on geo restrictions
+// Seed proposals: anyone can vote (local-only)
+// Global proposals (no geo): anyone can vote
+// Geo-restricted: only verified users with matching location
+const canUserVoteOnProposal = (
+  proposal: Proposal,
+  userCountry: string,
+  userState: string,
+  userCity: string,
+  isVerified: boolean
+): boolean => {
+  // Seed proposals: anyone can vote (local-only voting)
+  if (isSeedProposal(proposal.id)) return true;
+
+  const proposalGeo = proposal.geoRestrictions || [];
+
+  // Global proposals: anyone can vote
+  if (proposalGeo.length === 0) return true;
+
+  // Geo-restricted proposals require verification
+  if (!isVerified) return false;
+
+  // Check hierarchical location match
+  const userLocation = [userCountry, userState, userCity].filter(Boolean);
+  return proposalGeo.every((restriction, index) => {
+    const userLevel = userLocation[index];
+    return userLevel && userLevel.toLowerCase() === restriction.toLowerCase();
+  });
+};
+
 // Premium Filter Chip
 function FilterChip({
   label,
@@ -868,15 +898,17 @@ export default function ProposalsScreen() {
 
   const activeCount = useMemo(() => filteredProposals.filter((p) => !isProposalEnded(p)).length, [filteredProposals]);
 
-  // Proposals available for swiping (not voted, not ended)
+  // Proposals available for swiping (not voted, not ended, user can vote)
   const swipeableProposals = useMemo(() => {
     return filteredProposals.filter((p) => {
-      // Handle both string and number IDs for mock proposals
+      // Handle both string and number IDs for seed proposals
       const hasVoted = votedProposals.has(p.id as number) || votedProposals.has(p.id as any);
       const isEnded = isProposalEnded(p);
-      return !hasVoted && !isEnded;
+      // Filter out proposals user can't vote on (geo-restricted)
+      const canVote = canUserVoteOnProposal(p, userCountry, userState, userCity, isVerified);
+      return !hasVoted && !isEnded && canVote;
     });
-  }, [filteredProposals, votedProposals]);
+  }, [filteredProposals, votedProposals, userCountry, userState, userCity, isVerified]);
 
   // Reset swipe index when filters change or proposals update
   useEffect(() => {
