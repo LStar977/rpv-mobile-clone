@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   Dimensions,
 } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
@@ -533,6 +534,12 @@ export default function IdentityScreen() {
     }
   };
 
+  const copyWalletAddress = async (address: string) => {
+    await Clipboard.setStringAsync(address);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    Alert.alert('Copied', 'Wallet address copied to clipboard');
+  };
+
   // Calculate earned badges
   // State for API-fetched earned badges
   const [apiBadges, setApiBadges] = useState<Set<string>>(new Set());
@@ -814,7 +821,7 @@ export default function IdentityScreen() {
                 </View>
               </View>
 
-              <View style={[styles.detailRow, { borderBottomWidth: 0 }]}>
+              <View style={[styles.detailRow, { borderBottomColor: colors.border, borderBottomWidth: user?.walletAddress ? 1 : 0 }]}>
                 <View style={[styles.detailIcon, { backgroundColor: `${colors.gold}12` }]}>
                   <Ionicons name="location-outline" size={16} color={colors.gold} />
                 </View>
@@ -825,6 +832,23 @@ export default function IdentityScreen() {
                   </Text>
                 </View>
               </View>
+
+              {user?.walletAddress && (
+                <View style={[styles.detailRow, { borderBottomWidth: 0 }]}>
+                  <View style={[styles.detailIcon, { backgroundColor: `${colors.gold}12` }]}>
+                    <Ionicons name="wallet-outline" size={16} color={colors.gold} />
+                  </View>
+                  <View style={styles.detailText}>
+                    <Text style={[styles.detailLabel, { color: colors.textTertiary }]}>Blockchain Address</Text>
+                    <Text style={[styles.detailValue, { color: colors.text }]}>
+                      {`${user.walletAddress.slice(0, 6)}...${user.walletAddress.slice(-4)}`}
+                    </Text>
+                  </View>
+                  <TouchableOpacity onPress={() => copyWalletAddress(user.walletAddress!)}>
+                    <Ionicons name="copy-outline" size={18} color={colors.textSecondary} />
+                  </TouchableOpacity>
+                </View>
+              )}
             </View>
           </Animated.View>
         )}
