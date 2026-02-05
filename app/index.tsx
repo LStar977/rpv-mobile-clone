@@ -98,12 +98,12 @@ function PulsingRing({ delay, color }: { delay: number; color: string }) {
   );
 }
 
-// Pulsing Rings Container - expanding circles from logo
+// Pulsing Rings Container - expanding circles from logo center
 function PulsingRings() {
   const { colors } = useTheme();
 
   return (
-    <View style={[StyleSheet.absoluteFill, { alignItems: 'center', paddingTop: 130 }]} pointerEvents="none">
+    <View style={{ position: 'absolute', alignItems: 'center', justifyContent: 'center', width: 140, height: 140 }} pointerEvents="none">
       {[0, 1, 2].map((index) => (
         <PulsingRing key={index} delay={index * 1000} color={colors.gold} />
       ))}
@@ -548,16 +548,12 @@ export default function AuthScreen() {
           style={styles.backgroundGradient}
         />
 
-        {/* Animated aurora effect */}
-        <AuroraBackground />
-
-        {/* Pulsing rings from logo */}
-        <PulsingRings />
-
         {/* Content */}
         <View style={[styles.welcomeContent, { paddingTop: insets.top + 60 }]}>
-          {/* Logo */}
+          {/* Logo with pulsing rings */}
           <Animated.View style={[styles.logoWrapper, logoAnimatedStyle]}>
+            {/* Pulsing rings emanating from logo */}
+            <PulsingRings />
             <View style={[styles.logoOuter, { borderColor: colors.gold + '30' }]}>
               <LinearGradient
                 colors={[colors.surface, colors.surfaceElevated] as any}
@@ -566,7 +562,7 @@ export default function AuthScreen() {
                 <Image
                   source={require('../assets/logo.png')}
                   style={styles.logoImage}
-                  resizeMode="contain"
+                  resizeMode="cover"
                 />
               </LinearGradient>
             </View>
@@ -856,9 +852,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   logoImage: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 115,
+    height: 115,
+    borderRadius: 58,
   },
   logoGlow: {
     position: 'absolute',
