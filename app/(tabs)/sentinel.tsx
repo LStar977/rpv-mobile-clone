@@ -10,6 +10,7 @@ import {
   Alert,
   Dimensions,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
@@ -395,6 +396,7 @@ function ReportCard({
   proposalCreated: boolean;
 }) {
   const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
   const averageScore = calculateAverageScore(analysis.analysis.categoryScores);
   const scoreColor = getScoreColor(averageScore);
   const scoreLabel = getScoreLabel(averageScore);
@@ -407,7 +409,7 @@ function ReportCard({
   return (
     <ScrollView style={styles.reportCardScroll} showsVerticalScrollIndicator={false}>
       {/* Header */}
-      <View style={styles.reportHeader}>
+      <View style={[styles.reportHeader, { paddingTop: insets.top + 16 }]}>
         <TouchableOpacity onPress={onClose} style={styles.reportBackButton}>
           <Ionicons name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
@@ -554,6 +556,7 @@ function ReportCard({
 export default function SentinelScreen() {
   const { colors } = useTheme();
   const { user, token } = useAuthStore();
+  const insets = useSafeAreaInsets();
   const [isPremium, setIsPremium] = useState(false);
   const [loadingSubscription, setLoadingSubscription] = useState(true);
 
@@ -780,7 +783,7 @@ export default function SentinelScreen() {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView
         style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 16 }]}
         showsVerticalScrollIndicator={false}
       >
         {/* Header */}
@@ -983,7 +986,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingTop: 60,
+    // paddingTop is set dynamically via insets
     paddingHorizontal: SPACING.lg,
   },
 
@@ -1244,7 +1247,7 @@ const styles = StyleSheet.create({
   reportHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingTop: 60,
+    // paddingTop is set dynamically via insets
     paddingHorizontal: SPACING.lg,
     paddingBottom: SPACING.lg,
   },

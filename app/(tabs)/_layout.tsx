@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { Tabs, usePathname } from 'expo-router';
 import { View, StyleSheet, Platform } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import Animated, {
@@ -75,6 +76,7 @@ function TabIcon({
 export default function TabLayout() {
   const { colors, isDark } = useTheme();
   const pathname = usePathname();
+  const insets = useSafeAreaInsets();
   const {
     checkTutorialStatus,
     startTutorial,
@@ -139,9 +141,9 @@ export default function TabLayout() {
           backgroundColor: isDark ? 'rgba(10, 10, 12, 0.98)' : 'rgba(255, 255, 255, 0.98)',
           borderTopColor: isDark ? 'rgba(201, 162, 39, 0.15)' : 'rgba(0, 0, 0, 0.06)',
           borderTopWidth: 1,
-          paddingBottom: Platform.OS === 'ios' ? 28 : 14,
+          paddingBottom: Platform.OS === 'ios' ? insets.bottom : 14,
           paddingTop: 14,
-          height: Platform.OS === 'ios' ? 92 : 74,
+          height: Platform.OS === 'ios' ? 60 + insets.bottom : 74,
           ...SHADOWS.lg,
         },
         tabBarActiveTintColor: colors.gold,

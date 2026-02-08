@@ -1,4 +1,5 @@
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Dimensions } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -635,6 +636,7 @@ export default function DashboardScreen() {
   const { colors } = useTheme();
   const router = useRouter();
   const { user, isAuthenticated } = useAuthStore();
+  const insets = useSafeAreaInsets();
 
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -848,7 +850,7 @@ export default function DashboardScreen() {
   if (loading) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <View style={styles.loadingContent}>
+        <View style={[styles.loadingContent, { paddingTop: insets.top + 60 }]}>
           <SkeletonWelcome />
           <View style={styles.loadingCards}>
             <SkeletonStats count={3} />
@@ -868,7 +870,7 @@ export default function DashboardScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 60 }]}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -1010,10 +1012,10 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingTop: 60,
+    // paddingTop is set dynamically via insets
   },
   loadingContent: {
-    paddingTop: 60,
+    // paddingTop is set dynamically via insets
     paddingHorizontal: SPACING.lg,
   },
   loadingCards: {
