@@ -637,9 +637,10 @@ export default function SentinelScreen() {
   };
 
   const handleAnalyze = async () => {
-    // For non-premium users, show demo instead
+    // For non-premium users, prompt to upgrade
     if (!isPremium) {
-      handleTryDemo();
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      router.push('/modals/subscription');
       return;
     }
 
@@ -929,14 +930,12 @@ export default function SentinelScreen() {
             {analyzing ? (
               <>
                 <ActivityIndicator size="small" color="#000" />
-                <Text style={styles.analyzeButtonText}>Generating Report Card...</Text>
+                <Text style={styles.analyzeButtonText}>Analyzing...</Text>
               </>
             ) : (
               <>
-                <Ionicons name={isPremium ? 'sparkles' : 'eye'} size={20} color="#000" />
-                <Text style={styles.analyzeButtonText}>
-                  {isPremium ? 'Generate Report Card' : 'Try Demo Report Card'}
-                </Text>
+                <Ionicons name="sparkles" size={20} color="#000" />
+                <Text style={styles.analyzeButtonText}>Analyze with Sentinel</Text>
               </>
             )}
           </TouchableOpacity>
