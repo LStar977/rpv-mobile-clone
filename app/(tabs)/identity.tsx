@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   Dimensions,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Clipboard from 'expo-clipboard';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -371,6 +372,7 @@ function QuickStats({
 export default function IdentityScreen() {
   const { colors } = useTheme();
   const { isAuthenticated, user, token } = useAuthStore();
+  const insets = useSafeAreaInsets();
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -611,7 +613,7 @@ export default function IdentityScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 16 }]}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -897,7 +899,7 @@ const styles = StyleSheet.create({
   },
 
   scrollContent: {
-    paddingTop: 60,
+    // paddingTop is set dynamically via insets
     paddingHorizontal: SPACING.lg,
     paddingBottom: SPACING.xxl,
   },

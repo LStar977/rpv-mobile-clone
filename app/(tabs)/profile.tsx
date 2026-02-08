@@ -1,4 +1,5 @@
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useState, useEffect } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -122,6 +123,7 @@ function ThemeChip({
 export default function ProfileScreen() {
   const { colors, themePreference, setThemePreference, isDark } = useTheme();
   const { user, logout, token } = useAuthStore();
+  const insets = useSafeAreaInsets();
   const [userTier, setUserTier] = useState<UserTier>('free');
 
   // Fetch user's subscription tier
@@ -185,7 +187,7 @@ export default function ProfileScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={[styles.content, { paddingTop: insets.top + 36 }]} showsVerticalScrollIndicator={false}>
         {/* Profile Header */}
         <Animated.View
           entering={FadeInDown.duration(500)}
@@ -288,7 +290,7 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   content: {
     paddingHorizontal: SPACING.lg,
-    paddingTop: 80,
+    // paddingTop is set dynamically via insets
     paddingBottom: 40,
   },
 

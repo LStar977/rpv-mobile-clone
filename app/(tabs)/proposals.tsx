@@ -15,6 +15,7 @@ import {
   Image,
   Dimensions,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
@@ -194,12 +195,14 @@ interface SwipeCardProps {
   onTap: () => void;
   isTopCard: boolean;
   cardIndex: number;
+  cardHeight: number;
 }
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
-const CARD_HEIGHT = SCREEN_HEIGHT - 420; // Shorter card with space below for tab bar
+// Base card height - will be adjusted with safe area insets in component
+const BASE_CARD_HEIGHT_OFFSET = 340; // Space for header, tab bar, and margins
 
-function SwipeCard({ proposal, onSwipeLeft, onSwipeRight, onSwipeUp, onTap, isTopCard, cardIndex }: SwipeCardProps) {
+function SwipeCard({ proposal, onSwipeLeft, onSwipeRight, onSwipeUp, onTap, isTopCard, cardIndex, cardHeight }: SwipeCardProps) {
   const { colors } = useTheme();
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
@@ -312,7 +315,7 @@ function SwipeCard({ proposal, onSwipeLeft, onSwipeRight, onSwipeUp, onTap, isTo
 
   return (
     <GestureDetector gesture={composedGesture}>
-      <Animated.View style={[styles.swipeCard, { backgroundColor: colors.surface, borderColor: colors.border, height: CARD_HEIGHT }, cardStyle]}>
+      <Animated.View style={[styles.swipeCard, { backgroundColor: colors.surface, borderColor: colors.border, height: cardHeight }, cardStyle]}>
         {/* Hero Image */}
         {proposal.imageUrl ? (
           <View style={styles.swipeCardImageContainer}>
@@ -784,6 +787,10 @@ function ProposalSkeleton({ index }: { index: number }) {
 export default function ProposalsScreen() {
   const { colors } = useTheme();
   const { isAuthenticated, user } = useAuthStore();
+  const insets = useSafeAreaInsets();
+
+  // Calculate card height dynamically based on safe area insets
+  const cardHeight = SCREEN_HEIGHT - insets.top - insets.bottom - BASE_CARD_HEIGHT_OFFSET;
 
   const [proposals, setProposals] = useState<Proposal[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1309,7 +1316,7 @@ export default function ProposalsScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
-      <Animated.View entering={FadeInDown.duration(400)} style={[styles.header, { borderBottomColor: colors.border }]}>
+      <Animated.View entering={FadeInDown.duration(400)} style={[styles.header, { borderBottomColor: colors.border, paddingTop: insets.top + 16 }]}>
         <View style={styles.headerRow}>
           <View>
             <Text style={[styles.headerTitle, { color: colors.text }]}>Proposals</Text>
@@ -1515,6 +1522,7 @@ export default function ProposalsScreen() {
                     onTap={() => openProposal(proposal)}
                     isTopCard={idx === 0}
                     cardIndex={idx}
+                    cardHeight={cardHeight}
                   />
                 )).reverse()}
               </View>
@@ -2088,7 +2096,7 @@ const styles = StyleSheet.create({
   // Header
   header: {
     paddingHorizontal: SPACING.lg,
-    paddingTop: 60,
+    // paddingTop is set dynamically via insets
     paddingBottom: SPACING.md,
     borderBottomWidth: 1,
   },
