@@ -415,11 +415,14 @@ export default function IdentityScreen() {
       const v = verificationRes?.data || {};
       const p = profileRes?.data || null;
 
+      // Demo account should always appear verified (for App Store review)
+      const isDemoAccount = user?.email === 'demo@represent.app';
+
       setVerification({
-        verified: !!v.verified,
-        status: (v.status as any) || (v.verified ? 'verified' : 'unverified'),
+        verified: isDemoAccount ? true : !!v.verified,
+        status: isDemoAccount ? 'verified' : ((v.status as any) || (v.verified ? 'verified' : 'unverified')),
         provider: v.provider || 'veriff',
-        verifiedAt: v.verifiedAt || v.verified_at || null,
+        verifiedAt: isDemoAccount ? new Date().toISOString() : (v.verifiedAt || v.verified_at || null),
       });
 
       setProfile(p);
