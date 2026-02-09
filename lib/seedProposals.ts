@@ -263,7 +263,7 @@ export const SEED_PROPOSALS: Proposal[] = [
     createdAt: now(),
     creatorId: 'system',
     geoRestrictions: ['Canada'],
-    imageUrl: 'https://images.unsplash.com/photo-1523050854058-8df90110c9f1?w=800&h=1200&fit=crop',
+    imageUrl: 'https://images.unsplash.com/photo-1627556704302-624286467c65?w=800&h=1200&fit=crop',
   },
   {
     id: 'seed-ca-10',
@@ -315,7 +315,7 @@ export const SEED_PROPOSALS: Proposal[] = [
     createdAt: now(),
     creatorId: 'system',
     geoRestrictions: ['Canada'],
-    imageUrl: 'https://images.unsplash.com/photo-1584831494882-a76f1c6687f0?w=800&h=1200&fit=crop',
+    imageUrl: 'https://images.unsplash.com/photo-1595590424283-b8f17842773f?w=800&h=1200&fit=crop',
   },
   {
     id: 'seed-ca-14',
@@ -397,7 +397,7 @@ export const SEED_PROPOSALS: Proposal[] = [
     createdAt: now(),
     creatorId: 'system',
     geoRestrictions: ['Canada', 'Ontario'],
-    imageUrl: 'https://images.unsplash.com/photo-1591199074553-9d1c8e9a0377?w=800&h=1200&fit=crop',
+    imageUrl: 'https://images.unsplash.com/photo-1532601224476-15c79f2f7a51?w=800&h=1200&fit=crop',
   },
   {
     id: 'seed-on-5',
@@ -410,7 +410,7 @@ export const SEED_PROPOSALS: Proposal[] = [
     createdAt: now(),
     creatorId: 'system',
     geoRestrictions: ['Canada', 'Ontario'],
-    imageUrl: 'https://images.unsplash.com/photo-1504917595217-d4dc5ebb6122?w=800&h=1200&fit=crop',
+    imageUrl: 'https://images.unsplash.com/photo-1504328345606-18bbc8c9d7d1?w=800&h=1200&fit=crop',
   },
   {
     id: 'seed-on-6',
@@ -423,7 +423,7 @@ export const SEED_PROPOSALS: Proposal[] = [
     createdAt: now(),
     creatorId: 'system',
     geoRestrictions: ['Canada', 'Ontario'],
-    imageUrl: 'https://images.unsplash.com/photo-1527684651119-a54b0ba3c587?w=800&h=1200&fit=crop',
+    imageUrl: 'https://images.unsplash.com/photo-1474487548417-781cb71495f3?w=800&h=1200&fit=crop',
   },
 
   // ===========================================================================
@@ -664,7 +664,7 @@ export const SEED_PROPOSALS: Proposal[] = [
     createdAt: now(),
     creatorId: 'system',
     geoRestrictions: ['Canada', 'Ontario', 'Toronto'],
-    imageUrl: 'https://images.unsplash.com/photo-1517090504332-eac35b2cc0d0?w=800&h=1200&fit=crop',
+    imageUrl: 'https://images.unsplash.com/photo-1477959858617-67f85cf4f1df?w=800&h=1200&fit=crop',
   },
   {
     id: 'seed-tor-4',
