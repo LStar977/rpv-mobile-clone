@@ -51,9 +51,13 @@ function TabButton({
 function ProposalCard({
   proposal,
   index,
+  isAdmin,
+  onDelete,
 }: {
   proposal: OrganizationProposal;
   index: number;
+  isAdmin?: boolean;
+  onDelete?: (proposalId: string) => void;
 }) {
   const { colors } = useTheme();
 
@@ -62,12 +66,22 @@ function ProposalCard({
       entering={FadeInUp.delay(index * 100).duration(400)}
       style={[styles.proposalCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
     >
-      {proposal.isOfficial && (
-        <View style={[styles.officialBadge, { backgroundColor: `${colors.gold}15` }]}>
-          <Ionicons name="ribbon" size={12} color={colors.gold} />
-          <Text style={[styles.officialBadgeText, { color: colors.gold }]}>Official</Text>
-        </View>
-      )}
+      <View style={styles.proposalCardHeader}>
+        {proposal.isOfficial && (
+          <View style={[styles.officialBadge, { backgroundColor: `${colors.gold}15` }]}>
+            <Ionicons name="ribbon" size={12} color={colors.gold} />
+            <Text style={[styles.officialBadgeText, { color: colors.gold }]}>Official</Text>
+          </View>
+        )}
+        {isAdmin && onDelete && (
+          <TouchableOpacity
+            style={[styles.proposalDeleteBtn, { backgroundColor: `${colors.error}15` }]}
+            onPress={() => onDelete(String(proposal.id))}
+          >
+            <Ionicons name="trash-outline" size={16} color={colors.error} />
+          </TouchableOpacity>
+        )}
+      </View>
       <Text style={[styles.proposalTitle, { color: colors.text }]} numberOfLines={2}>
         {proposal.title}
       </Text>
@@ -423,6 +437,34 @@ export default function OrganizationDetailScreen() {
     ]);
   };
 
+  const handleDeleteProposal = (proposalId: string) => {
+    const proposal = proposals.find(p => String(p.id) === proposalId);
+    const proposalTitle = proposal?.title || 'this proposal';
+
+    Alert.alert('Delete Proposal', `Are you sure you want to delete "${proposalTitle}"?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+          try {
+            const result = await organizationsApi.deleteProposal(params.orgId, proposalId);
+            if (result.error) {
+              Alert.alert('Error', result.error);
+              return;
+            }
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            // Update local state immediately
+            setProposals(prev => prev.filter(p => String(p.id) !== proposalId));
+          } catch (error) {
+            Alert.alert('Error', 'Failed to delete proposal.');
+          }
+        },
+      },
+    ]);
+  };
+
   const getTierBadge = () => {
     if (!organization) return null;
 
@@ -600,7 +642,13 @@ export default function OrganizationDetailScreen() {
               </Animated.View>
             ) : (
               proposals.map((proposal, index) => (
-                <ProposalCard key={proposal.id} proposal={proposal} index={index} />
+                <ProposalCard
+                  key={proposal.id}
+                  proposal={proposal}
+                  index={index}
+                  isAdmin={organization?.role === 'admin'}
+                  onDelete={handleDeleteProposal}
+                />
               ))
             )}
           </>
@@ -1261,6 +1309,19 @@ const styles = StyleSheet.create({
     padding: SPACING.lg,
     marginBottom: SPACING.md,
     ...SHADOWS.sm,
+  },
+  proposalCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: SPACING.xs,
+  },
+  proposalDeleteBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   officialBadge: {
     flexDirection: 'row',

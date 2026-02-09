@@ -5,6 +5,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 const API_BASE_URL = 'https://representportal.com';
 const DEMO_ORGS_STORAGE_KEY = '@represent_demo_organizations';
 const DEMO_PROPOSALS_STORAGE_KEY = '@represent_demo_proposals';
+const DELETED_PROPOSALS_STORAGE_KEY = '@represent_deleted_proposals';
 
 // Helper to check if current user is demo account
 function isDemoAccount(): boolean {
@@ -433,21 +434,33 @@ export const organizationsApi = {
     // For demo accounts, also check local storage for proposals
     if (isDemoAccount()) {
       let localProposals: OrganizationProposal[] = [];
+      let deletedIds: string[] = [];
+
+      // Load deleted proposal IDs
+      try {
+        const deletedStored = await AsyncStorage.getItem(DELETED_PROPOSALS_STORAGE_KEY);
+        if (deletedStored) {
+          deletedIds = JSON.parse(deletedStored);
+        }
+      } catch (e) {
+        console.error('Failed to load deleted proposal IDs:', e);
+      }
 
       // Load locally stored demo proposals for this org
       try {
         const stored = await AsyncStorage.getItem(DEMO_PROPOSALS_STORAGE_KEY);
         if (stored) {
           const allProposals: OrganizationProposal[] = JSON.parse(stored);
-          localProposals = allProposals.filter(p => p.organizationId === orgId);
+          localProposals = allProposals.filter(p => p.organizationId === orgId && !deletedIds.includes(String(p.id)));
         }
       } catch (e) {
         console.error('Failed to load local demo proposals:', e);
       }
 
-      // For seed organization, also include seed proposals
+      // For seed organization, also include seed proposals (filtered by deleted IDs)
       if (orgId === DEMO_ORGANIZATION_ID) {
-        return { data: [...SEED_ORGANIZATION_PROPOSALS, ...localProposals], error: null };
+        const filteredSeedProposals = SEED_ORGANIZATION_PROPOSALS.filter(p => !deletedIds.includes(String(p.id)));
+        return { data: [...filteredSeedProposals, ...localProposals], error: null };
       }
 
       // For other demo orgs, return local proposals + backend
@@ -521,6 +534,61 @@ export const organizationsApi = {
       method: 'POST',
       body: JSON.stringify({ ...data, isOfficial: true }),
     });
+  },
+
+  async deleteProposal(orgId: string, proposalId: string): Promise<ApiResponse<{ success: boolean }>> {
+    // For demo accounts, handle deletion locally
+    if (isDemoAccount()) {
+      try {
+        // Check if it's a seed proposal or user-created proposal
+        const isSeedProposal = proposalId.startsWith('demo-org-proposal-');
+        const isLocalProposal = proposalId.startsWith('demo-proposal-');
+
+        if (isSeedProposal) {
+          // For seed proposals, add to deleted list (they'll be filtered out on fetch)
+          const deletedStored = await AsyncStorage.getItem(DELETED_PROPOSALS_STORAGE_KEY);
+          const deletedIds: string[] = deletedStored ? JSON.parse(deletedStored) : [];
+          if (!deletedIds.includes(proposalId)) {
+            deletedIds.push(proposalId);
+            await AsyncStorage.setItem(DELETED_PROPOSALS_STORAGE_KEY, JSON.stringify(deletedIds));
+          }
+          return { data: { success: true }, error: null };
+        }
+
+        if (isLocalProposal) {
+          // For locally created proposals, remove from storage AND add to deleted list
+          const stored = await AsyncStorage.getItem(DEMO_PROPOSALS_STORAGE_KEY);
+          if (stored) {
+            const proposals: OrganizationProposal[] = JSON.parse(stored);
+            const filtered = proposals.filter(p => String(p.id) !== proposalId);
+            await AsyncStorage.setItem(DEMO_PROPOSALS_STORAGE_KEY, JSON.stringify(filtered));
+          }
+          // Also add to deleted list to prevent any caching issues
+          const deletedStored = await AsyncStorage.getItem(DELETED_PROPOSALS_STORAGE_KEY);
+          const deletedIds: string[] = deletedStored ? JSON.parse(deletedStored) : [];
+          if (!deletedIds.includes(proposalId)) {
+            deletedIds.push(proposalId);
+            await AsyncStorage.setItem(DELETED_PROPOSALS_STORAGE_KEY, JSON.stringify(deletedIds));
+          }
+          return { data: { success: true }, error: null };
+        }
+
+        // For any other proposal, add to deleted list
+        const deletedStored = await AsyncStorage.getItem(DELETED_PROPOSALS_STORAGE_KEY);
+        const deletedIds: string[] = deletedStored ? JSON.parse(deletedStored) : [];
+        if (!deletedIds.includes(proposalId)) {
+          deletedIds.push(proposalId);
+          await AsyncStorage.setItem(DELETED_PROPOSALS_STORAGE_KEY, JSON.stringify(deletedIds));
+        }
+        return { data: { success: true }, error: null };
+      } catch (e) {
+        console.error('Failed to delete demo proposal:', e);
+        return { data: null, error: 'Failed to delete proposal' };
+      }
+    }
+
+    // For regular accounts, call the backend API
+    return apiRequest(`/api/organizations/${orgId}/proposals/${proposalId}`, { method: 'DELETE' });
   },
 
   async getProposalLimits(orgId: string): Promise<ApiResponse<{ created: number; limit: number; period: 'month' | 'week'; resetDate: string }>> {
