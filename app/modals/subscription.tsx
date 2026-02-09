@@ -94,8 +94,11 @@ export default function SubscriptionScreen() {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [subscription, setSubscription] = useState<SubscriptionData | null>(null);
-  const isVerified = user?.verified ?? false;
-  const isPremium = subscription?.tier === 'premium' && subscription?.status === 'active';
+
+  // Demo account should appear as premium (for App Store review)
+  const isDemoAccount = user?.email === 'demo@represent.app';
+  const isVerified = isDemoAccount ? true : (user?.verified ?? false);
+  const isPremium = isDemoAccount ? true : (subscription?.tier === 'premium' && subscription?.status === 'active');
 
   useEffect(() => {
     fetchData();

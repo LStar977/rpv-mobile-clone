@@ -129,6 +129,13 @@ export default function ProfileScreen() {
   // Fetch user's subscription tier
   useEffect(() => {
     const fetchTier = async () => {
+      // Demo account should appear as premium (for App Store review)
+      const isDemoAccount = user?.email === 'demo@represent.app';
+      if (isDemoAccount) {
+        setUserTier('premium');
+        return;
+      }
+
       if (!token) return;
 
       try {
@@ -155,7 +162,7 @@ export default function ProfileScreen() {
     };
 
     fetchTier();
-  }, [token]);
+  }, [token, user?.email]);
 
   const handleLogout = () => {
     Alert.alert('Log Out', 'Are you sure you want to log out?', [
@@ -177,6 +184,11 @@ export default function ProfileScreen() {
     user?.name?.charAt(0).toUpperCase() || user?.email?.charAt(0).toUpperCase() || 'U';
 
   const getLocationString = () => {
+    // Demo account should use hardcoded location for App Store review
+    const isDemoAccount = user?.email === 'demo@represent.app';
+    if (isDemoAccount) {
+      return 'Toronto, Ontario, Canada';
+    }
     const parts = [user?.city, user?.state, user?.country].filter(Boolean);
     return parts.length > 0 ? parts.join(', ') : null;
   };
