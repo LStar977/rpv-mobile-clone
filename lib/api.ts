@@ -4,6 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const API_BASE_URL = 'https://representportal.com';
 const DEMO_ORGS_STORAGE_KEY = '@represent_demo_organizations';
+const DEMO_PROPOSALS_STORAGE_KEY = '@represent_demo_proposals';
 
 // Helper to check if current user is demo account
 function isDemoAccount(): boolean {
@@ -386,10 +387,11 @@ export const organizationsApi = {
 
   async getOrganization(orgId: string): Promise<ApiResponse<Organization>> {
     // For demo account, check seed organizations and local storage first
+    // Always ensure admin role for demo accounts
     if (isDemoAccount()) {
       const seedOrg = SEED_ORGANIZATIONS.find(o => o.id === orgId);
       if (seedOrg) {
-        return { data: seedOrg, error: null };
+        return { data: { ...seedOrg, role: 'admin' }, error: null };
       }
 
       // Check locally stored demo organizations
@@ -399,12 +401,19 @@ export const organizationsApi = {
           const localOrgs: Organization[] = JSON.parse(stored);
           const localOrg = localOrgs.find(o => o.id === orgId);
           if (localOrg) {
-            return { data: localOrg, error: null };
+            return { data: { ...localOrg, role: 'admin' }, error: null };
           }
         }
       } catch (e) {
         console.error('Failed to load local demo organization:', e);
       }
+
+      // Fall through to backend, but ensure admin role for demo account
+      const result = await apiRequest<Organization>(`/api/organizations/${orgId}`);
+      if (result.data) {
+        return { data: { ...result.data, role: 'admin' }, error: null };
+      }
+      return result;
     }
     return apiRequest<Organization>(`/api/organizations/${orgId}`);
   },
@@ -421,10 +430,35 @@ export const organizationsApi = {
   },
 
   async getOrganizationProposals(orgId: string): Promise<ApiResponse<OrganizationProposal[]>> {
-    // For demo organization, return seed proposals
-    if (isDemoAccount() && orgId === DEMO_ORGANIZATION_ID) {
-      return { data: SEED_ORGANIZATION_PROPOSALS, error: null };
+    // For demo accounts, also check local storage for proposals
+    if (isDemoAccount()) {
+      let localProposals: OrganizationProposal[] = [];
+
+      // Load locally stored demo proposals for this org
+      try {
+        const stored = await AsyncStorage.getItem(DEMO_PROPOSALS_STORAGE_KEY);
+        if (stored) {
+          const allProposals: OrganizationProposal[] = JSON.parse(stored);
+          localProposals = allProposals.filter(p => p.organizationId === orgId);
+        }
+      } catch (e) {
+        console.error('Failed to load local demo proposals:', e);
+      }
+
+      // For seed organization, also include seed proposals
+      if (orgId === DEMO_ORGANIZATION_ID) {
+        return { data: [...SEED_ORGANIZATION_PROPOSALS, ...localProposals], error: null };
+      }
+
+      // For other demo orgs, return local proposals + backend
+      const result = await apiRequest<any>(`/api/organizations/${orgId}/proposals`);
+      let backendProposals: OrganizationProposal[] = [];
+      if (Array.isArray(result.data)) backendProposals = result.data;
+      else if (result.data?.proposals) backendProposals = result.data.proposals;
+
+      return { data: [...localProposals, ...backendProposals], error: null };
     }
+
     const result = await apiRequest<any>(`/api/organizations/${orgId}/proposals`);
     if (Array.isArray(result.data)) return { data: result.data, error: null };
     if (result.data?.proposals) return { data: result.data.proposals, error: null };
@@ -443,6 +477,46 @@ export const organizationsApi = {
   },
 
   async createProposal(orgId: string, data: CreateProposalData): Promise<ApiResponse<OrganizationProposal>> {
+    // For demo accounts, store proposals locally
+    if (isDemoAccount()) {
+      // Get organization name for the proposal
+      let orgName = '';
+      try {
+        const orgResult = await this.getOrganization(orgId);
+        if (orgResult.data) {
+          orgName = orgResult.data.name;
+        }
+      } catch (e) {
+        console.error('Failed to get organization name:', e);
+      }
+
+      const newProposal: OrganizationProposal = {
+        id: `demo-proposal-${Date.now()}`,
+        title: data.title,
+        description: data.description,
+        category: data.category,
+        supportVotes: 0,
+        opposeVotes: 0,
+        deadline: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+        createdAt: new Date().toISOString(),
+        creatorId: 'demo-user',
+        organizationId: orgId,
+        organizationName: orgName,
+        isOfficial: true,
+      };
+
+      try {
+        const stored = await AsyncStorage.getItem(DEMO_PROPOSALS_STORAGE_KEY);
+        const existingProposals: OrganizationProposal[] = stored ? JSON.parse(stored) : [];
+        existingProposals.push(newProposal);
+        await AsyncStorage.setItem(DEMO_PROPOSALS_STORAGE_KEY, JSON.stringify(existingProposals));
+        return { data: newProposal, error: null };
+      } catch (e) {
+        console.error('Failed to save demo proposal:', e);
+        return { data: newProposal, error: null }; // Return success anyway since we created it
+      }
+    }
+
     return apiRequest<OrganizationProposal>(`/api/organizations/${orgId}/proposals`, {
       method: 'POST',
       body: JSON.stringify({ ...data, isOfficial: true }),
