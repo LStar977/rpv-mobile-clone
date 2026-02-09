@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -385,7 +385,10 @@ export default function AuthScreen() {
   const [appleAvailable, setAppleAvailable] = useState(false);
   const [biometricAvailable, setBiometricAvailable] = useState(false);
   const [biometricType, setBiometricType] = useState('Biometric');
-  const { login, isAuthenticated, checkAuth } = useAuthStore();
+  const [demoLoading, setDemoLoading] = useState(false);
+  const demoTapCount = useRef(0);
+  const demoTapTimeout = useRef<NodeJS.Timeout | null>(null);
+  const { login, demoLogin, isAuthenticated, checkAuth } = useAuthStore();
 
   // Animations
   const logoScale = useSharedValue(0.8);
@@ -537,6 +540,44 @@ export default function AuthScreen() {
     }, 1000);
   };
 
+  // Hidden demo login trigger - 5 taps on logo
+  const handleLogoTap = async () => {
+    demoTapCount.current += 1;
+
+    // Clear existing timeout
+    if (demoTapTimeout.current) {
+      clearTimeout(demoTapTimeout.current);
+    }
+
+    // Reset tap count after 2 seconds of no taps
+    demoTapTimeout.current = setTimeout(() => {
+      demoTapCount.current = 0;
+    }, 2000);
+
+    // Trigger demo login on 5th tap
+    if (demoTapCount.current >= 5) {
+      demoTapCount.current = 0;
+      if (demoTapTimeout.current) {
+        clearTimeout(demoTapTimeout.current);
+      }
+
+      setDemoLoading(true);
+      haptics.medium();
+
+      const success = await demoLogin();
+
+      if (success) {
+        haptics.success();
+        router.replace('/(tabs)/dashboard');
+      } else {
+        haptics.error();
+        Alert.alert('Demo Login Failed', 'Could not authenticate demo account.');
+      }
+
+      setDemoLoading(false);
+    }
+  };
+
   // Welcome Screen
   if (view === 'welcome') {
     return (
@@ -550,24 +591,30 @@ export default function AuthScreen() {
 
         {/* Content */}
         <View style={[styles.welcomeContent, { paddingTop: insets.top + 60 }]}>
-          {/* Logo with pulsing rings */}
-          <Animated.View style={[styles.logoWrapper, logoAnimatedStyle]}>
-            {/* Pulsing rings emanating from logo */}
-            <PulsingRings />
-            <View style={[styles.logoOuter, { borderColor: colors.gold + '30' }]}>
-              <LinearGradient
-                colors={[colors.surface, colors.surfaceElevated] as any}
-                style={styles.logoInner}
-              >
-                <Image
-                  source={require('../assets/logo.png')}
-                  style={styles.logoImage}
-                  resizeMode="cover"
-                />
-              </LinearGradient>
-            </View>
-            <PulsingLogoGlow color={colors.gold} />
-          </Animated.View>
+          {/* Logo with pulsing rings - 5 taps triggers demo login */}
+          <TouchableOpacity onPress={handleLogoTap} activeOpacity={1} disabled={demoLoading}>
+            <Animated.View style={[styles.logoWrapper, logoAnimatedStyle]}>
+              {/* Pulsing rings emanating from logo */}
+              <PulsingRings />
+              <View style={[styles.logoOuter, { borderColor: colors.gold + '30' }]}>
+                <LinearGradient
+                  colors={[colors.surface, colors.surfaceElevated] as any}
+                  style={styles.logoInner}
+                >
+                  {demoLoading ? (
+                    <ActivityIndicator size="large" color={colors.gold} />
+                  ) : (
+                    <Image
+                      source={require('../assets/logo.png')}
+                      style={styles.logoImage}
+                      resizeMode="cover"
+                    />
+                  )}
+                </LinearGradient>
+              </View>
+              <PulsingLogoGlow color={colors.gold} />
+            </Animated.View>
+          </TouchableOpacity>
 
           {/* Brand */}
           <Animated.Text

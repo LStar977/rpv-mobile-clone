@@ -21,6 +21,7 @@ interface AuthState {
   isLoading: boolean;
   isAuthenticated: boolean;
   login: (provider: 'google' | 'apple', idToken: string, userData?: Partial<User>) => Promise<boolean>;
+  demoLogin: () => Promise<boolean>;
   logout: () => Promise<void>;
   checkAuth: () => Promise<void>;
   setLoading: (loading: boolean) => void;
@@ -74,6 +75,48 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       return true;
     } catch (error) {
       console.error('Login error:', error);
+      set({ isLoading: false });
+      return false;
+    }
+  },
+
+  demoLogin: async () => {
+    try {
+      set({ isLoading: true });
+
+      const response = await fetch(`${API_BASE_URL}/api/auth/mobile/demo`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: 'demo@represent.app',
+          password: 'RepresentDemo2024!',
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        console.error('Demo login failed:', error);
+        set({ isLoading: false });
+        return false;
+      }
+
+      const data = await response.json();
+
+      await SecureStore.setItemAsync(TOKEN_KEY, data.token);
+      await SecureStore.setItemAsync(USER_KEY, JSON.stringify(data.user));
+
+      set({
+        user: data.user,
+        token: data.token,
+        isAuthenticated: true,
+        isLoading: false,
+      });
+
+      return true;
+    } catch (error) {
+      console.error('Demo login error:', error);
       set({ isLoading: false });
       return false;
     }
