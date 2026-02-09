@@ -1,7 +1,9 @@
 import { getAuthToken, useAuthStore } from './auth';
 import { SEED_PROPOSALS } from './seedProposals';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const API_BASE_URL = 'https://representportal.com';
+const DEMO_ORGS_STORAGE_KEY = '@represent_demo_organizations';
 
 // Helper to check if current user is demo account
 function isDemoAccount(): boolean {
@@ -219,8 +221,19 @@ async function apiRequest<T>(
         errorMessage.includes('Identity');
       return { data: null, error: errorMessage, requiresVerification };
     }
-    const data = await response.json();
-    return { data, error: null };
+    // Handle potential non-JSON responses (e.g., HTML error pages with 200 status)
+    const text = await response.text();
+    if (!text) {
+      // Empty response is valid for some operations (like DELETE)
+      return { data: { success: true } as T, error: null };
+    }
+    try {
+      const data = JSON.parse(text);
+      return { data, error: null };
+    } catch (parseError) {
+      console.error('Failed to parse response as JSON:', text.substring(0, 200));
+      return { data: null, error: 'Server returned invalid response' };
+    }
   } catch (error) {
     console.error('API Request failed:', error);
     return { data: null, error: error instanceof Error ? error.message : 'Network error' };
@@ -338,23 +351,51 @@ export const organizationsApi = {
       backendOrgs = result.data.organizations;
     }
 
-    // For demo account, always include seed organizations
+    // For demo account, always include seed organizations AND locally stored orgs
     if (isDemoAccount()) {
-      // Filter out any seed orgs that might be in backend to avoid duplicates
+      // Load locally stored demo organizations
+      let localOrgs: Organization[] = [];
+      try {
+        const stored = await AsyncStorage.getItem(DEMO_ORGS_STORAGE_KEY);
+        if (stored) {
+          localOrgs = JSON.parse(stored);
+        }
+      } catch (e) {
+        console.error('Failed to load local demo organizations:', e);
+      }
+
+      // Combine all sources, avoiding duplicates
       const seedIds = SEED_ORGANIZATIONS.map(o => o.id);
-      const filteredBackend = backendOrgs.filter(o => !seedIds.includes(o.id));
-      return { data: [...SEED_ORGANIZATIONS, ...filteredBackend], error: null };
+      const localIds = localOrgs.map(o => o.id);
+      const allKnownIds = [...seedIds, ...localIds];
+      const filteredBackend = backendOrgs.filter(o => !allKnownIds.includes(o.id));
+
+      return { data: [...SEED_ORGANIZATIONS, ...localOrgs, ...filteredBackend], error: null };
     }
 
     return { data: backendOrgs, error: result.error };
   },
 
   async getOrganization(orgId: string): Promise<ApiResponse<Organization>> {
-    // For demo account, check seed organizations first
+    // For demo account, check seed organizations and local storage first
     if (isDemoAccount()) {
       const seedOrg = SEED_ORGANIZATIONS.find(o => o.id === orgId);
       if (seedOrg) {
         return { data: seedOrg, error: null };
+      }
+
+      // Check locally stored demo organizations
+      try {
+        const stored = await AsyncStorage.getItem(DEMO_ORGS_STORAGE_KEY);
+        if (stored) {
+          const localOrgs: Organization[] = JSON.parse(stored);
+          const localOrg = localOrgs.find(o => o.id === orgId);
+          if (localOrg) {
+            return { data: localOrg, error: null };
+          }
+        }
+      } catch (e) {
+        console.error('Failed to load local demo organization:', e);
       }
     }
     return apiRequest<Organization>(`/api/organizations/${orgId}`);
@@ -477,10 +518,49 @@ export const organizationsApi = {
     logoUrl?: string;
     type: 'community' | 'professional' | 'enterprise';
   }): Promise<ApiResponse<Organization>> {
-    return apiRequest<Organization>('/api/organizations', {
+    const result = await apiRequest<Organization>('/api/organizations', {
       method: 'POST',
       body: JSON.stringify(data),
     });
+
+    // For demo account, also save to local storage to persist across sessions
+    if (isDemoAccount() && result.data) {
+      try {
+        const stored = await AsyncStorage.getItem(DEMO_ORGS_STORAGE_KEY);
+        const existingOrgs: Organization[] = stored ? JSON.parse(stored) : [];
+        existingOrgs.push(result.data);
+        await AsyncStorage.setItem(DEMO_ORGS_STORAGE_KEY, JSON.stringify(existingOrgs));
+      } catch (e) {
+        console.error('Failed to save demo organization locally:', e);
+      }
+    }
+
+    // If backend failed but this is demo account, create a local org
+    if (isDemoAccount() && result.error) {
+      const localOrg: Organization = {
+        id: `local-${Date.now()}`,
+        name: data.name,
+        description: data.description,
+        logoUrl: data.logoUrl,
+        memberCount: 1,
+        tier: data.type === 'enterprise' ? 'professional' : 'starter',
+        verified: false,
+        createdAt: new Date().toISOString(),
+        role: 'admin',
+      };
+
+      try {
+        const stored = await AsyncStorage.getItem(DEMO_ORGS_STORAGE_KEY);
+        const existingOrgs: Organization[] = stored ? JSON.parse(stored) : [];
+        existingOrgs.push(localOrg);
+        await AsyncStorage.setItem(DEMO_ORGS_STORAGE_KEY, JSON.stringify(existingOrgs));
+        return { data: localOrg, error: null };
+      } catch (e) {
+        console.error('Failed to save demo organization locally:', e);
+      }
+    }
+
+    return result;
   },
 };
 
