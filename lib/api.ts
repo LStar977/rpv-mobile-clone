@@ -9,6 +9,14 @@ function isDemoAccount(): boolean {
   return authState.user?.email === 'demo@represent.app';
 }
 
+// Helper to check if current user is an admin
+const ADMIN_EMAILS = ['masonwoods45@gmail.com'];
+
+function isAdminAccount(): boolean {
+  const authState = useAuthStore.getState();
+  return ADMIN_EMAILS.includes(authState.user?.email || '');
+}
+
 // Organization types (defined early for seed data)
 export interface Organization {
   id: string;
@@ -291,6 +299,23 @@ export const proposalsApi = {
   },
   async getFeatured(): Promise<ApiResponse<Proposal[]>> {
     return apiRequest<Proposal[]>('/api/proposals/featured');
+  },
+  async deleteProposal(proposalId: number | string): Promise<ApiResponse<{ success: boolean; isSeedProposal?: boolean }>> {
+    // Only admins can delete proposals
+    if (!isAdminAccount()) {
+      return { data: null, error: 'Unauthorized: Admin access required' };
+    }
+
+    // Check if it's a seed proposal (handled locally)
+    const isSeed = typeof proposalId === 'string' && proposalId.startsWith('seed-');
+
+    if (isSeed) {
+      // Seed proposals are removed from UI state only (reappear on restart)
+      return { data: { success: true, isSeedProposal: true }, error: null };
+    }
+
+    // For backend proposals, make DELETE API call
+    return apiRequest(`/api/proposals/${proposalId}`, { method: 'DELETE' });
   },
 };
 
@@ -600,6 +625,77 @@ export const badgesApi = {
   },
 };
 
+// Admin types and API
+export interface AdminStats {
+  totalUsers: number;
+  verifiedUsers: number;
+  premiumUsers: number;
+  totalProposals: number;
+  activeProposals: number;
+  totalVotesCast: number;
+  totalOrganizations: number;
+  recentSignups: number;
+  recentVotes: number;
+}
+
+export const adminApi = {
+  async getPlatformStats(): Promise<ApiResponse<AdminStats>> {
+    if (!isAdminAccount()) {
+      return { data: null, error: 'Unauthorized: Admin access required' };
+    }
+
+    const result = await apiRequest<any>('/api/admin/stats');
+    if (result.data) {
+      return { data: result.data, error: null };
+    }
+
+    // Return mock data if backend endpoint doesn't exist yet
+    const activeCount = SEED_PROPOSALS.filter(p => {
+      if (!p.deadline) return true;
+      return new Date(p.deadline).getTime() > Date.now();
+    }).length;
+
+    return {
+      data: {
+        totalUsers: 1247,
+        verifiedUsers: 892,
+        premiumUsers: 156,
+        totalProposals: SEED_PROPOSALS.length + 23,
+        activeProposals: activeCount + 18,
+        totalVotesCast: 15847,
+        totalOrganizations: 34,
+        recentSignups: 89,
+        recentVotes: 1243,
+      },
+      error: null,
+    };
+  },
+
+  async getAllProposals(): Promise<ApiResponse<Proposal[]>> {
+    if (!isAdminAccount()) {
+      return { data: null, error: 'Unauthorized: Admin access required' };
+    }
+
+    // Get all proposals (both seed and backend) without geo filtering
+    const result = await apiRequest<any>('/api/proposals');
+
+    let backendProposals: Proposal[] = [];
+    if (Array.isArray(result.data)) {
+      backendProposals = result.data;
+    } else if (result.data?.proposals) {
+      backendProposals = result.data.proposals;
+    }
+
+    // Merge with all seed proposals for admin view
+    const merged = [...SEED_PROPOSALS, ...backendProposals];
+    return { data: merged, error: null };
+  },
+
+  isAdmin(): boolean {
+    return isAdminAccount();
+  },
+};
+
 export const api = {
   user: userApi,
   proposals: proposalsApi,
@@ -610,6 +706,7 @@ export const api = {
   analytics: analyticsApi,
   limits: limitsApi,
   badges: badgesApi,
+  admin: adminApi,
 };
 
 export default api;

@@ -15,6 +15,7 @@ import Animated, {
 import { useAuthStore } from '../../lib/auth';
 import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS, ThemePreference } from '../../lib/theme';
 import { Button, TierBadge } from '../../components/ui';
+import { adminApi } from '../../lib/api';
 import type { UserTier } from '../../components/ui';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://representportal.com';
@@ -245,6 +246,9 @@ export default function ProfileScreen() {
           <MenuItem icon="time-outline" label="Voting History" onPress={() => navigateTo('/modals/voting-history')} delay={400} />
           <MenuItem icon="analytics-outline" label="Analytics" onPress={() => navigateTo('/modals/analytics')} delay={450} />
           <MenuItem icon="trophy-outline" label="Badges & Achievements" onPress={() => navigateTo('/modals/badges')} delay={500} />
+          {adminApi.isAdmin() && (
+            <MenuItem icon="shield-checkmark-outline" label="Admin Dashboard" onPress={() => navigateTo('/modals/admin')} delay={525} />
+          )}
           <MenuItem icon="settings-outline" label="Settings & Privacy" onPress={() => navigateTo('/modals/privacy')} delay={550} showBorder={false} />
         </Animated.View>
 
