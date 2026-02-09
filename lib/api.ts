@@ -531,13 +531,24 @@ export const organizationsApi = {
       body: JSON.stringify(data),
     });
 
-    // For demo account, also save to local storage to persist across sessions
+    // For demo account, save with enhanced data to ensure input fields and admin role
     if (isDemoAccount() && result.data) {
+      const enhancedOrg: Organization = {
+        ...result.data,
+        // Ensure input data is preserved (backend might return different/missing values)
+        name: data.name,
+        description: data.description,
+        logoUrl: data.logoUrl,
+        // Always set demo creator as admin
+        role: 'admin',
+      };
+
       try {
         const stored = await AsyncStorage.getItem(DEMO_ORGS_STORAGE_KEY);
         const existingOrgs: Organization[] = stored ? JSON.parse(stored) : [];
-        existingOrgs.push(result.data);
+        existingOrgs.push(enhancedOrg);
         await AsyncStorage.setItem(DEMO_ORGS_STORAGE_KEY, JSON.stringify(existingOrgs));
+        return { data: enhancedOrg, error: null };
       } catch (e) {
         console.error('Failed to save demo organization locally:', e);
       }
