@@ -986,7 +986,14 @@ export default function ProposalsScreen() {
           setVotedProposals(new Set(votedRes.data.map((v: any) => (typeof v === 'object' ? v.proposalId : v))));
         }
 
-        if (profileRes.data) {
+        // Demo account should use hardcoded location and be verified (for App Store review)
+        const isDemoAccount = user?.email === 'demo@represent.app';
+        if (isDemoAccount) {
+          setUserCountry('Canada');
+          setUserState('Ontario');
+          setUserCity('Toronto');
+          setIsVerified(true);
+        } else if (profileRes.data) {
           setUserCountry(profileRes.data.country || '');
           setUserState(profileRes.data.state || '');
           setUserCity(profileRes.data.city || '');
@@ -1190,8 +1197,11 @@ export default function ProposalsScreen() {
       return;
     }
 
-    // Check proposal limits (skip for premium users with unlimited)
-    if (usageLimits && usageLimits.proposals.limit !== 'unlimited') {
+    // Demo account bypasses all limits (for App Store review)
+    const isDemoAccount = user?.email === 'demo@represent.app';
+
+    // Check proposal limits (skip for premium users with unlimited, or demo account)
+    if (!isDemoAccount && usageLimits && usageLimits.proposals.limit !== 'unlimited') {
       if (usageLimits.proposals.used >= usageLimits.proposals.limit) {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         setVerificationModalType('limit');
@@ -1202,8 +1212,8 @@ export default function ProposalsScreen() {
       }
     }
 
-    // Require verification for geo-restricted proposals
-    if (newProposal.geoScope !== 'global' && !isVerified) {
+    // Require verification for geo-restricted proposals (skip for demo account)
+    if (!isDemoAccount && newProposal.geoScope !== 'global' && !isVerified) {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       setVerificationModalType('proposal');
       setShowCreateModal(false);

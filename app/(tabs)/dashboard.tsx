@@ -701,9 +701,12 @@ export default function DashboardScreen() {
       urgent.sort((a, b) => a.hoursLeft - b.hoursLeft);
 
       const profile = profileRes.data;
-      const userCountry = profile?.country || user?.country || '';
-      const userState = profile?.state || user?.state || '';
-      const userCity = profile?.city || user?.city || '';
+
+      // Demo account should use hardcoded location for App Store review
+      const isDemoAccount = user?.email === 'demo@represent.app';
+      const userCountry = isDemoAccount ? 'Canada' : (profile?.country || user?.country || '');
+      const userState = isDemoAccount ? 'Ontario' : (profile?.state || user?.state || '');
+      const userCity = isDemoAccount ? 'Toronto' : (profile?.city || user?.city || '');
 
       const countryFlags: Record<string, string> = {
         Canada: '🇨🇦',
@@ -795,9 +798,15 @@ export default function DashboardScreen() {
         .length;
 
       setStats({ pending: pendingCount, voted: votedIds.size, passed: passedCount });
-      setCommunities(Object.values(communityMap).filter((c) => c.proposalCount > 0));
+      // For demo account, show all communities even if no proposals match
+      // For regular users, only show communities with proposals
+      const filteredCommunities = isDemoAccount
+        ? Object.values(communityMap)
+        : Object.values(communityMap).filter((c) => c.proposalCount > 0);
+      setCommunities(filteredCommunities);
       setUrgentProposals(urgent.slice(0, 3));
-      setIsVerified(verificationRes.data?.verified || false);
+      // Demo account should always appear verified (for App Store review)
+      setIsVerified(isDemoAccount ? true : (verificationRes.data?.verified || false));
 
       // Simulate live voters (in production, this would come from a real-time service)
       setLiveVoters(Math.floor(Math.random() * 15) + 3);

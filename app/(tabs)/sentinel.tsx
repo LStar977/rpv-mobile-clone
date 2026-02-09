@@ -605,6 +605,14 @@ export default function SentinelScreen() {
   // Check subscription
   useEffect(() => {
     const checkSubscription = async () => {
+      // Demo account should appear as premium (for App Store review)
+      const isDemoAccount = user?.email === 'demo@represent.app';
+      if (isDemoAccount) {
+        setIsPremium(true);
+        setLoadingSubscription(false);
+        return;
+      }
+
       if (!token) {
         setLoadingSubscription(false);
         return;
@@ -627,7 +635,7 @@ export default function SentinelScreen() {
       }
     };
     checkSubscription();
-  }, [token]);
+  }, [token, user?.email]);
 
   // Show demo report card for non-premium users
   const handleTryDemo = () => {

@@ -233,7 +233,7 @@ function ProposalAnalyticsCard({ proposal, index }: { proposal: ProposalAnalytic
 
 export default function AnalyticsScreen() {
   const { colors } = useTheme();
-  const { token } = useAuthStore();
+  const { token, user } = useAuthStore();
 
   const [isPremium, setIsPremium] = useState(false);
   const [loadingSubscription, setLoadingSubscription] = useState(true);
@@ -245,6 +245,14 @@ export default function AnalyticsScreen() {
   // Check if user has Premium subscription
   useEffect(() => {
     const checkSubscription = async () => {
+      // Demo account should appear as premium (for App Store review)
+      const isDemoAccount = user?.email === 'demo@represent.app';
+      if (isDemoAccount) {
+        setIsPremium(true);
+        setLoadingSubscription(false);
+        return;
+      }
+
       if (!token) {
         setLoadingSubscription(false);
         return;
@@ -267,7 +275,7 @@ export default function AnalyticsScreen() {
       }
     };
     checkSubscription();
-  }, [token]);
+  }, [token, user?.email]);
 
   const fetchAnalytics = useCallback(async () => {
     try {

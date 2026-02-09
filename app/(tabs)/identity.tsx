@@ -485,8 +485,11 @@ export default function IdentityScreen() {
       return;
     }
 
-    // Check if user has paid for verification or is premium
-    if (!hasPaidVerification && !isPremium) {
+    // Demo account bypasses all paywalls (for App Store review)
+    const isDemoAccountForPaywall = user?.email === 'demo@represent.app';
+
+    // Check if user has paid for verification or is premium (skip for demo account)
+    if (!isDemoAccountForPaywall && !hasPaidVerification && !isPremium) {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       Alert.alert(
         'Payment Required',
@@ -602,9 +605,12 @@ export default function IdentityScreen() {
 
   const displayName = profile?.name || user?.name || '';
   const displayEmail = profile?.email || user?.email || '';
-  const displayCountry = profile?.country || user?.country || '';
-  const displayState = profile?.state || user?.state || '';
-  const displayCity = profile?.city || user?.city || '';
+
+  // Demo account should use hardcoded location for App Store review
+  const isDemoAccount = user?.email === 'demo@represent.app';
+  const displayCountry = isDemoAccount ? 'Canada' : (profile?.country || user?.country || '');
+  const displayState = isDemoAccount ? 'Ontario' : (profile?.state || user?.state || '');
+  const displayCity = isDemoAccount ? 'Toronto' : (profile?.city || user?.city || '');
 
   // Build location string
   const locationParts = [displayCity, displayState, displayCountry].filter(Boolean);

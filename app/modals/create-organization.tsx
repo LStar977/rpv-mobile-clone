@@ -218,7 +218,7 @@ function TierCard({
 
 export default function CreateOrganizationScreen() {
   const { colors } = useTheme();
-  const { token } = useAuthStore();
+  const { token, user } = useAuthStore();
 
   // Step state
   const [currentStep, setCurrentStep] = useState<Step>('details');
@@ -307,6 +307,9 @@ export default function CreateOrganizationScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
     setProcessing(true);
 
+    // Demo account bypasses payment (for App Store review)
+    const isDemoAccount = user?.email === 'demo@represent.app';
+
     try {
       // STEP 1: Create org first (with pending subscription status)
       const createResult = await organizationsApi.createOrganization({
@@ -322,6 +325,27 @@ export default function CreateOrganizationScreen() {
       }
 
       const organizationId = createResult.data.organization.id;
+
+      // Demo account: skip payment and show success immediately
+      if (isDemoAccount) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        Alert.alert(
+          'Organization Created!',
+          `${name} has been created successfully. You are now the admin.`,
+          [
+            {
+              text: 'View Organization',
+              onPress: () => {
+                router.replace({
+                  pathname: '/modals/organization-detail',
+                  params: { orgId: organizationId, orgName: name },
+                });
+              },
+            },
+          ]
+        );
+        return;
+      }
 
       // STEP 2: Get payment intent with org ID
       const paymentIntent = await fetchOrganizationPaymentIntent(
