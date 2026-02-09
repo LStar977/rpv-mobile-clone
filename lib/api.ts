@@ -214,17 +214,25 @@ async function apiRequest<T>(
       const errorData = await response.json().catch(() => ({}));
       console.error(`API Error: ${response.status}`, errorData);
       const errorMessage = errorData.error || errorData.message || `HTTP ${response.status}`;
-      const requiresVerification = 
-        errorMessage.includes('passport') || 
-        errorMessage.includes('verify') || 
+      const requiresVerification =
+        errorMessage.includes('passport') ||
+        errorMessage.includes('verify') ||
         errorMessage.includes('identity') ||
         errorMessage.includes('Identity');
       return { data: null, error: errorMessage, requiresVerification };
     }
+
+    // For DELETE requests, treat any successful response as success
+    // Many servers return empty, "OK", "Deleted", or other non-JSON for DELETE
+    const method = options.method?.toUpperCase();
+    if (method === 'DELETE') {
+      return { data: { success: true } as T, error: null };
+    }
+
     // Handle potential non-JSON responses (e.g., HTML error pages with 200 status)
     const text = await response.text();
     if (!text) {
-      // Empty response is valid for some operations (like DELETE)
+      // Empty response is valid for some operations
       return { data: { success: true } as T, error: null };
     }
     try {
@@ -523,13 +531,24 @@ export const organizationsApi = {
       body: JSON.stringify(data),
     });
 
-    // For demo account, also save to local storage to persist across sessions
+    // For demo account, save with enhanced data to ensure input fields and admin role
     if (isDemoAccount() && result.data) {
+      const enhancedOrg: Organization = {
+        ...result.data,
+        // Ensure input data is preserved (backend might return different/missing values)
+        name: data.name,
+        description: data.description,
+        logoUrl: data.logoUrl,
+        // Always set demo creator as admin
+        role: 'admin',
+      };
+
       try {
         const stored = await AsyncStorage.getItem(DEMO_ORGS_STORAGE_KEY);
         const existingOrgs: Organization[] = stored ? JSON.parse(stored) : [];
-        existingOrgs.push(result.data);
+        existingOrgs.push(enhancedOrg);
         await AsyncStorage.setItem(DEMO_ORGS_STORAGE_KEY, JSON.stringify(existingOrgs));
+        return { data: enhancedOrg, error: null };
       } catch (e) {
         console.error('Failed to save demo organization locally:', e);
       }
