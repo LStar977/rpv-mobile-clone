@@ -214,17 +214,25 @@ async function apiRequest<T>(
       const errorData = await response.json().catch(() => ({}));
       console.error(`API Error: ${response.status}`, errorData);
       const errorMessage = errorData.error || errorData.message || `HTTP ${response.status}`;
-      const requiresVerification = 
-        errorMessage.includes('passport') || 
-        errorMessage.includes('verify') || 
+      const requiresVerification =
+        errorMessage.includes('passport') ||
+        errorMessage.includes('verify') ||
         errorMessage.includes('identity') ||
         errorMessage.includes('Identity');
       return { data: null, error: errorMessage, requiresVerification };
     }
+
+    // For DELETE requests, treat any successful response as success
+    // Many servers return empty, "OK", "Deleted", or other non-JSON for DELETE
+    const method = options.method?.toUpperCase();
+    if (method === 'DELETE') {
+      return { data: { success: true } as T, error: null };
+    }
+
     // Handle potential non-JSON responses (e.g., HTML error pages with 200 status)
     const text = await response.text();
     if (!text) {
-      // Empty response is valid for some operations (like DELETE)
+      // Empty response is valid for some operations
       return { data: { success: true } as T, error: null };
     }
     try {
