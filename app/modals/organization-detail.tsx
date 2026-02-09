@@ -927,6 +927,48 @@ export default function OrganizationDetailScreen() {
                     ))
                   )}
                 </Animated.View>
+
+                {/* Reset Demo Data Section */}
+                <Animated.View
+                  entering={FadeInUp.delay(300).duration(400)}
+                  style={[styles.adminSection, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                >
+                  <View style={styles.adminSectionHeader}>
+                    <View style={styles.adminSectionTitleRow}>
+                      <Ionicons name="refresh-outline" size={20} color={colors.warning} />
+                      <Text style={[styles.adminSectionTitle, { color: colors.text }]}>Demo Data</Text>
+                    </View>
+                  </View>
+                  <Text style={[styles.adminEmptyText, { color: colors.textSecondary, textAlign: 'left', paddingVertical: 0, marginBottom: SPACING.md }]}>
+                    Clear all test proposals you created and restore seed proposals.
+                  </Text>
+                  <TouchableOpacity
+                    style={[styles.resetDemoBtn, { borderColor: colors.warning }]}
+                    onPress={() => {
+                      Alert.alert(
+                        'Reset Demo Data',
+                        'This will remove all proposals you created and restore the original seed proposals. Continue?',
+                        [
+                          { text: 'Cancel', style: 'cancel' },
+                          {
+                            text: 'Reset',
+                            style: 'destructive',
+                            onPress: async () => {
+                              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                              await organizationsApi.clearDemoProposals();
+                              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                              fetchData();
+                              Alert.alert('Done', 'Demo data has been reset.');
+                            },
+                          },
+                        ]
+                      );
+                    }}
+                  >
+                    <Ionicons name="trash-outline" size={16} color={colors.warning} />
+                    <Text style={[styles.resetDemoBtnText, { color: colors.warning }]}>Reset Demo Proposals</Text>
+                  </TouchableOpacity>
+                </Animated.View>
               </>
             )}
           </>
@@ -1784,5 +1826,20 @@ const styles = StyleSheet.create({
   pinToggleHint: {
     ...TYPOGRAPHY.labelSmall,
     marginTop: 2,
+  },
+
+  // Reset Demo Button
+  resetDemoBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: SPACING.md,
+    borderRadius: BORDER_RADIUS.lg,
+    borderWidth: 1.5,
+    gap: SPACING.sm,
+  },
+  resetDemoBtnText: {
+    ...TYPOGRAPHY.labelMedium,
+    fontWeight: '600',
   },
 });

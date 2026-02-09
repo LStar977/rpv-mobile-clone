@@ -352,6 +352,17 @@ export const veriffApi = {
 };
 
 export const organizationsApi = {
+  // Utility to clear all demo proposals (keeps only seed data)
+  async clearDemoProposals(): Promise<void> {
+    try {
+      await AsyncStorage.removeItem(DEMO_PROPOSALS_STORAGE_KEY);
+      await AsyncStorage.removeItem(DELETED_PROPOSALS_STORAGE_KEY);
+      console.log('Demo proposals cleared successfully');
+    } catch (e) {
+      console.error('Failed to clear demo proposals:', e);
+    }
+  },
+
   async getMyOrganizations(): Promise<ApiResponse<Organization[]>> {
     const result = await apiRequest<any>('/api/organizations');
     let backendOrgs: Organization[] = [];
