@@ -1443,42 +1443,6 @@ export default function ProposalsScreen() {
               <Text style={[styles.clearBtnText, { color: colors.error }]}>Clear all filters</Text>
             </TouchableOpacity>
           )}
-
-          {/* Demo account: Clear test proposals */}
-          {user?.email === 'demo@represent.app' && (
-            <TouchableOpacity
-              style={[styles.clearBtn, { marginTop: SPACING.sm }]}
-              onPress={() => {
-                Alert.alert(
-                  'Clear Test Proposals',
-                  'This will hide all proposals you created for testing, keeping only the seed proposals. Continue?',
-                  [
-                    { text: 'Cancel', style: 'cancel' },
-                    {
-                      text: 'Clear',
-                      style: 'destructive',
-                      onPress: async () => {
-                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                        await proposalsApi.hideAllNonSeedProposals();
-                        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                        // Refresh proposals
-                        setLoading(true);
-                        const result = await proposalsApi.getAll();
-                        if (result.data) {
-                          setProposals(result.data);
-                        }
-                        setLoading(false);
-                        Alert.alert('Done', 'Test proposals have been hidden.');
-                      },
-                    },
-                  ]
-                );
-              }}
-            >
-              <Ionicons name="trash-outline" size={16} color={colors.warning} />
-              <Text style={[styles.clearBtnText, { color: colors.warning }]}>Clear test proposals</Text>
-            </TouchableOpacity>
-          )}
         </Animated.View>
       )}
 

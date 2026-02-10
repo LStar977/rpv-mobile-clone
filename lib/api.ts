@@ -6,7 +6,6 @@ const API_BASE_URL = 'https://representportal.com';
 const DEMO_ORGS_STORAGE_KEY = '@represent_demo_organizations';
 const DEMO_PROPOSALS_STORAGE_KEY = '@represent_demo_proposals';
 const DELETED_PROPOSALS_STORAGE_KEY = '@represent_deleted_proposals';
-const DELETED_MAIN_PROPOSALS_STORAGE_KEY = '@represent_deleted_main_proposals';
 
 // Helper to check if current user is demo account
 function isDemoAccount(): boolean {
@@ -287,39 +286,6 @@ export const userApi = {
 };
 
 export const proposalsApi = {
-  // Utility to clear all demo main proposals (hides non-seed proposals for demo account)
-  async clearDemoMainProposals(): Promise<void> {
-    try {
-      await AsyncStorage.removeItem(DELETED_MAIN_PROPOSALS_STORAGE_KEY);
-      console.log('Demo main proposals filter cleared successfully');
-    } catch (e) {
-      console.error('Failed to clear demo main proposals:', e);
-    }
-  },
-
-  // Hide all non-seed proposals for demo account
-  async hideAllNonSeedProposals(): Promise<void> {
-    if (!isDemoAccount()) return;
-
-    try {
-      // Get all proposals from backend
-      const result = await apiRequest<any>('/api/proposals');
-      let backendProposals: Proposal[] = [];
-      if (Array.isArray(result.data) && result.data.length > 0) {
-        backendProposals = result.data;
-      } else if (result.data?.proposals && Array.isArray(result.data.proposals)) {
-        backendProposals = result.data.proposals;
-      }
-
-      // Add all backend proposal IDs to the deleted list
-      const deletedIds = backendProposals.map(p => String(p.id));
-      await AsyncStorage.setItem(DELETED_MAIN_PROPOSALS_STORAGE_KEY, JSON.stringify(deletedIds));
-      console.log(`Hidden ${deletedIds.length} non-seed proposals`);
-    } catch (e) {
-      console.error('Failed to hide non-seed proposals:', e);
-    }
-  },
-
   async getAll(): Promise<ApiResponse<Proposal[]>> {
     const result = await apiRequest<any>('/api/proposals');
 
@@ -329,19 +295,6 @@ export const proposalsApi = {
       backendProposals = result.data;
     } else if (result.data?.proposals && Array.isArray(result.data.proposals)) {
       backendProposals = result.data.proposals;
-    }
-
-    // For demo accounts, filter out deleted/hidden proposals
-    if (isDemoAccount()) {
-      try {
-        const deletedStored = await AsyncStorage.getItem(DELETED_MAIN_PROPOSALS_STORAGE_KEY);
-        if (deletedStored) {
-          const deletedIds: string[] = JSON.parse(deletedStored);
-          backendProposals = backendProposals.filter(p => !deletedIds.includes(String(p.id)));
-        }
-      } catch (e) {
-        console.error('Failed to load deleted main proposal IDs:', e);
-      }
     }
 
     // Always include seed proposals merged with backend
@@ -371,23 +324,6 @@ export const proposalsApi = {
     return apiRequest<Proposal[]>('/api/proposals/featured');
   },
   async deleteProposal(proposalId: number | string): Promise<ApiResponse<{ success: boolean; isSeedProposal?: boolean }>> {
-    // Demo accounts can hide proposals locally
-    if (isDemoAccount()) {
-      try {
-        const deletedStored = await AsyncStorage.getItem(DELETED_MAIN_PROPOSALS_STORAGE_KEY);
-        const deletedIds: string[] = deletedStored ? JSON.parse(deletedStored) : [];
-        const idStr = String(proposalId);
-        if (!deletedIds.includes(idStr)) {
-          deletedIds.push(idStr);
-          await AsyncStorage.setItem(DELETED_MAIN_PROPOSALS_STORAGE_KEY, JSON.stringify(deletedIds));
-        }
-        return { data: { success: true }, error: null };
-      } catch (e) {
-        console.error('Failed to hide proposal for demo account:', e);
-        return { data: null, error: 'Failed to hide proposal' };
-      }
-    }
-
     // Only admins can delete proposals from backend
     if (!isAdminAccount()) {
       return { data: null, error: 'Unauthorized: Admin access required' };
@@ -416,17 +352,6 @@ export const veriffApi = {
 };
 
 export const organizationsApi = {
-  // Utility to clear all demo proposals (keeps only seed data)
-  async clearDemoProposals(): Promise<void> {
-    try {
-      await AsyncStorage.removeItem(DEMO_PROPOSALS_STORAGE_KEY);
-      await AsyncStorage.removeItem(DELETED_PROPOSALS_STORAGE_KEY);
-      console.log('Demo proposals cleared successfully');
-    } catch (e) {
-      console.error('Failed to clear demo proposals:', e);
-    }
-  },
-
   async getMyOrganizations(): Promise<ApiResponse<Organization[]>> {
     const result = await apiRequest<any>('/api/organizations');
     let backendOrgs: Organization[] = [];
