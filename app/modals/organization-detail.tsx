@@ -139,7 +139,7 @@ function AnnouncementCard({
 
 export default function OrganizationDetailScreen() {
   const { colors } = useTheme();
-  const { token, user } = useAuthStore();
+  const { token, user, isLoading: authLoading } = useAuthStore();
   const params = useLocalSearchParams<{ orgId: string; orgName: string; orgRole?: string }>();
 
   const [organization, setOrganization] = useState<Organization | null>(null);
@@ -171,6 +171,9 @@ export default function OrganizationDetailScreen() {
   const [newAnnouncement, setNewAnnouncement] = useState({ title: '', content: '', pinned: false });
 
   const fetchData = useCallback(async () => {
+    // Wait for auth to fully initialize before fetching
+    if (authLoading) return;
+
     if (!token || !params.orgId) {
       setLoading(false);
       return;
@@ -199,7 +202,7 @@ export default function OrganizationDetailScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [token, params.orgId, user]);
+  }, [token, params.orgId, user, authLoading]);
 
   useEffect(() => {
     fetchData();
