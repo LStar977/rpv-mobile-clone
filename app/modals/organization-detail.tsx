@@ -198,7 +198,7 @@ export default function OrganizationDetailScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [token, params.orgId]);
+  }, [token, params.orgId, user]);
 
   useEffect(() => {
     fetchData();
