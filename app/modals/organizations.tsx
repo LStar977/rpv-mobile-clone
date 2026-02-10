@@ -267,7 +267,7 @@ export default function OrganizationsScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     router.push({
       pathname: '/modals/organization-detail',
-      params: { orgId: org.id, orgName: org.name },
+      params: { orgId: org.id, orgName: org.name, orgRole: org.role },
     });
   };
 

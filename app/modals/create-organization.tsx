@@ -338,7 +338,7 @@ export default function CreateOrganizationScreen() {
               onPress: () => {
                 router.replace({
                   pathname: '/modals/organization-detail',
-                  params: { orgId: organizationId, orgName: name },
+                  params: { orgId: organizationId, orgName: name, orgRole: 'admin' },
                 });
               },
             },
@@ -376,7 +376,7 @@ export default function CreateOrganizationScreen() {
                 onPress: () => {
                   router.replace({
                     pathname: '/modals/organization-detail',
-                    params: { orgId: organizationId, orgName: name },
+                    params: { orgId: organizationId, orgName: name, orgRole: 'admin' },
                   });
                 },
               },
