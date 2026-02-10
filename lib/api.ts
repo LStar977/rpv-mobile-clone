@@ -382,10 +382,16 @@ export const organizationsApi = {
 
       // Ensure all backend orgs have admin role for demo account
       const backendWithRole = filteredBackend.map(o => ({ ...o, role: 'admin' as const }));
-      return { data: [...SEED_ORGANIZATIONS, ...localOrgs, ...backendWithRole], error: null };
+
+      // Filter out organizations with missing/empty names
+      const allOrgs = [...SEED_ORGANIZATIONS, ...localOrgs, ...backendWithRole];
+      const validOrgs = allOrgs.filter(o => o.name && o.name.trim() !== '');
+      return { data: validOrgs, error: null };
     }
 
-    return { data: backendOrgs, error: result.error };
+    // Filter out organizations with missing/empty names
+    const validOrgs = backendOrgs.filter(o => o.name && o.name.trim() !== '');
+    return { data: validOrgs, error: result.error };
   },
 
   async getOrganization(orgId: string): Promise<ApiResponse<Organization>> {

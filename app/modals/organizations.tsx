@@ -51,7 +51,7 @@ function OrganizationCard({
         <View style={styles.orgInfo}>
           <View style={styles.orgNameRow}>
             <Text style={[styles.orgName, { color: colors.text }]} numberOfLines={1}>
-              {organization.name}
+              {organization.name || 'Unnamed Organization'}
             </Text>
             {organization.verified && (
               <Ionicons name="checkmark-circle" size={16} color={colors.success} />
@@ -64,7 +64,7 @@ function OrganizationCard({
             <View style={styles.orgMetaItem}>
               <Ionicons name="people-outline" size={12} color={colors.textTertiary} />
               <Text style={[styles.orgMetaText, { color: colors.textTertiary }]}>
-                {organization.memberCount} members
+                {organization.memberCount ?? 0} members
               </Text>
             </View>
             {organization.role === 'admin' && (
