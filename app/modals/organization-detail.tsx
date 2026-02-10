@@ -139,7 +139,7 @@ function AnnouncementCard({
 
 export default function OrganizationDetailScreen() {
   const { colors } = useTheme();
-  const { token } = useAuthStore();
+  const { token, user } = useAuthStore();
   const params = useLocalSearchParams<{ orgId: string; orgName: string; orgRole?: string }>();
 
   const [organization, setOrganization] = useState<Organization | null>(null);
@@ -184,8 +184,9 @@ export default function OrganizationDetailScreen() {
       ]);
 
       if (orgResult.data) {
-        // Use API role if available, otherwise fall back to passed role from navigation
-        const role = orgResult.data.role || (params.orgRole as 'admin' | 'member' | undefined);
+        // For demo account, always use admin role
+        const isDemoUser = user?.email === 'demo@represent.app';
+        const role = isDemoUser ? 'admin' : (orgResult.data.role || (params.orgRole as 'admin' | 'member' | undefined));
         setOrganization({ ...orgResult.data, role });
       }
       if (proposalsResult.data) setProposals(proposalsResult.data);
