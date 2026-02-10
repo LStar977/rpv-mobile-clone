@@ -618,8 +618,8 @@ export default function OrganizationDetailScreen() {
         {/* Tab Content */}
         {activeTab === 'proposals' && (
           <>
-            {/* Admin Create Proposal Button */}
-            {organization?.role === 'admin' && (
+            {/* Create Proposal Button */}
+            {organization && (
               <Animated.View entering={FadeInUp.duration(300)} style={{ marginBottom: SPACING.md }}>
                 <TouchableOpacity
                   style={[styles.createProposalBtn, { backgroundColor: colors.gold }]}
