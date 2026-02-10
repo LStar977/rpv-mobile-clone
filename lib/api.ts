@@ -721,6 +721,11 @@ export const organizationsApi = {
       }
     }
 
+    // For regular accounts, ensure creator is always set as admin
+    if (result.data && !result.data.role) {
+      result.data.role = 'admin';
+    }
+
     return result;
   },
 };
