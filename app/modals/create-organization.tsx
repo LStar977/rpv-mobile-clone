@@ -319,12 +319,12 @@ export default function CreateOrganizationScreen() {
         type: selectedTier,
       });
 
-      if (createResult.error || !createResult.data?.organization?.id) {
+      if (createResult.error || !createResult.data?.id) {
         Alert.alert('Error', createResult.error || 'Failed to create organization');
         return;
       }
 
-      const organizationId = createResult.data.organization.id;
+      const organizationId = createResult.data.id;
 
       // Demo account: skip payment and show success immediately
       if (isDemoAccount) {
