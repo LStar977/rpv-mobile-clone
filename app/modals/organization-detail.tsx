@@ -40,7 +40,7 @@ function TabButton({
       activeOpacity={0.7}
     >
       <Ionicons name={icon as any} size={16} color={active ? colors.gold : colors.textSecondary} />
-      <Text style={[styles.tabButtonText, { color: active ? colors.gold : colors.textSecondary }]}>
+      <Text style={[styles.tabButtonText, { color: active ? colors.gold : colors.textSecondary }]} numberOfLines={1}>
         {label}
       </Text>
     </TouchableOpacity>
@@ -580,7 +580,12 @@ export default function OrganizationDetailScreen() {
         )}
 
         {/* Tabs */}
-        <View style={styles.tabsRow}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.tabsScrollView}
+          contentContainerStyle={styles.tabsRow}
+        >
           <TabButton
             label="Proposals"
             icon="document-text-outline"
@@ -607,7 +612,7 @@ export default function OrganizationDetailScreen() {
               onPress={() => setActiveTab('admin')}
             />
           )}
-        </View>
+        </ScrollView>
 
         {/* Tab Content */}
         {activeTab === 'proposals' && (
@@ -1269,17 +1274,21 @@ const styles = StyleSheet.create({
   },
 
   // Tabs
+  tabsScrollView: {
+    marginBottom: SPACING.lg,
+    marginHorizontal: -SPACING.lg,
+  },
   tabsRow: {
     flexDirection: 'row',
     gap: SPACING.sm,
-    marginBottom: SPACING.lg,
+    paddingHorizontal: SPACING.lg,
   },
   tabButton: {
-    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.lg,
     borderRadius: BORDER_RADIUS.full,
     borderWidth: 1,
     gap: SPACING.xs,
