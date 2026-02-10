@@ -149,6 +149,7 @@ export default function OrganizationDetailScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>('proposals');
   const [leaving, setLeaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   // Admin proposal creation state
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -265,6 +266,46 @@ export default function OrganizationDetailScreen() {
               Alert.alert('Error', 'Failed to leave organization. Please try again.');
             } finally {
               setLeaving(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const canDeleteOrganization = () => {
+    if (!organization) return false;
+    if (organization.role !== 'admin') return false;
+    if (organization.id === 'demo-org-001') return false;
+    return true;
+  };
+
+  const handleDeleteOrganization = () => {
+    if (!organization || !canDeleteOrganization()) return;
+
+    Alert.alert(
+      'Delete Organization',
+      `Are you sure you want to permanently delete "${organization.name}"?\n\nThis cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+            setDeleting(true);
+            try {
+              const result = await organizationsApi.deleteOrganization(params.orgId);
+              if (result.error) {
+                Alert.alert('Error', result.error);
+                return;
+              }
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              router.back();
+            } catch (error) {
+              Alert.alert('Error', 'Failed to delete organization.');
+            } finally {
+              setDeleting(false);
             }
           },
         },
@@ -739,6 +780,33 @@ export default function OrganizationDetailScreen() {
                 </>
               )}
             </TouchableOpacity>
+
+            {/* Delete Organization - Only for admins, not for seed org */}
+            {canDeleteOrganization() && (
+              <>
+                <View style={[styles.aboutDivider, { backgroundColor: colors.border }]} />
+                <View style={[styles.dangerZone, { backgroundColor: `${colors.error}10`, borderColor: `${colors.error}30` }]}>
+                  <View style={styles.dangerZoneHeader}>
+                    <Ionicons name="warning-outline" size={18} color={colors.error} />
+                    <Text style={[styles.dangerZoneTitle, { color: colors.error }]}>Danger Zone</Text>
+                  </View>
+                  <TouchableOpacity
+                    style={[styles.deleteOrgButton, { backgroundColor: colors.error }]}
+                    onPress={handleDeleteOrganization}
+                    disabled={deleting}
+                  >
+                    {deleting ? (
+                      <ActivityIndicator size="small" color="#fff" />
+                    ) : (
+                      <>
+                        <Ionicons name="trash-outline" size={18} color="#fff" />
+                        <Text style={styles.deleteOrgButtonText}>Delete Organization</Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
           </Animated.View>
         )}
 
@@ -1466,6 +1534,37 @@ const styles = StyleSheet.create({
   },
   leaveButtonText: {
     ...TYPOGRAPHY.labelMedium,
+    fontWeight: '600',
+  },
+
+  // Danger Zone (for delete organization)
+  dangerZone: {
+    padding: SPACING.lg,
+    borderRadius: BORDER_RADIUS.lg,
+    borderWidth: 1,
+    marginTop: SPACING.lg,
+  },
+  dangerZoneHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.xs,
+    marginBottom: SPACING.md,
+  },
+  dangerZoneTitle: {
+    ...TYPOGRAPHY.labelMedium,
+    fontWeight: '600',
+  },
+  deleteOrgButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: SPACING.md,
+    borderRadius: BORDER_RADIUS.lg,
+    gap: SPACING.sm,
+  },
+  deleteOrgButtonText: {
+    ...TYPOGRAPHY.labelMedium,
+    color: '#fff',
     fontWeight: '600',
   },
 
