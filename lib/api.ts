@@ -380,7 +380,9 @@ export const organizationsApi = {
       const allKnownIds = [...seedIds, ...localIds];
       const filteredBackend = backendOrgs.filter(o => !allKnownIds.includes(o.id));
 
-      return { data: [...SEED_ORGANIZATIONS, ...localOrgs, ...filteredBackend], error: null };
+      // Ensure all backend orgs have admin role for demo account
+      const backendWithRole = filteredBackend.map(o => ({ ...o, role: 'admin' as const }));
+      return { data: [...SEED_ORGANIZATIONS, ...localOrgs, ...backendWithRole], error: null };
     }
 
     return { data: backendOrgs, error: result.error };
