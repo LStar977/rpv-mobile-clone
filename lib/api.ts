@@ -438,6 +438,40 @@ export const organizationsApi = {
     return apiRequest(`/api/organizations/${orgId}/leave`, { method: 'POST' });
   },
 
+  async deleteOrganization(orgId: string): Promise<ApiResponse<{ success: boolean }>> {
+    // Block deletion of protected seed organization
+    if (orgId === DEMO_ORGANIZATION_ID) {
+      return { data: null, error: 'This demonstration organization cannot be deleted.' };
+    }
+
+    // Handle demo account local organizations
+    if (isDemoAccount()) {
+      try {
+        const stored = await AsyncStorage.getItem(DEMO_ORGS_STORAGE_KEY);
+        if (stored) {
+          const localOrgs: Organization[] = JSON.parse(stored);
+          const filtered = localOrgs.filter(o => o.id !== orgId);
+          if (filtered.length < localOrgs.length) {
+            await AsyncStorage.setItem(DEMO_ORGS_STORAGE_KEY, JSON.stringify(filtered));
+            // Also clean up proposals for this org
+            const proposalsStored = await AsyncStorage.getItem(DEMO_PROPOSALS_STORAGE_KEY);
+            if (proposalsStored) {
+              const proposals = JSON.parse(proposalsStored);
+              const filteredProposals = proposals.filter((p: any) => p.organizationId !== orgId);
+              await AsyncStorage.setItem(DEMO_PROPOSALS_STORAGE_KEY, JSON.stringify(filteredProposals));
+            }
+            return { data: { success: true }, error: null };
+          }
+        }
+      } catch (e) {
+        console.error('Failed to delete local demo organization:', e);
+      }
+    }
+
+    // Call backend API for regular accounts or demo backend orgs
+    return apiRequest(`/api/organizations/${orgId}`, { method: 'DELETE' });
+  },
+
   async getOrganizationProposals(orgId: string): Promise<ApiResponse<OrganizationProposal[]>> {
     // For demo accounts, also check local storage for proposals
     if (isDemoAccount()) {
