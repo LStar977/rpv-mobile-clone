@@ -32,7 +32,7 @@ import Animated, {
   Easing,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useTheme, SPACING, RADIUS, TYPOGRAPHY, SHADOWS, EASING } from '../lib/theme';
+import { useTheme, SPACING, RADIUS, TYPOGRAPHY, SHADOWS, EASING, responsive } from '../lib/theme';
 import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { useAuthStore } from '../lib/auth';
@@ -914,7 +914,7 @@ const styles = StyleSheet.create({
     zIndex: -1,
   },
   brandName: {
-    fontSize: 48,
+    fontSize: responsive(36, 42, 48),
     fontWeight: '700',
     letterSpacing: -1.5,
     marginBottom: SPACING.md,
@@ -927,14 +927,16 @@ const styles = StyleSheet.create({
   },
   featurePills: {
     flexDirection: 'row',
-    gap: SPACING.md,
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: responsive(SPACING.sm, SPACING.md, SPACING.md),
     marginBottom: SPACING['3xl'],
   },
   featurePill: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: SPACING.sm,
-    paddingHorizontal: SPACING.lg,
+    paddingHorizontal: responsive(SPACING.md, SPACING.lg, SPACING.lg),
     paddingVertical: SPACING.sm,
     borderRadius: RADIUS.full,
     borderWidth: 1,
