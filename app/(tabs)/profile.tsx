@@ -13,7 +13,7 @@ import Animated, {
   withSpring,
 } from 'react-native-reanimated';
 import { useAuthStore } from '../../lib/auth';
-import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS, ThemePreference } from '../../lib/theme';
+import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS, ThemePreference, responsive } from '../../lib/theme';
 import { Button, TierBadge } from '../../components/ui';
 import { adminApi } from '../../lib/api';
 import type { UserTier } from '../../components/ui';
@@ -329,7 +329,7 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.lg,
   },
   avatarText: { fontSize: 36, fontWeight: '700' },
-  userName: { ...TYPOGRAPHY.headlineLarge, marginBottom: SPACING.xs },
+  userName: { ...TYPOGRAPHY.headlineLarge, fontSize: responsive(20, 22, 24), marginBottom: SPACING.xs },
   userEmail: { ...TYPOGRAPHY.bodyMedium, marginBottom: SPACING.sm },
   tierBadgeContainer: {
     marginBottom: SPACING.lg,

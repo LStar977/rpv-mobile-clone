@@ -27,7 +27,7 @@ import Animated, {
 import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuthStore } from '../../lib/auth';
-import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS } from '../../lib/theme';
+import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS, responsive } from '../../lib/theme';
 import { UpgradeModal } from '../../components/ui';
 import { useTutorialTarget } from '../../components/tutorial';
 
@@ -1339,7 +1339,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   gaugeScore: {
-    fontSize: 48,
+    fontSize: responsive(40, 44, 48),
     fontWeight: '700',
   },
   gaugeLabel: {

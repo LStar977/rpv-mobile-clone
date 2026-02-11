@@ -29,7 +29,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { router } from 'expo-router';
 
-import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS } from '../../lib/theme';
+import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS, responsive } from '../../lib/theme';
 import { useAuthStore } from '../../lib/auth';
 import { userApi, veriffApi } from '../../lib/api';
 import { Button } from '../../components/ui';
@@ -919,6 +919,7 @@ const styles = StyleSheet.create({
   },
   pageTitle: {
     ...TYPOGRAPHY.displaySmall,
+    fontSize: responsive(28, 32, 36),
   },
   pageSubtitle: {
     ...TYPOGRAPHY.bodyMedium,
@@ -1003,7 +1004,7 @@ const styles = StyleSheet.create({
   },
   idCardName: {
     color: '#fff',
-    fontSize: 20,
+    fontSize: responsive(18, 20, 20),
     fontWeight: '700',
     marginBottom: 4,
   },
@@ -1017,6 +1018,7 @@ const styles = StyleSheet.create({
   },
   idCardMeta: {
     flex: 1,
+    minWidth: 0,
   },
   idCardMetaLabel: {
     color: 'rgba(255,255,255,0.4)',

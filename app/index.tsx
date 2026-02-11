@@ -914,7 +914,7 @@ const styles = StyleSheet.create({
     zIndex: -1,
   },
   brandName: {
-    fontSize: responsive(36, 42, 48),
+    fontSize: responsive(32, 36, 48),
     fontWeight: '700',
     letterSpacing: -1.5,
     marginBottom: SPACING.md,
@@ -935,8 +935,8 @@ const styles = StyleSheet.create({
   featurePill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: SPACING.sm,
-    paddingHorizontal: responsive(SPACING.md, SPACING.lg, SPACING.lg),
+    gap: responsive(SPACING.xs, SPACING.sm, SPACING.sm),
+    paddingHorizontal: responsive(SPACING.sm, SPACING.md, SPACING.lg),
     paddingVertical: SPACING.sm,
     borderRadius: RADIUS.full,
     borderWidth: 1,

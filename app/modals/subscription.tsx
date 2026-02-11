@@ -5,7 +5,7 @@ import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { useAuthStore } from '../../lib/auth';
-import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS } from '../../lib/theme';
+import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS, responsive } from '../../lib/theme';
 import {
   fetchPremiumPaymentIntent,
   fetchPremiumCheckoutUrl,
@@ -497,6 +497,7 @@ const styles = StyleSheet.create({
   },
   heroTitle: {
     ...TYPOGRAPHY.headlineLarge,
+    fontSize: responsive(20, 22, 24),
     textAlign: 'center',
     marginBottom: SPACING.xs,
   },
@@ -553,6 +554,7 @@ const styles = StyleSheet.create({
   },
   tierPrice: {
     ...TYPOGRAPHY.displaySmall,
+    fontSize: responsive(28, 32, 36),
     fontWeight: '700',
   },
   tierPeriod: {

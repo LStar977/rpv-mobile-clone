@@ -44,7 +44,7 @@ import { router } from 'expo-router';
 import { proposalsApi, userApi, uploadsApi, limitsApi, Proposal, UsageLimits } from '../../lib/api';
 import { useAuthStore } from '../../lib/auth';
 import { shareProposal } from '../../lib/share';
-import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS, ANIMATION } from '../../lib/theme';
+import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS, ANIMATION, responsive } from '../../lib/theme';
 import { showVoteConfirmation } from '../../lib/notifications';
 import { VoteConfirmationOverlay, UpgradeModal } from '../../components/ui';
 import { checkForNewBadges } from '../../lib/badgeNotification';
@@ -2116,7 +2116,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: SPACING.md,
   },
-  headerTitle: { ...TYPOGRAPHY.displaySmall },
+  headerTitle: { ...TYPOGRAPHY.displaySmall, fontSize: responsive(28, 32, 36) },
   headerSubtitle: { ...TYPOGRAPHY.labelMedium, marginTop: 2 },
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm },
 
@@ -2847,7 +2847,7 @@ const styles = StyleSheet.create({
   swipeCardTitleLarge: {
     color: '#fff',
     ...TYPOGRAPHY.headlineMedium,
-    fontSize: 24,
+    fontSize: responsive(20, 22, 24),
     fontWeight: '700',
     marginBottom: SPACING.sm,
     textShadowColor: 'rgba(0,0,0,0.5)',
