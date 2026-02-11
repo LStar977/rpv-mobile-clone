@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { useTheme } from '../../lib/theme';
+import { useTheme, responsive } from '../../lib/theme';
 import { useAuthStore } from '../../lib/auth';
 
 const { width } = Dimensions.get('window');
@@ -187,7 +187,7 @@ const styles = StyleSheet.create({
   statsContainer: { marginHorizontal: 16, marginTop: 16, padding: 16, borderRadius: 16, borderWidth: 1 },
   statsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', marginBottom: 16 },
   statItem: { alignItems: 'center' },
-  statValue: { fontSize: 28, fontWeight: 'bold' },
+  statValue: { fontSize: responsive(24, 26, 28), fontWeight: 'bold' },
   statLabel: { fontSize: 12, marginTop: 4 },
   statDivider: { width: 1, height: 40 },
   progressBar: { height: 8, borderRadius: 4, overflow: 'hidden' },

@@ -18,7 +18,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { router } from 'expo-router';
 import { useAuthStore } from '../../lib/auth';
-import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS } from '../../lib/theme';
+import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS, responsive } from '../../lib/theme';
 import { analyticsApi, AnalyticsData, ProposalAnalytics } from '../../lib/api';
 import { FeaturedStat, StatsGrid, ProgressStat, UpgradeModal } from '../../components/ui';
 
@@ -564,6 +564,7 @@ const styles = StyleSheet.create({
   },
   premiumTitle: {
     ...TYPOGRAPHY.displaySmall,
+    fontSize: responsive(28, 32, 36),
     fontWeight: '700',
     marginBottom: SPACING.xs,
   },
@@ -636,6 +637,7 @@ const styles = StyleSheet.create({
   },
   priceAmount: {
     ...TYPOGRAPHY.displaySmall,
+    fontSize: responsive(28, 32, 36),
     color: '#000',
     fontWeight: '700',
   },

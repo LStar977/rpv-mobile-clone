@@ -21,7 +21,7 @@ import Animated, {
   interpolate,
   Extrapolation,
 } from 'react-native-reanimated';
-import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS, ANIMATION } from '../../lib/theme';
+import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS, ANIMATION, responsive } from '../../lib/theme';
 import { useAuthStore } from '../../lib/auth';
 import { proposalsApi, userApi } from '../../lib/api';
 import { Button, Badge, CountBadge, SectionHeader } from '../../components/ui';
@@ -1052,6 +1052,7 @@ const styles = StyleSheet.create({
   },
   welcomeName: {
     ...TYPOGRAPHY.displaySmall,
+    fontSize: responsive(28, 32, 36),
     marginTop: SPACING.xxs,
   },
   welcomeActions: {
@@ -1225,7 +1226,8 @@ const styles = StyleSheet.create({
   },
   statCard: {
     flex: 1,
-    padding: SPACING.lg,
+    minWidth: 0,
+    padding: responsive(SPACING.md, SPACING.lg, SPACING.lg),
     borderRadius: BORDER_RADIUS.xl,
     borderWidth: 1,
     alignItems: 'center',
@@ -1241,6 +1243,7 @@ const styles = StyleSheet.create({
   },
   statValue: {
     ...TYPOGRAPHY.headlineMedium,
+    fontSize: responsive(18, 20, 20),
     fontWeight: '700',
   },
   statLabel: {
