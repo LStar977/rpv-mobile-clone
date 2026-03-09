@@ -1,4 +1,5 @@
 import { Alert, Platform } from 'react-native';
+import { router } from 'expo-router';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://representportal.com';
 
@@ -288,19 +289,39 @@ export function showPaymentError(message: string) {
 }
 
 /**
- * Show payment success alert
+ * Show payment success - navigate to receipt modal
  */
-export function showPaymentSuccess(type: 'verification' | 'premium') {
-  const messages = {
-    verification: {
-      title: 'Verification Payment Complete',
-      message: 'Your payment was successful! You can now proceed with identity verification.',
-    },
-    premium: {
-      title: 'Welcome to Premium!',
-      message: 'Your subscription is now active. Enjoy unlimited access to all features!',
-    },
+export function showPaymentSuccess(
+  type: 'verification' | 'premium' | 'organization',
+  options?: {
+    amount?: string;
+    transactionId?: string;
+    organizationName?: string;
+    tier?: string;
+  }
+) {
+  const amounts = {
+    verification: '$4.99',
+    premium: '$7.99',
+    organization: options?.tier === 'enterprise' ? '$99.00' : options?.tier === 'professional' ? '$49.00' : '$29.00',
   };
 
-  Alert.alert(messages[type].title, messages[type].message, [{ text: 'OK' }]);
+  router.push({
+    pathname: '/modals/receipt',
+    params: {
+      type,
+      amount: options?.amount || amounts[type],
+      transactionId: options?.transactionId || `TXN-${Date.now().toString(36).toUpperCase()}`,
+      date: new Date().toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      }),
+      paymentMethod: Platform.OS === 'ios' ? 'Apple Pay' : 'Card',
+      organizationName: options?.organizationName,
+      tier: options?.tier,
+    },
+  });
 }

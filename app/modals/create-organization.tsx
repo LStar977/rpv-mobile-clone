@@ -21,7 +21,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { useAuthStore } from '../../lib/auth';
 import { organizationsApi, uploadsApi } from '../../lib/api';
 import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS } from '../../lib/theme';
-import { showPaymentError } from '../../lib/stripe';
+import { showPaymentError, showPaymentSuccess } from '../../lib/stripe';
 import { processOrganizationPayment } from '../../lib/payment';
 
 type Step = 'details' | 'tier' | 'payment';
@@ -350,21 +350,12 @@ export default function CreateOrganizationScreen() {
       if (result.success) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
-        Alert.alert(
-          'Organization Created!',
-          `${name} has been created successfully. You are now the admin.`,
-          [
-            {
-              text: 'View Organization',
-              onPress: () => {
-                router.replace({
-                  pathname: '/modals/organization-detail',
-                  params: { orgId: organizationId, orgName: name, orgRole: 'admin' },
-                });
-              },
-            },
-          ]
-        );
+        showPaymentSuccess('organization', {
+          amount: ORG_TIERS[selectedTier].price + '/mo',
+          organizationName: name,
+          tier: ORG_TIERS[selectedTier].name,
+        });
+        // Receipt modal will handle navigation
       } else if (result.cancelled) {
         Alert.alert(
           'Payment Cancelled',

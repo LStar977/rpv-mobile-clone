@@ -21,6 +21,7 @@ interface AuthState {
   isLoading: boolean;
   isAuthenticated: boolean;
   login: (provider: 'google' | 'apple', idToken: string, userData?: Partial<User>) => Promise<boolean>;
+  emailLogin: (email: string, password: string, name?: string, isSignup?: boolean) => Promise<{ success: boolean; error?: string }>;
   demoLogin: () => Promise<boolean>;
   logout: () => Promise<void>;
   deleteAccount: () => Promise<boolean>;
@@ -78,6 +79,57 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       console.error('Login error:', error);
       set({ isLoading: false });
       return false;
+    }
+  },
+
+  emailLogin: async (email: string, password: string, name?: string, isSignup?: boolean) => {
+    try {
+      set({ isLoading: true });
+
+      const endpoint = isSignup ? '/api/auth/mobile/email/signup' : '/api/auth/mobile/email/login';
+      const body: Record<string, string> = { email, password };
+      if (isSignup && name) {
+        body.name = name;
+      }
+
+      const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
+      });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        console.error('Email auth failed:', error);
+        set({ isLoading: false });
+        return {
+          success: false,
+          error: error.message || error.error || 'Authentication failed. Please try again.'
+        };
+      }
+
+      const data = await response.json();
+
+      await SecureStore.setItemAsync(TOKEN_KEY, data.token);
+      await SecureStore.setItemAsync(USER_KEY, JSON.stringify(data.user));
+
+      set({
+        user: data.user,
+        token: data.token,
+        isAuthenticated: true,
+        isLoading: false,
+      });
+
+      return { success: true };
+    } catch (error) {
+      console.error('Email auth error:', error);
+      set({ isLoading: false });
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Network error. Please check your connection.'
+      };
     }
   },
 

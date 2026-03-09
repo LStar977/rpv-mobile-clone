@@ -29,7 +29,7 @@ export default function VerificationPaymentScreen() {
 
       if (result.success) {
         showPaymentSuccess('verification');
-        router.replace('/modals/veriff');
+        // Receipt modal will navigate to veriff
       } else if (result.cancelled) {
         // User cancelled - do nothing
       } else {
