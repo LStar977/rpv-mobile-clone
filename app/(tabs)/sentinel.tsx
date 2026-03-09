@@ -36,6 +36,7 @@ const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
 const API_URL = 'https://representportal.com';
 const STORAGE_KEY = 'sentinel_analysis_history';
+const AI_CONSENT_KEY = 'sentinel_ai_consent';
 const ISSUE_TYPES = ['Law', 'Policy', 'Regulation', 'Executive Order', 'Budget Decision', 'Other'];
 
 // Sample demo analysis for non-premium users to preview the UI
@@ -574,9 +575,33 @@ export default function SentinelScreen() {
   const [proposalCreated, setProposalCreated] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
+  // AI consent state
+  const [aiConsented, setAiConsented] = useState(false);
+  const [consentLoading, setConsentLoading] = useState(true);
+
   // Tutorial target refs
   const sentinelHeaderRef = useTutorialTarget('sentinel-header');
   const sentinelFormRef = useTutorialTarget('sentinel-form');
+
+  // Check AI consent
+  useEffect(() => {
+    const checkConsent = async () => {
+      try {
+        const consent = await AsyncStorage.getItem(AI_CONSENT_KEY);
+        setAiConsented(consent === 'true');
+      } catch (error) {
+        console.error('Error checking AI consent:', error);
+      } finally {
+        setConsentLoading(false);
+      }
+    };
+    checkConsent();
+  }, []);
+
+  const handleAcceptConsent = async () => {
+    await AsyncStorage.setItem(AI_CONSENT_KEY, 'true');
+    setAiConsented(true);
+  };
 
   // Load history from storage
   useEffect(() => {
@@ -758,14 +783,56 @@ export default function SentinelScreen() {
     }
   };
 
-  // Loading state
-  if (loadingSubscription) {
+  // Loading state (consent or subscription)
+  if (consentLoading || loadingSubscription) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.gold} />
           <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading Sentinel...</Text>
         </View>
+      </View>
+    );
+  }
+
+  // Show AI Consent Gate
+  if (!aiConsented) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <ScrollView contentContainerStyle={[styles.consentContainer, { paddingTop: insets.top + 40 }]}>
+          <View style={[styles.consentIconBg, { backgroundColor: `${colors.gold}15` }]}>
+            <Ionicons name="shield-checkmark" size={48} color={colors.gold} />
+          </View>
+          <Text style={[styles.consentTitle, { color: colors.text }]}>AI Data Disclosure</Text>
+          <Text style={[styles.consentBody, { color: colors.textSecondary }]}>
+            When you use Sentinel, the title, text, and category you enter are sent to our servers and processed using{' '}
+            <Text style={{ fontWeight: '700', color: colors.text }}>OpenAI</Text> to generate your governance analysis.
+          </Text>
+          <Text style={[styles.consentBody, { color: colors.textSecondary }]}>
+            This data is used solely for analysis and is not sold or shared with third parties. Your analysis history is stored locally on your device.
+          </Text>
+          <View style={[styles.consentBullets, { backgroundColor: colors.surfaceHighlight, borderColor: colors.border }]}>
+            <View style={styles.consentBulletRow}>
+              <Ionicons name="document-text-outline" size={18} color={colors.gold} />
+              <Text style={[styles.consentBulletText, { color: colors.text }]}>Data sent: Title, text, and issue type</Text>
+            </View>
+            <View style={styles.consentBulletRow}>
+              <Ionicons name="server-outline" size={18} color={colors.gold} />
+              <Text style={[styles.consentBulletText, { color: colors.text }]}>Processed by: OpenAI</Text>
+            </View>
+            <View style={styles.consentBulletRow}>
+              <Ionicons name="eye-off-outline" size={18} color={colors.gold} />
+              <Text style={[styles.consentBulletText, { color: colors.text }]}>Not sold or shared with third parties</Text>
+            </View>
+          </View>
+          <TouchableOpacity
+            style={[styles.consentAcceptButton, { backgroundColor: colors.gold }]}
+            onPress={handleAcceptConsent}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.consentAcceptText}>I Understand & Agree</Text>
+          </TouchableOpacity>
+        </ScrollView>
       </View>
     );
   }
@@ -947,6 +1014,9 @@ export default function SentinelScreen() {
               </>
             )}
           </TouchableOpacity>
+          <Text style={[styles.aiDisclosure, { color: colors.textTertiary }]}>
+            Your text is processed by OpenAI. See our Privacy Policy.
+          </Text>
           </Animated.View>
         </View>
 
@@ -1583,5 +1653,64 @@ const styles = StyleSheet.create({
 
   bottomPadding: {
     height: 100,
+  },
+
+  // AI Consent
+  consentContainer: {
+    paddingHorizontal: SPACING.xl,
+    alignItems: 'center',
+  },
+  consentIconBg: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: SPACING.xl,
+  },
+  consentTitle: {
+    ...TYPOGRAPHY.headlineLarge,
+    textAlign: 'center',
+    marginBottom: SPACING.lg,
+  },
+  consentBody: {
+    ...TYPOGRAPHY.bodyMedium,
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: SPACING.md,
+  },
+  consentBullets: {
+    width: '100%',
+    padding: SPACING.lg,
+    borderRadius: BORDER_RADIUS.xl,
+    borderWidth: 1,
+    marginTop: SPACING.md,
+    marginBottom: SPACING.xl,
+    gap: SPACING.md,
+  },
+  consentBulletRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.md,
+  },
+  consentBulletText: {
+    ...TYPOGRAPHY.bodyMedium,
+    flex: 1,
+  },
+  consentAcceptButton: {
+    width: '100%',
+    paddingVertical: SPACING.lg,
+    borderRadius: BORDER_RADIUS.full,
+    alignItems: 'center',
+  },
+  consentAcceptText: {
+    ...TYPOGRAPHY.labelLarge,
+    color: '#000',
+    fontWeight: '600',
+  },
+  aiDisclosure: {
+    ...TYPOGRAPHY.labelSmall,
+    textAlign: 'center',
+    marginTop: SPACING.sm,
   },
 });

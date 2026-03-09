@@ -1,8 +1,10 @@
+import { useEffect } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { View } from 'react-native';
 import { ThemeProvider, useTheme } from '../lib/theme';
 import { STRIPE_PUBLISHABLE_KEY, MERCHANT_IDENTIFIER } from '../lib/stripe';
+import { initIAP, endIAP } from '../lib/iap';
 import { TutorialOverlay } from '../components/tutorial';
 
 // Conditionally import StripeProvider to handle missing native module
@@ -15,6 +17,11 @@ try {
 
 function ThemedStack() {
   const { colors, isDark } = useTheme();
+
+  useEffect(() => {
+    initIAP();
+    return () => endIAP();
+  }, []);
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>

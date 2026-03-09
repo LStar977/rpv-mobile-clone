@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, Switch, useColorScheme } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Switch, useColorScheme, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
 import { isBiometricAvailable, isBiometricEnabled, setBiometricEnabled as saveBiometricEnabled, getBiometricType } from '../../lib/biometrics';
+import { useAuthStore } from '../../lib/auth';
 
 export default function PrivacyScreen() {
   const colorScheme = useColorScheme();
@@ -9,6 +11,8 @@ export default function PrivacyScreen() {
   const [biometricAvailable, setBiometricAvailable] = useState(false);
   const [biometricType, setBiometricTypeState] = useState('Biometric');
   const [biometricEnabled, setBiometricEnabled] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const { deleteAccount } = useAuthStore();
 
   const colors = {
     background: isDark ? '#0a0a0a' : '#ffffff',
@@ -91,6 +95,63 @@ export default function PrivacyScreen() {
             Your identity verification data is processed by Veriff and not stored on our servers.
           </Text>
         </View>
+
+        {/* Delete Account */}
+        <View style={[styles.card, { backgroundColor: colors.cardBg, borderColor: '#ff3b3020' }, styles.deleteCard]}>
+          <View style={styles.row}>
+            <Ionicons name="trash-outline" size={24} color="#ff3b30" />
+            <View style={styles.info}>
+              <Text style={[styles.cardTitle, { color: '#ff3b30' }]}>Delete Account</Text>
+              <Text style={[styles.cardSubtitle, { color: colors.textSecondary }]}>Permanently delete your account and all data</Text>
+            </View>
+          </View>
+          <TouchableOpacity
+            style={styles.deleteButton}
+            onPress={() => {
+              Alert.alert(
+                'Delete Account',
+                'Are you sure you want to permanently delete your account? This action cannot be undone. All your data, voting history, and subscriptions will be removed.',
+                [
+                  { text: 'Cancel', style: 'cancel' },
+                  {
+                    text: 'Delete My Account',
+                    style: 'destructive',
+                    onPress: () => {
+                      Alert.alert(
+                        'Final Confirmation',
+                        'This is your last chance. Your account will be permanently deleted.',
+                        [
+                          { text: 'Cancel', style: 'cancel' },
+                          {
+                            text: 'Yes, Delete',
+                            style: 'destructive',
+                            onPress: async () => {
+                              setDeleting(true);
+                              const success = await deleteAccount();
+                              setDeleting(false);
+                              if (success) {
+                                router.replace('/');
+                              } else {
+                                Alert.alert('Error', 'Failed to delete account. Please try again or contact support.');
+                              }
+                            },
+                          },
+                        ]
+                      );
+                    },
+                  },
+                ]
+              );
+            }}
+            disabled={deleting}
+          >
+            {deleting ? (
+              <ActivityIndicator size="small" color="#ff3b30" />
+            ) : (
+              <Text style={styles.deleteButtonText}>Delete Account</Text>
+            )}
+          </TouchableOpacity>
+        </View>
       </ScrollView>
     </View>
   );
@@ -106,4 +167,7 @@ const styles = StyleSheet.create({
   cardSubtitle: { fontSize: 13, marginTop: 2 },
   infoBox: { flexDirection: 'row', alignItems: 'flex-start', borderRadius: 10, padding: 14, marginTop: 8, gap: 10 },
   infoBoxText: { fontSize: 13, flex: 1, lineHeight: 18 },
+  deleteCard: { marginTop: 24 },
+  deleteButton: { marginTop: 12, alignItems: 'center', paddingVertical: 12, borderRadius: 10, borderWidth: 1, borderColor: '#ff3b30' },
+  deleteButtonText: { color: '#ff3b30', fontSize: 15, fontWeight: '600' },
 });

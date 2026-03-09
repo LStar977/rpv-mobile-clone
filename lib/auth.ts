@@ -23,6 +23,7 @@ interface AuthState {
   login: (provider: 'google' | 'apple', idToken: string, userData?: Partial<User>) => Promise<boolean>;
   demoLogin: () => Promise<boolean>;
   logout: () => Promise<void>;
+  deleteAccount: () => Promise<boolean>;
   checkAuth: () => Promise<void>;
   setLoading: (loading: boolean) => void;
 }
@@ -126,7 +127,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     try {
       await SecureStore.deleteItemAsync(TOKEN_KEY);
       await SecureStore.deleteItemAsync(USER_KEY);
-      
+
       set({
         user: null,
         token: null,
@@ -134,6 +135,39 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       });
     } catch (error) {
       console.error('Logout error:', error);
+    }
+  },
+
+  deleteAccount: async () => {
+    try {
+      const token = get().token;
+      if (!token) return false;
+
+      const response = await fetch(`${API_BASE_URL}/api/auth/account`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        console.error('Delete account failed:', await response.json().catch(() => ({})));
+        return false;
+      }
+
+      await SecureStore.deleteItemAsync(TOKEN_KEY);
+      await SecureStore.deleteItemAsync(USER_KEY);
+
+      set({
+        user: null,
+        token: null,
+        isAuthenticated: false,
+      });
+
+      return true;
+    } catch (error) {
+      console.error('Delete account error:', error);
+      return false;
     }
   },
 

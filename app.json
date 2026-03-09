@@ -51,7 +51,8 @@
           "merchantIdentifier": "merchant.com.representwallet.app",
           "enableGooglePay": true
         }
-      ]
+      ],
+      "react-native-iap"
     ],
     "extra": {
       "router": {
