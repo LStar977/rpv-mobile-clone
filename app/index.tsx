@@ -1238,7 +1238,7 @@ export default function AuthScreen() {
               onPress={() => setView('signup')}
             />
             <Button
-              title="I have an account"
+              title="Sign In"
               onPress={() => setView('login')}
               variant="ghost"
               size="lg"
