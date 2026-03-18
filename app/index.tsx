@@ -1214,30 +1214,9 @@ export default function AuthScreen() {
             entering={FadeInDown.delay(400).duration(600)}
             style={[styles.tagline, { color: colors.textSecondary }]}
           >
-            Your voice in governance.{'\n'}Verified. Secure. Powerful.
+            Democracy in your pocket.
           </Animated.Text>
 
-          {/* Feature cards */}
-          <View style={styles.featureCards}>
-            <FeatureCard
-              icon="shield-checkmark"
-              label="Identity"
-              tagline="Verified & Secure"
-              delay={500}
-            />
-            <FeatureCard
-              icon="checkmark-done-circle"
-              label="Vote"
-              tagline="Your Voice Counts"
-              delay={650}
-            />
-            <FeatureCard
-              icon="sparkles"
-              label="AI Analysis"
-              tagline="Smart Insights"
-              delay={800}
-            />
-          </View>
 
           {/* Biometric login (if available) */}
           {biometricAvailable && (
