@@ -708,27 +708,104 @@ function PulsingLogoGlow({ color }: { color: string }) {
   );
 }
 
-// Premium Feature Pill Component
-function FeaturePill({
+// Premium Feature Card Component
+function FeatureCard({
   icon,
   label,
+  tagline,
   delay,
   IconComponent = Ionicons,
 }: {
   icon: string;
   label: string;
+  tagline: string;
   delay: number;
   IconComponent?: any;
 }) {
   const { colors } = useTheme();
+  const floatY = useSharedValue(0);
+  const iconGlow = useSharedValue(0.3);
+  const iconScale = useSharedValue(1);
+  const borderOpacity = useSharedValue(0.3);
+
+  useEffect(() => {
+    // Gentle floating animation
+    floatY.value = withDelay(delay, withRepeat(
+      withSequence(
+        withTiming(-6, { duration: 2000, easing: Easing.inOut(Easing.ease) }),
+        withTiming(6, { duration: 2000, easing: Easing.inOut(Easing.ease) })
+      ),
+      -1,
+      true
+    ));
+    // Icon glow pulse
+    iconGlow.value = withDelay(delay, withRepeat(
+      withSequence(
+        withTiming(0.6, { duration: 1500, easing: Easing.inOut(Easing.ease) }),
+        withTiming(0.3, { duration: 1500, easing: Easing.inOut(Easing.ease) })
+      ),
+      -1,
+      true
+    ));
+    // Subtle icon scale
+    iconScale.value = withDelay(delay, withRepeat(
+      withSequence(
+        withTiming(1.1, { duration: 1500, easing: Easing.inOut(Easing.ease) }),
+        withTiming(1, { duration: 1500, easing: Easing.inOut(Easing.ease) })
+      ),
+      -1,
+      true
+    ));
+    // Border glow animation
+    borderOpacity.value = withDelay(delay, withRepeat(
+      withSequence(
+        withTiming(0.6, { duration: 2000, easing: Easing.inOut(Easing.ease) }),
+        withTiming(0.2, { duration: 2000, easing: Easing.inOut(Easing.ease) })
+      ),
+      -1,
+      true
+    ));
+  }, []);
+
+  const floatStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: floatY.value }],
+  }));
+
+  const glowStyle = useAnimatedStyle(() => ({
+    opacity: iconGlow.value,
+  }));
+
+  const iconAnimStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: iconScale.value }],
+  }));
+
+  const borderStyle = useAnimatedStyle(() => ({
+    opacity: borderOpacity.value,
+  }));
 
   return (
     <Animated.View
-      entering={FadeInUp.delay(delay).duration(500).springify()}
-      style={[styles.featurePill, { backgroundColor: colors.surface, borderColor: colors.border }]}
+      entering={FadeInUp.delay(delay).duration(600).springify()}
+      style={[floatStyle]}
     >
-      <IconComponent name={icon} size={16} color={colors.gold} />
-      <Text style={[styles.featurePillText, { color: colors.textSecondary }]}>{label}</Text>
+      <View style={[styles.featureCard, { backgroundColor: colors.surface }]}>
+        {/* Animated border glow */}
+        <Animated.View style={[styles.featureCardBorderGlow, { borderColor: colors.gold }, borderStyle]} />
+
+        {/* Icon with glow */}
+        <View style={styles.featureCardIconContainer}>
+          <Animated.View style={[styles.featureCardIconGlow, { backgroundColor: colors.gold }, glowStyle]} />
+          <Animated.View style={[styles.featureCardIconWrapper, { backgroundColor: colors.goldSurface }, iconAnimStyle]}>
+            <IconComponent name={icon} size={24} color={colors.gold} />
+          </Animated.View>
+        </View>
+
+        {/* Label */}
+        <Text style={[styles.featureCardLabel, { color: colors.text }]}>{label}</Text>
+
+        {/* Tagline */}
+        <Text style={[styles.featureCardTagline, { color: colors.textTertiary }]}>{tagline}</Text>
+      </View>
     </Animated.View>
   );
 }
@@ -1140,11 +1217,26 @@ export default function AuthScreen() {
             Your voice in governance.{'\n'}Verified. Secure. Powerful.
           </Animated.Text>
 
-          {/* Feature pills */}
-          <View style={styles.featurePills}>
-            <FeaturePill icon="shield-checkmark" label="Identity" delay={500} />
-            <FeaturePill icon="checkmark-done-circle" label="Vote" delay={600} />
-            <FeaturePill icon="sparkles" label="AI Analysis" delay={700} />
+          {/* Feature cards */}
+          <View style={styles.featureCards}>
+            <FeatureCard
+              icon="shield-checkmark"
+              label="Identity"
+              tagline="Verified & Secure"
+              delay={500}
+            />
+            <FeatureCard
+              icon="checkmark-done-circle"
+              label="Vote"
+              tagline="Your Voice Counts"
+              delay={650}
+            />
+            <FeatureCard
+              icon="sparkles"
+              label="AI Analysis"
+              tagline="Smart Insights"
+              delay={800}
+            />
           </View>
 
           {/* Biometric login (if available) */}
@@ -1450,6 +1542,60 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.sm,
     borderRadius: RADIUS.full,
     borderWidth: 1,
+  },
+  // Feature Cards
+  featureCards: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: SPACING.md,
+    marginBottom: SPACING['3xl'],
+    paddingHorizontal: SPACING.sm,
+  },
+  featureCard: {
+    alignItems: 'center',
+    paddingVertical: SPACING.lg,
+    paddingHorizontal: SPACING.md,
+    borderRadius: RADIUS.xl,
+    width: responsive(95, 105, 115),
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  featureCardBorderGlow: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: RADIUS.xl,
+    borderWidth: 1.5,
+  },
+  featureCardIconContainer: {
+    position: 'relative',
+    marginBottom: SPACING.sm,
+  },
+  featureCardIconGlow: {
+    position: 'absolute',
+    top: -8,
+    left: -8,
+    right: -8,
+    bottom: -8,
+    borderRadius: 30,
+  },
+  featureCardIconWrapper: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  featureCardLabel: {
+    ...TYPOGRAPHY.label,
+    marginBottom: SPACING.xs,
+    textAlign: 'center',
+  },
+  featureCardTagline: {
+    ...TYPOGRAPHY.captionSmall,
+    textAlign: 'center',
   },
   featurePillText: {
     ...TYPOGRAPHY.labelSmall,
