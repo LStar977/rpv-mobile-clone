@@ -7,7 +7,7 @@ export default function ModalsLayout() {
     <Stack screenOptions={{ headerShown: false, presentation: 'modal', contentStyle: { backgroundColor: colors.background } }}>
       <Stack.Screen name="veriff" />
       <Stack.Screen name="subscription" />
-      <Stack.Screen name="wallet" />
+      <Stack.Screen name="receipt" />
       <Stack.Screen name="badges" />
       <Stack.Screen name="voting-history" />
       <Stack.Screen name="privacy" />

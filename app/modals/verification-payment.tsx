@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Linking, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Linking, Alert, Platform } from 'react-native';
 import { useState, useEffect } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -6,15 +6,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { useAuthStore } from '../../lib/auth';
 import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS } from '../../lib/theme';
-import {
-  fetchVerificationPaymentIntent,
-  fetchVerificationCheckoutUrl,
-  processPayment,
-  showPaymentError,
-  showPaymentSuccess,
-  isApplePaySupported,
-  isGooglePaySupported,
-} from '../../lib/stripe';
+import { showPaymentError, showPaymentSuccess } from '../../lib/stripe';
+import { processVerificationPayment } from '../../lib/payment';
 
 const VERIFICATION_BENEFITS = [
   { icon: 'checkmark-circle', text: 'Vote on all proposals (global + geo-restricted)' },
@@ -28,60 +21,22 @@ export default function VerificationPaymentScreen() {
   const { colors } = useTheme();
   const { token } = useAuthStore();
   const [loading, setLoading] = useState(false);
-  const [applePayAvailable, setApplePayAvailable] = useState(false);
-  const [googlePayAvailable, setGooglePayAvailable] = useState(false);
-
-  useEffect(() => {
-    // Check for available payment methods
-    const checkPaymentMethods = async () => {
-      const [applePay, googlePay] = await Promise.all([
-        isApplePaySupported(),
-        isGooglePaySupported(),
-      ]);
-      setApplePayAvailable(applePay);
-      setGooglePayAvailable(googlePay);
-    };
-    checkPaymentMethods();
-  }, []);
 
   const handlePayment = async () => {
     setLoading(true);
     try {
-      // Try native Payment Sheet first
-      const paymentIntent = await fetchVerificationPaymentIntent(token);
+      const result = await processVerificationPayment(token);
 
-      // If backend returns clientSecret, use native Payment Sheet
-      if (paymentIntent.clientSecret) {
-        const result = await processPayment({
-          clientSecret: paymentIntent.clientSecret,
-          ephemeralKey: paymentIntent.ephemeralKey,
-          customerId: paymentIntent.customerId,
-          merchantDisplayName: 'Represent Wallet',
-        });
-
-        if (result.success) {
-          showPaymentSuccess('verification');
-          // Navigate to Veriff verification after successful payment
-          router.replace('/modals/veriff');
-        } else if (result.cancelled) {
-          // User cancelled - do nothing
-        } else {
-          showPaymentError(result.error || 'Payment failed');
-        }
-      } else if (paymentIntent.url) {
-        // Fallback to web checkout if backend returns URL instead
-        await Linking.openURL(paymentIntent.url);
-        router.back();
+      if (result.success) {
+        showPaymentSuccess('verification');
+        // Receipt modal will navigate to veriff
+      } else if (result.cancelled) {
+        // User cancelled - do nothing
+      } else {
+        showPaymentError(result.error || 'Payment failed');
       }
     } catch (error: any) {
-      // If native payment fails, try web checkout as fallback
-      try {
-        const url = await fetchVerificationCheckoutUrl(token);
-        await Linking.openURL(url);
-        router.back();
-      } catch (fallbackError: any) {
-        Alert.alert('Error', fallbackError.message || 'Failed to start payment. Please try again.');
-      }
+      Alert.alert('Error', error.message || 'Failed to start payment. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -205,18 +160,8 @@ export default function VerificationPaymentScreen() {
         </TouchableOpacity>
         <View style={styles.paymentMethodsRow}>
           <Text style={[styles.ctaDisclaimer, { color: colors.textTertiary }]}>
-            Secure payment via Stripe
+            {Platform.OS === 'ios' ? 'Secure in-app purchase' : 'Secure payment via Stripe'}
           </Text>
-          {(applePayAvailable || googlePayAvailable) && (
-            <View style={styles.paymentIcons}>
-              {applePayAvailable && (
-                <Ionicons name="logo-apple" size={16} color={colors.textTertiary} />
-              )}
-              {googlePayAvailable && (
-                <Ionicons name="logo-google" size={16} color={colors.textTertiary} />
-              )}
-            </View>
-          )}
         </View>
       </View>
     </View>

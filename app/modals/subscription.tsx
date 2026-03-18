@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Linking, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Linking, Alert, Platform } from 'react-native';
 import { useState, useEffect } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -6,15 +6,9 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { useAuthStore } from '../../lib/auth';
 import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS, responsive } from '../../lib/theme';
-import {
-  fetchPremiumPaymentIntent,
-  fetchPremiumCheckoutUrl,
-  processPayment,
-  showPaymentError,
-  showPaymentSuccess,
-  isApplePaySupported,
-  isGooglePaySupported,
-} from '../../lib/stripe';
+import { showPaymentError, showPaymentSuccess } from '../../lib/stripe';
+import { processPremiumPayment } from '../../lib/payment';
+import { restorePurchases } from '../../lib/iap';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://representportal.com';
 
@@ -128,39 +122,37 @@ export default function SubscriptionScreen() {
   const handleSubscribePremium = async () => {
     setActionLoading('premium');
     try {
-      // Try native Payment Sheet first
-      const paymentIntent = await fetchPremiumPaymentIntent(token);
+      const result = await processPremiumPayment(token);
 
-      // If backend returns clientSecret, use native Payment Sheet
-      if (paymentIntent.clientSecret) {
-        const result = await processPayment({
-          clientSecret: paymentIntent.clientSecret,
-          ephemeralKey: paymentIntent.ephemeralKey,
-          customerId: paymentIntent.customerId,
-          merchantDisplayName: 'Represent Wallet',
-        });
-
-        if (result.success) {
-          showPaymentSuccess('premium');
-          // Refresh subscription data
-          fetchData();
-        } else if (result.cancelled) {
-          // User cancelled - do nothing
-        } else {
-          showPaymentError(result.error || 'Payment failed');
-        }
-      } else if (paymentIntent.url) {
-        // Fallback to web checkout if backend returns URL instead
-        await Linking.openURL(paymentIntent.url);
+      if (result.success) {
+        showPaymentSuccess('premium');
+        fetchData();
+      } else if (result.cancelled) {
+        // User cancelled - do nothing
+      } else {
+        showPaymentError(result.error || 'Payment failed');
       }
     } catch (error: any) {
-      // If native payment fails, try web checkout as fallback
-      try {
-        const url = await fetchPremiumCheckoutUrl(token);
-        await Linking.openURL(url);
-      } catch (fallbackError: any) {
-        Alert.alert('Error', fallbackError.message || 'Failed to start checkout');
+      Alert.alert('Error', error.message || 'Failed to start checkout');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleRestorePurchases = async () => {
+    setActionLoading('restore');
+    try {
+      const result = await restorePurchases(token);
+      if (result.restored) {
+        Alert.alert('Purchases Restored', 'Your previous purchases have been restored successfully.');
+        fetchData();
+      } else if (result.error) {
+        Alert.alert('Error', result.error);
+      } else {
+        Alert.alert('No Purchases Found', 'No previous purchases were found to restore.');
       }
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to restore purchases');
     } finally {
       setActionLoading(null);
     }
@@ -409,6 +401,25 @@ export default function SubscriptionScreen() {
         {renderTierCard('premium', 300, true)}
         {renderTierCard('organization', 400)}
 
+        {/* Restore Purchases (iOS only) */}
+        {Platform.OS === 'ios' && (
+          <Animated.View entering={FadeInUp.delay(450).duration(400)}>
+            <TouchableOpacity
+              onPress={handleRestorePurchases}
+              disabled={actionLoading !== null}
+              style={styles.restoreButton}
+            >
+              {actionLoading === 'restore' ? (
+                <ActivityIndicator size="small" color={colors.textSecondary} />
+              ) : (
+                <Text style={[styles.restoreText, { color: colors.textSecondary }]}>
+                  Restore Purchases
+                </Text>
+              )}
+            </TouchableOpacity>
+          </Animated.View>
+        )}
+
         {/* FAQ Section */}
         <Animated.View
           entering={FadeInUp.delay(500).duration(400)}
@@ -615,6 +626,15 @@ const styles = StyleSheet.create({
   outlineButtonText: {
     ...TYPOGRAPHY.labelMedium,
     fontWeight: '600',
+  },
+  restoreButton: {
+    alignItems: 'center',
+    paddingVertical: SPACING.md,
+    marginBottom: SPACING.md,
+  },
+  restoreText: {
+    ...TYPOGRAPHY.labelMedium,
+    fontWeight: '500',
   },
   faqSection: {
     borderRadius: BORDER_RADIUS.xxl,

@@ -388,7 +388,7 @@ export default function AuthScreen() {
   const [demoLoading, setDemoLoading] = useState(false);
   const demoTapCount = useRef(0);
   const demoTapTimeout = useRef<NodeJS.Timeout | null>(null);
-  const { login, demoLogin, isAuthenticated, checkAuth } = useAuthStore();
+  const { login, emailLogin, demoLogin, isAuthenticated, checkAuth } = useAuthStore();
 
   // Animations
   const logoScale = useSharedValue(0.8);
@@ -524,7 +524,7 @@ export default function AuthScreen() {
     }
   };
 
-  const handleEmailAuth = () => {
+  const handleEmailAuth = async () => {
     if (!email || !password || (view === 'signup' && !name)) {
       setError('Please fill in all fields');
       haptics.warning();
@@ -532,12 +532,19 @@ export default function AuthScreen() {
     }
     setError('');
     setIsLoading(true);
-    // Simulated - replace with actual auth
-    setTimeout(() => {
-      setIsLoading(false);
+
+    const isSignup = view === 'signup';
+    const result = await emailLogin(email, password, isSignup ? name : undefined, isSignup);
+
+    setIsLoading(false);
+
+    if (result.success) {
+      haptics.success();
+      router.replace('/(tabs)/dashboard');
+    } else {
       haptics.error();
-      setError('Email authentication coming soon. Please use Google or Apple.');
-    }, 1000);
+      setError(result.error || 'Authentication failed. Please try again.');
+    }
   };
 
   // Hidden demo login trigger - 5 taps on logo

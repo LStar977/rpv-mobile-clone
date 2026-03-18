@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useState, useEffect } from 'react';
 import { Ionicons } from '@expo/vector-icons';
@@ -16,6 +16,7 @@ import { useAuthStore } from '../../lib/auth';
 import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS, ThemePreference, responsive } from '../../lib/theme';
 import { Button, TierBadge } from '../../components/ui';
 import { adminApi } from '../../lib/api';
+import { restorePurchases } from '../../lib/iap';
 import type { UserTier } from '../../components/ui';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://representportal.com';
@@ -249,7 +250,19 @@ export default function ProfileScreen() {
           {adminApi.isAdmin() && (
             <MenuItem icon="shield-checkmark-outline" label="Admin Dashboard" onPress={() => navigateTo('/modals/admin')} delay={525} />
           )}
-          <MenuItem icon="settings-outline" label="Settings & Privacy" onPress={() => navigateTo('/modals/privacy')} delay={550} showBorder={false} />
+          {Platform.OS === 'ios' && (
+            <MenuItem icon="refresh-outline" label="Restore Purchases" onPress={async () => {
+              const result = await restorePurchases(token);
+              if (result.restored) {
+                Alert.alert('Purchases Restored', 'Your previous purchases have been restored successfully.');
+              } else if (result.error) {
+                Alert.alert('Error', result.error);
+              } else {
+                Alert.alert('No Purchases Found', 'No previous purchases were found to restore.');
+              }
+            }} delay={550} />
+          )}
+          <MenuItem icon="settings-outline" label="Settings & Privacy" onPress={() => navigateTo('/modals/privacy')} delay={575} showBorder={false} />
         </Animated.View>
 
         {/* Theme Card */}

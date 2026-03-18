@@ -21,11 +21,8 @@ import * as ImagePicker from 'expo-image-picker';
 import { useAuthStore } from '../../lib/auth';
 import { organizationsApi, uploadsApi } from '../../lib/api';
 import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS } from '../../lib/theme';
-import {
-  fetchOrganizationPaymentIntent,
-  processPayment,
-  showPaymentError,
-} from '../../lib/stripe';
+import { showPaymentError, showPaymentSuccess } from '../../lib/stripe';
+import { processOrganizationPayment } from '../../lib/payment';
 
 type Step = 'details' | 'tier' | 'payment';
 
@@ -347,67 +344,26 @@ export default function CreateOrganizationScreen() {
         return;
       }
 
-      // STEP 2: Get payment intent with org ID
-      const paymentIntent = await fetchOrganizationPaymentIntent(
-        token,
-        selectedTier,
-        organizationId
-      );
+      // STEP 2: Process payment (IAP on iOS, Stripe on Android)
+      const result = await processOrganizationPayment(token, selectedTier, organizationId);
 
-      if (paymentIntent.clientSecret) {
-        // STEP 3: Process payment with native Payment Sheet
-        const result = await processPayment({
-          clientSecret: paymentIntent.clientSecret,
-          ephemeralKey: paymentIntent.ephemeralKey,
-          customerId: paymentIntent.customerId,
-          merchantDisplayName: 'Represent Wallet',
+      if (result.success) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+        showPaymentSuccess('organization', {
+          amount: ORG_TIERS[selectedTier].price + '/mo',
+          organizationName: name,
+          tier: ORG_TIERS[selectedTier].name,
         });
-
-        if (result.success) {
-          // STEP 4: Payment successful - webhook will activate subscription
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-
-          Alert.alert(
-            'Organization Created!',
-            `${name} has been created successfully. You are now the admin.`,
-            [
-              {
-                text: 'View Organization',
-                onPress: () => {
-                  router.replace({
-                    pathname: '/modals/organization-detail',
-                    params: { orgId: organizationId, orgName: name, orgRole: 'admin' },
-                  });
-                },
-              },
-            ]
-          );
-        } else if (result.cancelled) {
-          // User cancelled - org exists but subscription is pending
-          Alert.alert(
-            'Payment Cancelled',
-            'Your organization has been created but is pending payment. You can complete payment later from your organizations list.',
-            [{ text: 'OK', onPress: () => router.back() }]
-          );
-        } else {
-          showPaymentError(result.error || 'Payment failed');
-        }
-      } else if (paymentIntent.url) {
-        // Fallback to web checkout
+        // Receipt modal will handle navigation
+      } else if (result.cancelled) {
         Alert.alert(
-          'Web Checkout',
-          'You will be redirected to complete payment in your browser.',
-          [
-            { text: 'Cancel', style: 'cancel' },
-            {
-              text: 'Continue',
-              onPress: async () => {
-                const { Linking } = await import('react-native');
-                await Linking.openURL(paymentIntent.url!);
-              },
-            },
-          ]
+          'Payment Cancelled',
+          'Your organization has been created but is pending payment. You can complete payment later from your organizations list.',
+          [{ text: 'OK', onPress: () => router.back() }]
         );
+      } else {
+        showPaymentError(result.error || 'Payment failed');
       }
     } catch (error: any) {
       Alert.alert('Error', error.message || 'Failed to create organization. Please try again.');
