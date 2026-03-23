@@ -645,7 +645,7 @@ export default function DashboardScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  const [stats, setStats] = useState({ pending: 0, voted: 0, passed: 0 });
+  const [stats, setStats] = useState({ pending: 0, voted: 0, created: 0 });
   const [communities, setCommunities] = useState<Community[]>([]);
   const [urgentProposals, setUrgentProposals] = useState<UrgentProposal[]>([]);
   const [activities, setActivities] = useState<ActivityItem[]>([]);
@@ -794,14 +794,10 @@ export default function DashboardScreen() {
         }
       });
 
-      const passedCount = proposals
-        .filter((p: any) => {
-          const total = (p.supportVotes || 0) + (p.opposeVotes || 0);
-          return total > 0 && (p.supportVotes || 0) > (p.opposeVotes || 0) && votedIds.has(p.id);
-        })
-        .length;
+      // Count proposals created by the current user
+      const createdCount = proposals.filter((p: any) => p.creatorId === user?.id).length;
 
-      setStats({ pending: pendingCount, voted: votedIds.size, passed: passedCount });
+      setStats({ pending: pendingCount, voted: votedIds.size, created: createdCount });
       // For demo account, show all communities even if no proposals match
       // For regular users, only show communities with proposals
       const filteredCommunities = isDemoAccount
@@ -925,27 +921,42 @@ export default function DashboardScreen() {
         <View style={styles.section}>
           <SectionHeader title="YOUR IMPACT" style={styles.sectionHeader} />
           <View style={styles.statsGrid}>
-            <StatCard
-              icon="hourglass-outline"
-              value={stats.pending.toString()}
-              label="Pending"
-              accent={colors.warning}
-              delay={0}
-            />
-            <StatCard
-              icon="checkmark-circle-outline"
-              value={stats.voted.toString()}
-              label="Voted"
-              accent={colors.success}
-              delay={80}
-            />
-            <StatCard
-              icon="trophy-outline"
-              value={stats.passed.toString()}
-              label="Passed"
-              accent={colors.gold}
-              delay={160}
-            />
+            <TouchableOpacity
+              onPress={() => router.push('/(tabs)/proposals')}
+              activeOpacity={0.8}
+            >
+              <StatCard
+                icon="hourglass-outline"
+                value={stats.pending.toString()}
+                label="Pending"
+                accent={colors.warning}
+                delay={0}
+              />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => router.push('/modals/voting-history')}
+              activeOpacity={0.8}
+            >
+              <StatCard
+                icon="checkmark-circle-outline"
+                value={stats.voted.toString()}
+                label="Voted"
+                accent={colors.success}
+                delay={80}
+              />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => router.push('/modals/my-proposals')}
+              activeOpacity={0.8}
+            >
+              <StatCard
+                icon="create-outline"
+                value={stats.created.toString()}
+                label="Created"
+                accent={colors.gold}
+                delay={160}
+              />
+            </TouchableOpacity>
           </View>
         </View>
 
