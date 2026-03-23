@@ -1,45 +1,26 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Linking, Alert, Platform } from 'react-native';
-import { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
-import { useAuthStore } from '../../lib/auth';
+import * as Haptics from 'expo-haptics';
 import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS } from '../../lib/theme';
-import { showPaymentError, showPaymentSuccess } from '../../lib/stripe';
-import { processVerificationPayment } from '../../lib/payment';
 
 const VERIFICATION_BENEFITS = [
   { icon: 'checkmark-circle', text: 'Vote on all proposals (global + geo-restricted)' },
   { icon: 'location', text: 'Create proposals for your verified region' },
   { icon: 'infinite', text: 'Unlimited voting (no monthly limits)' },
   { icon: 'shield-checkmark', text: 'Verified badge on your profile' },
-  { icon: 'lock-closed', text: 'One-time payment, lifetime access' },
+  { icon: 'gift', text: 'Free verification, lifetime access' },
 ];
 
 export default function VerificationPaymentScreen() {
   const { colors } = useTheme();
-  const { token } = useAuthStore();
-  const [loading, setLoading] = useState(false);
 
-  const handlePayment = async () => {
-    setLoading(true);
-    try {
-      const result = await processVerificationPayment(token);
-
-      if (result.success) {
-        showPaymentSuccess('verification');
-        // Receipt modal will navigate to veriff
-      } else if (result.cancelled) {
-        // User cancelled - do nothing
-      } else {
-        showPaymentError(result.error || 'Payment failed');
-      }
-    } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to start payment. Please try again.');
-    } finally {
-      setLoading(false);
-    }
+  const handleStartVerification = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    // Navigate directly to identity verification (Veriff)
+    router.replace('/modals/verify-identity');
   };
 
   const handleViewPremium = () => {
@@ -60,9 +41,9 @@ export default function VerificationPaymentScreen() {
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Hero Section */}
         <Animated.View entering={FadeInDown.duration(400)} style={styles.heroSection}>
-          <View style={[styles.priceContainer, { backgroundColor: `${colors.gold}15` }]}>
-            <Text style={[styles.priceAmount, { color: colors.gold }]}>$4.99</Text>
-            <Text style={[styles.priceLabel, { color: colors.textSecondary }]}>one-time</Text>
+          <View style={[styles.priceContainer, { backgroundColor: `${colors.success}15` }]}>
+            <Text style={[styles.priceAmount, { color: colors.success }]}>Free</Text>
+            <Text style={[styles.priceLabel, { color: colors.textSecondary }]}>forever</Text>
           </View>
 
           <Text style={[styles.heroTitle, { color: colors.text }]}>
@@ -97,7 +78,7 @@ export default function VerificationPaymentScreen() {
         >
           <Ionicons name="information-circle-outline" size={20} color={colors.info} />
           <Text style={[styles.processText, { color: colors.textSecondary }]}>
-            After payment, you'll complete identity verification via Veriff using a government-issued ID.
+            You'll complete identity verification via Veriff using a government-issued ID.
             Your location will be verified automatically.
           </Text>
         </Animated.View>
@@ -138,29 +119,21 @@ export default function VerificationPaymentScreen() {
       {/* Fixed CTA */}
       <View style={[styles.ctaContainer, { backgroundColor: colors.background, borderTopColor: colors.border }]}>
         <TouchableOpacity
-          onPress={handlePayment}
-          disabled={loading}
-          style={[loading && styles.btnDisabled]}
+          onPress={handleStartVerification}
         >
           <LinearGradient
-            colors={[colors.gold, colors.goldDark || '#A68523']}
+            colors={[colors.success, '#22A06B']}
             style={styles.ctaButton}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
           >
-            {loading ? (
-              <ActivityIndicator size="small" color="#000" />
-            ) : (
-              <>
-                <Ionicons name="card-outline" size={20} color="#000" />
-                <Text style={styles.ctaButtonText}>Continue to Payment</Text>
-              </>
-            )}
+            <Ionicons name="shield-checkmark" size={20} color="#000" />
+            <Text style={styles.ctaButtonText}>Start Verification</Text>
           </LinearGradient>
         </TouchableOpacity>
         <View style={styles.paymentMethodsRow}>
           <Text style={[styles.ctaDisclaimer, { color: colors.textTertiary }]}>
-            {Platform.OS === 'ios' ? 'Secure in-app purchase' : 'Secure payment via Stripe'}
+            Quick identity verification via Veriff
           </Text>
         </View>
       </View>

@@ -37,9 +37,9 @@ const TIERS = {
   },
   verified: {
     name: 'Verified',
-    price: '$4.99',
-    period: 'one-time',
-    description: 'Unlock all proposals in your region',
+    price: 'Free',
+    period: '',
+    description: 'Verify your identity to unlock all proposals',
     icon: 'shield-checkmark' as const,
     features: [
       { text: 'Vote on ALL proposals', included: true },
@@ -432,7 +432,7 @@ export default function SubscriptionScreen() {
               What's the difference between Verified and Premium?
             </Text>
             <Text style={[styles.faqAnswer, { color: colors.textSecondary }]}>
-              Verified ($4.99 one-time) unlocks geo-restricted voting and proposals. Premium ($7.99/mo) includes verification plus analytics, unlimited proposals, and priority visibility.
+              Verified (free) unlocks geo-restricted voting and proposals. Premium ($7.99/mo) includes verification plus analytics, unlimited proposals, and priority visibility.
             </Text>
           </View>
 

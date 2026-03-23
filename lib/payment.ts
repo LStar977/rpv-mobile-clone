@@ -25,13 +25,13 @@ export function shouldUseIAP(): boolean {
 }
 
 /**
- * Process verification payment ($4.99 one-time)
+ * Process verification payment
+ * NOTE: Verification is now FREE - this function returns immediate success
+ * for backward compatibility with any code that still calls it
  */
 export async function processVerificationPayment(token: string | null): Promise<PaymentResult> {
-  if (shouldUseIAP()) {
-    return processIAPPurchase(IAP_PRODUCTS.verification, token);
-  }
-  return processStripeVerification(token);
+  // Verification is now free - return immediate success
+  return { success: true };
 }
 
 /**

@@ -43,10 +43,11 @@ import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-g
 import { router } from 'expo-router';
 import { proposalsApi, userApi, uploadsApi, limitsApi, Proposal, UsageLimits } from '../../lib/api';
 import { useAuthStore } from '../../lib/auth';
+import { useBallotStore } from '../../lib/ballots';
 import { shareProposal } from '../../lib/share';
 import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS, ANIMATION, responsive } from '../../lib/theme';
 import { showVoteConfirmation } from '../../lib/notifications';
-import { VoteConfirmationOverlay, UpgradeModal } from '../../components/ui';
+import { VoteConfirmationOverlay, UpgradeModal, BallotDisplay } from '../../components/ui';
 import { checkForNewBadges } from '../../lib/badgeNotification';
 import * as ImagePicker from 'expo-image-picker';
 import { useTutorialTarget } from '../../components/tutorial';
@@ -1044,6 +1045,17 @@ export default function ProposalsScreen() {
       return;
     }
 
+    // Check ballot balance (premium users have unlimited)
+    const { spendBallot, tier: ballotTier } = useBallotStore.getState();
+    if (ballotTier !== 'premium') {
+      const canSpend = spendBallot();
+      if (!canSpend) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+        router.push('/modals/out-of-ballots');
+        return;
+      }
+    }
+
     // Check if proposal has geo restrictions
     const proposal = proposals.find((p) => p.id === proposalId);
     const proposalGeo = proposal?.geoRestrictions || [];
@@ -1336,6 +1348,7 @@ export default function ProposalsScreen() {
           </View>
 
           <View style={styles.headerActions}>
+            <BallotDisplay size="sm" />
             <ViewModeToggle
               mode={viewMode}
               onToggle={() => setViewMode((m) => (m === 'swipe' ? 'list' : 'swipe'))}

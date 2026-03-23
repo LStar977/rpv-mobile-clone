@@ -40,10 +40,10 @@ const MODAL_CONFIG = {
   verification: {
     icon: 'shield-checkmark' as const,
     defaultTitle: 'Verification Required',
-    defaultMessage: 'This proposal is restricted to verified users in specific regions. Complete identity verification to vote.',
-    buttonText: 'Get Verified',
+    defaultMessage: 'This proposal is restricted to verified users in specific regions. Complete free identity verification to vote.',
+    buttonText: 'Get Verified Free',
     buttonIcon: 'shield-checkmark' as const,
-    price: '$4.99 one-time',
+    price: 'Free',
     route: '/modals/verification-payment',
   },
 };

@@ -23,8 +23,10 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS, ANIMATION, responsive } from '../../lib/theme';
 import { useAuthStore } from '../../lib/auth';
+import { useBallotStore } from '../../lib/ballots';
 import { proposalsApi, userApi } from '../../lib/api';
-import { Button, Badge, CountBadge, SectionHeader } from '../../components/ui';
+import { BallotIcon } from '../../components/icons';
+import { Button, Badge, CountBadge, SectionHeader, BallotDisplay } from '../../components/ui';
 import { SkeletonStats, SkeletonListItem, SkeletonWelcome } from '../../components/ui/Skeleton';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -173,6 +175,7 @@ function WelcomeHeader({
       </View>
 
       <View style={styles.welcomeActions}>
+        <BallotDisplay size="sm" />
         {onNotificationPress && (
           <TouchableOpacity
             onPress={onNotificationPress}
@@ -636,6 +639,7 @@ export default function DashboardScreen() {
   const { colors } = useTheme();
   const router = useRouter();
   const { user, isAuthenticated } = useAuthStore();
+  const { balance: ballotBalance, initialize: initializeBallots, tier: ballotTier } = useBallotStore();
   const insets = useSafeAreaInsets();
 
   const [refreshing, setRefreshing] = useState(false);
@@ -845,6 +849,7 @@ export default function DashboardScreen() {
 
   useEffect(() => {
     fetchDashboardData();
+    initializeBallots();
   }, [fetchDashboardData]);
 
   const onRefresh = useCallback(() => {

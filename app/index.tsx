@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -30,7 +30,10 @@ import Animated, {
   interpolate,
   Extrapolation,
   Easing,
+  runOnJS,
+  useAnimatedProps,
 } from 'react-native-reanimated';
+import Svg, { Circle, Defs, LinearGradient as SvgLinearGradient, Stop } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme, SPACING, RADIUS, TYPOGRAPHY, SHADOWS, EASING, responsive } from '../lib/theme';
 import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
@@ -51,6 +54,492 @@ GoogleSignin.configure({
 
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 const AnimatedLinearGradient = Animated.createAnimatedComponent(LinearGradient);
+const AnimatedCircle = Animated.createAnimatedComponent(Circle);
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PREMIUM VISUAL EFFECTS - Billion Dollar Feel
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Floating Particle Component
+function Particle({ delay, color }: { delay: number; color: string }) {
+  const translateY = useSharedValue(SCREEN_HEIGHT);
+  const translateX = useSharedValue(0);
+  const opacity = useSharedValue(0);
+  const scale = useSharedValue(1);
+
+  const startX = useMemo(() => Math.random() * SCREEN_WIDTH, []);
+  const size = useMemo(() => 2 + Math.random() * 4, []);
+  const duration = useMemo(() => 4000 + Math.random() * 3000, []);
+  const swayAmount = useMemo(() => 20 + Math.random() * 30, []);
+
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      // Vertical movement
+      translateY.value = withRepeat(
+        withTiming(-100, { duration, easing: Easing.linear }),
+        -1,
+        false
+      );
+      // Horizontal sway
+      translateX.value = withRepeat(
+        withSequence(
+          withTiming(swayAmount, { duration: duration / 2, easing: Easing.inOut(Easing.ease) }),
+          withTiming(-swayAmount, { duration: duration / 2, easing: Easing.inOut(Easing.ease) })
+        ),
+        -1,
+        true
+      );
+      // Fade in/out based on position
+      opacity.value = withRepeat(
+        withSequence(
+          withTiming(0.6 + Math.random() * 0.4, { duration: duration * 0.2 }),
+          withTiming(0.6 + Math.random() * 0.4, { duration: duration * 0.6 }),
+          withTiming(0, { duration: duration * 0.2 })
+        ),
+        -1,
+        false
+      );
+      // Subtle scale pulse
+      scale.value = withRepeat(
+        withSequence(
+          withTiming(1.2, { duration: 1500, easing: Easing.inOut(Easing.ease) }),
+          withTiming(0.8, { duration: 1500, easing: Easing.inOut(Easing.ease) })
+        ),
+        -1,
+        true
+      );
+    }, delay);
+    return () => clearTimeout(timeout);
+  }, []);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: translateX.value },
+      { translateY: translateY.value },
+      { scale: scale.value },
+    ],
+    opacity: opacity.value,
+  }));
+
+  return (
+    <Animated.View
+      style={[
+        {
+          position: 'absolute',
+          left: startX,
+          width: size,
+          height: size,
+          borderRadius: size / 2,
+          backgroundColor: color,
+        },
+        animatedStyle,
+      ]}
+    />
+  );
+}
+
+// Particle Field - Floating particles background
+function ParticleField() {
+  const { colors } = useTheme();
+  const particles = useMemo(() =>
+    Array.from({ length: 25 }, (_, i) => ({
+      id: i,
+      delay: i * 200,
+    })),
+    []
+  );
+
+  return (
+    <View style={StyleSheet.absoluteFill} pointerEvents="none">
+      {particles.map((particle) => (
+        <Particle key={particle.id} delay={particle.delay} color={colors.gold + '60'} />
+      ))}
+    </View>
+  );
+}
+
+// Animated Glow Orb - Multi-layered ethereal glow
+function AnimatedGlowOrb({ color }: { color: string }) {
+  const scale1 = useSharedValue(1);
+  const scale2 = useSharedValue(1);
+  const scale3 = useSharedValue(1);
+  const opacity1 = useSharedValue(0.15);
+  const opacity2 = useSharedValue(0.1);
+  const opacity3 = useSharedValue(0.05);
+
+  useEffect(() => {
+    // Layer 1 - Inner glow
+    scale1.value = withRepeat(
+      withSequence(
+        withTiming(1.1, { duration: 2000, easing: Easing.inOut(Easing.ease) }),
+        withTiming(1, { duration: 2000, easing: Easing.inOut(Easing.ease) })
+      ),
+      -1,
+      true
+    );
+    opacity1.value = withRepeat(
+      withSequence(
+        withTiming(0.25, { duration: 2000, easing: Easing.inOut(Easing.ease) }),
+        withTiming(0.15, { duration: 2000, easing: Easing.inOut(Easing.ease) })
+      ),
+      -1,
+      true
+    );
+    // Layer 2 - Middle glow (offset timing)
+    scale2.value = withDelay(500, withRepeat(
+      withSequence(
+        withTiming(1.3, { duration: 2500, easing: Easing.inOut(Easing.ease) }),
+        withTiming(1.1, { duration: 2500, easing: Easing.inOut(Easing.ease) })
+      ),
+      -1,
+      true
+    ));
+    opacity2.value = withDelay(500, withRepeat(
+      withSequence(
+        withTiming(0.15, { duration: 2500, easing: Easing.inOut(Easing.ease) }),
+        withTiming(0.08, { duration: 2500, easing: Easing.inOut(Easing.ease) })
+      ),
+      -1,
+      true
+    ));
+    // Layer 3 - Outer glow (offset timing)
+    scale3.value = withDelay(1000, withRepeat(
+      withSequence(
+        withTiming(1.6, { duration: 3000, easing: Easing.inOut(Easing.ease) }),
+        withTiming(1.3, { duration: 3000, easing: Easing.inOut(Easing.ease) })
+      ),
+      -1,
+      true
+    ));
+    opacity3.value = withDelay(1000, withRepeat(
+      withSequence(
+        withTiming(0.1, { duration: 3000, easing: Easing.inOut(Easing.ease) }),
+        withTiming(0.04, { duration: 3000, easing: Easing.inOut(Easing.ease) })
+      ),
+      -1,
+      true
+    ));
+  }, []);
+
+  const layer1Style = useAnimatedStyle(() => ({
+    transform: [{ scale: scale1.value }],
+    opacity: opacity1.value,
+  }));
+  const layer2Style = useAnimatedStyle(() => ({
+    transform: [{ scale: scale2.value }],
+    opacity: opacity2.value,
+  }));
+  const layer3Style = useAnimatedStyle(() => ({
+    transform: [{ scale: scale3.value }],
+    opacity: opacity3.value,
+  }));
+
+  const baseStyle = {
+    position: 'absolute' as const,
+    width: 140,
+    height: 140,
+    borderRadius: 70,
+    backgroundColor: color,
+  };
+
+  return (
+    <View style={{ position: 'absolute', width: 140, height: 140, alignItems: 'center', justifyContent: 'center' }}>
+      <Animated.View style={[baseStyle, { width: 200, height: 200, borderRadius: 100, marginLeft: -30, marginTop: -30 }, layer3Style]} />
+      <Animated.View style={[baseStyle, { width: 170, height: 170, borderRadius: 85, marginLeft: -15, marginTop: -15 }, layer2Style]} />
+      <Animated.View style={[baseStyle, layer1Style]} />
+    </View>
+  );
+}
+
+// Self-Drawing Ring - SVG circle that animates its stroke
+function SelfDrawingRing({ size, color }: { size: number; color: string }) {
+  const progress = useSharedValue(0);
+  const glowOpacity = useSharedValue(0);
+  const circumference = Math.PI * (size - 4);
+
+  useEffect(() => {
+    // Draw the ring
+    progress.value = withDelay(300, withTiming(1, { duration: 1500, easing: Easing.out(Easing.ease) }));
+    // Glow after drawing
+    glowOpacity.value = withDelay(1500, withRepeat(
+      withSequence(
+        withTiming(0.6, { duration: 1500, easing: Easing.inOut(Easing.ease) }),
+        withTiming(0.2, { duration: 1500, easing: Easing.inOut(Easing.ease) })
+      ),
+      -1,
+      true
+    ));
+  }, []);
+
+  const animatedProps = useAnimatedProps(() => ({
+    strokeDashoffset: circumference * (1 - progress.value),
+  }));
+
+  const glowStyle = useAnimatedStyle(() => ({
+    opacity: glowOpacity.value,
+  }));
+
+  return (
+    <View style={{ position: 'absolute', width: size, height: size }}>
+      {/* Glow layer */}
+      <Animated.View style={[{ position: 'absolute', width: size, height: size }, glowStyle]}>
+        <Svg width={size} height={size}>
+          <Circle
+            cx={size / 2}
+            cy={size / 2}
+            r={(size - 4) / 2}
+            stroke={color}
+            strokeWidth={6}
+            fill="none"
+            opacity={0.3}
+          />
+        </Svg>
+      </Animated.View>
+      {/* Main ring */}
+      <Svg width={size} height={size}>
+        <Defs>
+          <SvgLinearGradient id="ringGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <Stop offset="0%" stopColor={color} stopOpacity={1} />
+            <Stop offset="50%" stopColor={color} stopOpacity={0.8} />
+            <Stop offset="100%" stopColor={color} stopOpacity={0.4} />
+          </SvgLinearGradient>
+        </Defs>
+        <AnimatedCircle
+          cx={size / 2}
+          cy={size / 2}
+          r={(size - 4) / 2}
+          stroke="url(#ringGradient)"
+          strokeWidth={2}
+          fill="none"
+          strokeLinecap="round"
+          strokeDasharray={circumference}
+          animatedProps={animatedProps}
+          rotation={-90}
+          origin={`${size / 2}, ${size / 2}`}
+        />
+      </Svg>
+    </View>
+  );
+}
+
+// Shimmer Effect - Diagonal light sweep
+function ShimmerOverlay({ width, height }: { width: number; height: number }) {
+  const translateX = useSharedValue(-width * 2);
+
+  useEffect(() => {
+    const runShimmer = () => {
+      translateX.value = -width * 2;
+      translateX.value = withDelay(
+        4000,
+        withTiming(width * 2, { duration: 800, easing: Easing.inOut(Easing.ease) })
+      );
+    };
+    runShimmer();
+    const interval = setInterval(runShimmer, 5000);
+    return () => clearInterval(interval);
+  }, [width]);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: translateX.value }, { rotate: '20deg' }],
+  }));
+
+  return (
+    <View style={{ position: 'absolute', width, height, borderRadius: height / 2, overflow: 'hidden' }} pointerEvents="none">
+      <Animated.View style={[{ position: 'absolute', width: width * 0.5, height: height * 2, top: -height / 2 }, animatedStyle]}>
+        <LinearGradient
+          colors={['transparent', 'rgba(255,255,255,0.3)', 'rgba(255,255,255,0.4)', 'rgba(255,255,255,0.3)', 'transparent']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={{ width: '100%', height: '100%' }}
+        />
+      </Animated.View>
+    </View>
+  );
+}
+
+// Animated Gradient Text - Premium title effect
+function AnimatedGradientTitle({ children }: { children: string }) {
+  const { colors } = useTheme();
+  const gradientPosition = useSharedValue(0);
+
+  useEffect(() => {
+    gradientPosition.value = withRepeat(
+      withTiming(1, { duration: 3000, easing: Easing.inOut(Easing.ease) }),
+      -1,
+      true
+    );
+  }, []);
+
+  // Since MaskedView isn't available, we'll create a shimmer text effect
+  const shimmerX = useSharedValue(-200);
+
+  useEffect(() => {
+    const runShimmer = () => {
+      shimmerX.value = -200;
+      shimmerX.value = withDelay(
+        3000,
+        withTiming(400, { duration: 1200, easing: Easing.inOut(Easing.ease) })
+      );
+    };
+    runShimmer();
+    const interval = setInterval(runShimmer, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const shimmerStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: shimmerX.value }],
+  }));
+
+  return (
+    <View style={{ position: 'relative' }}>
+      <Text style={[styles.brandName, { color: colors.gold }]}>{children}</Text>
+      <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, overflow: 'hidden' }} pointerEvents="none">
+        <Animated.View style={[{ position: 'absolute', width: 100, height: '100%', top: 0 }, shimmerStyle]}>
+          <LinearGradient
+            colors={['transparent', 'rgba(255,255,255,0.4)', 'transparent']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={{ width: '100%', height: '100%' }}
+          />
+        </Animated.View>
+      </View>
+    </View>
+  );
+}
+
+// Premium CTA Button with glow and shimmer
+function PremiumCTAButton({ title, onPress }: { title: string; onPress: () => void }) {
+  const { colors } = useTheme();
+  const scale = useSharedValue(1);
+  const glowOpacity = useSharedValue(0.3);
+  const shimmerX = useSharedValue(-300);
+
+  useEffect(() => {
+    // Pulsing glow
+    glowOpacity.value = withRepeat(
+      withSequence(
+        withTiming(0.6, { duration: 1500, easing: Easing.inOut(Easing.ease) }),
+        withTiming(0.3, { duration: 1500, easing: Easing.inOut(Easing.ease) })
+      ),
+      -1,
+      true
+    );
+    // Periodic shimmer
+    const runShimmer = () => {
+      shimmerX.value = -300;
+      shimmerX.value = withDelay(
+        2000,
+        withTiming(400, { duration: 600, easing: Easing.out(Easing.ease) })
+      );
+    };
+    runShimmer();
+    const interval = setInterval(runShimmer, 4000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const handlePressIn = () => {
+    scale.value = withSpring(0.97, EASING.springSnappy);
+  };
+
+  const handlePressOut = () => {
+    scale.value = withSpring(1, EASING.springSnappy);
+  };
+
+  const buttonStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+
+  const glowStyle = useAnimatedStyle(() => ({
+    opacity: glowOpacity.value,
+  }));
+
+  const shimmerStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: shimmerX.value }, { rotate: '20deg' }],
+  }));
+
+  return (
+    <AnimatedTouchable
+      onPress={onPress}
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
+      activeOpacity={1}
+      style={[styles.premiumCTAContainer, buttonStyle]}
+    >
+      {/* Glow layer */}
+      <Animated.View style={[styles.premiumCTAGlow, { backgroundColor: colors.gold }, glowStyle]} />
+
+      {/* Button */}
+      <LinearGradient
+        colors={[colors.goldLight, colors.gold, colors.goldDark] as any}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.premiumCTAButton}
+      >
+        <Text style={[styles.premiumCTAText, { color: colors.black }]}>{title}</Text>
+
+        {/* Shimmer */}
+        <View style={styles.premiumCTAShimmerContainer}>
+          <Animated.View style={[styles.premiumCTAShimmer, shimmerStyle]}>
+            <LinearGradient
+              colors={['transparent', 'rgba(255,255,255,0.4)', 'transparent']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={{ width: '100%', height: '100%' }}
+            />
+          </Animated.View>
+        </View>
+      </LinearGradient>
+    </AnimatedTouchable>
+  );
+}
+
+// Light Rays - Ambient rays from behind logo
+function LightRays({ color }: { color: string }) {
+  const rotation = useSharedValue(0);
+  const opacity = useSharedValue(0.1);
+
+  useEffect(() => {
+    rotation.value = withRepeat(
+      withTiming(360, { duration: 60000, easing: Easing.linear }),
+      -1,
+      false
+    );
+    opacity.value = withRepeat(
+      withSequence(
+        withTiming(0.15, { duration: 3000, easing: Easing.inOut(Easing.ease) }),
+        withTiming(0.05, { duration: 3000, easing: Easing.inOut(Easing.ease) })
+      ),
+      -1,
+      true
+    );
+  }, []);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${rotation.value}deg` }],
+    opacity: opacity.value,
+  }));
+
+  return (
+    <Animated.View style={[styles.lightRaysContainer, animatedStyle]} pointerEvents="none">
+      {[0, 45, 90, 135, 180, 225, 270, 315].map((angle) => (
+        <View
+          key={angle}
+          style={[
+            styles.lightRay,
+            {
+              backgroundColor: color,
+              transform: [{ rotate: `${angle}deg` }],
+            },
+          ]}
+        />
+      ))}
+    </Animated.View>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ORIGINAL COMPONENTS (Enhanced)
+// ═══════════════════════════════════════════════════════════════════════════════
 
 // Pulsing Ring Component - single expanding ring
 function PulsingRing({ delay, color }: { delay: number; color: string }) {
@@ -219,27 +708,104 @@ function PulsingLogoGlow({ color }: { color: string }) {
   );
 }
 
-// Premium Feature Pill Component
-function FeaturePill({
+// Premium Feature Card Component
+function FeatureCard({
   icon,
   label,
+  tagline,
   delay,
   IconComponent = Ionicons,
 }: {
   icon: string;
   label: string;
+  tagline: string;
   delay: number;
   IconComponent?: any;
 }) {
   const { colors } = useTheme();
+  const floatY = useSharedValue(0);
+  const iconGlow = useSharedValue(0.3);
+  const iconScale = useSharedValue(1);
+  const borderOpacity = useSharedValue(0.3);
+
+  useEffect(() => {
+    // Gentle floating animation
+    floatY.value = withDelay(delay, withRepeat(
+      withSequence(
+        withTiming(-6, { duration: 2000, easing: Easing.inOut(Easing.ease) }),
+        withTiming(6, { duration: 2000, easing: Easing.inOut(Easing.ease) })
+      ),
+      -1,
+      true
+    ));
+    // Icon glow pulse
+    iconGlow.value = withDelay(delay, withRepeat(
+      withSequence(
+        withTiming(0.6, { duration: 1500, easing: Easing.inOut(Easing.ease) }),
+        withTiming(0.3, { duration: 1500, easing: Easing.inOut(Easing.ease) })
+      ),
+      -1,
+      true
+    ));
+    // Subtle icon scale
+    iconScale.value = withDelay(delay, withRepeat(
+      withSequence(
+        withTiming(1.1, { duration: 1500, easing: Easing.inOut(Easing.ease) }),
+        withTiming(1, { duration: 1500, easing: Easing.inOut(Easing.ease) })
+      ),
+      -1,
+      true
+    ));
+    // Border glow animation
+    borderOpacity.value = withDelay(delay, withRepeat(
+      withSequence(
+        withTiming(0.6, { duration: 2000, easing: Easing.inOut(Easing.ease) }),
+        withTiming(0.2, { duration: 2000, easing: Easing.inOut(Easing.ease) })
+      ),
+      -1,
+      true
+    ));
+  }, []);
+
+  const floatStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: floatY.value }],
+  }));
+
+  const glowStyle = useAnimatedStyle(() => ({
+    opacity: iconGlow.value,
+  }));
+
+  const iconAnimStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: iconScale.value }],
+  }));
+
+  const borderStyle = useAnimatedStyle(() => ({
+    opacity: borderOpacity.value,
+  }));
 
   return (
     <Animated.View
-      entering={FadeInUp.delay(delay).duration(500).springify()}
-      style={[styles.featurePill, { backgroundColor: colors.surface, borderColor: colors.border }]}
+      entering={FadeInUp.delay(delay).duration(600).springify()}
+      style={[floatStyle]}
     >
-      <IconComponent name={icon} size={16} color={colors.gold} />
-      <Text style={[styles.featurePillText, { color: colors.textSecondary }]}>{label}</Text>
+      <View style={[styles.featureCard, { backgroundColor: colors.surface }]}>
+        {/* Animated border glow */}
+        <Animated.View style={[styles.featureCardBorderGlow, { borderColor: colors.gold }, borderStyle]} />
+
+        {/* Icon with glow */}
+        <View style={styles.featureCardIconContainer}>
+          <Animated.View style={[styles.featureCardIconGlow, { backgroundColor: colors.gold }, glowStyle]} />
+          <Animated.View style={[styles.featureCardIconWrapper, { backgroundColor: colors.goldSurface }, iconAnimStyle]}>
+            <IconComponent name={icon} size={24} color={colors.gold} />
+          </Animated.View>
+        </View>
+
+        {/* Label */}
+        <Text style={[styles.featureCardLabel, { color: colors.text }]}>{label}</Text>
+
+        {/* Tagline */}
+        <Text style={[styles.featureCardTagline, { color: colors.textTertiary }]}>{tagline}</Text>
+      </View>
     </Animated.View>
   );
 }
@@ -589,6 +1155,9 @@ export default function AuthScreen() {
   if (view === 'welcome') {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
+        {/* Floating particles background */}
+        <ParticleField />
+
         {/* Background gradient */}
         <LinearGradient
           colors={['transparent', colors.goldSurface, 'transparent']}
@@ -598,11 +1167,22 @@ export default function AuthScreen() {
 
         {/* Content */}
         <View style={[styles.welcomeContent, { paddingTop: insets.top + 60 }]}>
-          {/* Logo with pulsing rings - 5 taps triggers demo login */}
+          {/* Logo with premium effects - 5 taps triggers demo login */}
           <TouchableOpacity onPress={handleLogoTap} activeOpacity={1} disabled={demoLoading}>
             <Animated.View style={[styles.logoWrapper, logoAnimatedStyle]}>
+              {/* Light rays behind everything */}
+              <LightRays color={colors.gold} />
+
+              {/* Animated glow orb */}
+              <AnimatedGlowOrb color={colors.gold} />
+
+              {/* Self-drawing ring */}
+              <SelfDrawingRing size={160} color={colors.gold} />
+
               {/* Pulsing rings emanating from logo */}
               <PulsingRings />
+
+              {/* Logo container */}
               <View style={[styles.logoOuter, { borderColor: colors.gold + '30' }]}>
                 <LinearGradient
                   colors={[colors.surface, colors.surfaceElevated] as any}
@@ -618,32 +1198,25 @@ export default function AuthScreen() {
                     />
                   )}
                 </LinearGradient>
+                {/* Shimmer overlay on logo */}
+                <ShimmerOverlay width={115} height={115} />
               </View>
               <PulsingLogoGlow color={colors.gold} />
             </Animated.View>
           </TouchableOpacity>
 
-          {/* Brand */}
-          <Animated.Text
-            entering={FadeInDown.delay(300).duration(600)}
-            style={[styles.brandName, { color: colors.text }]}
-          >
-            Represent
-          </Animated.Text>
+          {/* Animated Brand Title */}
+          <Animated.View entering={FadeInDown.delay(300).duration(600)}>
+            <AnimatedGradientTitle>Represent</AnimatedGradientTitle>
+          </Animated.View>
 
           <Animated.Text
             entering={FadeInDown.delay(400).duration(600)}
             style={[styles.tagline, { color: colors.textSecondary }]}
           >
-            Your voice in governance.{'\n'}Verified. Secure. Powerful.
+            Democracy in your pocket.
           </Animated.Text>
 
-          {/* Feature pills */}
-          <View style={styles.featurePills}>
-            <FeaturePill icon="shield-checkmark" label="Identity" delay={500} />
-            <FeaturePill icon="checkmark-done-circle" label="Vote" delay={600} />
-            <FeaturePill icon="sparkles" label="AI Analysis" delay={700} />
-          </View>
 
           {/* Biometric login (if available) */}
           {biometricAvailable && (
@@ -655,20 +1228,17 @@ export default function AuthScreen() {
             </Animated.View>
           )}
 
-          {/* Auth buttons */}
+          {/* Premium CTA buttons */}
           <Animated.View
             entering={FadeInUp.delay(900).duration(500)}
             style={styles.welcomeButtons}
           >
-            <Button
+            <PremiumCTAButton
               title="Get Started"
               onPress={() => setView('signup')}
-              variant="primary"
-              size="xl"
-              fullWidth
             />
             <Button
-              title="I have an account"
+              title="Sign In"
               onPress={() => setView('login')}
               variant="ghost"
               size="lg"
@@ -888,6 +1458,10 @@ const styles = StyleSheet.create({
   logoWrapper: {
     marginBottom: SPACING['3xl'],
     position: 'relative',
+    width: 160,
+    height: 160,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   logoOuter: {
     width: 140,
@@ -947,6 +1521,60 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.sm,
     borderRadius: RADIUS.full,
     borderWidth: 1,
+  },
+  // Feature Cards
+  featureCards: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: SPACING.md,
+    marginBottom: SPACING['3xl'],
+    paddingHorizontal: SPACING.sm,
+  },
+  featureCard: {
+    alignItems: 'center',
+    paddingVertical: SPACING.lg,
+    paddingHorizontal: SPACING.md,
+    borderRadius: RADIUS.xl,
+    width: responsive(95, 105, 115),
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  featureCardBorderGlow: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: RADIUS.xl,
+    borderWidth: 1.5,
+  },
+  featureCardIconContainer: {
+    position: 'relative',
+    marginBottom: SPACING.sm,
+  },
+  featureCardIconGlow: {
+    position: 'absolute',
+    top: -8,
+    left: -8,
+    right: -8,
+    bottom: -8,
+    borderRadius: 30,
+  },
+  featureCardIconWrapper: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  featureCardLabel: {
+    ...TYPOGRAPHY.label,
+    marginBottom: SPACING.xs,
+    textAlign: 'center',
+  },
+  featureCardTagline: {
+    ...TYPOGRAPHY.captionSmall,
+    textAlign: 'center',
   },
   featurePillText: {
     ...TYPOGRAPHY.labelSmall,
@@ -1089,5 +1717,60 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: SPACING.xl,
     paddingHorizontal: SPACING.lg,
+  },
+  // Premium CTA Button styles
+  premiumCTAContainer: {
+    width: '100%',
+    position: 'relative',
+  },
+  premiumCTAGlow: {
+    position: 'absolute',
+    top: -8,
+    left: -8,
+    right: -8,
+    bottom: -8,
+    borderRadius: RADIUS.lg + 8,
+  },
+  premiumCTAButton: {
+    width: '100%',
+    height: 56,
+    borderRadius: RADIUS.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  premiumCTAText: {
+    ...TYPOGRAPHY.labelLarge,
+    fontWeight: '700',
+  },
+  premiumCTAShimmerContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    overflow: 'hidden',
+    borderRadius: RADIUS.lg,
+  },
+  premiumCTAShimmer: {
+    position: 'absolute',
+    width: 100,
+    height: '200%',
+    top: '-50%',
+  },
+  // Light rays styles
+  lightRaysContainer: {
+    position: 'absolute',
+    width: 300,
+    height: 300,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  lightRay: {
+    position: 'absolute',
+    width: 2,
+    height: 150,
+    borderRadius: 1,
+    transformOrigin: 'center bottom',
   },
 });

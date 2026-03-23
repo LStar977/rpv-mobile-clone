@@ -69,3 +69,6 @@ export type { UserTier } from './TierBadge';
 
 // Modals
 export { UpgradeModal } from './UpgradeModal';
+
+// Ballots
+export { BallotDisplay } from './BallotDisplay';
