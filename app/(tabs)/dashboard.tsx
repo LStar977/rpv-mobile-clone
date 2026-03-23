@@ -939,18 +939,6 @@ export default function DashboardScreen() {
               accent={colors.gold}
               delay={160}
             />
-            <TouchableOpacity
-              onPress={() => router.push('/modals/purchase-ballots')}
-              activeOpacity={0.8}
-            >
-              <StatCard
-                icon="ticket-outline"
-                value={ballotTier === 'premium' ? '∞' : ballotBalance.toString()}
-                label="Ballots"
-                accent={colors.gold}
-                delay={240}
-              />
-            </TouchableOpacity>
           </View>
         </View>
 
