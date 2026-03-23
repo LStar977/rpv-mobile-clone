@@ -1046,7 +1046,7 @@ export default function ProposalsScreen() {
     }
 
     // Check ballot balance (premium users have unlimited)
-    const { spendBallot, tier: ballotTier } = useBallotStore.getState();
+    const { spendBallot, tier: ballotTier, syncFromChain } = useBallotStore.getState();
     if (ballotTier !== 'premium') {
       const canSpend = spendBallot();
       if (!canSpend) {
@@ -1152,6 +1152,11 @@ export default function ProposalsScreen() {
 
       // Check for newly earned badges (async, non-blocking)
       setTimeout(() => checkForNewBadges(), 1500);
+
+      // Re-sync ballot balance from chain after vote (token was transferred)
+      if (user?.walletAddress) {
+        syncFromChain(user.walletAddress);
+      }
     } catch {
       Alert.alert('Error', 'Failed to submit vote. Please try again.');
     } finally {

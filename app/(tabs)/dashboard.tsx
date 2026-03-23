@@ -639,7 +639,7 @@ export default function DashboardScreen() {
   const { colors } = useTheme();
   const router = useRouter();
   const { user, isAuthenticated } = useAuthStore();
-  const { balance: ballotBalance, initialize: initializeBallots, tier: ballotTier } = useBallotStore();
+  const { balance: ballotBalance, syncFromChain, tier: ballotTier } = useBallotStore();
   const insets = useSafeAreaInsets();
 
   const [refreshing, setRefreshing] = useState(false);
@@ -849,14 +849,21 @@ export default function DashboardScreen() {
 
   useEffect(() => {
     fetchDashboardData();
-    initializeBallots();
-  }, [fetchDashboardData]);
+    // Sync ballot balance from on-chain RPV token
+    if (user?.walletAddress) {
+      syncFromChain(user.walletAddress);
+    }
+  }, [fetchDashboardData, user?.walletAddress, syncFromChain]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     fetchDashboardData();
-  }, [fetchDashboardData]);
+    // Re-sync ballot balance from chain
+    if (user?.walletAddress) {
+      syncFromChain(user.walletAddress);
+    }
+  }, [fetchDashboardData, user?.walletAddress, syncFromChain]);
 
   const navigateToProposals = () => router.push('/(tabs)/proposals');
 
