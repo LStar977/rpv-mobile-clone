@@ -795,7 +795,10 @@ export default function DashboardScreen() {
       });
 
       // Count proposals created by the current user
+      console.log('[Dashboard] User ID:', user?.id);
+      console.log('[Dashboard] Sample proposal creatorIds:', proposals.slice(0, 3).map((p: any) => p.creatorId));
       const createdCount = proposals.filter((p: any) => p.creatorId === user?.id).length;
+      console.log('[Dashboard] Created count:', createdCount);
 
       setStats({ pending: pendingCount, voted: votedIds.size, created: createdCount });
       // For demo account, show all communities even if no proposals match
@@ -924,6 +927,7 @@ export default function DashboardScreen() {
             <TouchableOpacity
               onPress={() => router.push('/(tabs)/proposals')}
               activeOpacity={0.8}
+              style={{ flex: 1 }}
             >
               <StatCard
                 icon="hourglass-outline"
@@ -936,6 +940,7 @@ export default function DashboardScreen() {
             <TouchableOpacity
               onPress={() => router.push('/modals/voting-history')}
               activeOpacity={0.8}
+              style={{ flex: 1 }}
             >
               <StatCard
                 icon="checkmark-circle-outline"
@@ -948,6 +953,7 @@ export default function DashboardScreen() {
             <TouchableOpacity
               onPress={() => router.push('/modals/my-proposals')}
               activeOpacity={0.8}
+              style={{ flex: 1 }}
             >
               <StatCard
                 icon="create-outline"
