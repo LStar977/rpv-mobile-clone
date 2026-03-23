@@ -1,23 +1,14 @@
-import { createPublicClient, http, formatUnits, parseAbi } from 'viem';
-import { baseSepolia } from 'viem/chains';
-
 // RPV Token contract on Base Sepolia
-export const RPV_TOKEN_ADDRESS = '0x4a57Cd1C4235cb7Af37625bA59bA00beB2265312' as const;
+export const RPV_TOKEN_ADDRESS = '0x4a57Cd1C4235cb7Af37625bA59bA00beB2265312';
 
-// ERC-20 ABI for balanceOf
-const erc20Abi = parseAbi([
-  'function balanceOf(address owner) view returns (uint256)',
-  'function decimals() view returns (uint8)',
-]);
+// Base Sepolia RPC endpoint
+const RPC_URL = 'https://sepolia.base.org';
 
-// Create public client for Base Sepolia
-const client = createPublicClient({
-  chain: baseSepolia,
-  transport: http(),
-});
+// ERC-20 balanceOf function selector: keccak256("balanceOf(address)")[:4]
+const BALANCE_OF_SELECTOR = '0x70a08231';
 
 /**
- * Get RPV token balance for a wallet address
+ * Get RPV token balance for a wallet address using direct RPC call
  * @param walletAddress - The wallet address to check
  * @returns The token balance as a number (human-readable, not wei)
  */
@@ -30,37 +21,47 @@ export async function getRPVBalance(walletAddress: string): Promise<number> {
       return 0;
     }
 
-    const balance = await client.readContract({
-      address: RPV_TOKEN_ADDRESS,
-      abi: erc20Abi,
-      functionName: 'balanceOf',
-      args: [walletAddress as `0x${string}`],
+    // Pad address to 32 bytes (remove 0x, pad to 64 chars)
+    const paddedAddress = walletAddress.toLowerCase().replace('0x', '').padStart(64, '0');
+    const data = BALANCE_OF_SELECTOR + paddedAddress;
+
+    const response = await fetch(RPC_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'eth_call',
+        params: [
+          {
+            to: RPV_TOKEN_ADDRESS,
+            data: data,
+          },
+          'latest',
+        ],
+      }),
     });
 
-    const formattedBalance = Number(formatUnits(balance, 18));
-    console.log('[RPV] Raw balance:', balance.toString(), '| Formatted:', formattedBalance);
+    const json = await response.json();
+    console.log('[RPV] RPC response:', JSON.stringify(json));
 
-    // RPV token uses 18 decimals (standard ERC-20)
-    return formattedBalance;
+    if (json.error) {
+      console.error('[RPV] RPC error:', json.error);
+      return 0;
+    }
+
+    // Parse the hex result (it's a uint256 in wei)
+    const balanceWei = BigInt(json.result || '0x0');
+    // Convert from wei (18 decimals) to human-readable
+    const balance = Number(balanceWei) / 1e18;
+
+    console.log('[RPV] Balance wei:', balanceWei.toString(), '| Formatted:', balance);
+
+    return balance;
   } catch (error) {
     console.error('[RPV] Error fetching balance:', error);
     return 0;
-  }
-}
-
-/**
- * Get RPV token decimals (should be 18)
- */
-export async function getRPVDecimals(): Promise<number> {
-  try {
-    const decimals = await client.readContract({
-      address: RPV_TOKEN_ADDRESS,
-      abi: erc20Abi,
-      functionName: 'decimals',
-    });
-    return decimals;
-  } catch (error) {
-    console.error('Error fetching RPV decimals:', error);
-    return 18; // Default to 18
   }
 }
