@@ -21,6 +21,7 @@ import Animated, {
 import { useTheme, SPACING, TYPOGRAPHY, SHADOWS, RADIUS, EASING } from '../../lib/theme';
 import { haptics } from '../../lib/haptics';
 import { StatusDot } from './Badge';
+import { BallotDisplay } from './BallotDisplay';
 
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
@@ -163,6 +164,7 @@ interface WelcomeHeaderProps {
   onAvatarPress?: () => void;
   onNotificationPress?: () => void;
   notificationCount?: number;
+  showBallots?: boolean;
   style?: ViewStyle;
 }
 
@@ -175,6 +177,7 @@ export function WelcomeHeader({
   onAvatarPress,
   onNotificationPress,
   notificationCount = 0,
+  showBallots = true,
   style,
 }: WelcomeHeaderProps) {
   const { colors } = useTheme();
@@ -221,6 +224,7 @@ export function WelcomeHeader({
         </View>
 
         <View style={styles.welcomeActions}>
+          {showBallots && <BallotDisplay size="sm" />}
           {onNotificationPress && (
             <TouchableOpacity
               onPress={() => {

@@ -23,7 +23,9 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS, ANIMATION, responsive } from '../../lib/theme';
 import { useAuthStore } from '../../lib/auth';
+import { useBallotStore } from '../../lib/ballots';
 import { proposalsApi, userApi } from '../../lib/api';
+import { BallotIcon } from '../../components/icons';
 import { Button, Badge, CountBadge, SectionHeader } from '../../components/ui';
 import { SkeletonStats, SkeletonListItem, SkeletonWelcome } from '../../components/ui/Skeleton';
 
@@ -636,6 +638,7 @@ export default function DashboardScreen() {
   const { colors } = useTheme();
   const router = useRouter();
   const { user, isAuthenticated } = useAuthStore();
+  const { balance: ballotBalance, initialize: initializeBallots, tier: ballotTier } = useBallotStore();
   const insets = useSafeAreaInsets();
 
   const [refreshing, setRefreshing] = useState(false);
@@ -845,6 +848,7 @@ export default function DashboardScreen() {
 
   useEffect(() => {
     fetchDashboardData();
+    initializeBallots();
   }, [fetchDashboardData]);
 
   const onRefresh = useCallback(() => {
@@ -934,6 +938,18 @@ export default function DashboardScreen() {
               accent={colors.gold}
               delay={160}
             />
+            <TouchableOpacity
+              onPress={() => router.push('/modals/purchase-ballots')}
+              activeOpacity={0.8}
+            >
+              <StatCard
+                icon="ticket-outline"
+                value={ballotTier === 'premium' ? '∞' : ballotBalance.toString()}
+                label="Ballots"
+                accent={colors.gold}
+                delay={240}
+              />
+            </TouchableOpacity>
           </View>
         </View>
 

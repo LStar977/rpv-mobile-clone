@@ -43,6 +43,7 @@ import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-g
 import { router } from 'expo-router';
 import { proposalsApi, userApi, uploadsApi, limitsApi, Proposal, UsageLimits } from '../../lib/api';
 import { useAuthStore } from '../../lib/auth';
+import { useBallotStore } from '../../lib/ballots';
 import { shareProposal } from '../../lib/share';
 import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS, ANIMATION, responsive } from '../../lib/theme';
 import { showVoteConfirmation } from '../../lib/notifications';
@@ -1042,6 +1043,17 @@ export default function ProposalsScreen() {
     if (!isAuthenticated) {
       Alert.alert('Sign In Required', 'Please sign in to vote.');
       return;
+    }
+
+    // Check ballot balance (premium users have unlimited)
+    const { spendBallot, tier: ballotTier } = useBallotStore.getState();
+    if (ballotTier !== 'premium') {
+      const canSpend = spendBallot();
+      if (!canSpend) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+        router.push('/modals/out-of-ballots');
+        return;
+      }
     }
 
     // Check if proposal has geo restrictions
