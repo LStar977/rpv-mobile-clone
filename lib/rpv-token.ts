@@ -22,8 +22,11 @@ const client = createPublicClient({
  * @returns The token balance as a number (human-readable, not wei)
  */
 export async function getRPVBalance(walletAddress: string): Promise<number> {
+  console.log('[RPV] Fetching balance for wallet:', walletAddress);
+
   try {
     if (!walletAddress) {
+      console.log('[RPV] No wallet address provided');
       return 0;
     }
 
@@ -34,10 +37,13 @@ export async function getRPVBalance(walletAddress: string): Promise<number> {
       args: [walletAddress as `0x${string}`],
     });
 
+    const formattedBalance = Number(formatUnits(balance, 18));
+    console.log('[RPV] Raw balance:', balance.toString(), '| Formatted:', formattedBalance);
+
     // RPV token uses 18 decimals (standard ERC-20)
-    return Number(formatUnits(balance, 18));
+    return formattedBalance;
   } catch (error) {
-    console.error('Error fetching RPV balance:', error);
+    console.error('[RPV] Error fetching balance:', error);
     return 0;
   }
 }

@@ -36,7 +36,10 @@ export const useBallotStore = create<BallotState>((set, get) => ({
    * Sync ballot balance from on-chain RPV token balance
    */
   syncFromChain: async (walletAddress: string) => {
+    console.log('[Ballots] syncFromChain called with:', walletAddress);
+
     if (!walletAddress) {
+      console.log('[Ballots] No wallet address, setting balance to 0');
       set({ balance: 0, isLoading: false, walletAddress: null });
       return;
     }
@@ -45,13 +48,14 @@ export const useBallotStore = create<BallotState>((set, get) => ({
 
     try {
       const balance = await getRPVBalance(walletAddress);
+      console.log('[Ballots] Got RPV balance:', balance, '| Setting to:', Math.floor(balance));
       set({
         balance: Math.floor(balance), // RPV tokens = ballots (1:1)
         isLoading: false,
         lastSyncedAt: Date.now(),
       });
     } catch (error) {
-      console.error('Failed to sync RPV balance:', error);
+      console.error('[Ballots] Failed to sync RPV balance:', error);
       set({ isLoading: false });
     }
   },
