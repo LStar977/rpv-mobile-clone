@@ -26,7 +26,7 @@ import { useAuthStore } from '../../lib/auth';
 import { useBallotStore } from '../../lib/ballots';
 import { proposalsApi, userApi } from '../../lib/api';
 import { BallotIcon } from '../../components/icons';
-import { Button, Badge, CountBadge, SectionHeader } from '../../components/ui';
+import { Button, Badge, CountBadge, SectionHeader, BallotDisplay } from '../../components/ui';
 import { SkeletonStats, SkeletonListItem, SkeletonWelcome } from '../../components/ui/Skeleton';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -175,6 +175,7 @@ function WelcomeHeader({
       </View>
 
       <View style={styles.welcomeActions}>
+        <BallotDisplay size="sm" />
         {onNotificationPress && (
           <TouchableOpacity
             onPress={onNotificationPress}
