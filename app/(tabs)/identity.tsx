@@ -387,9 +387,7 @@ export default function IdentityScreen() {
   const [profile, setProfile] = useState<ProfileState | null>(null);
   const [startingKyc, setStartingKyc] = useState(false);
 
-  // Payment/subscription state for gating verification
-  const [hasPaidVerification, setHasPaidVerification] = useState(false);
-  const [isPremium, setIsPremium] = useState(false);
+  // Verification is now free - payment state no longer needed
 
   // Mock stats - in real app, fetch from API
   const [stats, setStats] = useState({ votes: 0, proposals: 0, streak: 0 });
@@ -485,30 +483,7 @@ export default function IdentityScreen() {
       return;
     }
 
-    // Demo account bypasses all paywalls (for App Store review)
-    const isDemoAccountForPaywall = user?.email === 'demo@represent.app';
-
-    // Check if user has paid for verification or is premium (skip for demo account)
-    if (!isDemoAccountForPaywall && !hasPaidVerification && !isPremium) {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      Alert.alert(
-        'Payment Required',
-        'Identity verification requires a one-time payment of $4.99, or is included free with Premium membership.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Get Verified ($4.99)',
-            onPress: () => router.push('/modals/verification-payment'),
-          },
-          {
-            text: 'View Premium',
-            onPress: () => router.push('/modals/subscription'),
-          },
-        ]
-      );
-      return;
-    }
-
+    // Verification is now free - proceed directly to Veriff
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setStartingKyc(true);
 
