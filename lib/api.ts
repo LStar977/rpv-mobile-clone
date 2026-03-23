@@ -299,6 +299,7 @@ export const proposalsApi = {
 
     // Always include seed proposals merged with backend
     // Seeds first so users see them immediately, then user-created proposals
+    console.log('[API] Backend proposals:', backendProposals.length, backendProposals.map((p: any) => ({ id: p.id, creatorId: p.creatorId })));
     const merged = [...SEED_PROPOSALS, ...backendProposals];
     return { data: merged, error: null };
   },
