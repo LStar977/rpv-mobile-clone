@@ -6,7 +6,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import Animated, { FadeIn, FadeInDown, FadeInUp, useSharedValue, useAnimatedStyle, withSpring, withRepeat, withSequence } from 'react-native-reanimated';
 import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS } from '../../lib/theme';
-import { useBallotStore, formatTimeRemaining } from '../../lib/ballots';
+import { useBallotStore } from '../../lib/ballots';
 import { useAuthStore } from '../../lib/auth';
 import { IAP_PRODUCTS, BALLOT_PACKS, purchaseBallots, iapAvailable } from '../../lib/iap';
 import { BallotIcon, BallotIconFilled } from '../../components/icons';
@@ -45,10 +45,9 @@ const PACKS: BallotPack[] = [
 
 export default function PurchaseBallotsScreen() {
   const { colors } = useTheme();
-  const { balance, tier, addBallots, getTimeUntilNextBallot, checkRegeneration } = useBallotStore();
-  const { isAuthenticated } = useAuthStore();
+  const { balance, tier, syncFromChain } = useBallotStore();
+  const { isAuthenticated, user } = useAuthStore();
   const [purchasing, setPurchasing] = useState<string | null>(null);
-  const [timeRemaining, setTimeRemaining] = useState(0);
 
   // Animation for the hero icon
   const pulseScale = useSharedValue(1);
@@ -68,23 +67,9 @@ export default function PurchaseBallotsScreen() {
     transform: [{ scale: pulseScale.value }],
   }));
 
-  // Timer for regeneration
-  useEffect(() => {
-    if (tier === 'premium') return;
-
-    const interval = setInterval(() => {
-      checkRegeneration();
-      setTimeRemaining(getTimeUntilNextBallot());
-    }, 1000);
-
-    setTimeRemaining(getTimeUntilNextBallot());
-
-    return () => clearInterval(interval);
-  }, [tier]);
-
   const handlePurchase = async (pack: BallotPack) => {
     if (!isAuthenticated) {
-      Alert.alert('Sign In Required', 'Please sign in to purchase ballots.');
+      Alert.alert('Sign In Required', 'Please sign in to purchase RPV tokens.');
       return;
     }
 
@@ -100,12 +85,14 @@ export default function PurchaseBallotsScreen() {
       const result = await purchaseBallots(pack.id as keyof typeof BALLOT_PACKS);
 
       if (result.success) {
-        // Add ballots to store
-        await addBallots(pack.ballots);
+        // Sync balance from chain (backend mints tokens to user's wallet)
+        if (user?.walletAddress) {
+          await syncFromChain(user.walletAddress);
+        }
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         Alert.alert(
           'Purchase Complete!',
-          `You received ${pack.ballots} ballots. Happy voting!`,
+          `${pack.ballots} RPV tokens have been sent to your wallet. Happy voting!`,
           [{ text: 'OK', onPress: () => router.back() }]
         );
       } else if (result.cancelled) {
@@ -127,7 +114,7 @@ export default function PurchaseBallotsScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.closeButton}>
           <Ionicons name="close" size={24} color={colors.text} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>Get Ballots</Text>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>Get RPV Tokens</Text>
         <View style={{ width: 40 }} />
       </View>
 
@@ -142,7 +129,7 @@ export default function PurchaseBallotsScreen() {
             Power Your Voice
           </Text>
           <Text style={[styles.heroSubtitle, { color: colors.textSecondary }]}>
-            Each ballot lets you vote on one proposal. Buy packs to never miss an important vote.
+            Each vote requires 1 RPV token. Buy tokens to participate in more proposals.
           </Text>
 
           {/* Current Balance */}
@@ -154,18 +141,9 @@ export default function PurchaseBallotsScreen() {
                 <Text style={[styles.balanceValue, { color: colors.gold }]}>
                   {tier === 'premium' ? '∞' : balance}
                 </Text>
-                <Text style={[styles.balanceUnit, { color: colors.textSecondary }]}>ballots</Text>
+                <Text style={[styles.balanceUnit, { color: colors.textSecondary }]}>RPV</Text>
               </View>
             </View>
-
-            {tier !== 'premium' && timeRemaining > 0 && (
-              <View style={styles.balanceRight}>
-                <Text style={[styles.regenLabel, { color: colors.textTertiary }]}>Next free ballot</Text>
-                <Text style={[styles.regenTime, { color: colors.success }]}>
-                  {formatTimeRemaining(timeRemaining)}
-                </Text>
-              </View>
-            )}
 
             {tier === 'premium' && (
               <View style={[styles.premiumBadge, { backgroundColor: `${colors.gold}20` }]}>
@@ -216,10 +194,10 @@ export default function PurchaseBallotsScreen() {
                     </View>
                     <View>
                       <Text style={[styles.packBallots, { color: colors.text }]}>
-                        {pack.ballots} Ballots
+                        {pack.ballots} RPV Tokens
                       </Text>
                       <Text style={[styles.packPerBallot, { color: colors.textSecondary }]}>
-                        {pack.perBallot} per ballot
+                        {pack.perBallot} per token
                       </Text>
                     </View>
                   </View>
@@ -248,11 +226,9 @@ export default function PurchaseBallotsScreen() {
         >
           <Ionicons name="information-circle-outline" size={20} color={colors.info} />
           <View style={styles.infoContent}>
-            <Text style={[styles.infoTitle, { color: colors.text }]}>Free Ballots Regenerate</Text>
+            <Text style={[styles.infoTitle, { color: colors.text }]}>On-Chain Tokens</Text>
             <Text style={[styles.infoText, { color: colors.textSecondary }]}>
-              {tier === 'free' && 'Free users get 1 ballot per day.'}
-              {tier === 'verified' && 'Verified users get 2 ballots per day.'}
-              {tier === 'premium' && 'Premium users have unlimited ballots!'}
+              RPV tokens are real blockchain assets on Base. When you vote, your token is transferred on-chain.
             </Text>
           </View>
         </Animated.View>
@@ -274,7 +250,7 @@ export default function PurchaseBallotsScreen() {
               <Text style={[styles.upsellTitle, { color: colors.gold }]}>Go Premium</Text>
             </View>
             <Text style={[styles.upsellText, { color: colors.textSecondary }]}>
-              Get unlimited ballots + Sentinel AI for $7.99/month
+              Get unlimited voting power + Sentinel AI for $7.99/month
             </Text>
             <TouchableOpacity
               onPress={() => router.push('/modals/subscription')}
@@ -322,23 +298,22 @@ const styles = StyleSheet.create({
     padding: SPACING.xl,
   },
   heroIconContainer: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
+    width: 96,
+    height: 96,
+    borderRadius: 48,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: SPACING.lg,
   },
   heroTitle: {
     ...TYPOGRAPHY.headlineLarge,
-    textAlign: 'center',
-    marginBottom: SPACING.sm,
+    marginBottom: SPACING.xs,
   },
   heroSubtitle: {
     ...TYPOGRAPHY.bodyMedium,
     textAlign: 'center',
-    lineHeight: 22,
     marginBottom: SPACING.xl,
+    paddingHorizontal: SPACING.lg,
   },
   balanceCard: {
     flexDirection: 'row',
@@ -360,7 +335,7 @@ const styles = StyleSheet.create({
     gap: SPACING.sm,
   },
   balanceValue: {
-    ...TYPOGRAPHY.displaySmall,
+    ...TYPOGRAPHY.headlineLarge,
     fontWeight: '700',
   },
   balanceUnit: {
@@ -385,22 +360,21 @@ const styles = StyleSheet.create({
     borderRadius: BORDER_RADIUS.full,
   },
   premiumText: {
-    ...TYPOGRAPHY.labelMedium,
+    ...TYPOGRAPHY.labelSmall,
     fontWeight: '600',
   },
   packsSection: {
-    paddingHorizontal: SPACING.lg,
+    padding: SPACING.lg,
   },
   sectionTitle: {
-    ...TYPOGRAPHY.headlineSmall,
-    marginBottom: SPACING.lg,
+    ...TYPOGRAPHY.labelLarge,
+    marginBottom: SPACING.md,
   },
   packCard: {
     borderRadius: BORDER_RADIUS.xl,
     marginBottom: SPACING.md,
-    position: 'relative',
     overflow: 'hidden',
-    ...SHADOWS.sm,
+    position: 'relative',
   },
   packBadge: {
     position: 'absolute',
@@ -441,13 +415,14 @@ const styles = StyleSheet.create({
   },
   packPerBallot: {
     ...TYPOGRAPHY.labelSmall,
-    marginTop: 2,
   },
-  packRight: {},
+  packRight: {
+    alignItems: 'flex-end',
+  },
   priceButton: {
     paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.md,
-    borderRadius: BORDER_RADIUS.lg,
+    paddingVertical: SPACING.sm,
+    borderRadius: BORDER_RADIUS.full,
   },
   priceText: {
     ...TYPOGRAPHY.labelLarge,
@@ -455,13 +430,11 @@ const styles = StyleSheet.create({
   },
   infoCard: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    padding: SPACING.lg,
     marginHorizontal: SPACING.lg,
-    marginTop: SPACING.md,
+    padding: SPACING.lg,
     borderRadius: BORDER_RADIUS.xl,
     borderWidth: 1,
-    gap: SPACING.sm,
+    gap: SPACING.md,
   },
   infoContent: {
     flex: 1,
@@ -469,18 +442,17 @@ const styles = StyleSheet.create({
   infoTitle: {
     ...TYPOGRAPHY.labelMedium,
     fontWeight: '600',
-    marginBottom: 4,
+    marginBottom: SPACING.xs,
   },
   infoText: {
     ...TYPOGRAPHY.bodySmall,
-    lineHeight: 18,
   },
   upsellCard: {
-    padding: SPACING.lg,
     marginHorizontal: SPACING.lg,
     marginTop: SPACING.lg,
-    borderRadius: BORDER_RADIUS.xxl,
-    borderWidth: 2,
+    padding: SPACING.lg,
+    borderRadius: BORDER_RADIUS.xl,
+    borderWidth: 1,
     overflow: 'hidden',
   },
   upsellHeader: {
@@ -491,17 +463,16 @@ const styles = StyleSheet.create({
   },
   upsellTitle: {
     ...TYPOGRAPHY.labelLarge,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   upsellText: {
     ...TYPOGRAPHY.bodySmall,
-    lineHeight: 20,
-    marginBottom: SPACING.sm,
+    marginBottom: SPACING.md,
   },
   upsellLink: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: SPACING.xxs,
+    gap: SPACING.xs,
   },
   upsellLinkText: {
     ...TYPOGRAPHY.labelMedium,
