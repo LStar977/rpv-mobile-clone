@@ -10,7 +10,17 @@ import Animated, {
   FadeIn,
   FadeInDown,
   FadeInUp,
+  useSharedValue,
+  useAnimatedStyle,
+  withRepeat,
+  withSequence,
+  withTiming,
+  withDelay,
+  withSpring,
+  interpolate,
+  Easing,
 } from 'react-native-reanimated';
+import Svg, { Circle, Defs, RadialGradient, Stop } from 'react-native-svg';
 import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS, responsive } from '../../lib/theme';
 import { useAuthStore } from '../../lib/auth';
 import { useBallotStore } from '../../lib/ballots';
@@ -166,6 +176,48 @@ export default function DashboardScreen() {
     [allProposals]
   );
 
+  // ═══ ANIMATIONS ═══
+  const glowPulse = useSharedValue(0);
+  const shimmerX = useSharedValue(-1);
+  const ringRotate = useSharedValue(0);
+
+  useEffect(() => {
+    // Subtle glow pulse
+    glowPulse.value = withRepeat(
+      withSequence(
+        withTiming(1, { duration: 2000, easing: Easing.inOut(Easing.ease) }),
+        withTiming(0, { duration: 2000, easing: Easing.inOut(Easing.ease) })
+      ),
+      -1,
+      false
+    );
+    // Shimmer sweep
+    shimmerX.value = withRepeat(
+      withTiming(1, { duration: 3000, easing: Easing.inOut(Easing.ease) }),
+      -1,
+      false
+    );
+    // Ring rotation
+    ringRotate.value = withRepeat(
+      withTiming(360, { duration: 20000, easing: Easing.linear }),
+      -1,
+      false
+    );
+  }, []);
+
+  const glowStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(glowPulse.value, [0, 1], [0.3, 0.7]),
+    transform: [{ scale: interpolate(glowPulse.value, [0, 1], [1, 1.1]) }],
+  }));
+
+  const shimmerStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: interpolate(shimmerX.value, [-1, 1], [-200, SCREEN_WIDTH + 200]) }],
+  }));
+
+  const ringStyle = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${ringRotate.value}deg` }],
+  }));
+
   if (loading) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -189,80 +241,131 @@ export default function DashboardScreen() {
         snapToAlignment="start"
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.gold} />}
       >
-        {/* ═══ CARD 1: Hero / Your Impact ═══ */}
-        <Animated.View entering={FadeInDown.duration(500)} style={styles.heroCardOuter}>
-          <BlurView
-            intensity={isDark ? 40 : 60}
-            tint={isDark ? 'dark' : 'light'}
-            style={styles.heroBlur}
+        {/* ═══ CARD 1: Premium Hero ═══ */}
+        <Animated.View entering={FadeInDown.duration(600)} style={styles.heroCardOuter}>
+          {/* Animated glow background */}
+          <Animated.View style={[styles.heroGlow, glowStyle]}>
+            <LinearGradient
+              colors={[`${colors.gold}40`, `${colors.gold}00`]}
+              style={StyleSheet.absoluteFill}
+              start={{ x: 0.5, y: 0 }}
+              end={{ x: 0.5, y: 1 }}
+            />
+          </Animated.View>
+
+          {/* Main card */}
+          <LinearGradient
+            colors={isDark
+              ? [`${colors.gold}15`, `${colors.gold}08`, colors.surface, colors.surface]
+              : [`${colors.gold}20`, `${colors.gold}10`, '#FFFFFF', '#FFFFFF']}
+            style={styles.heroGradient}
+            start={{ x: 0.5, y: 0 }}
+            end={{ x: 0.5, y: 1 }}
           >
-            <View style={[
-              styles.heroGlassInner,
-              {
-                backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.75)',
-                borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.6)',
-              }
-            ]}>
-              {/* Header */}
-              <View style={styles.cardHeader}>
-                <View>
-                  <Text style={[styles.cardHeaderGreeting, { color: colors.textTertiary }]}>{getGreeting()}</Text>
-                  <View style={styles.cardHeaderNameRow}>
-                    <Text style={[styles.cardHeaderName, { color: colors.text }]}>{displayName}</Text>
-                    {isVerified && (
-                      <View style={[styles.verifiedBadge, { backgroundColor: colors.success }]}>
-                        <Ionicons name="checkmark" size={10} color="#FFF" />
-                      </View>
-                    )}
-                  </View>
+            {/* Shimmer overlay */}
+            <View style={styles.shimmerContainer}>
+              <Animated.View style={[styles.shimmerBar, shimmerStyle]}>
+                <LinearGradient
+                  colors={['transparent', `${colors.gold}15`, 'transparent']}
+                  style={StyleSheet.absoluteFill}
+                  start={{ x: 0, y: 0.5 }}
+                  end={{ x: 1, y: 0.5 }}
+                />
+              </Animated.View>
+            </View>
+
+            {/* Decorative rings */}
+            <Animated.View style={[styles.decorativeRing, styles.ringOuter, ringStyle, { borderColor: `${colors.gold}10` }]} />
+            <Animated.View style={[styles.decorativeRing, styles.ringInner, { borderColor: `${colors.gold}08` }]} />
+
+            {/* Header */}
+            <View style={styles.heroHeader}>
+              <View>
+                <Text style={[styles.heroGreeting, { color: colors.textTertiary }]}>{getGreeting()}</Text>
+                <View style={styles.heroNameRow}>
+                  <Text style={[styles.heroName, { color: colors.text }]}>{displayName}</Text>
+                  {isVerified && (
+                    <LinearGradient colors={[colors.success, '#22C55E']} style={styles.verifiedBadgePremium}>
+                      <Ionicons name="checkmark" size={12} color="#FFF" />
+                    </LinearGradient>
+                  )}
                 </View>
-                <View style={styles.cardHeaderRight}>
-                  <BallotDisplay size="sm" />
-                  <TouchableOpacity onPress={() => router.push('/(tabs)/profile')} activeOpacity={0.8}>
-                    <LinearGradient colors={[colors.gold, colors.goldDark || '#A68523']} style={styles.avatar}>
+              </View>
+              <View style={styles.heroHeaderRight}>
+                <BallotDisplay size="sm" />
+                <TouchableOpacity onPress={() => router.push('/(tabs)/profile')} activeOpacity={0.8}>
+                  <View style={styles.avatarOuter}>
+                    <LinearGradient colors={[colors.gold, colors.goldDark || '#A68523']} style={styles.avatarGradient}>
                       <Text style={[styles.avatarText, { color: colors.background }]}>
                         {user?.name ? user.name.charAt(0).toUpperCase() : 'U'}
                       </Text>
                     </LinearGradient>
-                  </TouchableOpacity>
+                  </View>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Premium Stats with glowing orbs */}
+            <View style={styles.premiumStatsRow}>
+              <TouchableOpacity style={styles.premiumStatItem} onPress={navigateToProposals} activeOpacity={0.7}>
+                <View style={[styles.statOrb, { backgroundColor: `${colors.warning}15`, borderColor: `${colors.warning}30` }]}>
+                  <Text style={[styles.statOrbValue, { color: colors.warning }]}>{stats.pending}</Text>
                 </View>
+                <Text style={[styles.premiumStatLabel, { color: colors.textSecondary }]}>Pending</Text>
+              </TouchableOpacity>
+
+              <View style={styles.statConnector}>
+                <View style={[styles.statConnectorLine, { backgroundColor: `${colors.gold}20` }]} />
+                <View style={[styles.statConnectorDot, { backgroundColor: colors.gold }]} />
+                <View style={[styles.statConnectorLine, { backgroundColor: `${colors.gold}20` }]} />
               </View>
 
-              {/* Centered Stats Row */}
-              <View style={styles.statsRow}>
-                <TouchableOpacity style={styles.statItem} onPress={navigateToProposals} activeOpacity={0.7}>
-                  <Text style={[styles.statItemValue, { color: colors.warning }]}>{stats.pending}</Text>
-                  <Text style={[styles.statItemLabel, { color: colors.textTertiary }]}>Pending</Text>
-                </TouchableOpacity>
-                <View style={[styles.statDivider, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)' }]} />
-                <TouchableOpacity style={styles.statItem} onPress={() => router.push('/modals/voting-history')} activeOpacity={0.7}>
-                  <Text style={[styles.statItemValue, { color: colors.success }]}>{stats.voted}</Text>
-                  <Text style={[styles.statItemLabel, { color: colors.textTertiary }]}>Voted</Text>
-                </TouchableOpacity>
-                <View style={[styles.statDivider, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)' }]} />
-                <TouchableOpacity style={styles.statItem} onPress={() => router.push('/modals/my-proposals')} activeOpacity={0.7}>
-                  <Text style={[styles.statItemValue, { color: colors.gold }]}>{stats.created}</Text>
-                  <Text style={[styles.statItemLabel, { color: colors.textTertiary }]}>Created</Text>
-                </TouchableOpacity>
+              <TouchableOpacity style={styles.premiumStatItem} onPress={() => router.push('/modals/voting-history')} activeOpacity={0.7}>
+                <View style={[styles.statOrb, { backgroundColor: `${colors.success}15`, borderColor: `${colors.success}30` }]}>
+                  <Text style={[styles.statOrbValue, { color: colors.success }]}>{stats.voted}</Text>
+                </View>
+                <Text style={[styles.premiumStatLabel, { color: colors.textSecondary }]}>Voted</Text>
+              </TouchableOpacity>
+
+              <View style={styles.statConnector}>
+                <View style={[styles.statConnectorLine, { backgroundColor: `${colors.gold}20` }]} />
+                <View style={[styles.statConnectorDot, { backgroundColor: colors.gold }]} />
+                <View style={[styles.statConnectorLine, { backgroundColor: `${colors.gold}20` }]} />
               </View>
 
-              {/* CTA */}
-              <TouchableOpacity
-                onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); navigateToProposals(); }}
-                activeOpacity={0.85}
-              >
-                <LinearGradient colors={[colors.gold, colors.goldDark || '#A68523']} style={styles.heroCta} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
-                  <Text style={styles.heroCtaText}>Vote Now</Text>
-                  {stats.pending > 0 && (
-                    <View style={styles.ctaBadge}>
-                      <Text style={styles.ctaBadgeText}>{stats.pending}</Text>
-                    </View>
-                  )}
-                  <Ionicons name="arrow-forward" size={18} color="#FFF" />
-                </LinearGradient>
+              <TouchableOpacity style={styles.premiumStatItem} onPress={() => router.push('/modals/my-proposals')} activeOpacity={0.7}>
+                <View style={[styles.statOrb, { backgroundColor: `${colors.gold}15`, borderColor: `${colors.gold}30` }]}>
+                  <Text style={[styles.statOrbValue, { color: colors.gold }]}>{stats.created}</Text>
+                </View>
+                <Text style={[styles.premiumStatLabel, { color: colors.textSecondary }]}>Created</Text>
               </TouchableOpacity>
             </View>
-          </BlurView>
+
+            {/* Premium CTA */}
+            <TouchableOpacity
+              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); navigateToProposals(); }}
+              activeOpacity={0.9}
+              style={styles.premiumCtaOuter}
+            >
+              <LinearGradient
+                colors={[colors.gold, colors.goldDark || '#A68523', colors.gold]}
+                style={styles.premiumCta}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+              >
+                <View style={styles.ctaShine} />
+                <Text style={styles.premiumCtaText}>Vote Now</Text>
+                {stats.pending > 0 && (
+                  <View style={styles.premiumCtaBadge}>
+                    <Text style={styles.premiumCtaBadgeText}>{stats.pending}</Text>
+                  </View>
+                )}
+                <View style={styles.ctaArrow}>
+                  <Ionicons name="arrow-forward" size={18} color={colors.gold} />
+                </View>
+              </LinearGradient>
+            </TouchableOpacity>
+          </LinearGradient>
         </Animated.View>
 
         {/* ═══ CARD 2: Closing Soon ═══ */}
@@ -515,80 +618,206 @@ const styles = StyleSheet.create({
     ...SHADOWS.md,
   },
 
-  // Card 1: Header
-  cardHeader: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start',
-    marginBottom: SPACING.xl,
-  },
-  cardHeaderGreeting: { ...TYPOGRAPHY.labelMedium, letterSpacing: 0.3 },
-  cardHeaderNameRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm, marginTop: 2 },
-  cardHeaderName: { fontSize: responsive(28, 32, 36), fontWeight: '800' },
-  verifiedBadge: { width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  cardHeaderRight: { flexDirection: 'row', alignItems: 'center', gap: SPACING.md },
-  avatar: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
-  avatarText: { fontSize: 18, fontWeight: '700' },
-
-  // Hero glassmorphism card
+  // ═══ PREMIUM HERO STYLES ═══
   heroCardOuter: {
     marginHorizontal: SPACING.lg,
     marginBottom: SPACING.lg,
-    borderRadius: 28,
+    borderRadius: 32,
     overflow: 'hidden',
-    ...SHADOWS.lg,
+    position: 'relative',
   },
-  heroBlur: {
-    borderRadius: 28,
-    overflow: 'hidden',
+  heroGlow: {
+    position: 'absolute',
+    top: -50,
+    left: -50,
+    right: -50,
+    height: 200,
+    borderRadius: 100,
   },
-  heroGlassInner: {
-    padding: SPACING.xl,
+  heroGradient: {
+    borderRadius: 32,
     borderWidth: 1,
-    borderRadius: 28,
+    borderColor: 'rgba(201, 162, 39, 0.2)',
+    padding: SPACING.xl,
+    overflow: 'hidden',
+    ...SHADOWS.xl,
+  },
+  shimmerContainer: {
+    ...StyleSheet.absoluteFillObject,
+    overflow: 'hidden',
+    borderRadius: 32,
+  },
+  shimmerBar: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    width: 100,
+    transform: [{ skewX: '-20deg' }],
+  },
+  decorativeRing: {
+    position: 'absolute',
+    borderWidth: 1,
+    borderRadius: 999,
+  },
+  ringOuter: {
+    top: -80,
+    right: -80,
+    width: 200,
+    height: 200,
+  },
+  ringInner: {
+    top: -40,
+    right: -40,
+    width: 120,
+    height: 120,
   },
 
-  // Centered stats row
-  statsRow: {
+  // Hero Header
+  heroHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: SPACING.xl,
+  },
+  heroGreeting: {
+    ...TYPOGRAPHY.labelMedium,
+    letterSpacing: 0.5,
+    textTransform: 'none',
+  },
+  heroNameRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: SPACING.xl,
+    gap: SPACING.sm,
+    marginTop: 4,
+  },
+  heroName: {
+    fontSize: responsive(32, 36, 40),
+    fontWeight: '800',
+    letterSpacing: -0.5,
+  },
+  verifiedBadgePremium: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...SHADOWS.sm,
+  },
+  heroHeaderRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.md,
+  },
+  avatarOuter: {
+    padding: 2,
+    borderRadius: 24,
+    backgroundColor: 'rgba(201, 162, 39, 0.2)',
+  },
+  avatarGradient: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarText: {
+    fontSize: 18,
+    fontWeight: '700',
+  },
+
+  // Premium Stats with Orbs
+  premiumStatsRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: SPACING.lg,
     marginBottom: SPACING.lg,
   },
-  statItem: {
+  premiumStatItem: {
     alignItems: 'center',
     flex: 1,
   },
-  statItemValue: {
-    fontSize: 32,
+  statOrb: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: SPACING.sm,
+  },
+  statOrbValue: {
+    fontSize: 28,
     fontWeight: '800',
     fontVariant: ['tabular-nums'],
   },
-  statItemLabel: {
-    ...TYPOGRAPHY.labelMedium,
-    marginTop: 4,
+  premiumStatLabel: {
+    ...TYPOGRAPHY.labelSmall,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
-  statDivider: {
-    width: 1,
-    height: 48,
+  statConnector: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: 24,
+  },
+  statConnectorLine: {
+    flex: 1,
+    height: 1,
+  },
+  statConnectorDot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
   },
 
-  // Hero CTA
-  heroCta: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    paddingVertical: 16, borderRadius: BORDER_RADIUS.full, gap: SPACING.sm,
+  // Premium CTA
+  premiumCtaOuter: {
+    borderRadius: BORDER_RADIUS.full,
     ...SHADOWS.lg,
   },
-  heroCtaText: { ...TYPOGRAPHY.labelLarge, color: '#FFF', fontWeight: '700' },
-  ctaBadge: {
+  premiumCta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 18,
+    borderRadius: BORDER_RADIUS.full,
+    gap: SPACING.md,
+    overflow: 'hidden',
+  },
+  ctaShine: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: '50%',
+    backgroundColor: 'rgba(255,255,255,0.15)',
+  },
+  premiumCtaText: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#FFF',
+    letterSpacing: 0.3,
+  },
+  premiumCtaBadge: {
     backgroundColor: 'rgba(0,0,0,0.2)',
     paddingHorizontal: SPACING.sm,
-    paddingVertical: 2,
+    paddingVertical: 4,
     borderRadius: BORDER_RADIUS.full,
   },
-  ctaBadgeText: {
+  premiumCtaBadgeText: {
     color: '#FFF',
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '700',
+  },
+  ctaArrow: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.95)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
   // Card title row
@@ -653,16 +882,24 @@ const styles = StyleSheet.create({
   recentBar: { height: 4, borderRadius: 2, overflow: 'hidden' },
   recentBarFill: { height: '100%', borderRadius: 2 },
 
-  // Quick Actions
-  actionsTitle: { ...TYPOGRAPHY.headlineSmall, fontWeight: '700', marginBottom: SPACING.lg },
-  actionsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.md },
-  actionCard: {
-    width: (SCREEN_WIDTH - SPACING.lg * 2 - SPACING.xl * 2 - SPACING.md) / 2,
-    paddingVertical: SPACING.xl, paddingHorizontal: SPACING.lg,
-    borderRadius: BORDER_RADIUS.xl, borderWidth: 1, alignItems: 'center', gap: SPACING.sm,
+  // Quick Actions - 2x2 Grid
+  actionsTitle: { ...TYPOGRAPHY.headlineSmall, fontWeight: '700', marginBottom: SPACING.md },
+  actionsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: SPACING.sm,
   },
-  actionCardLabel: { ...TYPOGRAPHY.labelLarge, fontWeight: '700' },
-  actionCardSub: { ...TYPOGRAPHY.labelSmall },
+  actionCard: {
+    width: '48.5%',
+    paddingVertical: SPACING.lg,
+    paddingHorizontal: SPACING.md,
+    borderRadius: BORDER_RADIUS.lg,
+    borderWidth: 1,
+    alignItems: 'center',
+    gap: SPACING.xs,
+  },
+  actionCardLabel: { ...TYPOGRAPHY.labelMedium, fontWeight: '700' },
+  actionCardSub: { ...TYPOGRAPHY.labelSmall, fontSize: 11 },
 
   bottomSpacer: { height: 100 },
 });
