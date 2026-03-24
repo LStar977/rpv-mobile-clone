@@ -299,11 +299,13 @@ export const proposalsApi = {
       backendProposals = result.data.proposals;
     }
 
+    // Backend uses "userId" but client expects "creatorId" - map the field
+    backendProposals = backendProposals.map((p: any) => ({
+      ...p,
+      creatorId: p.creatorId || p.userId,
+    }));
+
     console.log('[Proposals] Backend count:', backendProposals.length, '| Seed count:', SEED_PROPOSALS.length);
-    if (backendProposals.length > 0) {
-      console.log('[Proposals] Backend sample keys:', Object.keys(backendProposals[0]));
-      console.log('[Proposals] Backend sample:', JSON.stringify(backendProposals[0]).substring(0, 500));
-    }
 
     const merged = [...SEED_PROPOSALS, ...backendProposals];
     return { data: merged, error: null };
