@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect, useMemo } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
+import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 import Animated, {
   FadeIn,
@@ -44,7 +45,7 @@ const countryThemes: Record<string, string> = {
 
 // --- Main Dashboard Screen ---
 export default function DashboardScreen() {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const router = useRouter();
   const { user, isAuthenticated } = useAuthStore();
   const { syncFromChain } = useBallotStore();
@@ -189,83 +190,79 @@ export default function DashboardScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.gold} />}
       >
         {/* ═══ CARD 1: Hero / Your Impact ═══ */}
-        <Animated.View entering={FadeInDown.duration(500)} style={[styles.card, { minHeight: CARD_MIN_HEIGHT }]}>
-          <LinearGradient
-            colors={[`${colors.gold}12`, colors.surface, colors.surface]}
-            style={[StyleSheet.absoluteFill, { borderRadius: 28 }]}
-            start={{ x: 0.5, y: 0 }}
-            end={{ x: 0.5, y: 1 }}
-          />
-          {/* Header */}
-          <View style={styles.cardHeader}>
-            <View>
-              <Text style={[styles.cardHeaderGreeting, { color: colors.textTertiary }]}>{getGreeting()}</Text>
-              <View style={styles.cardHeaderNameRow}>
-                <Text style={[styles.cardHeaderName, { color: colors.text }]}>{displayName}</Text>
-                {isVerified && (
-                  <View style={[styles.verifiedBadge, { backgroundColor: colors.success }]}>
-                    <Ionicons name="checkmark" size={10} color="#FFF" />
+        <Animated.View entering={FadeInDown.duration(500)} style={styles.heroCardOuter}>
+          <BlurView
+            intensity={isDark ? 40 : 60}
+            tint={isDark ? 'dark' : 'light'}
+            style={styles.heroBlur}
+          >
+            <View style={[
+              styles.heroGlassInner,
+              {
+                backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.75)',
+                borderColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.6)',
+              }
+            ]}>
+              {/* Header */}
+              <View style={styles.cardHeader}>
+                <View>
+                  <Text style={[styles.cardHeaderGreeting, { color: colors.textTertiary }]}>{getGreeting()}</Text>
+                  <View style={styles.cardHeaderNameRow}>
+                    <Text style={[styles.cardHeaderName, { color: colors.text }]}>{displayName}</Text>
+                    {isVerified && (
+                      <View style={[styles.verifiedBadge, { backgroundColor: colors.success }]}>
+                        <Ionicons name="checkmark" size={10} color="#FFF" />
+                      </View>
+                    )}
                   </View>
-                )}
+                </View>
+                <View style={styles.cardHeaderRight}>
+                  <BallotDisplay size="sm" />
+                  <TouchableOpacity onPress={() => router.push('/(tabs)/profile')} activeOpacity={0.8}>
+                    <LinearGradient colors={[colors.gold, colors.goldDark || '#A68523']} style={styles.avatar}>
+                      <Text style={[styles.avatarText, { color: colors.background }]}>
+                        {user?.name ? user.name.charAt(0).toUpperCase() : 'U'}
+                      </Text>
+                    </LinearGradient>
+                  </TouchableOpacity>
+                </View>
               </View>
-            </View>
-            <View style={styles.cardHeaderRight}>
-              <BallotDisplay size="sm" />
-              <TouchableOpacity onPress={() => router.push('/(tabs)/profile')} activeOpacity={0.8}>
-                <LinearGradient colors={[colors.gold, colors.goldDark || '#A68523']} style={styles.avatar}>
-                  <Text style={[styles.avatarText, { color: colors.background }]}>
-                    {user?.name ? user.name.charAt(0).toUpperCase() : 'U'}
-                  </Text>
+
+              {/* Centered Stats Row */}
+              <View style={styles.statsRow}>
+                <TouchableOpacity style={styles.statItem} onPress={navigateToProposals} activeOpacity={0.7}>
+                  <Text style={[styles.statItemValue, { color: colors.warning }]}>{stats.pending}</Text>
+                  <Text style={[styles.statItemLabel, { color: colors.textTertiary }]}>Pending</Text>
+                </TouchableOpacity>
+                <View style={[styles.statDivider, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)' }]} />
+                <TouchableOpacity style={styles.statItem} onPress={() => router.push('/modals/voting-history')} activeOpacity={0.7}>
+                  <Text style={[styles.statItemValue, { color: colors.success }]}>{stats.voted}</Text>
+                  <Text style={[styles.statItemLabel, { color: colors.textTertiary }]}>Voted</Text>
+                </TouchableOpacity>
+                <View style={[styles.statDivider, { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)' }]} />
+                <TouchableOpacity style={styles.statItem} onPress={() => router.push('/modals/my-proposals')} activeOpacity={0.7}>
+                  <Text style={[styles.statItemValue, { color: colors.gold }]}>{stats.created}</Text>
+                  <Text style={[styles.statItemLabel, { color: colors.textTertiary }]}>Created</Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* CTA */}
+              <TouchableOpacity
+                onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); navigateToProposals(); }}
+                activeOpacity={0.85}
+              >
+                <LinearGradient colors={[colors.gold, colors.goldDark || '#A68523']} style={styles.heroCta} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+                  <Text style={styles.heroCtaText}>Vote Now</Text>
+                  {stats.pending > 0 && (
+                    <View style={styles.ctaBadge}>
+                      <Text style={styles.ctaBadgeText}>{stats.pending}</Text>
+                    </View>
+                  )}
+                  <Ionicons name="arrow-forward" size={18} color="#FFF" />
                 </LinearGradient>
               </TouchableOpacity>
             </View>
-          </View>
-
-          {/* Status + Stats */}
-          <View style={styles.heroContent}>
-            <View style={styles.heroStatusWrap}>
-              {stats.pending === 0 ? (
-                <>
-                  <View style={[styles.heroStatusIcon, { backgroundColor: `${colors.success}15` }]}>
-                    <Ionicons name="checkmark-circle" size={48} color={colors.success} />
-                  </View>
-                  <Text style={[styles.heroStatusText, { color: colors.success }]}>All caught up!</Text>
-                </>
-              ) : (
-                <>
-                  <Text style={[styles.heroNumber, { color: colors.warning }]}>{stats.pending}</Text>
-                  <Text style={[styles.heroNumberLabel, { color: colors.textTertiary }]}>awaiting your vote</Text>
-                </>
-              )}
-            </View>
-            <View style={styles.heroStatsCol}>
-              <TouchableOpacity style={styles.heroStat} onPress={navigateToProposals} activeOpacity={0.7}>
-                <Text style={[styles.heroStatValue, { color: colors.warning }]}>{stats.pending}</Text>
-                <Text style={[styles.heroStatLabel, { color: colors.textTertiary }]}>Pending</Text>
-              </TouchableOpacity>
-              <View style={[styles.heroStatLine, { backgroundColor: colors.border }]} />
-              <TouchableOpacity style={styles.heroStat} onPress={() => router.push('/modals/voting-history')} activeOpacity={0.7}>
-                <Text style={[styles.heroStatValue, { color: colors.success }]}>{stats.voted}</Text>
-                <Text style={[styles.heroStatLabel, { color: colors.textTertiary }]}>Voted</Text>
-              </TouchableOpacity>
-              <View style={[styles.heroStatLine, { backgroundColor: colors.border }]} />
-              <TouchableOpacity style={styles.heroStat} onPress={() => router.push('/modals/my-proposals')} activeOpacity={0.7}>
-                <Text style={[styles.heroStatValue, { color: colors.gold }]}>{stats.created}</Text>
-                <Text style={[styles.heroStatLabel, { color: colors.textTertiary }]}>Created</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          {/* CTA */}
-          <TouchableOpacity
-            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); navigateToProposals(); }}
-            activeOpacity={0.85}
-          >
-            <LinearGradient colors={[colors.gold, colors.goldDark || '#A68523']} style={styles.heroCta} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
-              <Text style={styles.heroCtaText}>Vote Now</Text>
-              <Ionicons name="arrow-forward" size={18} color="#FFF" />
-            </LinearGradient>
-          </TouchableOpacity>
+          </BlurView>
         </Animated.View>
 
         {/* ═══ CARD 2: Closing Soon ═══ */}
@@ -367,16 +364,9 @@ export default function DashboardScreen() {
                     </View>
                   )}
 
-                  {/* Top row: emoji + voted count */}
+                  {/* Top row: emoji */}
                   <View style={styles.communityTileTop}>
                     <Text style={styles.communityTileFlag}>{c.icon}</Text>
-
-                    <View style={[styles.communityTileVotedWrap, { backgroundColor: `${accent}15` }]}>
-                      <Text style={[styles.communityTileVotedCount, { color: accent }]}>
-                        {c.proposalCount - c.unvotedCount}/{c.proposalCount}
-                      </Text>
-                      <Text style={[styles.communityTileVotedLabel, { color: colors.textTertiary }]}>voted</Text>
-                    </View>
                   </View>
 
                   {/* Name and meta */}
@@ -538,18 +528,49 @@ const styles = StyleSheet.create({
   avatar: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   avatarText: { fontSize: 18, fontWeight: '700' },
 
-  // Hero content
-  heroContent: { flexDirection: 'row', alignItems: 'center', marginBottom: SPACING.xl },
-  heroStatusWrap: { width: 140, height: 140, alignItems: 'center', justifyContent: 'center' },
-  heroStatusIcon: { width: 72, height: 72, borderRadius: 36, alignItems: 'center', justifyContent: 'center', marginBottom: SPACING.xs },
-  heroStatusText: { ...TYPOGRAPHY.labelLarge, fontWeight: '700' },
-  heroNumber: { fontSize: 48, fontWeight: '800', fontVariant: ['tabular-nums'] },
-  heroNumberLabel: { ...TYPOGRAPHY.labelMedium, marginTop: -2 },
-  heroStatsCol: { flex: 1, marginLeft: SPACING.xl, gap: SPACING.md },
-  heroStat: { alignItems: 'center' },
-  heroStatValue: { fontSize: 24, fontWeight: '800', fontVariant: ['tabular-nums'] },
-  heroStatLabel: { ...TYPOGRAPHY.labelSmall, marginTop: 1 },
-  heroStatLine: { height: 1, width: '60%', alignSelf: 'center' },
+  // Hero glassmorphism card
+  heroCardOuter: {
+    marginHorizontal: SPACING.lg,
+    marginBottom: SPACING.lg,
+    borderRadius: 28,
+    overflow: 'hidden',
+    ...SHADOWS.lg,
+  },
+  heroBlur: {
+    borderRadius: 28,
+    overflow: 'hidden',
+  },
+  heroGlassInner: {
+    padding: SPACING.xl,
+    borderWidth: 1,
+    borderRadius: 28,
+  },
+
+  // Centered stats row
+  statsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+    paddingVertical: SPACING.xl,
+    marginBottom: SPACING.lg,
+  },
+  statItem: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  statItemValue: {
+    fontSize: 32,
+    fontWeight: '800',
+    fontVariant: ['tabular-nums'],
+  },
+  statItemLabel: {
+    ...TYPOGRAPHY.labelMedium,
+    marginTop: 4,
+  },
+  statDivider: {
+    width: 1,
+    height: 48,
+  },
 
   // Hero CTA
   heroCta: {
@@ -558,6 +579,17 @@ const styles = StyleSheet.create({
     ...SHADOWS.lg,
   },
   heroCtaText: { ...TYPOGRAPHY.labelLarge, color: '#FFF', fontWeight: '700' },
+  ctaBadge: {
+    backgroundColor: 'rgba(0,0,0,0.2)',
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: 2,
+    borderRadius: BORDER_RADIUS.full,
+  },
+  ctaBadgeText: {
+    color: '#FFF',
+    fontSize: 13,
+    fontWeight: '700',
+  },
 
   // Card title row
   cardTitleRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.md, marginBottom: SPACING.lg },
@@ -592,16 +624,12 @@ const styles = StyleSheet.create({
   },
   communityTileBadgeText: { fontSize: 11, fontWeight: '700', color: '#FFF' },
   communityTileTop: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     marginBottom: SPACING.md,
   },
   communityTileFlag: { fontSize: 48 },
   communityTileIconCircle: {
     width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center',
   },
-  communityTileVotedWrap: { paddingHorizontal: SPACING.sm, paddingVertical: SPACING.xs, borderRadius: BORDER_RADIUS.md, alignItems: 'center' },
-  communityTileVotedCount: { fontSize: 14, fontWeight: '700', fontVariant: ['tabular-nums'] },
-  communityTileVotedLabel: { fontSize: 10, fontWeight: '500', marginTop: -1 },
   communityTileName: { ...TYPOGRAPHY.headlineSmall, fontWeight: '700' },
   communityTileMeta: { ...TYPOGRAPHY.labelSmall, marginTop: 2 },
   communityTileAction: {
