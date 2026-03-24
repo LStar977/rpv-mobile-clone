@@ -7,20 +7,9 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 import Animated, {
-  FadeIn,
   FadeInDown,
   FadeInUp,
-  useSharedValue,
-  useAnimatedStyle,
-  withRepeat,
-  withSequence,
-  withTiming,
-  withDelay,
-  withSpring,
-  interpolate,
-  Easing,
 } from 'react-native-reanimated';
-import Svg, { Circle, Defs, RadialGradient, Stop } from 'react-native-svg';
 import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS, responsive } from '../../lib/theme';
 import { useAuthStore } from '../../lib/auth';
 import { useBallotStore } from '../../lib/ballots';
@@ -176,48 +165,6 @@ export default function DashboardScreen() {
     [allProposals]
   );
 
-  // ═══ ANIMATIONS ═══
-  const glowPulse = useSharedValue(0);
-  const shimmerX = useSharedValue(-1);
-  const ringRotate = useSharedValue(0);
-
-  useEffect(() => {
-    // Subtle glow pulse
-    glowPulse.value = withRepeat(
-      withSequence(
-        withTiming(1, { duration: 2000, easing: Easing.inOut(Easing.ease) }),
-        withTiming(0, { duration: 2000, easing: Easing.inOut(Easing.ease) })
-      ),
-      -1,
-      false
-    );
-    // Shimmer sweep
-    shimmerX.value = withRepeat(
-      withTiming(1, { duration: 3000, easing: Easing.inOut(Easing.ease) }),
-      -1,
-      false
-    );
-    // Ring rotation
-    ringRotate.value = withRepeat(
-      withTiming(360, { duration: 20000, easing: Easing.linear }),
-      -1,
-      false
-    );
-  }, []);
-
-  const glowStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(glowPulse.value, [0, 1], [0.3, 0.7]),
-    transform: [{ scale: interpolate(glowPulse.value, [0, 1], [1, 1.1]) }],
-  }));
-
-  const shimmerStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: interpolate(shimmerX.value, [-1, 1], [-200, SCREEN_WIDTH + 200]) }],
-  }));
-
-  const ringStyle = useAnimatedStyle(() => ({
-    transform: [{ rotate: `${ringRotate.value}deg` }],
-  }));
-
   if (loading) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -241,42 +188,22 @@ export default function DashboardScreen() {
         snapToAlignment="start"
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.gold} />}
       >
-        {/* ═══ CARD 1: Premium Hero ═══ */}
-        <Animated.View entering={FadeInDown.duration(600)} style={styles.heroCardOuter}>
-          {/* Animated glow background */}
-          <Animated.View style={[styles.heroGlow, glowStyle]}>
+        {/* ═══ CARD 1: Clean Professional Hero ═══ */}
+        <Animated.View entering={FadeInDown.duration(500)} style={styles.heroCardOuter}>
+          <View style={[
+            styles.heroCard,
+            {
+              backgroundColor: colors.surface,
+              borderColor: isDark ? `${colors.gold}15` : `${colors.gold}20`,
+            }
+          ]}>
+            {/* Subtle top accent */}
             <LinearGradient
-              colors={[`${colors.gold}40`, `${colors.gold}00`]}
-              style={StyleSheet.absoluteFill}
-              start={{ x: 0.5, y: 0 }}
-              end={{ x: 0.5, y: 1 }}
+              colors={[`${colors.gold}12`, 'transparent']}
+              style={styles.heroTopAccent}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 0, y: 1 }}
             />
-          </Animated.View>
-
-          {/* Main card */}
-          <LinearGradient
-            colors={isDark
-              ? [`${colors.gold}15`, `${colors.gold}08`, colors.surface, colors.surface]
-              : [`${colors.gold}20`, `${colors.gold}10`, '#FFFFFF', '#FFFFFF']}
-            style={styles.heroGradient}
-            start={{ x: 0.5, y: 0 }}
-            end={{ x: 0.5, y: 1 }}
-          >
-            {/* Shimmer overlay */}
-            <View style={styles.shimmerContainer}>
-              <Animated.View style={[styles.shimmerBar, shimmerStyle]}>
-                <LinearGradient
-                  colors={['transparent', `${colors.gold}15`, 'transparent']}
-                  style={StyleSheet.absoluteFill}
-                  start={{ x: 0, y: 0.5 }}
-                  end={{ x: 1, y: 0.5 }}
-                />
-              </Animated.View>
-            </View>
-
-            {/* Decorative rings */}
-            <Animated.View style={[styles.decorativeRing, styles.ringOuter, ringStyle, { borderColor: `${colors.gold}10` }]} />
-            <Animated.View style={[styles.decorativeRing, styles.ringInner, { borderColor: `${colors.gold}08` }]} />
 
             {/* Header */}
             <View style={styles.heroHeader}>
@@ -285,87 +212,67 @@ export default function DashboardScreen() {
                 <View style={styles.heroNameRow}>
                   <Text style={[styles.heroName, { color: colors.text }]}>{displayName}</Text>
                   {isVerified && (
-                    <LinearGradient colors={[colors.success, '#22C55E']} style={styles.verifiedBadgePremium}>
-                      <Ionicons name="checkmark" size={12} color="#FFF" />
-                    </LinearGradient>
+                    <View style={[styles.verifiedBadge, { backgroundColor: colors.success }]}>
+                      <Ionicons name="checkmark" size={11} color="#FFF" />
+                    </View>
                   )}
                 </View>
               </View>
               <View style={styles.heroHeaderRight}>
                 <BallotDisplay size="sm" />
                 <TouchableOpacity onPress={() => router.push('/(tabs)/profile')} activeOpacity={0.8}>
-                  <View style={styles.avatarOuter}>
-                    <LinearGradient colors={[colors.gold, colors.goldDark || '#A68523']} style={styles.avatarGradient}>
-                      <Text style={[styles.avatarText, { color: colors.background }]}>
-                        {user?.name ? user.name.charAt(0).toUpperCase() : 'U'}
-                      </Text>
-                    </LinearGradient>
-                  </View>
+                  <LinearGradient colors={[colors.gold, colors.goldDark || '#A68523']} style={styles.avatar}>
+                    <Text style={[styles.avatarText, { color: colors.background }]}>
+                      {user?.name ? user.name.charAt(0).toUpperCase() : 'U'}
+                    </Text>
+                  </LinearGradient>
                 </TouchableOpacity>
               </View>
             </View>
 
-            {/* Premium Stats with glowing orbs */}
-            <View style={styles.premiumStatsRow}>
-              <TouchableOpacity style={styles.premiumStatItem} onPress={navigateToProposals} activeOpacity={0.7}>
-                <View style={[styles.statOrb, { backgroundColor: `${colors.warning}15`, borderColor: `${colors.warning}30` }]}>
-                  <Text style={[styles.statOrbValue, { color: colors.warning }]}>{stats.pending}</Text>
-                </View>
-                <Text style={[styles.premiumStatLabel, { color: colors.textSecondary }]}>Pending</Text>
+            {/* Clean Stats Row */}
+            <View style={styles.statsRow}>
+              <TouchableOpacity style={styles.statItem} onPress={navigateToProposals} activeOpacity={0.7}>
+                <Text style={[styles.statValue, { color: colors.warning }]}>{stats.pending}</Text>
+                <Text style={[styles.statLabel, { color: colors.textTertiary }]}>Pending</Text>
               </TouchableOpacity>
 
-              <View style={styles.statConnector}>
-                <View style={[styles.statConnectorLine, { backgroundColor: `${colors.gold}20` }]} />
-                <View style={[styles.statConnectorDot, { backgroundColor: colors.gold }]} />
-                <View style={[styles.statConnectorLine, { backgroundColor: `${colors.gold}20` }]} />
-              </View>
+              <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
 
-              <TouchableOpacity style={styles.premiumStatItem} onPress={() => router.push('/modals/voting-history')} activeOpacity={0.7}>
-                <View style={[styles.statOrb, { backgroundColor: `${colors.success}15`, borderColor: `${colors.success}30` }]}>
-                  <Text style={[styles.statOrbValue, { color: colors.success }]}>{stats.voted}</Text>
-                </View>
-                <Text style={[styles.premiumStatLabel, { color: colors.textSecondary }]}>Voted</Text>
+              <TouchableOpacity style={styles.statItem} onPress={() => router.push('/modals/voting-history')} activeOpacity={0.7}>
+                <Text style={[styles.statValue, { color: colors.success }]}>{stats.voted}</Text>
+                <Text style={[styles.statLabel, { color: colors.textTertiary }]}>Voted</Text>
               </TouchableOpacity>
 
-              <View style={styles.statConnector}>
-                <View style={[styles.statConnectorLine, { backgroundColor: `${colors.gold}20` }]} />
-                <View style={[styles.statConnectorDot, { backgroundColor: colors.gold }]} />
-                <View style={[styles.statConnectorLine, { backgroundColor: `${colors.gold}20` }]} />
-              </View>
+              <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
 
-              <TouchableOpacity style={styles.premiumStatItem} onPress={() => router.push('/modals/my-proposals')} activeOpacity={0.7}>
-                <View style={[styles.statOrb, { backgroundColor: `${colors.gold}15`, borderColor: `${colors.gold}30` }]}>
-                  <Text style={[styles.statOrbValue, { color: colors.gold }]}>{stats.created}</Text>
-                </View>
-                <Text style={[styles.premiumStatLabel, { color: colors.textSecondary }]}>Created</Text>
+              <TouchableOpacity style={styles.statItem} onPress={() => router.push('/modals/my-proposals')} activeOpacity={0.7}>
+                <Text style={[styles.statValue, { color: colors.gold }]}>{stats.created}</Text>
+                <Text style={[styles.statLabel, { color: colors.textTertiary }]}>Created</Text>
               </TouchableOpacity>
             </View>
 
-            {/* Premium CTA */}
+            {/* Clean CTA */}
             <TouchableOpacity
               onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); navigateToProposals(); }}
               activeOpacity={0.9}
-              style={styles.premiumCtaOuter}
             >
               <LinearGradient
-                colors={[colors.gold, colors.goldDark || '#A68523', colors.gold]}
-                style={styles.premiumCta}
+                colors={[colors.gold, colors.goldDark || '#A68523']}
+                style={styles.ctaButton}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
               >
-                <View style={styles.ctaShine} />
-                <Text style={styles.premiumCtaText}>Vote Now</Text>
+                <Text style={styles.ctaText}>Vote Now</Text>
                 {stats.pending > 0 && (
-                  <View style={styles.premiumCtaBadge}>
-                    <Text style={styles.premiumCtaBadgeText}>{stats.pending}</Text>
+                  <View style={styles.ctaBadge}>
+                    <Text style={styles.ctaBadgeText}>{stats.pending}</Text>
                   </View>
                 )}
-                <View style={styles.ctaArrow}>
-                  <Ionicons name="arrow-forward" size={18} color={colors.gold} />
-                </View>
+                <Ionicons name="arrow-forward" size={18} color="#FFF" />
               </LinearGradient>
             </TouchableOpacity>
-          </LinearGradient>
+          </View>
         </Animated.View>
 
         {/* ═══ CARD 2: Closing Soon ═══ */}
@@ -626,58 +533,24 @@ const styles = StyleSheet.create({
     ...SHADOWS.md,
   },
 
-  // ═══ PREMIUM HERO STYLES ═══
+  // ═══ CLEAN HERO STYLES ═══
   heroCardOuter: {
     marginHorizontal: SPACING.lg,
     marginBottom: SPACING.lg,
-    borderRadius: 32,
-    overflow: 'hidden',
-    position: 'relative',
   },
-  heroGlow: {
-    position: 'absolute',
-    top: -50,
-    left: -50,
-    right: -50,
-    height: 200,
-    borderRadius: 100,
-  },
-  heroGradient: {
-    borderRadius: 32,
+  heroCard: {
+    borderRadius: 24,
     borderWidth: 1,
-    borderColor: 'rgba(201, 162, 39, 0.2)',
     padding: SPACING.xl,
     overflow: 'hidden',
-    ...SHADOWS.xl,
+    ...SHADOWS.md,
   },
-  shimmerContainer: {
-    ...StyleSheet.absoluteFillObject,
-    overflow: 'hidden',
-    borderRadius: 32,
-  },
-  shimmerBar: {
+  heroTopAccent: {
     position: 'absolute',
     top: 0,
-    bottom: 0,
-    width: 100,
-    transform: [{ skewX: '-20deg' }],
-  },
-  decorativeRing: {
-    position: 'absolute',
-    borderWidth: 1,
-    borderRadius: 999,
-  },
-  ringOuter: {
-    top: -80,
-    right: -80,
-    width: 200,
-    height: 200,
-  },
-  ringInner: {
-    top: -40,
-    right: -40,
-    width: 120,
-    height: 120,
+    left: 0,
+    right: 0,
+    height: 80,
   },
 
   // Hero Header
@@ -689,8 +562,7 @@ const styles = StyleSheet.create({
   },
   heroGreeting: {
     ...TYPOGRAPHY.labelMedium,
-    letterSpacing: 0.5,
-    textTransform: 'none',
+    letterSpacing: 0.3,
   },
   heroNameRow: {
     flexDirection: 'row',
@@ -699,29 +571,23 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   heroName: {
-    fontSize: responsive(32, 36, 40),
-    fontWeight: '800',
-    letterSpacing: -0.5,
+    fontSize: responsive(28, 32, 36),
+    fontWeight: '700',
+    letterSpacing: -0.3,
   },
-  verifiedBadgePremium: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+  verifiedBadge: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
     alignItems: 'center',
     justifyContent: 'center',
-    ...SHADOWS.sm,
   },
   heroHeaderRight: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: SPACING.md,
   },
-  avatarOuter: {
-    padding: 2,
-    borderRadius: 24,
-    backgroundColor: 'rgba(201, 162, 39, 0.2)',
-  },
-  avatarGradient: {
+  avatar: {
     width: 44,
     height: 44,
     borderRadius: 22,
@@ -733,99 +599,57 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
 
-  // Premium Stats with Orbs
-  premiumStatsRow: {
+  // Clean Stats Row
+  statsRow: {
     flexDirection: 'row',
-    justifyContent: 'center',
+    justifyContent: 'space-around',
     alignItems: 'center',
     paddingVertical: SPACING.lg,
     marginBottom: SPACING.lg,
   },
-  premiumStatItem: {
+  statItem: {
     alignItems: 'center',
     flex: 1,
   },
-  statOrb: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    borderWidth: 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: SPACING.sm,
-  },
-  statOrbValue: {
-    fontSize: 28,
-    fontWeight: '800',
+  statValue: {
+    fontSize: 32,
+    fontWeight: '700',
     fontVariant: ['tabular-nums'],
   },
-  premiumStatLabel: {
+  statLabel: {
     ...TYPOGRAPHY.labelSmall,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    fontWeight: '500',
+    marginTop: 4,
   },
-  statConnector: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    width: 24,
-  },
-  statConnectorLine: {
-    flex: 1,
-    height: 1,
-  },
-  statConnectorDot: {
-    width: 4,
-    height: 4,
-    borderRadius: 2,
+  statDivider: {
+    width: 1,
+    height: 40,
   },
 
-  // Premium CTA
-  premiumCtaOuter: {
-    borderRadius: BORDER_RADIUS.full,
-    ...SHADOWS.lg,
-  },
-  premiumCta: {
+  // Clean CTA
+  ctaButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 18,
+    paddingVertical: 16,
     borderRadius: BORDER_RADIUS.full,
-    gap: SPACING.md,
-    overflow: 'hidden',
+    gap: SPACING.sm,
   },
-  ctaShine: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: '50%',
-    backgroundColor: 'rgba(255,255,255,0.15)',
-  },
-  premiumCtaText: {
-    fontSize: 17,
-    fontWeight: '700',
+  ctaText: {
+    fontSize: 16,
+    fontWeight: '600',
     color: '#FFF',
-    letterSpacing: 0.3,
   },
-  premiumCtaBadge: {
-    backgroundColor: 'rgba(0,0,0,0.2)',
+  ctaBadge: {
+    backgroundColor: 'rgba(0,0,0,0.15)',
     paddingHorizontal: SPACING.sm,
-    paddingVertical: 4,
+    paddingVertical: 3,
     borderRadius: BORDER_RADIUS.full,
   },
-  premiumCtaBadgeText: {
+  ctaBadgeText: {
     color: '#FFF',
     fontSize: 14,
-    fontWeight: '700',
-  },
-  ctaArrow: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: 'rgba(255,255,255,0.95)',
-    alignItems: 'center',
-    justifyContent: 'center',
+    fontWeight: '600',
   },
 
   // Card title row
