@@ -25,7 +25,8 @@ import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS, ANIMATION, respo
 import { useAuthStore } from '../../lib/auth';
 import { useBallotStore } from '../../lib/ballots';
 import { proposalsApi, userApi } from '../../lib/api';
-import { Badge, SectionHeader, BallotDisplay } from '../../components/ui';
+import { BallotIcon } from '../../components/icons';
+import { Button, Badge, CountBadge, SectionHeader, BallotDisplay } from '../../components/ui';
 import { SkeletonStats, SkeletonListItem, SkeletonWelcome } from '../../components/ui/Skeleton';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -46,6 +47,15 @@ type UrgentProposal = {
   title: string;
   hoursLeft: number;
   category: string;
+};
+
+type ActivityItem = {
+  id: string;
+  type: 'new_proposal' | 'vote_result' | 'badge_earned' | 'proposal_closed';
+  message: string;
+  time: string;
+  icon: string;
+  color: string;
 };
 
 // Country-themed gradient colors for community cards
@@ -94,7 +104,7 @@ function StatCard({
 
   return (
     <Animated.View
-      style={[styles.statCard, { backgroundColor: colors.surface, borderColor: `${accent}30` }, animatedStyle]}
+      style={[styles.statCard, { backgroundColor: colors.surface, borderColor: colors.border }, animatedStyle]}
     >
       <LinearGradient
         colors={[`${accent}08`, 'transparent']}
@@ -102,10 +112,8 @@ function StatCard({
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
       />
-      <View style={[styles.statIconOuter, { borderColor: `${accent}25` }]}>
-        <View style={[styles.statIconInner, { backgroundColor: `${accent}15` }]}>
-          <Ionicons name={icon as any} size={18} color={accent} />
-        </View>
+      <View style={[styles.statIconContainer, { backgroundColor: `${accent}15` }]}>
+        <Ionicons name={icon as any} size={18} color={accent} />
       </View>
       <Text style={[styles.statValue, { color: colors.text }]}>{value}</Text>
       <Text style={[styles.statLabel, { color: colors.textTertiary }]}>{label}</Text>
@@ -164,7 +172,6 @@ function WelcomeHeader({
         <Text style={[styles.welcomeName, { color: colors.text }]} numberOfLines={1}>
           {displayName}
         </Text>
-        <View style={[styles.welcomeGoldUnderline, { backgroundColor: colors.gold }]} />
       </View>
 
       <View style={styles.welcomeActions}>
@@ -193,7 +200,7 @@ function WelcomeHeader({
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
               >
-                <Text style={[styles.avatarText, { color: colors.background, textShadowColor: `${colors.gold}80`, textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 8 }]}>{letter}</Text>
+                <Text style={[styles.avatarText, { color: colors.background }]}>{letter}</Text>
               </LinearGradient>
             </View>
           </LinearGradient>
@@ -296,9 +303,6 @@ function PriorityCard({
       }}
       style={[styles.priorityCard, { backgroundColor: bgColor, borderColor: `${gradientColors[0]}30` }]}
     >
-      {/* Decorative gradient orb */}
-      <View style={[styles.priorityOrb, { backgroundColor: `${gradientColors[0]}15` }]} />
-
       {/* Shimmer effect */}
       <View style={styles.shimmerContainer}>
         <Animated.View style={[styles.shimmerBar, shimmerStyle]}>
@@ -384,25 +388,6 @@ function UrgentProposalCard({
 
   const urgencyColor = getUrgencyColor(proposal.hoursLeft);
 
-  const pulseOpacity = useSharedValue(1);
-
-  useEffect(() => {
-    if (proposal.hoursLeft < 6) {
-      pulseOpacity.value = withRepeat(
-        withSequence(
-          withTiming(0.5, { duration: 750 }),
-          withTiming(1, { duration: 750 })
-        ),
-        -1,
-        false
-      );
-    }
-  }, [proposal.hoursLeft]);
-
-  const pulseStyle = useAnimatedStyle(() => ({
-    opacity: pulseOpacity.value,
-  }));
-
   return (
     <AnimatedTouchable
       entering={FadeInRight.delay(index * 80).duration(350)}
@@ -413,21 +398,14 @@ function UrgentProposalCard({
       }}
       activeOpacity={0.75}
     >
-      {/* Gradient overlay from left */}
-      <LinearGradient
-        colors={[`${urgencyColor}12`, 'transparent']}
-        style={StyleSheet.absoluteFill}
-        start={{ x: 0, y: 0.5 }}
-        end={{ x: 0.5, y: 0.5 }}
-      />
       <View style={[styles.urgentCardAccent, { backgroundColor: urgencyColor }]} />
       <View style={styles.urgentCardContent}>
         <View style={styles.urgentCardHeader}>
           <Badge label={proposal.category} variant="default" size="sm" />
-          <Animated.View style={[styles.urgentCardTime, { backgroundColor: `${urgencyColor}15` }, proposal.hoursLeft < 6 ? pulseStyle : undefined]}>
+          <View style={[styles.urgentCardTime, { backgroundColor: `${urgencyColor}15` }]}>
             <Ionicons name="time-outline" size={14} color={urgencyColor} />
             <Text style={[styles.urgentCardTimeText, { color: urgencyColor }]}>{proposal.hoursLeft}h left</Text>
-          </Animated.View>
+          </View>
         </View>
         <Text style={[styles.urgentCardTitle, { color: colors.text }]} numberOfLines={2}>
           {proposal.title}
@@ -453,7 +431,6 @@ function CommunityHeroCard({
 }) {
   const { colors } = useTheme();
   const progressWidth = useSharedValue(0);
-  const liveDotScale = useSharedValue(1);
 
   // Get country-specific theme colors
   const theme = countryThemes[community.name] || { primary: colors.gold };
@@ -469,22 +446,10 @@ function CommunityHeroCard({
       200,
       withTiming(votedPercent / 100, { duration: 1000 })
     );
-    liveDotScale.value = withRepeat(
-      withSequence(
-        withTiming(1.3, { duration: 800 }),
-        withTiming(1, { duration: 800 })
-      ),
-      -1,
-      false
-    );
   }, [votedPercent]);
 
   const animatedProgressStyle = useAnimatedStyle(() => ({
     width: `${progressWidth.value * 100}%` as any,
-  }));
-
-  const liveDotAnimStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: liveDotScale.value }],
   }));
 
   return (
@@ -555,7 +520,7 @@ function CommunityHeroCard({
             <View style={[styles.communityHeroStatDivider, { backgroundColor: colors.border }]} />
             <View style={styles.communityHeroStat}>
               <View style={styles.communityHeroLive}>
-                <Animated.View style={[styles.communityHeroLiveDot, { backgroundColor: colors.success }, liveDotAnimStyle]} />
+                <View style={[styles.communityHeroLiveDot, { backgroundColor: colors.success }]} />
                 <Text style={[styles.communityHeroStatValue, { color: colors.text }]}>
                   {liveVoters}
                 </Text>
@@ -572,12 +537,6 @@ function CommunityHeroCard({
       <View style={[styles.communityHeroProgressBg, { backgroundColor: colors.border }]}>
         <Animated.View
           style={[styles.communityHeroProgressFill, { backgroundColor: themeColor }, animatedProgressStyle]}
-        />
-      </View>
-      {/* Progress glow */}
-      <View style={styles.communityHeroProgressGlowContainer}>
-        <Animated.View
-          style={[styles.communityHeroProgressGlow, { backgroundColor: `${themeColor}40` }, animatedProgressStyle]}
         />
       </View>
 
@@ -613,19 +572,13 @@ function CommunityGridCard({
   return (
     <AnimatedTouchable
       entering={FadeInUp.delay(200 + index * 80).duration(350).springify()}
-      style={[styles.communityGrid, { backgroundColor: colors.surface, borderColor: `${colors.gold}20` }]}
+      style={[styles.communityGrid, { backgroundColor: colors.surface, borderColor: colors.border }]}
       onPress={() => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         onPress();
       }}
       activeOpacity={0.8}
     >
-      <LinearGradient
-        colors={[`${colors.gold}06`, 'transparent']}
-        style={StyleSheet.absoluteFill}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-      />
       <View style={styles.communityGridTop}>
         <Text style={styles.communityGridIcon}>{community.icon}</Text>
         {community.unvotedCount > 0 && (
@@ -653,6 +606,33 @@ function CommunityGridCard({
   );
 }
 
+// --- Activity Card ---
+function ActivityCard({
+  activity,
+  index,
+}: {
+  activity: ActivityItem;
+  index: number;
+}) {
+  const { colors } = useTheme();
+
+  return (
+    <Animated.View
+      entering={FadeInRight.delay(index * 60).duration(280)}
+      style={[styles.activityCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
+    >
+      <View style={[styles.activityIcon, { backgroundColor: `${activity.color}12` }]}>
+        <Ionicons name={activity.icon as any} size={18} color={activity.color} />
+      </View>
+      <View style={styles.activityContent}>
+        <Text style={[styles.activityMessage, { color: colors.text }]} numberOfLines={1}>
+          {activity.message}
+        </Text>
+        <Text style={[styles.activityTime, { color: colors.textTertiary }]}>{activity.time}</Text>
+      </View>
+    </Animated.View>
+  );
+}
 
 // --- Main Dashboard Screen ---
 export default function DashboardScreen() {
@@ -668,6 +648,7 @@ export default function DashboardScreen() {
   const [stats, setStats] = useState({ pending: 0, voted: 0, created: 0 });
   const [communities, setCommunities] = useState<Community[]>([]);
   const [urgentProposals, setUrgentProposals] = useState<UrgentProposal[]>([]);
+  const [activities, setActivities] = useState<ActivityItem[]>([]);
   const [isVerified, setIsVerified] = useState(false);
   const [liveVoters, setLiveVoters] = useState(0);
 
@@ -835,13 +816,37 @@ export default function DashboardScreen() {
       // Simulate live voters (in production, this would come from a real-time service)
       setLiveVoters(Math.floor(Math.random() * 15) + 3);
 
+      const recentActivities: ActivityItem[] = [];
+      if (proposals.length > 0) {
+        const newest = proposals[0];
+        const title = newest.title || 'New proposal';
+        recentActivities.push({
+          id: '1',
+          type: 'new_proposal',
+          message: `New: ${title.length > 35 ? title.substring(0, 35) + '...' : title}`,
+          time: '2h ago',
+          icon: 'document-text-outline',
+          color: colors.gold,
+        });
+      }
+      if (votedIds.size > 0) {
+        recentActivities.push({
+          id: '2',
+          type: 'badge_earned',
+          message: `You've cast ${votedIds.size} vote${votedIds.size > 1 ? 's' : ''}`,
+          time: 'Recent',
+          icon: 'trophy-outline',
+          color: colors.success,
+        });
+      }
+      setActivities(recentActivities);
     } catch (error) {
       console.error('Dashboard fetch error:', error);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [isAuthenticated, user]);
+  }, [isAuthenticated, user, colors.gold, colors.success]);
 
   useEffect(() => {
     fetchDashboardData();
@@ -1013,38 +1018,28 @@ export default function DashboardScreen() {
           </View>
         )}
 
-        {/* Section Divider */}
-        <View style={styles.sectionDivider}>
-          <LinearGradient
-            colors={['transparent', `${colors.gold}30`, 'transparent']}
-            style={{ height: 1 }}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-          />
-        </View>
+        {/* Activity Feed */}
+        {activities.length > 0 && (
+          <View style={styles.section}>
+            <SectionHeader title="RECENT ACTIVITY" style={styles.sectionHeader} />
+            {activities.map((activity, idx) => (
+              <ActivityCard key={activity.id} activity={activity} index={idx} />
+            ))}
+          </View>
+        )}
 
         {/* Bottom CTA */}
-        <AnimatedTouchable
-          entering={FadeInUp.delay(500).duration(400)}
-          style={styles.ctaSection}
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-            navigateToProposals();
-          }}
-          activeOpacity={0.85}
-        >
-          <LinearGradient
-            colors={[colors.gold, colors.goldDark || '#A68523']}
-            style={styles.ctaGradient}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-          >
-            <Text style={styles.ctaText}>Explore All Proposals</Text>
-            <View style={styles.ctaIconCircle}>
-              <Ionicons name="arrow-forward" size={18} color={colors.gold} />
-            </View>
-          </LinearGradient>
-        </AnimatedTouchable>
+        <Animated.View entering={FadeInUp.delay(400).duration(400)} style={styles.ctaSection}>
+          <Button
+            title="Explore All Proposals"
+            onPress={navigateToProposals}
+            variant="primary"
+            size="lg"
+            fullWidth
+            icon="arrow-forward"
+            iconPosition="right"
+          />
+        </Animated.View>
 
         <View style={styles.bottomSpacer} />
       </ScrollView>
@@ -1088,15 +1083,8 @@ const styles = StyleSheet.create({
   },
   welcomeName: {
     ...TYPOGRAPHY.displaySmall,
-    fontSize: responsive(32, 36, 40),
-    fontWeight: '800',
+    fontSize: responsive(28, 32, 36),
     marginTop: SPACING.xxs,
-  },
-  welcomeGoldUnderline: {
-    width: 40,
-    height: 3,
-    borderRadius: 2,
-    marginTop: 6,
   },
   welcomeActions: {
     flexDirection: 'row',
@@ -1148,19 +1136,11 @@ const styles = StyleSheet.create({
   // Priority Card
   priorityCard: {
     marginHorizontal: SPACING.lg,
-    borderRadius: 28,
+    borderRadius: BORDER_RADIUS.xxl,
     borderWidth: 1.5,
     padding: SPACING.xl,
     overflow: 'hidden',
     ...SHADOWS.lg,
-  },
-  priorityOrb: {
-    position: 'absolute',
-    top: -30,
-    right: -30,
-    width: 120,
-    height: 120,
-    borderRadius: 60,
   },
   shimmerContainer: {
     ...StyleSheet.absoluteFillObject,
@@ -1241,11 +1221,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 16,
+    paddingVertical: 14,
     paddingHorizontal: SPACING.xl,
     borderRadius: BORDER_RADIUS.full,
     gap: SPACING.sm,
-    ...SHADOWS.lg,
+    ...SHADOWS.md,
   },
   priorityCtaText: {
     ...TYPOGRAPHY.labelLarge,
@@ -1263,7 +1243,7 @@ const styles = StyleSheet.create({
 
   // Sections
   section: {
-    marginTop: 32,
+    marginTop: SPACING.xxl,
   },
   sectionHeader: {
     paddingHorizontal: SPACING.lg,
@@ -1284,26 +1264,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     overflow: 'hidden',
   },
-  statIconOuter: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    borderWidth: 2.5,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: SPACING.sm,
-  },
-  statIconInner: {
+  statIconContainer: {
     width: 36,
     height: 36,
     borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
+    marginBottom: SPACING.sm,
   },
   statValue: {
     ...TYPOGRAPHY.headlineMedium,
-    fontSize: responsive(22, 24, 26),
-    fontWeight: '800',
+    fontSize: responsive(18, 20, 20),
+    fontWeight: '700',
   },
   statLabel: {
     ...TYPOGRAPHY.labelSmall,
@@ -1441,14 +1413,14 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   communityHeroProgressBg: {
-    height: 6,
+    height: 4,
     marginHorizontal: SPACING.lg,
-    borderRadius: 3,
+    borderRadius: 2,
     overflow: 'hidden',
   },
   communityHeroProgressFill: {
     height: '100%',
-    borderRadius: 3,
+    borderRadius: 2,
   },
   communityHeroFooter: {
     flexDirection: 'row',
@@ -1478,7 +1450,6 @@ const styles = StyleSheet.create({
     padding: SPACING.lg,
     borderRadius: BORDER_RADIUS.xl,
     borderWidth: 1,
-    overflow: 'hidden',
     ...SHADOWS.sm,
   },
   communityGridTop: {
@@ -1488,7 +1459,7 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.sm,
   },
   communityGridIcon: {
-    fontSize: 32,
+    fontSize: 28,
   },
   communityGridBadge: {
     minWidth: 22,
@@ -1515,39 +1486,39 @@ const styles = StyleSheet.create({
     ...TYPOGRAPHY.labelSmall,
   },
 
-  // Section Divider
-  sectionDivider: {
-    marginHorizontal: 48,
-    marginTop: 32,
+  // Activity Cards
+  activityCard: {
+    marginHorizontal: SPACING.lg,
+    marginBottom: SPACING.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: SPACING.lg,
+    borderRadius: BORDER_RADIUS.xl,
+    borderWidth: 1,
+    gap: SPACING.md,
+  },
+  activityIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  activityContent: {
+    flex: 1,
+  },
+  activityMessage: {
+    ...TYPOGRAPHY.labelLarge,
+  },
+  activityTime: {
+    ...TYPOGRAPHY.labelSmall,
+    marginTop: 2,
   },
 
   // CTA Section
   ctaSection: {
     paddingHorizontal: SPACING.lg,
     marginTop: SPACING.xl,
-  },
-  ctaGradient: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 18,
-    borderRadius: BORDER_RADIUS.full,
-    gap: SPACING.md,
-    ...SHADOWS.lg,
-  },
-  ctaText: {
-    ...TYPOGRAPHY.labelLarge,
-    color: '#FFFFFF',
-    fontWeight: '700',
-    fontSize: 16,
-  },
-  ctaIconCircle: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: 'rgba(255,255,255,0.95)',
-    alignItems: 'center',
-    justifyContent: 'center',
   },
 
   bottomSpacer: {
