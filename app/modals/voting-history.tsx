@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView, ActivityIndicator, RefreshControl, 
 import { Ionicons } from '@expo/vector-icons';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
+import { router } from 'expo-router';
 import { useAuthStore } from '../../lib/auth';
 import { limitsApi, UsageLimits } from '../../lib/api';
 import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS } from '../../lib/theme';
@@ -298,8 +299,15 @@ export default function VotingHistoryScreen() {
             const isSupport = proposal.position === 'support';
 
             return (
-              <Animated.View
+              <TouchableOpacity
                 key={proposal.id}
+                activeOpacity={0.7}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  router.push({ pathname: '/(tabs)/proposals', params: { proposalId: String(proposal.id) } });
+                }}
+              >
+              <Animated.View
                 entering={FadeInUp.delay(300 + index * 50).duration(400)}
                 style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}
               >
@@ -358,8 +366,10 @@ export default function VotingHistoryScreen() {
                       {formatDate(proposal.votedAt)}
                     </Text>
                   )}
+                  <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} style={{ marginLeft: 'auto' }} />
                 </View>
               </Animated.View>
+              </TouchableOpacity>
             );
           })
         ) : (

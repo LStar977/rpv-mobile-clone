@@ -40,7 +40,7 @@ import Animated, {
   Extrapolation,
 } from 'react-native-reanimated';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { proposalsApi, userApi, uploadsApi, limitsApi, Proposal, UsageLimits } from '../../lib/api';
 import { useAuthStore } from '../../lib/auth';
 import { useBallotStore } from '../../lib/ballots';
@@ -788,6 +788,7 @@ function ProposalSkeleton({ index }: { index: number }) {
 export default function ProposalsScreen() {
   const { colors } = useTheme();
   const { isAuthenticated, user } = useAuthStore();
+  const { proposalId: deepLinkProposalId } = useLocalSearchParams<{ proposalId?: string }>();
   const insets = useSafeAreaInsets();
 
   // Calculate card height dynamically based on safe area insets
@@ -1017,6 +1018,7 @@ export default function ProposalsScreen() {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
 
   const handleVote = async (proposalId: number | string, vote: 'support' | 'oppose') => {
     // Seed proposals: local-only voting (no auth/API required)
@@ -1335,6 +1337,16 @@ export default function ProposalsScreen() {
     setShowDetailModal(false);
     setTimeout(() => setSelectedProposal(null), 150);
   };
+
+  // Auto-open a proposal when navigated with proposalId param (e.g. from voting history)
+  useEffect(() => {
+    if (deepLinkProposalId && proposals.length > 0 && !loading) {
+      const match = proposals.find((p) => String(p.id) === String(deepLinkProposalId));
+      if (match && !showDetailModal) {
+        openProposal(match);
+      }
+    }
+  }, [deepLinkProposalId, proposals, loading]);
 
   const detail = selectedProposal;
   const detailHasVoted = detail ? votedProposals.has(detail.id as number) : false;
