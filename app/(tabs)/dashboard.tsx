@@ -354,63 +354,93 @@ export default function DashboardScreen() {
 
         {/* ═══ CARD 3: Your Communities ═══ */}
         {communities.length > 0 && (
-          <Animated.View entering={FadeInUp.delay(300).duration(500)} style={styles.card}>
-            <View style={styles.cardTitleRow}>
+          <Animated.View entering={FadeInUp.delay(300).duration(500)} style={[styles.card, { padding: SPACING.lg }]}>
+            <View style={[styles.cardTitleRow, { paddingHorizontal: SPACING.xs }]}>
               <View style={[styles.cardTitleIcon, { backgroundColor: `${colors.gold}15` }]}>
                 <Ionicons name="globe-outline" size={20} color={colors.gold} />
               </View>
-              <View>
+              <View style={{ flex: 1 }}>
                 <Text style={[styles.cardTitle, { color: colors.text }]}>Your Communities</Text>
-                <Text style={[styles.cardSubtitle, { color: colors.textTertiary }]}>
-                  {liveVoters > 0 && (
-                    <Text>
-                      <Animated.View style={[styles.liveDotInline, { backgroundColor: colors.success }, livePulseStyle]} />
-                      {'  '}{liveVoters} active now
-                    </Text>
-                  )}
-                </Text>
+                {liveVoters > 0 && (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
+                    <Animated.View style={[styles.liveDotInline, { backgroundColor: colors.success }, livePulseStyle]} />
+                    <Text style={[styles.cardSubtitle, { color: colors.textTertiary }]}>{liveVoters} active now</Text>
+                  </View>
+                )}
               </View>
             </View>
 
             {communities.map((c, idx) => {
               const accent = c.type === 'country' ? (countryThemes[c.name] || colors.gold) : colors.gold;
               const votedPct = c.proposalCount > 0 ? Math.round(((c.proposalCount - c.unvotedCount) / c.proposalCount) * 100) : 0;
+              const typeIcon = c.type === 'state' ? 'business' : c.type === 'city' ? 'location' : 'globe';
               return (
-                <TouchableOpacity
+                <AnimatedTouchable
                   key={c.id}
-                  style={[styles.communityItem, { borderColor: colors.border }]}
-                  onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); navigateToProposals(); }}
-                  activeOpacity={0.8}
+                  entering={FadeInUp.delay(350 + idx * 100).duration(400).springify()}
+                  style={[styles.communityTile, { borderColor: `${accent}25` }]}
+                  onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); navigateToProposals(); }}
+                  activeOpacity={0.85}
                 >
-                  <Text style={styles.communityEmoji}>{c.icon}</Text>
-                  <View style={styles.communityInfo}>
-                    <Text style={[styles.communityName, { color: colors.text }]}>{c.name}</Text>
-                    <View style={styles.communityMeta}>
-                      <Text style={[styles.communityMetaText, { color: colors.textTertiary }]}>
-                        {c.proposalCount} proposals · {votedPct}% voted
-                      </Text>
-                    </View>
-                    <View style={[styles.communityBar, { backgroundColor: `${accent}15` }]}>
-                      <View style={[styles.communityBarFill, { width: `${votedPct}%`, backgroundColor: accent }]} />
-                    </View>
-                  </View>
+                  {/* Themed gradient background */}
+                  <LinearGradient
+                    colors={[`${accent}20`, `${accent}08`, 'transparent']}
+                    style={[StyleSheet.absoluteFill, { borderRadius: 20 }]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                  />
+                  <LinearGradient
+                    colors={['transparent', `${accent}12`]}
+                    style={[StyleSheet.absoluteFill, { borderRadius: 20 }]}
+                    start={{ x: 1, y: 0 }}
+                    end={{ x: 0, y: 1 }}
+                  />
+
+                  {/* Unvoted badge — top right */}
                   {c.unvotedCount > 0 && (
-                    <View style={[styles.communityBadge, { backgroundColor: accent }]}>
-                      <Text style={styles.communityBadgeText}>{c.unvotedCount}</Text>
+                    <View style={[styles.communityTileBadge, { backgroundColor: accent, ...SHADOWS.sm }]}>
+                      <Text style={styles.communityTileBadgeText}>{c.unvotedCount} new</Text>
                     </View>
                   )}
-                </TouchableOpacity>
+
+                  {/* Top row: flag/icon + ring */}
+                  <View style={styles.communityTileTop}>
+                    {c.type === 'country' ? (
+                      <Text style={styles.communityTileFlag}>{c.icon}</Text>
+                    ) : (
+                      <View style={[styles.communityTileIconCircle, { backgroundColor: `${accent}20` }]}>
+                        <Ionicons name={typeIcon as any} size={24} color={accent} />
+                      </View>
+                    )}
+
+                    <View style={styles.communityTileRingWrap}>
+                      <ProgressRing
+                        size={56}
+                        strokeWidth={5}
+                        progress={votedPct / 100}
+                        color={accent}
+                        trackColor={`${accent}15`}
+                      />
+                      <Text style={[styles.communityTileRingText, { color: colors.text }]}>
+                        {votedPct}%
+                      </Text>
+                    </View>
+                  </View>
+
+                  {/* Name and meta */}
+                  <Text style={[styles.communityTileName, { color: colors.text }]}>{c.name}</Text>
+                  <Text style={[styles.communityTileMeta, { color: colors.textSecondary }]}>
+                    {c.proposalCount} proposals
+                  </Text>
+
+                  {/* Action */}
+                  <View style={styles.communityTileAction}>
+                    <Text style={[styles.communityTileActionText, { color: accent }]}>See proposals</Text>
+                    <Ionicons name="arrow-forward" size={14} color={accent} />
+                  </View>
+                </AnimatedTouchable>
               );
             })}
-
-            <TouchableOpacity
-              style={styles.cardBottomAction}
-              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); navigateToProposals(); }}
-              activeOpacity={0.7}
-            >
-              <Text style={[styles.cardBottomActionText, { color: colors.gold }]}>See all proposals</Text>
-              <Ionicons name="arrow-forward" size={14} color={colors.gold} />
-            </TouchableOpacity>
           </Animated.View>
         )}
 
@@ -598,23 +628,32 @@ const styles = StyleSheet.create({
   urgentBarFill: { height: '100%', borderRadius: 2 },
   urgentPct: { ...TYPOGRAPHY.labelSmall, fontWeight: '600', width: 32, textAlign: 'right' },
 
-  // Community items
-  communityItem: {
-    flexDirection: 'row', alignItems: 'center', paddingVertical: SPACING.md,
-    borderBottomWidth: 1, gap: SPACING.md,
+  // Community tiles
+  communityTile: {
+    borderRadius: 20, borderWidth: 1, padding: SPACING.lg,
+    marginTop: SPACING.md, overflow: 'hidden', position: 'relative',
   },
-  communityEmoji: { fontSize: 32 },
-  communityInfo: { flex: 1 },
-  communityName: { ...TYPOGRAPHY.labelLarge, fontWeight: '600' },
-  communityMeta: { marginTop: 2 },
-  communityMetaText: { ...TYPOGRAPHY.labelSmall },
-  communityBar: { height: 4, borderRadius: 2, overflow: 'hidden', marginTop: SPACING.sm },
-  communityBarFill: { height: '100%', borderRadius: 2 },
-  communityBadge: {
-    minWidth: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center',
-    paddingHorizontal: SPACING.sm,
+  communityTileBadge: {
+    position: 'absolute', top: SPACING.md, right: SPACING.md, zIndex: 1,
+    paddingHorizontal: SPACING.md, paddingVertical: 4, borderRadius: BORDER_RADIUS.full,
   },
-  communityBadgeText: { fontSize: 12, fontWeight: '700', color: '#FFF' },
+  communityTileBadgeText: { fontSize: 11, fontWeight: '700', color: '#FFF' },
+  communityTileTop: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    marginBottom: SPACING.md,
+  },
+  communityTileFlag: { fontSize: 48 },
+  communityTileIconCircle: {
+    width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center',
+  },
+  communityTileRingWrap: { width: 56, height: 56, alignItems: 'center', justifyContent: 'center' },
+  communityTileRingText: { position: 'absolute', fontSize: 13, fontWeight: '800', fontVariant: ['tabular-nums'] },
+  communityTileName: { ...TYPOGRAPHY.headlineSmall, fontWeight: '700' },
+  communityTileMeta: { ...TYPOGRAPHY.labelSmall, marginTop: 2 },
+  communityTileAction: {
+    flexDirection: 'row', alignItems: 'center', gap: SPACING.xs, marginTop: SPACING.md,
+  },
+  communityTileActionText: { ...TYPOGRAPHY.labelMedium, fontWeight: '600' },
   liveDotInline: { width: 6, height: 6, borderRadius: 3 },
 
   // Card bottom action
