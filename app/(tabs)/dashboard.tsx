@@ -337,7 +337,6 @@ export default function DashboardScreen() {
                 ? (countryThemes[c.name] || colors.gold)
                 : c.type === 'state' ? (colors.accent || '#8B5CF6')
                 : (colors.info || '#60A5FA');
-              const votedPct = c.proposalCount > 0 ? Math.round(((c.proposalCount - c.unvotedCount) / c.proposalCount) * 100) : 0;
               const typeLabel = c.type === 'country' ? 'Your country' : c.type === 'state' ? 'Your province' : 'Your city';
               return (
                 <AnimatedTouchable
@@ -368,21 +367,15 @@ export default function DashboardScreen() {
                     </View>
                   )}
 
-                  {/* Top row: emoji + ring */}
+                  {/* Top row: emoji + voted count */}
                   <View style={styles.communityTileTop}>
                     <Text style={styles.communityTileFlag}>{c.icon}</Text>
 
-                    <View style={styles.communityTileRingWrap}>
-                      <ProgressRing
-                        size={56}
-                        strokeWidth={5}
-                        progress={votedPct / 100}
-                        color={accent}
-                        trackColor={`${accent}15`}
-                      />
-                      <Text style={[styles.communityTileRingText, { color: colors.text }]}>
-                        {votedPct}%
+                    <View style={[styles.communityTileVotedWrap, { backgroundColor: `${accent}15` }]}>
+                      <Text style={[styles.communityTileVotedCount, { color: accent }]}>
+                        {c.proposalCount - c.unvotedCount}/{c.proposalCount}
                       </Text>
+                      <Text style={[styles.communityTileVotedLabel, { color: colors.textTertiary }]}>voted</Text>
                     </View>
                   </View>
 
@@ -606,8 +599,9 @@ const styles = StyleSheet.create({
   communityTileIconCircle: {
     width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center',
   },
-  communityTileRingWrap: { width: 56, height: 56, alignItems: 'center', justifyContent: 'center' },
-  communityTileRingText: { position: 'absolute', fontSize: 13, fontWeight: '800', fontVariant: ['tabular-nums'] },
+  communityTileVotedWrap: { paddingHorizontal: SPACING.sm, paddingVertical: SPACING.xs, borderRadius: BORDER_RADIUS.md, alignItems: 'center' },
+  communityTileVotedCount: { fontSize: 14, fontWeight: '700', fontVariant: ['tabular-nums'] },
+  communityTileVotedLabel: { fontSize: 10, fontWeight: '500', marginTop: -1 },
   communityTileName: { ...TYPOGRAPHY.headlineSmall, fontWeight: '700' },
   communityTileMeta: { ...TYPOGRAPHY.labelSmall, marginTop: 2 },
   communityTileAction: {
