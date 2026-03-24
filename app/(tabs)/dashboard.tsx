@@ -371,9 +371,12 @@ export default function DashboardScreen() {
             </View>
 
             {communities.map((c, idx) => {
-              const accent = c.type === 'country' ? (countryThemes[c.name] || colors.gold) : colors.gold;
+              const accent = c.type === 'country'
+                ? (countryThemes[c.name] || colors.gold)
+                : c.type === 'state' ? (colors.accent || '#8B5CF6')
+                : (colors.info || '#60A5FA');
               const votedPct = c.proposalCount > 0 ? Math.round(((c.proposalCount - c.unvotedCount) / c.proposalCount) * 100) : 0;
-              const typeIcon = c.type === 'state' ? 'business' : c.type === 'city' ? 'location' : 'globe';
+              const typeLabel = c.type === 'country' ? 'Your country' : c.type === 'state' ? 'Your province' : 'Your city';
               return (
                 <AnimatedTouchable
                   key={c.id}
@@ -403,15 +406,9 @@ export default function DashboardScreen() {
                     </View>
                   )}
 
-                  {/* Top row: flag/icon + ring */}
+                  {/* Top row: emoji + ring */}
                   <View style={styles.communityTileTop}>
-                    {c.type === 'country' ? (
-                      <Text style={styles.communityTileFlag}>{c.icon}</Text>
-                    ) : (
-                      <View style={[styles.communityTileIconCircle, { backgroundColor: `${accent}20` }]}>
-                        <Ionicons name={typeIcon as any} size={24} color={accent} />
-                      </View>
-                    )}
+                    <Text style={styles.communityTileFlag}>{c.icon}</Text>
 
                     <View style={styles.communityTileRingWrap}>
                       <ProgressRing
@@ -430,7 +427,7 @@ export default function DashboardScreen() {
                   {/* Name and meta */}
                   <Text style={[styles.communityTileName, { color: colors.text }]}>{c.name}</Text>
                   <Text style={[styles.communityTileMeta, { color: colors.textSecondary }]}>
-                    {c.proposalCount} proposals
+                    {typeLabel} · {c.proposalCount} proposals
                   </Text>
 
                   {/* Action */}
