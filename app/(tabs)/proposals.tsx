@@ -820,7 +820,10 @@ export default function ProposalsScreen() {
   // Vote confirmation overlay state
   const [showVoteOverlay, setShowVoteOverlay] = useState(false);
   const [lastVoteType, setLastVoteType] = useState<'support' | 'oppose'>('support');
-  const [isVoteInFlight, setIsVoteInFlight] = useState(false);
+
+  // Vote queue for sequential processing of real (non-seed) votes
+  const voteQueueRef = useRef<Array<{ proposalId: number | string; vote: 'support' | 'oppose'; title: string }>>([]);
+  const isProcessingQueueRef = useRef(false);
 
   // Swipe mode state
   const [viewMode, setViewMode] = useState<'swipe' | 'list'>('swipe');
@@ -1167,6 +1170,24 @@ export default function ProposalsScreen() {
     }
   };
 
+  // Process vote queue sequentially to avoid blockchain nonce collisions
+  const processVoteQueue = useCallback(async () => {
+    if (isProcessingQueueRef.current) return;
+    isProcessingQueueRef.current = true;
+
+    while (voteQueueRef.current.length > 0) {
+      const { proposalId, vote, title } = voteQueueRef.current[0];
+      try {
+        await handleVote(proposalId, vote);
+      } catch {
+        Alert.alert('Vote Failed', `Your vote on "${title}" couldn't be submitted. Please find it and try again.`);
+      }
+      voteQueueRef.current.shift();
+    }
+
+    isProcessingQueueRef.current = false;
+  }, [handleVote]);
+
   // Swipe vote handler
   const handleSwipeVote = useCallback(async (proposal: Proposal, vote: 'support' | 'oppose') => {
     // Get fresh tutorial state directly from store (not from stale closure)
@@ -1190,9 +1211,6 @@ export default function ProposalsScreen() {
       return;
     }
 
-    // Prevent concurrent real votes (avoids blockchain nonce collisions)
-    if (isVoteInFlight && !isSeedProposal(proposal.id)) return;
-
     // Move to next card
     setSwipeIndex((prev) => prev + 1);
 
@@ -1201,18 +1219,14 @@ export default function ProposalsScreen() {
     setShowVoteOverlay(true);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
-    // Submit the vote
+    // Submit the vote — queue real proposals for sequential processing
     if (!isSeedProposal(proposal.id)) {
-      setIsVoteInFlight(true);
-      try {
-        await handleVote(proposal.id, vote);
-      } finally {
-        setIsVoteInFlight(false);
-      }
+      voteQueueRef.current.push({ proposalId: proposal.id, vote, title: proposal.title || 'Untitled' });
+      processVoteQueue();
     } else {
       handleVote(proposal.id, vote);
     }
-  }, [handleVote, isVoteInFlight]);
+  }, [handleVote, processVoteQueue]);
 
   // Skip handler - move to next card without voting
   const handleSkip = useCallback(() => {
