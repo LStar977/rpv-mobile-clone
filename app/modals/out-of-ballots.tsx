@@ -1,12 +1,11 @@
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { useState, useEffect } from 'react';
 import { Ionicons } from '@expo/vector-icons';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
-import Animated, { FadeIn, FadeInDown, FadeInUp } from 'react-native-reanimated';
+import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS } from '../../lib/theme';
-import { useBallotStore, formatTimeRemaining } from '../../lib/ballots';
+import { useBallotStore } from '../../lib/ballots';
 import { BallotIcon, BallotIconFilled } from '../../components/icons';
 
 const PURCHASE_PACKS = [
@@ -17,29 +16,14 @@ const PURCHASE_PACKS = [
 
 export default function OutOfBallotsModal() {
   const { colors } = useTheme();
-  const { tier, getTimeUntilNextBallot, checkRegeneration } = useBallotStore();
-  const [timeRemaining, setTimeRemaining] = useState(0);
-
-  // Update timer every second
-  useEffect(() => {
-    if (tier === 'premium') return;
-
-    const interval = setInterval(() => {
-      checkRegeneration();
-      setTimeRemaining(getTimeUntilNextBallot());
-    }, 1000);
-
-    setTimeRemaining(getTimeUntilNextBallot());
-
-    return () => clearInterval(interval);
-  }, [tier]);
+  const { tier, balance } = useBallotStore();
 
   const handlePurchase = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     router.replace('/modals/purchase-ballots');
   };
 
-  const handleWait = () => {
+  const handleClose = () => {
     Haptics.selectionAsync();
     router.back();
   };
@@ -69,34 +53,33 @@ export default function OutOfBallotsModal() {
           entering={FadeInDown.delay(200).springify()}
           style={[styles.title, { color: colors.text }]}
         >
-          You're out of ballots!
+          You're out of RPV tokens!
         </Animated.Text>
 
-        {/* Subtitle with timer */}
+        {/* Subtitle */}
         <Animated.View entering={FadeInDown.delay(300).springify()}>
           <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
             {tier === 'premium'
-              ? 'As a Premium member, you have unlimited ballots!'
-              : `Your next free ballot regenerates in:`}
+              ? 'As a Premium member, you have unlimited voting power!'
+              : 'Each vote requires 1 RPV token. Purchase more to continue voting.'}
           </Text>
 
-          {tier !== 'premium' && timeRemaining > 0 && (
-            <View style={[styles.timerContainer, { backgroundColor: `${colors.gold}15`, borderColor: `${colors.gold}30` }]}>
-              <Ionicons name="time-outline" size={20} color={colors.gold} />
-              <Text style={[styles.timerText, { color: colors.gold }]}>
-                {formatTimeRemaining(timeRemaining)}
-              </Text>
-            </View>
-          )}
+          {/* Current balance indicator */}
+          <View style={[styles.balanceContainer, { backgroundColor: `${colors.error}15`, borderColor: `${colors.error}30` }]}>
+            <BallotIcon size={20} color={colors.error} />
+            <Text style={[styles.balanceText, { color: colors.error }]}>
+              {balance} RPV tokens remaining
+            </Text>
+          </View>
         </Animated.View>
 
         {/* Purchase Options */}
         <Animated.View entering={FadeInUp.delay(400).springify()} style={styles.purchaseSection}>
           <Text style={[styles.purchaseTitle, { color: colors.text }]}>
-            Need ballots now?
+            Get more RPV tokens
           </Text>
 
-          {PURCHASE_PACKS.map((pack, index) => (
+          {PURCHASE_PACKS.map((pack) => (
             <TouchableOpacity
               key={pack.id}
               style={[
@@ -124,7 +107,7 @@ export default function OutOfBallotsModal() {
               <View style={styles.packLeft}>
                 <BallotIcon size={24} color={colors.gold} />
                 <Text style={[styles.packBallots, { color: colors.text }]}>
-                  {pack.ballots} Ballots
+                  {pack.ballots} RPV
                 </Text>
               </View>
 
@@ -149,13 +132,13 @@ export default function OutOfBallotsModal() {
             end={{ x: 1, y: 0 }}
           >
             <Ionicons name="cart-outline" size={20} color="#000" />
-            <Text style={styles.primaryButtonText}>Buy Ballots</Text>
+            <Text style={styles.primaryButtonText}>Buy RPV Tokens</Text>
           </LinearGradient>
         </TouchableOpacity>
 
-        <TouchableOpacity onPress={handleWait} style={styles.secondaryButton}>
+        <TouchableOpacity onPress={handleClose} style={styles.secondaryButton}>
           <Text style={[styles.secondaryButtonText, { color: colors.textSecondary }]}>
-            Wait for free ballot
+            Maybe later
           </Text>
         </TouchableOpacity>
       </View>
@@ -208,7 +191,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: SPACING.md,
   },
-  timerContainer: {
+  balanceContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -219,9 +202,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     marginBottom: SPACING.xl,
   },
-  timerText: {
-    ...TYPOGRAPHY.headlineSmall,
-    fontWeight: '700',
+  balanceText: {
+    ...TYPOGRAPHY.labelLarge,
+    fontWeight: '600',
   },
   purchaseSection: {
     width: '100%',

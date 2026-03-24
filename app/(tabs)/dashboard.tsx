@@ -639,13 +639,13 @@ export default function DashboardScreen() {
   const { colors } = useTheme();
   const router = useRouter();
   const { user, isAuthenticated } = useAuthStore();
-  const { balance: ballotBalance, initialize: initializeBallots, tier: ballotTier } = useBallotStore();
+  const { balance: ballotBalance, syncFromChain, tier: ballotTier } = useBallotStore();
   const insets = useSafeAreaInsets();
 
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  const [stats, setStats] = useState({ pending: 0, voted: 0, passed: 0 });
+  const [stats, setStats] = useState({ pending: 0, voted: 0, created: 0 });
   const [communities, setCommunities] = useState<Community[]>([]);
   const [urgentProposals, setUrgentProposals] = useState<UrgentProposal[]>([]);
   const [activities, setActivities] = useState<ActivityItem[]>([]);
@@ -794,14 +794,15 @@ export default function DashboardScreen() {
         }
       });
 
-      const passedCount = proposals
-        .filter((p: any) => {
-          const total = (p.supportVotes || 0) + (p.opposeVotes || 0);
-          return total > 0 && (p.supportVotes || 0) > (p.opposeVotes || 0) && votedIds.has(p.id);
-        })
-        .length;
+      // Count proposals created by the current user
+      const nonSeedProposals = proposals.filter((p: any) => p.creatorId !== 'system');
+      console.log('[Dashboard] User ID:', user?.id);
+      console.log('[Dashboard] Total proposals:', proposals.length, '| Non-seed:', nonSeedProposals.length);
+      console.log('[Dashboard] Non-seed creatorIds:', nonSeedProposals.map((p: any) => p.creatorId));
+      const createdCount = proposals.filter((p: any) => p.creatorId === user?.id).length;
+      console.log('[Dashboard] Created count:', createdCount);
 
-      setStats({ pending: pendingCount, voted: votedIds.size, passed: passedCount });
+      setStats({ pending: pendingCount, voted: votedIds.size, created: createdCount });
       // For demo account, show all communities even if no proposals match
       // For regular users, only show communities with proposals
       const filteredCommunities = isDemoAccount
@@ -849,14 +850,21 @@ export default function DashboardScreen() {
 
   useEffect(() => {
     fetchDashboardData();
-    initializeBallots();
-  }, [fetchDashboardData]);
+    // Sync ballot balance from on-chain RPV token
+    if (user?.walletAddress) {
+      syncFromChain(user.walletAddress);
+    }
+  }, [fetchDashboardData, user?.walletAddress, syncFromChain]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     fetchDashboardData();
-  }, [fetchDashboardData]);
+    // Re-sync ballot balance from chain
+    if (user?.walletAddress) {
+      syncFromChain(user.walletAddress);
+    }
+  }, [fetchDashboardData, user?.walletAddress, syncFromChain]);
 
   const navigateToProposals = () => router.push('/(tabs)/proposals');
 
@@ -918,27 +926,45 @@ export default function DashboardScreen() {
         <View style={styles.section}>
           <SectionHeader title="YOUR IMPACT" style={styles.sectionHeader} />
           <View style={styles.statsGrid}>
-            <StatCard
-              icon="hourglass-outline"
-              value={stats.pending.toString()}
-              label="Pending"
-              accent={colors.warning}
-              delay={0}
-            />
-            <StatCard
-              icon="checkmark-circle-outline"
-              value={stats.voted.toString()}
-              label="Voted"
-              accent={colors.success}
-              delay={80}
-            />
-            <StatCard
-              icon="trophy-outline"
-              value={stats.passed.toString()}
-              label="Passed"
-              accent={colors.gold}
-              delay={160}
-            />
+            <TouchableOpacity
+              onPress={() => router.push('/(tabs)/proposals')}
+              activeOpacity={0.8}
+              style={{ flex: 1 }}
+            >
+              <StatCard
+                icon="hourglass-outline"
+                value={stats.pending.toString()}
+                label="Pending"
+                accent={colors.warning}
+                delay={0}
+              />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => router.push('/modals/voting-history')}
+              activeOpacity={0.8}
+              style={{ flex: 1 }}
+            >
+              <StatCard
+                icon="checkmark-circle-outline"
+                value={stats.voted.toString()}
+                label="Voted"
+                accent={colors.success}
+                delay={80}
+              />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => router.push('/modals/my-proposals')}
+              activeOpacity={0.8}
+              style={{ flex: 1 }}
+            >
+              <StatCard
+                icon="create-outline"
+                value={stats.created.toString()}
+                label="Created"
+                accent={colors.gold}
+                delay={160}
+              />
+            </TouchableOpacity>
           </View>
         </View>
 

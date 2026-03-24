@@ -1,81 +1,69 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
-
-const BALLOTS_KEY = 'represent_ballots';
-const REGEN_KEY = 'represent_ballots_regen';
-
-// Regeneration rates by tier (in milliseconds)
-const REGEN_RATES = {
-  free: 24 * 60 * 60 * 1000,      // 24 hours
-  verified: 12 * 60 * 60 * 1000,  // 12 hours
-  premium: 0,                      // Unlimited (no regen needed)
-};
-
-// Daily regeneration amounts by tier
-const REGEN_AMOUNTS = {
-  free: 1,
-  verified: 2,
-  premium: 0, // Premium has unlimited, no regen needed
-};
-
-const INITIAL_BALLOTS = 10;
+import { getRPVBalance } from './rpv-token';
 
 interface BallotState {
   balance: number;
-  lastRegeneration: number | null; // timestamp
   tier: 'free' | 'verified' | 'premium';
   isLoading: boolean;
+  lastSyncedAt: number | null;
+  walletAddress: string | null;
 
   // Actions
-  initialize: () => Promise<void>;
+  initialize: () => void;
   setTier: (tier: 'free' | 'verified' | 'premium') => void;
-  spendBallot: () => boolean;
-  addBallots: (count: number) => Promise<void>;
-  checkRegeneration: () => void;
-  getTimeUntilNextBallot: () => number; // milliseconds
-  getRegenerationProgress: () => number; // 0-1
+  syncFromChain: (walletAddress: string) => Promise<void>;
+  spendBallot: () => boolean; // Optimistic update for UI
+  canVote: () => boolean;
 }
 
 export const useBallotStore = create<BallotState>((set, get) => ({
   balance: 0,
-  lastRegeneration: null,
   tier: 'free',
   isLoading: true,
+  lastSyncedAt: null,
+  walletAddress: null,
 
-  initialize: async () => {
-    try {
-      const storedBalance = await AsyncStorage.getItem(BALLOTS_KEY);
-      const storedRegen = await AsyncStorage.getItem(REGEN_KEY);
-
-      let balance = INITIAL_BALLOTS;
-      let lastRegeneration: number | null = null;
-
-      if (storedBalance !== null) {
-        balance = parseInt(storedBalance, 10);
-      }
-
-      if (storedRegen !== null) {
-        lastRegeneration = parseInt(storedRegen, 10);
-      }
-
-      set({ balance, lastRegeneration, isLoading: false });
-
-      // Check for any pending regeneration
-      get().checkRegeneration();
-    } catch (error) {
-      console.error('Failed to initialize ballots:', error);
-      set({ balance: INITIAL_BALLOTS, isLoading: false });
-    }
+  initialize: () => {
+    // No longer loading from AsyncStorage - will sync from chain
+    set({ isLoading: false });
   },
 
   setTier: (tier) => {
     set({ tier });
-    // If upgrading to premium, no need to track regeneration
-    if (tier === 'premium') {
-      set({ lastRegeneration: null });
+  },
+
+  /**
+   * Sync ballot balance from on-chain RPV token balance
+   */
+  syncFromChain: async (walletAddress: string) => {
+    console.log('[Ballots] syncFromChain called with:', walletAddress);
+
+    if (!walletAddress) {
+      console.log('[Ballots] No wallet address, setting balance to 0');
+      set({ balance: 0, isLoading: false, walletAddress: null });
+      return;
+    }
+
+    set({ isLoading: true, walletAddress });
+
+    try {
+      const balance = await getRPVBalance(walletAddress);
+      console.log('[Ballots] Got RPV balance:', balance, '| Setting to:', Math.floor(balance));
+      set({
+        balance: Math.floor(balance), // RPV tokens = ballots (1:1)
+        isLoading: false,
+        lastSyncedAt: Date.now(),
+      });
+    } catch (error) {
+      console.error('[Ballots] Failed to sync RPV balance:', error);
+      set({ isLoading: false });
     }
   },
 
+  /**
+   * Optimistic balance deduction for immediate UI feedback
+   * Actual balance will be synced from chain after vote API call
+   */
   spendBallot: () => {
     const { balance, tier } = get();
 
@@ -88,92 +76,18 @@ export const useBallotStore = create<BallotState>((set, get) => ({
       return false;
     }
 
-    const newBalance = balance - 1;
-    set({ balance: newBalance });
-
-    // Start regeneration timer if this is the first spend
-    const { lastRegeneration } = get();
-    if (lastRegeneration === null) {
-      const now = Date.now();
-      set({ lastRegeneration: now });
-      AsyncStorage.setItem(REGEN_KEY, now.toString());
-    }
-
-    // Persist balance
-    AsyncStorage.setItem(BALLOTS_KEY, newBalance.toString());
-
+    // Optimistic update - will be corrected on next chain sync
+    set({ balance: balance - 1 });
     return true;
   },
 
-  addBallots: async (count) => {
-    const { balance } = get();
-    const newBalance = balance + count;
-    set({ balance: newBalance });
-    await AsyncStorage.setItem(BALLOTS_KEY, newBalance.toString());
-  },
-
-  checkRegeneration: () => {
-    const { lastRegeneration, tier, balance } = get();
-
-    // Premium users don't need regeneration
-    if (tier === 'premium') return;
-
-    // No regeneration timer set
-    if (lastRegeneration === null) return;
-
-    const now = Date.now();
-    const elapsed = now - lastRegeneration;
-    const regenRate = REGEN_RATES[tier];
-    const regenAmount = REGEN_AMOUNTS[tier];
-
-    // Calculate how many regeneration cycles have passed
-    const cycles = Math.floor(elapsed / regenRate);
-
-    if (cycles > 0) {
-      const ballotsToAdd = cycles * regenAmount;
-      const newBalance = balance + ballotsToAdd;
-      const newRegenTime = lastRegeneration + (cycles * regenRate);
-
-      set({ balance: newBalance, lastRegeneration: newRegenTime });
-      AsyncStorage.setItem(BALLOTS_KEY, newBalance.toString());
-      AsyncStorage.setItem(REGEN_KEY, newRegenTime.toString());
-    }
-  },
-
-  getTimeUntilNextBallot: () => {
-    const { lastRegeneration, tier } = get();
-
-    // Premium users have unlimited
-    if (tier === 'premium') return 0;
-
-    // No regeneration timer set (hasn't spent any ballots yet)
-    if (lastRegeneration === null) return 0;
-
-    const now = Date.now();
-    const regenRate = REGEN_RATES[tier];
-    const elapsed = now - lastRegeneration;
-    const timeInCurrentCycle = elapsed % regenRate;
-    const remaining = regenRate - timeInCurrentCycle;
-
-    return remaining;
-  },
-
-  getRegenerationProgress: () => {
-    const { lastRegeneration, tier } = get();
-
-    if (tier === 'premium') return 1;
-    if (lastRegeneration === null) return 0;
-
-    const now = Date.now();
-    const regenRate = REGEN_RATES[tier];
-    const elapsed = now - lastRegeneration;
-    const timeInCurrentCycle = elapsed % regenRate;
-
-    return timeInCurrentCycle / regenRate;
+  canVote: () => {
+    const { balance, tier } = get();
+    return tier === 'premium' || balance > 0;
   },
 }));
 
-// Helper to format time remaining
+// Helper to format time remaining (kept for compatibility)
 export function formatTimeRemaining(ms: number): string {
   if (ms <= 0) return 'Now';
 

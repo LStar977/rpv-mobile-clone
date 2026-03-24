@@ -40,7 +40,7 @@ import Animated, {
   Extrapolation,
 } from 'react-native-reanimated';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { proposalsApi, userApi, uploadsApi, limitsApi, Proposal, UsageLimits } from '../../lib/api';
 import { useAuthStore } from '../../lib/auth';
 import { useBallotStore } from '../../lib/ballots';
@@ -788,6 +788,7 @@ function ProposalSkeleton({ index }: { index: number }) {
 export default function ProposalsScreen() {
   const { colors } = useTheme();
   const { isAuthenticated, user } = useAuthStore();
+  const { proposalId: deepLinkProposalId } = useLocalSearchParams<{ proposalId?: string }>();
   const insets = useSafeAreaInsets();
 
   // Calculate card height dynamically based on safe area insets
@@ -819,6 +820,10 @@ export default function ProposalsScreen() {
   // Vote confirmation overlay state
   const [showVoteOverlay, setShowVoteOverlay] = useState(false);
   const [lastVoteType, setLastVoteType] = useState<'support' | 'oppose'>('support');
+
+  // Vote queue for sequential processing of real (non-seed) votes
+  const voteQueueRef = useRef<Array<{ proposalId: number | string; vote: 'support' | 'oppose'; title: string }>>([]);
+  const isProcessingQueueRef = useRef(false);
 
   // Swipe mode state
   const [viewMode, setViewMode] = useState<'swipe' | 'list'>('swipe');
@@ -1018,6 +1023,7 @@ export default function ProposalsScreen() {
     fetchData();
   }, [fetchData]);
 
+
   const handleVote = async (proposalId: number | string, vote: 'support' | 'oppose') => {
     // Seed proposals: local-only voting (no auth/API required)
     if (isSeedProposal(proposalId)) {
@@ -1046,7 +1052,7 @@ export default function ProposalsScreen() {
     }
 
     // Check ballot balance (premium users have unlimited)
-    const { spendBallot, tier: ballotTier } = useBallotStore.getState();
+    const { spendBallot, tier: ballotTier, syncFromChain } = useBallotStore.getState();
     if (ballotTier !== 'premium') {
       const canSpend = spendBallot();
       if (!canSpend) {
@@ -1152,12 +1158,35 @@ export default function ProposalsScreen() {
 
       // Check for newly earned badges (async, non-blocking)
       setTimeout(() => checkForNewBadges(), 1500);
+
+      // Re-sync ballot balance from chain after vote (token was transferred)
+      if (user?.walletAddress) {
+        syncFromChain(user.walletAddress);
+      }
     } catch {
       Alert.alert('Error', 'Failed to submit vote. Please try again.');
     } finally {
       setVotingProposalId(null);
     }
   };
+
+  // Process vote queue sequentially to avoid blockchain nonce collisions
+  const processVoteQueue = useCallback(async () => {
+    if (isProcessingQueueRef.current) return;
+    isProcessingQueueRef.current = true;
+
+    while (voteQueueRef.current.length > 0) {
+      const { proposalId, vote, title } = voteQueueRef.current[0];
+      try {
+        await handleVote(proposalId, vote);
+      } catch {
+        Alert.alert('Vote Failed', `Your vote on "${title}" couldn't be submitted. Please find it and try again.`);
+      }
+      voteQueueRef.current.shift();
+    }
+
+    isProcessingQueueRef.current = false;
+  }, [handleVote]);
 
   // Swipe vote handler
   const handleSwipeVote = useCallback(async (proposal: Proposal, vote: 'support' | 'oppose') => {
@@ -1185,9 +1214,19 @@ export default function ProposalsScreen() {
     // Move to next card
     setSwipeIndex((prev) => prev + 1);
 
-    // Submit the vote (blockchain transaction - cannot be undone)
-    await handleVote(proposal.id as number, vote);
-  }, [handleVote]);
+    // Show animation immediately (optimistic UI) instead of waiting for API
+    setLastVoteType(vote);
+    setShowVoteOverlay(true);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+    // Submit the vote — queue real proposals for sequential processing
+    if (!isSeedProposal(proposal.id)) {
+      voteQueueRef.current.push({ proposalId: proposal.id, vote, title: proposal.title || 'Untitled' });
+      processVoteQueue();
+    } else {
+      handleVote(proposal.id, vote);
+    }
+  }, [handleVote, processVoteQueue]);
 
   // Skip handler - move to next card without voting
   const handleSkip = useCallback(() => {
@@ -1330,6 +1369,16 @@ export default function ProposalsScreen() {
     setShowDetailModal(false);
     setTimeout(() => setSelectedProposal(null), 150);
   };
+
+  // Auto-open a proposal when navigated with proposalId param (e.g. from voting history)
+  useEffect(() => {
+    if (deepLinkProposalId && proposals.length > 0 && !loading) {
+      const match = proposals.find((p) => String(p.id) === String(deepLinkProposalId));
+      if (match && !showDetailModal) {
+        openProposal(match);
+      }
+    }
+  }, [deepLinkProposalId, proposals, loading]);
 
   const detail = selectedProposal;
   const detailHasVoted = detail ? votedProposals.has(detail.id as number) : false;
