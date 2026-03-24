@@ -14,8 +14,6 @@ import Animated, {
   useSharedValue,
   withDelay,
   withTiming,
-  withRepeat,
-  withSequence,
 } from 'react-native-reanimated';
 import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS, responsive } from '../../lib/theme';
 import { useAuthStore } from '../../lib/auth';
@@ -85,7 +83,6 @@ export default function DashboardScreen() {
   const [communities, setCommunities] = useState<Community[]>([]);
   const [urgentProposals, setUrgentProposals] = useState<UrgentProposal[]>([]);
   const [isVerified, setIsVerified] = useState(false);
-  const [liveVoters, setLiveVoters] = useState(0);
   const [allProposals, setAllProposals] = useState<any[]>([]);
 
   // ─── Data fetching (identical to all other versions) ───
@@ -155,7 +152,6 @@ export default function DashboardScreen() {
       setCommunities(filteredCommunities);
       setUrgentProposals(urgent.slice(0, 5));
       setIsVerified(isDemoAccount ? true : (verificationRes.data?.verified || false));
-      setLiveVoters(Math.floor(Math.random() * 15) + 3);
       setAllProposals(proposals);
     } catch (error) {
       console.error('Dashboard fetch error:', error);
@@ -197,13 +193,6 @@ export default function DashboardScreen() {
       .slice(0, 3),
     [allProposals]
   );
-
-  // Pulsing animation for live dot
-  const livePulse = useSharedValue(1);
-  useEffect(() => {
-    livePulse.value = withRepeat(withSequence(withTiming(1.4, { duration: 800 }), withTiming(1, { duration: 800 })), -1, false);
-  }, []);
-  const livePulseStyle = useAnimatedStyle(() => ({ transform: [{ scale: livePulse.value }] }));
 
   if (loading) {
     return (
@@ -361,12 +350,6 @@ export default function DashboardScreen() {
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={[styles.cardTitle, { color: colors.text }]}>Your Communities</Text>
-                {liveVoters > 0 && (
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
-                    <Animated.View style={[styles.liveDotInline, { backgroundColor: colors.success }, livePulseStyle]} />
-                    <Text style={[styles.cardSubtitle, { color: colors.textTertiary }]}>{liveVoters} active now</Text>
-                  </View>
-                )}
               </View>
             </View>
 
@@ -651,7 +634,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: SPACING.xs, marginTop: SPACING.md,
   },
   communityTileActionText: { ...TYPOGRAPHY.labelMedium, fontWeight: '600' },
-  liveDotInline: { width: 6, height: 6, borderRadius: 3 },
 
   // Card bottom action
   cardBottomAction: {
