@@ -234,7 +234,7 @@ export default function DashboardScreen() {
               ) : (
                 <>
                   <Text style={[styles.heroNumber, { color: colors.warning }]}>{stats.pending}</Text>
-                  <Text style={[styles.heroNumberLabel, { color: colors.textTertiary }]}>pending votes</Text>
+                  <Text style={[styles.heroNumberLabel, { color: colors.textTertiary }]}>awaiting your vote</Text>
                 </>
               )}
             </View>
@@ -410,8 +410,8 @@ export default function DashboardScreen() {
                 <Ionicons name="sparkles" size={20} color={colors.info || '#60A5FA'} />
               </View>
               <View>
-                <Text style={[styles.cardTitle, { color: colors.text }]}>Latest Proposals</Text>
-                <Text style={[styles.cardSubtitle, { color: colors.textTertiary }]}>Recently created by the community</Text>
+                <Text style={[styles.cardTitle, { color: colors.text }]}>Trending Proposals</Text>
+                <Text style={[styles.cardSubtitle, { color: colors.textTertiary }]}>Popular in your community</Text>
               </View>
             </View>
 
