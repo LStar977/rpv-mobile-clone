@@ -5,15 +5,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
-import Svg, { Circle } from 'react-native-svg';
 import Animated, {
   FadeIn,
   FadeInDown,
   FadeInUp,
-  useAnimatedStyle,
-  useSharedValue,
-  withDelay,
-  withTiming,
 } from 'react-native-reanimated';
 import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS, responsive } from '../../lib/theme';
 import { useAuthStore } from '../../lib/auth';
@@ -24,7 +19,6 @@ import { SkeletonStats, SkeletonListItem, SkeletonWelcome } from '../../componen
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
-const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
 type Community = {
   id: string;
@@ -41,27 +35,6 @@ type UrgentProposal = {
   hoursLeft: number;
   category: string;
 };
-
-// --- Animated Progress Ring ---
-function ProgressRing({ size, strokeWidth, progress, color, trackColor }: {
-  size: number; strokeWidth: number; progress: number; color: string; trackColor: string;
-}) {
-  const radius = (size - strokeWidth) / 2;
-  const circumference = 2 * Math.PI * radius;
-  const animatedProgress = useSharedValue(0);
-  useEffect(() => {
-    animatedProgress.value = withDelay(400, withTiming(progress, { duration: 1400 }));
-  }, [progress]);
-  const animatedProps = useAnimatedStyle(() => ({
-    strokeDashoffset: circumference * (1 - animatedProgress.value),
-  } as any));
-  return (
-    <Svg width={size} height={size} style={{ transform: [{ rotate: '-90deg' }] }}>
-      <Circle cx={size / 2} cy={size / 2} r={radius} stroke={trackColor} strokeWidth={strokeWidth} fill="transparent" />
-      <AnimatedCircle cx={size / 2} cy={size / 2} r={radius} stroke={color} strokeWidth={strokeWidth} fill="transparent" strokeDasharray={`${circumference}`} strokeLinecap="round" style={animatedProps} />
-    </Svg>
-  );
-}
 
 const countryThemes: Record<string, string> = {
   'Canada': '#FF0000', 'United States': '#3C3B6E', 'United Kingdom': '#012169',
@@ -173,8 +146,6 @@ export default function DashboardScreen() {
   const navigateToProposals = () => router.push('/(tabs)/proposals');
 
   // ─── Computed ───
-  const totalVotable = stats.voted + stats.pending;
-  const voteProgress = totalVotable > 0 ? stats.voted / totalVotable : 0;
   const displayName = user?.name ? user.name.split(' ')[0] : 'there';
   const getGreeting = () => {
     const h = new Date().getHours();
@@ -250,14 +221,22 @@ export default function DashboardScreen() {
             </View>
           </View>
 
-          {/* Ring + Stats */}
+          {/* Status + Stats */}
           <View style={styles.heroContent}>
-            <View style={styles.heroRingWrap}>
-              <ProgressRing size={140} strokeWidth={10} progress={voteProgress} color={colors.gold} trackColor={`${colors.gold}12`} />
-              <View style={styles.heroRingInner}>
-                <Text style={[styles.heroNumber, { color: colors.text }]}>{Math.round(voteProgress * 100)}%</Text>
-                <Text style={[styles.heroNumberLabel, { color: colors.textTertiary }]}>voted</Text>
-              </View>
+            <View style={styles.heroStatusWrap}>
+              {stats.pending === 0 ? (
+                <>
+                  <View style={[styles.heroStatusIcon, { backgroundColor: `${colors.success}15` }]}>
+                    <Ionicons name="checkmark-circle" size={48} color={colors.success} />
+                  </View>
+                  <Text style={[styles.heroStatusText, { color: colors.success }]}>All caught up!</Text>
+                </>
+              ) : (
+                <>
+                  <Text style={[styles.heroNumber, { color: colors.warning }]}>{stats.pending}</Text>
+                  <Text style={[styles.heroNumberLabel, { color: colors.textTertiary }]}>pending votes</Text>
+                </>
+              )}
             </View>
             <View style={styles.heroStatsCol}>
               <TouchableOpacity style={styles.heroStat} onPress={navigateToProposals} activeOpacity={0.7}>
@@ -568,9 +547,10 @@ const styles = StyleSheet.create({
 
   // Hero content
   heroContent: { flexDirection: 'row', alignItems: 'center', marginBottom: SPACING.xl },
-  heroRingWrap: { width: 140, height: 140, alignItems: 'center', justifyContent: 'center' },
-  heroRingInner: { position: 'absolute', alignItems: 'center' },
-  heroNumber: { fontSize: 36, fontWeight: '800', fontVariant: ['tabular-nums'] },
+  heroStatusWrap: { width: 140, height: 140, alignItems: 'center', justifyContent: 'center' },
+  heroStatusIcon: { width: 72, height: 72, borderRadius: 36, alignItems: 'center', justifyContent: 'center', marginBottom: SPACING.xs },
+  heroStatusText: { ...TYPOGRAPHY.labelLarge, fontWeight: '700' },
+  heroNumber: { fontSize: 48, fontWeight: '800', fontVariant: ['tabular-nums'] },
   heroNumberLabel: { ...TYPOGRAPHY.labelMedium, marginTop: -2 },
   heroStatsCol: { flex: 1, marginLeft: SPACING.xl, gap: SPACING.md },
   heroStat: { alignItems: 'center' },
