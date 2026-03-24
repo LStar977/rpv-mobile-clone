@@ -820,6 +820,7 @@ export default function ProposalsScreen() {
   // Vote confirmation overlay state
   const [showVoteOverlay, setShowVoteOverlay] = useState(false);
   const [lastVoteType, setLastVoteType] = useState<'support' | 'oppose'>('support');
+  const [isVoteInFlight, setIsVoteInFlight] = useState(false);
 
   // Swipe mode state
   const [viewMode, setViewMode] = useState<'swipe' | 'list'>('swipe');
@@ -1189,12 +1190,29 @@ export default function ProposalsScreen() {
       return;
     }
 
+    // Prevent concurrent real votes (avoids blockchain nonce collisions)
+    if (isVoteInFlight && !isSeedProposal(proposal.id)) return;
+
     // Move to next card
     setSwipeIndex((prev) => prev + 1);
 
-    // Submit the vote (blockchain transaction - cannot be undone)
-    await handleVote(proposal.id as number, vote);
-  }, [handleVote]);
+    // Show animation immediately (optimistic UI) instead of waiting for API
+    setLastVoteType(vote);
+    setShowVoteOverlay(true);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+    // Submit the vote
+    if (!isSeedProposal(proposal.id)) {
+      setIsVoteInFlight(true);
+      try {
+        await handleVote(proposal.id, vote);
+      } finally {
+        setIsVoteInFlight(false);
+      }
+    } else {
+      handleVote(proposal.id, vote);
+    }
+  }, [handleVote, isVoteInFlight]);
 
   // Skip handler - move to next card without voting
   const handleSkip = useCallback(() => {
