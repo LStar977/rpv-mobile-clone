@@ -438,38 +438,46 @@ export default function DashboardScreen() {
                 : c.type === 'state' ? (colors.accent || '#8B5CF6')
                 : (colors.info || '#60A5FA');
               const typeLabel = c.type === 'country' ? 'Your country' : c.type === 'state' ? 'Your province' : 'Your city';
+              const typeIcon = c.type === 'state' ? 'business-outline' : c.type === 'city' ? 'location-outline' : null;
               return (
                 <AnimatedTouchable
                   key={c.id}
                   entering={FadeInUp.delay(350 + idx * 100).duration(400).springify()}
-                  style={[styles.communityTile, { borderColor: `${accent}25` }]}
+                  style={[
+                    styles.communityTile,
+                    {
+                      borderColor: `${accent}40`,
+                      borderLeftWidth: 3,
+                      borderLeftColor: accent,
+                    }
+                  ]}
                   onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); navigateToProposals(); }}
                   activeOpacity={0.85}
                 >
-                  {/* Themed gradient background */}
+                  {/* Themed gradient background - more vibrant */}
                   <LinearGradient
-                    colors={[`${accent}20`, `${accent}08`, 'transparent']}
+                    colors={[`${accent}25`, `${accent}12`, `${accent}05`]}
                     style={[StyleSheet.absoluteFill, { borderRadius: 20 }]}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
-                  />
-                  <LinearGradient
-                    colors={['transparent', `${accent}12`]}
-                    style={[StyleSheet.absoluteFill, { borderRadius: 20 }]}
-                    start={{ x: 1, y: 0 }}
-                    end={{ x: 0, y: 1 }}
                   />
 
                   {/* Unvoted badge — top right */}
                   {c.unvotedCount > 0 && (
                     <View style={[styles.communityTileBadge, { backgroundColor: accent, ...SHADOWS.sm }]}>
-                      <Text style={styles.communityTileBadgeText}>{c.unvotedCount} new</Text>
+                      <Text style={styles.communityTileBadgeText}>{c.unvotedCount}</Text>
                     </View>
                   )}
 
-                  {/* Top row: emoji */}
+                  {/* Top row: emoji or icon */}
                   <View style={styles.communityTileTop}>
-                    <Text style={styles.communityTileFlag}>{c.icon}</Text>
+                    {c.type === 'country' ? (
+                      <Text style={styles.communityTileFlag}>{c.icon}</Text>
+                    ) : (
+                      <View style={[styles.communityIconCircle, { backgroundColor: `${accent}20`, borderColor: `${accent}30` }]}>
+                        <Ionicons name={typeIcon as any} size={24} color={accent} />
+                      </View>
+                    )}
                   </View>
 
                   {/* Name and meta */}
@@ -856,6 +864,14 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.md,
   },
   communityTileFlag: { fontSize: 48 },
+  communityIconCircle: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   communityTileIconCircle: {
     width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center',
   },
