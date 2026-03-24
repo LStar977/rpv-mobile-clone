@@ -795,8 +795,10 @@ export default function DashboardScreen() {
       });
 
       // Count proposals created by the current user
+      const nonSeedProposals = proposals.filter((p: any) => p.creatorId !== 'system');
       console.log('[Dashboard] User ID:', user?.id);
-      console.log('[Dashboard] Sample proposal creatorIds:', proposals.slice(0, 3).map((p: any) => p.creatorId));
+      console.log('[Dashboard] Total proposals:', proposals.length, '| Non-seed:', nonSeedProposals.length);
+      console.log('[Dashboard] Non-seed creatorIds:', nonSeedProposals.map((p: any) => p.creatorId));
       const createdCount = proposals.filter((p: any) => p.creatorId === user?.id).length;
       console.log('[Dashboard] Created count:', createdCount);
 

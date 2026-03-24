@@ -287,7 +287,9 @@ export const userApi = {
 
 export const proposalsApi = {
   async getAll(): Promise<ApiResponse<Proposal[]>> {
+    console.log('[Proposals] getAll() called - fetching from backend...');
     const result = await apiRequest<any>('/api/proposals');
+    console.log('[Proposals] API result - error:', result.error, '| data type:', typeof result.data, '| isArray:', Array.isArray(result.data));
 
     // Extract backend proposals if available
     let backendProposals: Proposal[] = [];
@@ -297,17 +299,21 @@ export const proposalsApi = {
       backendProposals = result.data.proposals;
     }
 
-    // Always include seed proposals merged with backend
-    // Seeds first so users see them immediately, then user-created proposals
-    console.log('[API] Backend proposals:', backendProposals.length, backendProposals.map((p: any) => ({ id: p.id, creatorId: p.creatorId })));
+    console.log('[Proposals] Backend count:', backendProposals.length, '| Seed count:', SEED_PROPOSALS.length);
+    if (backendProposals.length > 0) {
+      console.log('[Proposals] Backend creatorIds:', backendProposals.map((p: any) => p.creatorId));
+    }
+
     const merged = [...SEED_PROPOSALS, ...backendProposals];
     return { data: merged, error: null };
   },
   async create(data: CreateProposalData): Promise<ApiResponse<Proposal>> {
-    return apiRequest<Proposal>('/api/proposals', {
+    const result = await apiRequest<Proposal>('/api/proposals', {
       method: 'POST',
       body: JSON.stringify(data),
     });
+    console.log('[Proposals] Create response - error:', result.error, '| creatorId:', (result.data as any)?.creatorId || (result.data as any)?.proposal?.creatorId);
+    return result;
   },
   async claimVoteToken(proposalId: number | string): Promise<ApiResponse<{ success: boolean; txHash?: string }>> {
     return apiRequest(`/api/proposals/${proposalId}/claim-vote-token`, { method: 'POST' });
