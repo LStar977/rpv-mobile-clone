@@ -1,26 +1,51 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Dimensions, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Dimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import { BlurView } from 'expo-blur';
+import Svg, { Circle } from 'react-native-svg';
 import * as Haptics from 'expo-haptics';
 import Animated, {
   FadeIn,
   FadeInDown,
   FadeInUp,
   FadeInRight,
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+  withTiming,
+  withDelay,
+  withSequence,
+  withRepeat,
+  useAnimatedProps,
+  interpolateColor,
 } from 'react-native-reanimated';
-import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS } from '../../lib/theme';
+import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY } from '../../lib/theme';
 import { useAuthStore } from '../../lib/auth';
 import { useBallotStore } from '../../lib/ballots';
 import { proposalsApi, userApi } from '../../lib/api';
 import { BallotDisplay } from '../../components/ui';
 import { SkeletonStats, SkeletonListItem, SkeletonWelcome } from '../../components/ui/Skeleton';
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
+const AnimatedCircle = Animated.createAnimatedComponent(Circle);
+
+// Gamification colors
+const GAME_COLORS = {
+  streak: '#FF9500',
+  streakGlow: '#FFD60A',
+  xp: '#AF52DE',
+  xpGlow: '#BF5AF2',
+  goal: '#34C759',
+  goalGlow: '#30D158',
+  badge: '#007AFF',
+  bronze: '#CD7F32',
+  silver: '#C0C0C0',
+  gold: '#FFD700',
+  platinum: '#E5E4E2',
+};
 
 type Community = {
   id: string;
@@ -38,72 +63,265 @@ type UrgentProposal = {
   category: string;
 };
 
-// --- Glass Card Component ---
-function GlassCard({
-  children,
-  style,
-  intensity = 40,
-  entering,
+type Achievement = {
+  id: string;
+  icon: string;
+  title: string;
+  description: string;
+  unlocked: boolean;
+  tier: 'bronze' | 'silver' | 'gold' | 'platinum';
+};
+
+// --- Animated Progress Ring ---
+function GoalRing({
+  size,
+  strokeWidth,
+  progress,
+  color,
+  trackColor,
 }: {
-  children: React.ReactNode;
-  style?: any;
-  intensity?: number;
-  entering?: any;
+  size: number;
+  strokeWidth: number;
+  progress: number;
+  color: string;
+  trackColor: string;
 }) {
-  const { colors, isDark } = useTheme();
+  const radius = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const animatedProgress = useSharedValue(0);
+
+  useEffect(() => {
+    animatedProgress.value = withDelay(300, withSpring(progress, { damping: 15, stiffness: 80 }));
+  }, [progress]);
+
+  const animatedProps = useAnimatedProps(() => ({
+    strokeDashoffset: circumference * (1 - animatedProgress.value),
+  }));
 
   return (
-    <Animated.View entering={entering} style={[styles.glassCardOuter, style]}>
-      <BlurView
-        intensity={intensity}
-        tint={isDark ? 'dark' : 'light'}
-        style={styles.glassCardBlur}
-      >
-        <View style={[
-          styles.glassCardInner,
-          {
-            backgroundColor: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(255,255,255,0.7)',
-            borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.5)',
-          }
-        ]}>
-          {children}
-        </View>
-      </BlurView>
-    </Animated.View>
+    <Svg width={size} height={size} style={{ transform: [{ rotate: '-90deg' }] }}>
+      <Circle
+        cx={size / 2}
+        cy={size / 2}
+        r={radius}
+        stroke={trackColor}
+        strokeWidth={strokeWidth}
+        fill="transparent"
+      />
+      <AnimatedCircle
+        cx={size / 2}
+        cy={size / 2}
+        r={radius}
+        stroke={color}
+        strokeWidth={strokeWidth}
+        fill="transparent"
+        strokeDasharray={`${circumference}`}
+        strokeLinecap="round"
+        animatedProps={animatedProps}
+      />
+    </Svg>
   );
 }
 
-// --- Stat Pill Component ---
-function StatPill({
-  value,
-  label,
-  color,
-  onPress,
-  delay = 0,
-}: {
-  value: number;
-  label: string;
-  color: string;
-  onPress?: () => void;
-  delay?: number;
-}) {
+// --- Streak Fire Component ---
+function StreakFire({ streak, isActive }: { streak: number; isActive: boolean }) {
+  const { colors } = useTheme();
+  const scale = useSharedValue(1);
+  const glow = useSharedValue(0);
+
+  useEffect(() => {
+    if (isActive) {
+      scale.value = withRepeat(
+        withSequence(
+          withTiming(1.1, { duration: 600 }),
+          withTiming(1, { duration: 600 })
+        ),
+        -1,
+        true
+      );
+      glow.value = withRepeat(
+        withSequence(
+          withTiming(1, { duration: 800 }),
+          withTiming(0.3, { duration: 800 })
+        ),
+        -1,
+        true
+      );
+    }
+  }, [isActive]);
+
+  const fireStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+
+  const glowStyle = useAnimatedStyle(() => ({
+    opacity: glow.value,
+    transform: [{ scale: 1 + glow.value * 0.2 }],
+  }));
+
+  return (
+    <View style={styles.streakFireContainer}>
+      {isActive && (
+        <Animated.View style={[styles.streakGlow, glowStyle, { backgroundColor: GAME_COLORS.streakGlow }]} />
+      )}
+      <Animated.View style={fireStyle}>
+        <Text style={styles.fireEmoji}>{isActive ? '🔥' : '❄️'}</Text>
+      </Animated.View>
+      <Text style={[styles.streakCount, { color: isActive ? GAME_COLORS.streak : colors.textTertiary }]}>
+        {streak}
+      </Text>
+      <Text style={[styles.streakLabel, { color: colors.textTertiary }]}>
+        {streak === 1 ? 'day' : 'days'}
+      </Text>
+    </View>
+  );
+}
+
+// --- XP Progress Bar ---
+function XPBar({ currentXP, levelXP, level }: { currentXP: number; levelXP: number; level: number }) {
   const { colors, isDark } = useTheme();
+  const progress = currentXP / levelXP;
+  const animatedWidth = useSharedValue(0);
+
+  useEffect(() => {
+    animatedWidth.value = withDelay(400, withSpring(progress, { damping: 15 }));
+  }, [progress]);
+
+  const barStyle = useAnimatedStyle(() => ({
+    width: `${animatedWidth.value * 100}%`,
+  }));
+
+  return (
+    <View style={styles.xpContainer}>
+      <View style={styles.xpHeader}>
+        <View style={styles.xpLevelBadge}>
+          <LinearGradient
+            colors={[GAME_COLORS.xp, GAME_COLORS.xpGlow]}
+            style={styles.xpLevelGradient}
+          >
+            <Text style={styles.xpLevelText}>{level}</Text>
+          </LinearGradient>
+        </View>
+        <Text style={[styles.xpText, { color: colors.textSecondary }]}>
+          <Text style={{ color: GAME_COLORS.xp, fontWeight: '700' }}>{currentXP}</Text> / {levelXP} XP
+        </Text>
+      </View>
+      <View style={[styles.xpTrack, { backgroundColor: isDark ? 'rgba(175,82,222,0.2)' : 'rgba(175,82,222,0.15)' }]}>
+        <Animated.View style={[styles.xpFill, barStyle]}>
+          <LinearGradient
+            colors={[GAME_COLORS.xp, GAME_COLORS.xpGlow]}
+            style={StyleSheet.absoluteFill}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+          />
+        </Animated.View>
+      </View>
+    </View>
+  );
+}
+
+// --- Achievement Badge ---
+function AchievementBadge({ achievement, index }: { achievement: Achievement; index: number }) {
+  const { colors, isDark } = useTheme();
+  const tierColor = {
+    bronze: GAME_COLORS.bronze,
+    silver: GAME_COLORS.silver,
+    gold: GAME_COLORS.gold,
+    platinum: GAME_COLORS.platinum,
+  }[achievement.tier];
 
   return (
     <AnimatedTouchable
-      entering={FadeInUp.delay(delay).duration(400)}
+      entering={FadeInUp.delay(500 + index * 100).duration(400).springify()}
       style={[
-        styles.statPill,
+        styles.achievementBadge,
         {
           backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
-          borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
+          borderColor: achievement.unlocked ? tierColor : (isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)'),
+          opacity: achievement.unlocked ? 1 : 0.5,
+        }
+      ]}
+      activeOpacity={0.7}
+    >
+      <Text style={[styles.achievementIcon, { opacity: achievement.unlocked ? 1 : 0.4 }]}>
+        {achievement.icon}
+      </Text>
+      <Text style={[styles.achievementTitle, { color: achievement.unlocked ? colors.text : colors.textTertiary }]} numberOfLines={1}>
+        {achievement.title}
+      </Text>
+      {achievement.unlocked && (
+        <View style={[styles.achievementCheck, { backgroundColor: tierColor }]}>
+          <Ionicons name="checkmark" size={10} color="#FFF" />
+        </View>
+      )}
+    </AnimatedTouchable>
+  );
+}
+
+// --- Quest Card ---
+function QuestCard({
+  title,
+  description,
+  progress,
+  total,
+  xpReward,
+  icon,
+  color,
+  onPress,
+  index,
+}: {
+  title: string;
+  description: string;
+  progress: number;
+  total: number;
+  xpReward: number;
+  icon: string;
+  color: string;
+  onPress: () => void;
+  index: number;
+}) {
+  const { colors, isDark } = useTheme();
+  const isComplete = progress >= total;
+  const pct = Math.min(progress / total, 1);
+
+  return (
+    <AnimatedTouchable
+      entering={FadeInRight.delay(300 + index * 80).duration(400)}
+      style={[
+        styles.questCard,
+        {
+          backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : colors.surface,
+          borderColor: isComplete ? GAME_COLORS.goal : (isDark ? 'rgba(255,255,255,0.08)' : colors.border),
         }
       ]}
       onPress={onPress}
-      activeOpacity={0.7}
+      activeOpacity={0.8}
     >
-      <Text style={[styles.statPillValue, { color }]}>{value}</Text>
-      <Text style={[styles.statPillLabel, { color: colors.textTertiary }]}>{label}</Text>
+      {isComplete && (
+        <LinearGradient
+          colors={[`${GAME_COLORS.goal}15`, 'transparent']}
+          style={StyleSheet.absoluteFill}
+        />
+      )}
+      <View style={[styles.questIconWrap, { backgroundColor: `${color}20` }]}>
+        <Text style={styles.questIcon}>{icon}</Text>
+      </View>
+      <View style={styles.questContent}>
+        <Text style={[styles.questTitle, { color: colors.text }]}>{title}</Text>
+        <Text style={[styles.questDesc, { color: colors.textTertiary }]} numberOfLines={1}>{description}</Text>
+        <View style={styles.questProgressRow}>
+          <View style={[styles.questTrack, { backgroundColor: `${color}20` }]}>
+            <View style={[styles.questFill, { width: `${pct * 100}%`, backgroundColor: color }]} />
+          </View>
+          <Text style={[styles.questProgressText, { color: colors.textSecondary }]}>
+            {progress}/{total}
+          </Text>
+        </View>
+      </View>
+      <View style={[styles.questXP, { backgroundColor: `${GAME_COLORS.xp}15` }]}>
+        <Text style={[styles.questXPText, { color: GAME_COLORS.xp }]}>+{xpReward}</Text>
+        <Text style={[styles.questXPLabel, { color: GAME_COLORS.xp }]}>XP</Text>
+      </View>
     </AnimatedTouchable>
   );
 }
@@ -123,6 +341,26 @@ export default function DashboardScreen() {
   const [urgentProposals, setUrgentProposals] = useState<UrgentProposal[]>([]);
   const [isVerified, setIsVerified] = useState(false);
   const [allProposals, setAllProposals] = useState<any[]>([]);
+
+  // Gamification state (would come from backend in production)
+  const [gameStats, setGameStats] = useState({
+    streak: 7,
+    streakActive: true,
+    dailyGoal: 3,
+    dailyProgress: 2,
+    xp: 1250,
+    level: 12,
+    levelXP: 2000,
+  });
+
+  const achievements: Achievement[] = useMemo(() => [
+    { id: '1', icon: '🗳️', title: 'First Vote', description: 'Cast your first vote', unlocked: true, tier: 'bronze' },
+    { id: '2', icon: '🔥', title: 'Week Warrior', description: '7 day streak', unlocked: true, tier: 'silver' },
+    { id: '3', icon: '💡', title: 'Idea Maker', description: 'Create a proposal', unlocked: stats.created > 0, tier: 'bronze' },
+    { id: '4', icon: '🏆', title: 'Century Club', description: '100 votes cast', unlocked: stats.voted >= 100, tier: 'gold' },
+    { id: '5', icon: '⚡', title: 'Speed Voter', description: 'Vote within 1 hour', unlocked: false, tier: 'silver' },
+    { id: '6', icon: '🌟', title: 'Influencer', description: '10 proposals pass', unlocked: false, tier: 'platinum' },
+  ], [stats]);
 
   // ─── Data fetching ───
   const fetchDashboardData = useCallback(async () => {
@@ -191,6 +429,12 @@ export default function DashboardScreen() {
       setUrgentProposals(urgent.slice(0, 5));
       setIsVerified(isDemoAccount ? true : (verificationRes.data?.verified || false));
       setAllProposals(proposals);
+
+      // Update game stats based on real data
+      setGameStats(prev => ({
+        ...prev,
+        dailyProgress: Math.min(votedIds.size % 3, 3), // Simulated daily progress
+      }));
     } catch (error) {
       console.error('Dashboard fetch error:', error);
     } finally { setLoading(false); setRefreshing(false); }
@@ -210,12 +454,7 @@ export default function DashboardScreen() {
 
   const navigateToProposals = () => router.push('/(tabs)/proposals');
 
-  // ─── Computed ───
-  const displayName = user?.name ? user.name.split(' ')[0] : 'there';
-  const getGreeting = () => {
-    const h = new Date().getHours();
-    return h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
-  };
+  const displayName = user?.name ? user.name.split(' ')[0] : 'Voter';
 
   if (loading) {
     return (
@@ -229,37 +468,28 @@ export default function DashboardScreen() {
     );
   }
 
+  const dailyGoalProgress = gameStats.dailyProgress / gameStats.dailyGoal;
+  const dailyGoalComplete = gameStats.dailyProgress >= gameStats.dailyGoal;
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Background Gradient */}
-      <LinearGradient
-        colors={isDark
-          ? [`${colors.gold}08`, colors.background, `${colors.accent || '#8B5CF6'}05`, colors.background]
-          : [`${colors.gold}15`, colors.background, `${colors.accent || '#8B5CF6'}08`, colors.background]
-        }
-        style={StyleSheet.absoluteFill}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-      />
-
-      {/* Floating orbs for depth */}
-      <View style={[styles.orb, styles.orbTopRight, { backgroundColor: `${colors.gold}12` }]} />
-      <View style={[styles.orb, styles.orbBottomLeft, { backgroundColor: `${colors.accent || '#8B5CF6'}10` }]} />
-
       <ScrollView
         contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 8 }]}
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.gold} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={GAME_COLORS.xp} />}
       >
         {/* ═══ Header ═══ */}
         <Animated.View entering={FadeInDown.duration(400)} style={styles.header}>
           <View style={styles.headerLeft}>
-            <Text style={[styles.greeting, { color: colors.textTertiary }]}>{getGreeting()}</Text>
-            <View style={styles.nameRow}>
-              <Text style={[styles.displayName, { color: colors.text }]}>{displayName}</Text>
+            <Text style={[styles.greeting, { color: colors.text }]}>Hey, {displayName}!</Text>
+            <View style={styles.levelRow}>
+              <LinearGradient colors={[GAME_COLORS.xp, GAME_COLORS.xpGlow]} style={styles.levelPill}>
+                <Text style={styles.levelPillText}>Lvl {gameStats.level}</Text>
+              </LinearGradient>
               {isVerified && (
-                <View style={[styles.verifiedBadge, { backgroundColor: colors.success }]}>
-                  <Ionicons name="checkmark" size={10} color="#FFF" />
+                <View style={[styles.verifiedPill, { backgroundColor: GAME_COLORS.goal }]}>
+                  <Ionicons name="checkmark-circle" size={12} color="#FFF" />
+                  <Text style={styles.verifiedText}>Verified</Text>
                 </View>
               )}
             </View>
@@ -267,140 +497,148 @@ export default function DashboardScreen() {
           <View style={styles.headerRight}>
             <BallotDisplay size="sm" />
             <TouchableOpacity onPress={() => router.push('/(tabs)/profile')} activeOpacity={0.8}>
-              <LinearGradient colors={[colors.gold, colors.goldDark || '#A68523']} style={styles.avatar}>
-                <Text style={[styles.avatarText, { color: colors.background }]}>
-                  {user?.name ? user.name.charAt(0).toUpperCase() : 'U'}
-                </Text>
+              <LinearGradient colors={[GAME_COLORS.xp, GAME_COLORS.xpGlow]} style={styles.avatar}>
+                <Text style={styles.avatarText}>{user?.name ? user.name.charAt(0).toUpperCase() : 'U'}</Text>
               </LinearGradient>
             </TouchableOpacity>
           </View>
         </Animated.View>
 
-        {/* ═══ Hero Status Card ═══ */}
-        <GlassCard entering={FadeInUp.delay(100).duration(500)} style={styles.heroCard}>
-          <View style={styles.heroContent}>
-            {stats.pending === 0 ? (
-              <View style={styles.heroCaughtUp}>
-                <View style={[styles.heroCaughtUpIcon, { backgroundColor: `${colors.success}15` }]}>
-                  <Ionicons name="checkmark-circle" size={56} color={colors.success} />
-                </View>
-                <Text style={[styles.heroCaughtUpText, { color: colors.success }]}>All caught up!</Text>
-                <Text style={[styles.heroCaughtUpSub, { color: colors.textTertiary }]}>
-                  You've voted on all available proposals
-                </Text>
-              </View>
-            ) : (
-              <View style={styles.heroPending}>
-                <Text style={[styles.heroPendingNumber, { color: colors.text }]}>{stats.pending}</Text>
-                <Text style={[styles.heroPendingLabel, { color: colors.textSecondary }]}>proposals awaiting your vote</Text>
-                <TouchableOpacity
-                  style={[styles.heroCtaButton, { backgroundColor: colors.gold }]}
-                  onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); navigateToProposals(); }}
-                  activeOpacity={0.85}
-                >
-                  <Text style={styles.heroCtaText}>Vote Now</Text>
-                  <Ionicons name="arrow-forward" size={18} color="#FFF" />
-                </TouchableOpacity>
-              </View>
-            )}
+        {/* ═══ Stats Bar: Streak + Daily Goal ═══ */}
+        <Animated.View entering={FadeInUp.delay(100).duration(500)} style={styles.statsBar}>
+          {/* Streak */}
+          <View style={[styles.statBox, { backgroundColor: isDark ? 'rgba(255,149,0,0.1)' : 'rgba(255,149,0,0.08)' }]}>
+            <StreakFire streak={gameStats.streak} isActive={gameStats.streakActive} />
           </View>
-        </GlassCard>
 
-        {/* ═══ Stats Row ═══ */}
-        <View style={styles.statsRow}>
-          <StatPill value={stats.pending} label="Pending" color={colors.warning} onPress={navigateToProposals} delay={200} />
-          <StatPill value={stats.voted} label="Voted" color={colors.success} onPress={() => router.push('/modals/voting-history')} delay={250} />
-          <StatPill value={stats.created} label="Created" color={colors.gold} onPress={() => router.push('/modals/my-proposals')} delay={300} />
-        </View>
-
-        {/* ═══ Urgent Proposals ═══ */}
-        {urgentProposals.length > 0 && (
-          <GlassCard entering={FadeInUp.delay(350).duration(500)} style={styles.sectionCard}>
-            <View style={styles.sectionHeader}>
-              <View style={[styles.sectionIcon, { backgroundColor: `${colors.error}15` }]}>
-                <Ionicons name="flame" size={20} color={colors.error} />
-              </View>
-              <View style={styles.sectionTitleWrap}>
-                <Text style={[styles.sectionTitle, { color: colors.text }]}>Closing Soon</Text>
-                <Text style={[styles.sectionSubtitle, { color: colors.textTertiary }]}>
-                  {urgentProposals.length} need your vote
-                </Text>
+          {/* Daily Goal Ring */}
+          <View style={[styles.statBox, styles.goalBox, { backgroundColor: isDark ? 'rgba(52,199,89,0.1)' : 'rgba(52,199,89,0.08)' }]}>
+            <View style={styles.goalRingWrap}>
+              <GoalRing
+                size={70}
+                strokeWidth={6}
+                progress={dailyGoalProgress}
+                color={GAME_COLORS.goal}
+                trackColor={isDark ? 'rgba(52,199,89,0.2)' : 'rgba(52,199,89,0.15)'}
+              />
+              <View style={styles.goalRingInner}>
+                {dailyGoalComplete ? (
+                  <Ionicons name="checkmark" size={24} color={GAME_COLORS.goal} />
+                ) : (
+                  <Text style={[styles.goalRingText, { color: colors.text }]}>
+                    {gameStats.dailyProgress}/{gameStats.dailyGoal}
+                  </Text>
+                )}
               </View>
             </View>
+            <Text style={[styles.goalLabel, { color: colors.textSecondary }]}>
+              {dailyGoalComplete ? 'Goal complete!' : 'Daily Goal'}
+            </Text>
+          </View>
 
-            {urgentProposals.slice(0, 3).map((p, idx) => {
-              const urgColor = p.hoursLeft <= 6 ? colors.error : p.hoursLeft <= 24 ? colors.warning : colors.gold;
-              return (
-                <TouchableOpacity
-                  key={p.id}
-                  style={[
-                    styles.urgentItem,
-                    { borderBottomColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' },
-                    idx === Math.min(2, urgentProposals.length - 1) && { borderBottomWidth: 0 }
-                  ]}
-                  onPress={() => router.push({ pathname: '/(tabs)/proposals', params: { proposalId: p.id } })}
-                  activeOpacity={0.7}
-                >
-                  <View style={styles.urgentItemLeft}>
-                    <Text style={[styles.urgentTitle, { color: colors.text }]} numberOfLines={1}>{p.title}</Text>
-                    <Text style={[styles.urgentCategory, { color: colors.textTertiary }]}>{p.category}</Text>
-                  </View>
-                  <View style={[styles.urgentTimeBadge, { backgroundColor: `${urgColor}15` }]}>
-                    <Ionicons name="time-outline" size={12} color={urgColor} />
-                    <Text style={[styles.urgentTimeText, { color: urgColor }]}>{p.hoursLeft}h</Text>
-                  </View>
-                </TouchableOpacity>
-              );
-            })}
-          </GlassCard>
+          {/* Total Votes */}
+          <View style={[styles.statBox, { backgroundColor: isDark ? 'rgba(0,122,255,0.1)' : 'rgba(0,122,255,0.08)' }]}>
+            <Text style={[styles.statNumber, { color: GAME_COLORS.badge }]}>{stats.voted}</Text>
+            <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Total Votes</Text>
+          </View>
+        </Animated.View>
+
+        {/* ═══ XP Progress ═══ */}
+        <Animated.View entering={FadeInUp.delay(200).duration(500)}>
+          <XPBar currentXP={gameStats.xp} levelXP={gameStats.levelXP} level={gameStats.level} />
+        </Animated.View>
+
+        {/* ═══ Daily Quests ═══ */}
+        <Animated.View entering={FadeInUp.delay(250).duration(500)} style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Daily Quests</Text>
+            <View style={styles.sectionBadge}>
+              <Text style={styles.sectionBadgeText}>+XP</Text>
+            </View>
+          </View>
+
+          <QuestCard
+            title="Cast 3 Votes"
+            description="Vote on any 3 proposals today"
+            progress={gameStats.dailyProgress}
+            total={3}
+            xpReward={50}
+            icon="🗳️"
+            color={GAME_COLORS.goal}
+            onPress={navigateToProposals}
+            index={0}
+          />
+
+          {urgentProposals.length > 0 && (
+            <QuestCard
+              title="Beat the Clock"
+              description={`Vote on "${urgentProposals[0].title.slice(0, 25)}..."`}
+              progress={0}
+              total={1}
+              xpReward={25}
+              icon="⏰"
+              color={GAME_COLORS.streak}
+              onPress={() => router.push({ pathname: '/(tabs)/proposals', params: { proposalId: urgentProposals[0].id } })}
+              index={1}
+            />
+          )}
+
+          <QuestCard
+            title="Community Explorer"
+            description="View all proposals in your country"
+            progress={1}
+            total={1}
+            xpReward={15}
+            icon="🌍"
+            color={GAME_COLORS.badge}
+            onPress={navigateToProposals}
+            index={2}
+          />
+        </Animated.View>
+
+        {/* ═══ Achievements ═══ */}
+        <Animated.View entering={FadeInUp.delay(400).duration(500)} style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Achievements</Text>
+            <TouchableOpacity activeOpacity={0.7}>
+              <Text style={[styles.seeAll, { color: GAME_COLORS.xp }]}>See All</Text>
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.achievementsScroll}
+          >
+            {achievements.map((achievement, idx) => (
+              <AchievementBadge key={achievement.id} achievement={achievement} index={idx} />
+            ))}
+          </ScrollView>
+        </Animated.View>
+
+        {/* ═══ Vote CTA ═══ */}
+        {stats.pending > 0 && (
+          <Animated.View entering={FadeInUp.delay(500).duration(500)} style={styles.ctaSection}>
+            <TouchableOpacity
+              style={styles.ctaButton}
+              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); navigateToProposals(); }}
+              activeOpacity={0.9}
+            >
+              <LinearGradient
+                colors={[GAME_COLORS.goal, GAME_COLORS.goalGlow]}
+                style={styles.ctaGradient}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+              >
+                <Text style={styles.ctaText}>Start Voting</Text>
+                <View style={styles.ctaBadge}>
+                  <Text style={styles.ctaBadgeText}>{stats.pending} pending</Text>
+                </View>
+              </LinearGradient>
+            </TouchableOpacity>
+          </Animated.View>
         )}
 
-        {/* ═══ Communities ═══ */}
-        {communities.length > 0 && (
-          <GlassCard entering={FadeInUp.delay(400).duration(500)} style={styles.sectionCard}>
-            <View style={styles.sectionHeader}>
-              <View style={[styles.sectionIcon, { backgroundColor: `${colors.gold}15` }]}>
-                <Ionicons name="globe-outline" size={20} color={colors.gold} />
-              </View>
-              <View style={styles.sectionTitleWrap}>
-                <Text style={[styles.sectionTitle, { color: colors.text }]}>Your Communities</Text>
-              </View>
-            </View>
-
-            <View style={styles.communitiesGrid}>
-              {communities.map((c, idx) => (
-                <AnimatedTouchable
-                  key={c.id}
-                  entering={FadeInRight.delay(450 + idx * 80).duration(350)}
-                  style={[
-                    styles.communityChip,
-                    {
-                      backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
-                      borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
-                    }
-                  ]}
-                  onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); navigateToProposals(); }}
-                  activeOpacity={0.7}
-                >
-                  <Text style={styles.communityEmoji}>{c.icon}</Text>
-                  <View style={styles.communityInfo}>
-                    <Text style={[styles.communityName, { color: colors.text }]} numberOfLines={1}>{c.name}</Text>
-                    <Text style={[styles.communityMeta, { color: colors.textTertiary }]}>
-                      {c.proposalCount - c.unvotedCount}/{c.proposalCount} voted
-                    </Text>
-                  </View>
-                  {c.unvotedCount > 0 && (
-                    <View style={[styles.communityBadge, { backgroundColor: colors.gold }]}>
-                      <Text style={styles.communityBadgeText}>{c.unvotedCount}</Text>
-                    </View>
-                  )}
-                </AnimatedTouchable>
-              ))}
-            </View>
-          </GlassCard>
-        )}
-
-        {/* Bottom spacing */}
         <View style={{ height: 100 }} />
       </ScrollView>
     </View>
@@ -410,20 +648,9 @@ export default function DashboardScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   scrollContent: { paddingHorizontal: SPACING.lg },
-
-  // Loading
   loadingContent: { flex: 1, paddingHorizontal: SPACING.lg },
   loadingCards: { marginTop: SPACING.xl },
   loadingList: { marginTop: SPACING.xl, gap: SPACING.md },
-
-  // Background orbs
-  orb: {
-    position: 'absolute',
-    borderRadius: 999,
-    ...Platform.select({ ios: { }, android: { opacity: 0.8 } }),
-  },
-  orbTopRight: { width: 300, height: 300, top: -100, right: -100 },
-  orbBottomLeft: { width: 250, height: 250, bottom: 100, left: -80 },
 
   // Header
   header: {
@@ -435,132 +662,177 @@ const styles = StyleSheet.create({
   },
   headerLeft: {},
   headerRight: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm },
-  greeting: { ...TYPOGRAPHY.labelMedium },
-  nameRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.xs },
-  displayName: { ...TYPOGRAPHY.headlineMedium, fontWeight: '700' },
-  verifiedBadge: {
-    width: 18, height: 18, borderRadius: 9,
-    alignItems: 'center', justifyContent: 'center',
+  greeting: { ...TYPOGRAPHY.headlineMedium, fontWeight: '800' },
+  levelRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.xs, marginTop: 4 },
+  levelPill: {
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: 3,
+    borderRadius: 10,
   },
-  avatar: {
-    width: 40, height: 40, borderRadius: 20,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  avatarText: { fontSize: 16, fontWeight: '700' },
-
-  // Glass Card
-  glassCardOuter: {
-    borderRadius: 24,
-    overflow: 'hidden',
-    marginBottom: SPACING.md,
-  },
-  glassCardBlur: {
-    borderRadius: 24,
-    overflow: 'hidden',
-  },
-  glassCardInner: {
-    borderRadius: 24,
-    borderWidth: 1,
-    padding: SPACING.lg,
-  },
-
-  // Hero Card
-  heroCard: { marginTop: SPACING.sm },
-  heroContent: { alignItems: 'center', paddingVertical: SPACING.md },
-
-  heroCaughtUp: { alignItems: 'center' },
-  heroCaughtUpIcon: {
-    width: 88, height: 88, borderRadius: 44,
-    alignItems: 'center', justifyContent: 'center',
-    marginBottom: SPACING.md,
-  },
-  heroCaughtUpText: { ...TYPOGRAPHY.headlineMedium, fontWeight: '700' },
-  heroCaughtUpSub: { ...TYPOGRAPHY.bodyMedium, marginTop: SPACING.xs, textAlign: 'center' },
-
-  heroPending: { alignItems: 'center' },
-  heroPendingNumber: { fontSize: 72, fontWeight: '800', fontVariant: ['tabular-nums'], lineHeight: 80 },
-  heroPendingLabel: { ...TYPOGRAPHY.bodyLarge, marginTop: -SPACING.xs },
-  heroCtaButton: {
+  levelPillText: { color: '#FFF', fontSize: 11, fontWeight: '700' },
+  verifiedPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: SPACING.xs,
-    paddingHorizontal: SPACING.xl,
-    paddingVertical: SPACING.md,
-    borderRadius: 50,
-    marginTop: SPACING.lg,
+    gap: 3,
+    paddingHorizontal: SPACING.xs,
+    paddingVertical: 3,
+    borderRadius: 10,
   },
-  heroCtaText: { color: '#FFF', ...TYPOGRAPHY.labelLarge, fontWeight: '700' },
+  verifiedText: { color: '#FFF', fontSize: 11, fontWeight: '600' },
+  avatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarText: { color: '#FFF', fontSize: 18, fontWeight: '700' },
 
-  // Stats Row
-  statsRow: {
+  // Stats Bar
+  statsBar: {
     flexDirection: 'row',
     gap: SPACING.sm,
-    marginBottom: SPACING.md,
+    marginBottom: SPACING.lg,
   },
-  statPill: {
+  statBox: {
     flex: 1,
     alignItems: 'center',
+    justifyContent: 'center',
     paddingVertical: SPACING.md,
     borderRadius: 16,
-    borderWidth: 1,
   },
-  statPillValue: { fontSize: 24, fontWeight: '700', fontVariant: ['tabular-nums'] },
-  statPillLabel: { ...TYPOGRAPHY.labelSmall, marginTop: 2 },
+  goalBox: { flex: 1.3 },
+  statNumber: { fontSize: 28, fontWeight: '800', fontVariant: ['tabular-nums'] },
+  statLabel: { ...TYPOGRAPHY.labelSmall, marginTop: 2 },
 
-  // Section Card
-  sectionCard: {},
+  // Streak Fire
+  streakFireContainer: { alignItems: 'center' },
+  streakGlow: {
+    position: 'absolute',
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    top: -5,
+  },
+  fireEmoji: { fontSize: 32 },
+  streakCount: { fontSize: 20, fontWeight: '800', marginTop: -4 },
+  streakLabel: { ...TYPOGRAPHY.labelSmall },
+
+  // Goal Ring
+  goalRingWrap: { alignItems: 'center', justifyContent: 'center' },
+  goalRingInner: { position: 'absolute', alignItems: 'center', justifyContent: 'center' },
+  goalRingText: { fontSize: 14, fontWeight: '700' },
+  goalLabel: { ...TYPOGRAPHY.labelSmall, marginTop: SPACING.xs },
+
+  // XP Bar
+  xpContainer: { marginBottom: SPACING.lg },
+  xpHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: SPACING.xs },
+  xpLevelBadge: { marginRight: SPACING.sm },
+  xpLevelGradient: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  xpLevelText: { color: '#FFF', fontSize: 13, fontWeight: '800' },
+  xpText: { ...TYPOGRAPHY.bodySmall },
+  xpTrack: { height: 10, borderRadius: 5, overflow: 'hidden' },
+  xpFill: { height: '100%', borderRadius: 5 },
+
+  // Section
+  section: { marginBottom: SPACING.lg },
   sectionHeader: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: SPACING.md,
   },
-  sectionIcon: {
-    width: 36, height: 36, borderRadius: 10,
-    alignItems: 'center', justifyContent: 'center',
-    marginRight: SPACING.sm,
-  },
-  sectionTitleWrap: { flex: 1 },
   sectionTitle: { ...TYPOGRAPHY.headlineSmall, fontWeight: '700' },
-  sectionSubtitle: { ...TYPOGRAPHY.labelSmall, marginTop: 1 },
-
-  // Urgent Items
-  urgentItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: SPACING.sm,
-    borderBottomWidth: 1,
-  },
-  urgentItemLeft: { flex: 1, marginRight: SPACING.sm },
-  urgentTitle: { ...TYPOGRAPHY.bodyMedium, fontWeight: '600' },
-  urgentCategory: { ...TYPOGRAPHY.labelSmall, marginTop: 2 },
-  urgentTimeBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
+  sectionBadge: {
+    backgroundColor: GAME_COLORS.xp,
     paddingHorizontal: SPACING.sm,
-    paddingVertical: SPACING.xs,
+    paddingVertical: 2,
     borderRadius: 8,
   },
-  urgentTimeText: { ...TYPOGRAPHY.labelSmall, fontWeight: '600' },
+  sectionBadgeText: { color: '#FFF', fontSize: 11, fontWeight: '700' },
+  seeAll: { ...TYPOGRAPHY.labelMedium, fontWeight: '600' },
 
-  // Communities
-  communitiesGrid: { gap: SPACING.sm },
-  communityChip: {
+  // Quest Card
+  questCard: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: SPACING.md,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    marginBottom: SPACING.sm,
+    overflow: 'hidden',
+  },
+  questIconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: SPACING.sm,
+  },
+  questIcon: { fontSize: 22 },
+  questContent: { flex: 1 },
+  questTitle: { ...TYPOGRAPHY.bodyMedium, fontWeight: '700' },
+  questDesc: { ...TYPOGRAPHY.labelSmall, marginTop: 1 },
+  questProgressRow: { flexDirection: 'row', alignItems: 'center', marginTop: SPACING.xs, gap: SPACING.xs },
+  questTrack: { flex: 1, height: 6, borderRadius: 3 },
+  questFill: { height: '100%', borderRadius: 3 },
+  questProgressText: { ...TYPOGRAPHY.labelSmall, fontWeight: '600', minWidth: 28 },
+  questXP: {
+    alignItems: 'center',
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: SPACING.xs,
+    borderRadius: 10,
+    marginLeft: SPACING.sm,
+  },
+  questXPText: { fontSize: 14, fontWeight: '800' },
+  questXPLabel: { fontSize: 9, fontWeight: '600' },
+
+  // Achievements
+  achievementsScroll: { paddingRight: SPACING.lg },
+  achievementBadge: {
+    width: 90,
+    alignItems: 'center',
+    padding: SPACING.sm,
     borderRadius: 14,
-    borderWidth: 1,
+    borderWidth: 2,
+    marginRight: SPACING.sm,
   },
-  communityEmoji: { fontSize: 28, marginRight: SPACING.sm },
-  communityInfo: { flex: 1 },
-  communityName: { ...TYPOGRAPHY.bodyMedium, fontWeight: '600' },
-  communityMeta: { ...TYPOGRAPHY.labelSmall, marginTop: 1 },
-  communityBadge: {
-    minWidth: 24, height: 24, borderRadius: 12,
-    alignItems: 'center', justifyContent: 'center',
-    paddingHorizontal: 8,
+  achievementIcon: { fontSize: 32, marginBottom: 4 },
+  achievementTitle: { ...TYPOGRAPHY.labelSmall, fontWeight: '600', textAlign: 'center' },
+  achievementCheck: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  communityBadgeText: { color: '#FFF', fontSize: 12, fontWeight: '700' },
+
+  // CTA
+  ctaSection: { marginTop: SPACING.sm },
+  ctaButton: { borderRadius: 16, overflow: 'hidden' },
+  ctaGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: SPACING.md + 4,
+    gap: SPACING.sm,
+  },
+  ctaText: { color: '#FFF', ...TYPOGRAPHY.headlineSmall, fontWeight: '700' },
+  ctaBadge: {
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: 4,
+    borderRadius: 10,
+  },
+  ctaBadgeText: { color: '#FFF', fontSize: 12, fontWeight: '600' },
 });
