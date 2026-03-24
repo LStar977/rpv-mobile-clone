@@ -1,25 +1,19 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import Svg, { Circle } from 'react-native-svg';
 import * as Haptics from 'expo-haptics';
 import Animated, {
-  FadeIn,
   FadeInDown,
   FadeInUp,
   FadeInRight,
   useSharedValue,
   useAnimatedStyle,
-  withSpring,
-  withTiming,
-  withDelay,
-  withSequence,
   withRepeat,
-  useAnimatedProps,
-  interpolateColor,
+  withTiming,
+  withSequence,
 } from 'react-native-reanimated';
 import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY } from '../../lib/theme';
 import { useAuthStore } from '../../lib/auth';
@@ -28,24 +22,7 @@ import { proposalsApi, userApi } from '../../lib/api';
 import { BallotDisplay } from '../../components/ui';
 import { SkeletonStats, SkeletonListItem, SkeletonWelcome } from '../../components/ui/Skeleton';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
-const AnimatedCircle = Animated.createAnimatedComponent(Circle);
-
-// Gamification colors
-const GAME_COLORS = {
-  streak: '#FF9500',
-  streakGlow: '#FFD60A',
-  xp: '#AF52DE',
-  xpGlow: '#BF5AF2',
-  goal: '#34C759',
-  goalGlow: '#30D158',
-  badge: '#007AFF',
-  bronze: '#CD7F32',
-  silver: '#C0C0C0',
-  gold: '#FFD700',
-  platinum: '#E5E4E2',
-};
 
 type Community = {
   id: string;
@@ -63,265 +40,95 @@ type UrgentProposal = {
   category: string;
 };
 
-type Achievement = {
-  id: string;
-  icon: string;
-  title: string;
-  description: string;
-  unlocked: boolean;
-  tier: 'bronze' | 'silver' | 'gold' | 'platinum';
-};
-
-// --- Animated Progress Ring ---
-function GoalRing({
-  size,
-  strokeWidth,
-  progress,
-  color,
-  trackColor,
+// --- Jurisdiction Chip (State/City) ---
+function JurisdictionChip({
+  community,
+  onPress,
+  index,
 }: {
-  size: number;
-  strokeWidth: number;
-  progress: number;
-  color: string;
-  trackColor: string;
+  community: Community;
+  onPress: () => void;
+  index: number;
 }) {
-  const radius = (size - strokeWidth) / 2;
-  const circumference = 2 * Math.PI * radius;
-  const animatedProgress = useSharedValue(0);
-
-  useEffect(() => {
-    animatedProgress.value = withDelay(300, withSpring(progress, { damping: 15, stiffness: 80 }));
-  }, [progress]);
-
-  const animatedProps = useAnimatedProps(() => ({
-    strokeDashoffset: circumference * (1 - animatedProgress.value),
-  }));
-
-  return (
-    <Svg width={size} height={size} style={{ transform: [{ rotate: '-90deg' }] }}>
-      <Circle
-        cx={size / 2}
-        cy={size / 2}
-        r={radius}
-        stroke={trackColor}
-        strokeWidth={strokeWidth}
-        fill="transparent"
-      />
-      <AnimatedCircle
-        cx={size / 2}
-        cy={size / 2}
-        r={radius}
-        stroke={color}
-        strokeWidth={strokeWidth}
-        fill="transparent"
-        strokeDasharray={`${circumference}`}
-        strokeLinecap="round"
-        animatedProps={animatedProps}
-      />
-    </Svg>
-  );
-}
-
-// --- Streak Fire Component ---
-function StreakFire({ streak, isActive }: { streak: number; isActive: boolean }) {
-  const { colors } = useTheme();
-  const scale = useSharedValue(1);
-  const glow = useSharedValue(0);
-
-  useEffect(() => {
-    if (isActive) {
-      scale.value = withRepeat(
-        withSequence(
-          withTiming(1.1, { duration: 600 }),
-          withTiming(1, { duration: 600 })
-        ),
-        -1,
-        true
-      );
-      glow.value = withRepeat(
-        withSequence(
-          withTiming(1, { duration: 800 }),
-          withTiming(0.3, { duration: 800 })
-        ),
-        -1,
-        true
-      );
-    }
-  }, [isActive]);
-
-  const fireStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-  }));
-
-  const glowStyle = useAnimatedStyle(() => ({
-    opacity: glow.value,
-    transform: [{ scale: 1 + glow.value * 0.2 }],
-  }));
-
-  return (
-    <View style={styles.streakFireContainer}>
-      {isActive && (
-        <Animated.View style={[styles.streakGlow, glowStyle, { backgroundColor: GAME_COLORS.streakGlow }]} />
-      )}
-      <Animated.View style={fireStyle}>
-        <Text style={styles.fireEmoji}>{isActive ? '🔥' : '❄️'}</Text>
-      </Animated.View>
-      <Text style={[styles.streakCount, { color: isActive ? GAME_COLORS.streak : colors.textTertiary }]}>
-        {streak}
-      </Text>
-      <Text style={[styles.streakLabel, { color: colors.textTertiary }]}>
-        {streak === 1 ? 'day' : 'days'}
-      </Text>
-    </View>
-  );
-}
-
-// --- XP Progress Bar ---
-function XPBar({ currentXP, levelXP, level }: { currentXP: number; levelXP: number; level: number }) {
   const { colors, isDark } = useTheme();
-  const progress = currentXP / levelXP;
-  const animatedWidth = useSharedValue(0);
-
-  useEffect(() => {
-    animatedWidth.value = withDelay(400, withSpring(progress, { damping: 15 }));
-  }, [progress]);
-
-  const barStyle = useAnimatedStyle(() => ({
-    width: `${animatedWidth.value * 100}%`,
-  }));
-
-  return (
-    <View style={styles.xpContainer}>
-      <View style={styles.xpHeader}>
-        <View style={styles.xpLevelBadge}>
-          <LinearGradient
-            colors={[GAME_COLORS.xp, GAME_COLORS.xpGlow]}
-            style={styles.xpLevelGradient}
-          >
-            <Text style={styles.xpLevelText}>{level}</Text>
-          </LinearGradient>
-        </View>
-        <Text style={[styles.xpText, { color: colors.textSecondary }]}>
-          <Text style={{ color: GAME_COLORS.xp, fontWeight: '700' }}>{currentXP}</Text> / {levelXP} XP
-        </Text>
-      </View>
-      <View style={[styles.xpTrack, { backgroundColor: isDark ? 'rgba(175,82,222,0.2)' : 'rgba(175,82,222,0.15)' }]}>
-        <Animated.View style={[styles.xpFill, barStyle]}>
-          <LinearGradient
-            colors={[GAME_COLORS.xp, GAME_COLORS.xpGlow]}
-            style={StyleSheet.absoluteFill}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-          />
-        </Animated.View>
-      </View>
-    </View>
-  );
-}
-
-// --- Achievement Badge ---
-function AchievementBadge({ achievement, index }: { achievement: Achievement; index: number }) {
-  const { colors, isDark } = useTheme();
-  const tierColor = {
-    bronze: GAME_COLORS.bronze,
-    silver: GAME_COLORS.silver,
-    gold: GAME_COLORS.gold,
-    platinum: GAME_COLORS.platinum,
-  }[achievement.tier];
+  const hasUnvoted = community.unvotedCount > 0;
 
   return (
     <AnimatedTouchable
-      entering={FadeInUp.delay(500 + index * 100).duration(400).springify()}
+      entering={FadeInRight.delay(400 + index * 60).duration(350)}
       style={[
-        styles.achievementBadge,
+        styles.jurisdictionChip,
         {
-          backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
-          borderColor: achievement.unlocked ? tierColor : (isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)'),
-          opacity: achievement.unlocked ? 1 : 0.5,
-        }
+          backgroundColor: isDark ? colors.surfaceElevated : colors.surface,
+          borderColor: hasUnvoted ? colors.gold : colors.border,
+          borderWidth: hasUnvoted ? 1.5 : 1,
+        },
       ]}
+      onPress={onPress}
       activeOpacity={0.7}
     >
-      <Text style={[styles.achievementIcon, { opacity: achievement.unlocked ? 1 : 0.4 }]}>
-        {achievement.icon}
+      <Text style={styles.jurisdictionIcon}>{community.icon}</Text>
+      <Text style={[styles.jurisdictionName, { color: colors.text }]} numberOfLines={1}>
+        {community.name}
       </Text>
-      <Text style={[styles.achievementTitle, { color: achievement.unlocked ? colors.text : colors.textTertiary }]} numberOfLines={1}>
-        {achievement.title}
-      </Text>
-      {achievement.unlocked && (
-        <View style={[styles.achievementCheck, { backgroundColor: tierColor }]}>
-          <Ionicons name="checkmark" size={10} color="#FFF" />
+      {hasUnvoted && (
+        <View style={[styles.jurisdictionBadge, { backgroundColor: colors.gold }]}>
+          <Text style={styles.jurisdictionBadgeText}>{community.unvotedCount}</Text>
         </View>
       )}
     </AnimatedTouchable>
   );
 }
 
-// --- Quest Card ---
-function QuestCard({
-  title,
-  description,
-  progress,
-  total,
-  xpReward,
-  icon,
-  color,
+// --- Attention Card (Urgent Proposal) ---
+function AttentionCard({
+  proposal,
   onPress,
   index,
 }: {
-  title: string;
-  description: string;
-  progress: number;
-  total: number;
-  xpReward: number;
-  icon: string;
-  color: string;
+  proposal: UrgentProposal;
   onPress: () => void;
   index: number;
 }) {
   const { colors, isDark } = useTheme();
-  const isComplete = progress >= total;
-  const pct = Math.min(progress / total, 1);
+  const isUrgent = proposal.hoursLeft < 12;
+  const accentColor = isUrgent ? colors.warning : colors.gold;
+
+  const formatTime = (hours: number) => {
+    if (hours < 1) return 'Less than 1 hour';
+    if (hours === 1) return '1 hour remains';
+    if (hours < 24) return `${hours} hours remain`;
+    const days = Math.floor(hours / 24);
+    return days === 1 ? '1 day remains' : `${days} days remain`;
+  };
 
   return (
     <AnimatedTouchable
-      entering={FadeInRight.delay(300 + index * 80).duration(400)}
+      entering={FadeInUp.delay(500 + index * 80).duration(400)}
       style={[
-        styles.questCard,
+        styles.attentionCard,
         {
-          backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : colors.surface,
-          borderColor: isComplete ? GAME_COLORS.goal : (isDark ? 'rgba(255,255,255,0.08)' : colors.border),
-        }
+          backgroundColor: isDark ? colors.surfaceElevated : colors.surface,
+          borderLeftColor: accentColor,
+        },
       ]}
       onPress={onPress}
       activeOpacity={0.8}
     >
-      {isComplete && (
-        <LinearGradient
-          colors={[`${GAME_COLORS.goal}15`, 'transparent']}
-          style={StyleSheet.absoluteFill}
-        />
-      )}
-      <View style={[styles.questIconWrap, { backgroundColor: `${color}20` }]}>
-        <Text style={styles.questIcon}>{icon}</Text>
-      </View>
-      <View style={styles.questContent}>
-        <Text style={[styles.questTitle, { color: colors.text }]}>{title}</Text>
-        <Text style={[styles.questDesc, { color: colors.textTertiary }]} numberOfLines={1}>{description}</Text>
-        <View style={styles.questProgressRow}>
-          <View style={[styles.questTrack, { backgroundColor: `${color}20` }]}>
-            <View style={[styles.questFill, { width: `${pct * 100}%`, backgroundColor: color }]} />
+      <View style={styles.attentionContent}>
+        <Text style={[styles.attentionTitle, { color: colors.text }]} numberOfLines={2}>
+          {proposal.title}
+        </Text>
+        <View style={styles.attentionMeta}>
+          <View style={[styles.categoryTag, { backgroundColor: `${accentColor}15` }]}>
+            <Text style={[styles.categoryText, { color: accentColor }]}>{proposal.category}</Text>
           </View>
-          <Text style={[styles.questProgressText, { color: colors.textSecondary }]}>
-            {progress}/{total}
+          <Text style={[styles.attentionTime, { color: colors.textTertiary }]}>
+            {formatTime(proposal.hoursLeft)}
           </Text>
         </View>
       </View>
-      <View style={[styles.questXP, { backgroundColor: `${GAME_COLORS.xp}15` }]}>
-        <Text style={[styles.questXPText, { color: GAME_COLORS.xp }]}>+{xpReward}</Text>
-        <Text style={[styles.questXPLabel, { color: GAME_COLORS.xp }]}>XP</Text>
-      </View>
+      <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
     </AnimatedTouchable>
   );
 }
@@ -340,27 +147,23 @@ export default function DashboardScreen() {
   const [communities, setCommunities] = useState<Community[]>([]);
   const [urgentProposals, setUrgentProposals] = useState<UrgentProposal[]>([]);
   const [isVerified, setIsVerified] = useState(false);
-  const [allProposals, setAllProposals] = useState<any[]>([]);
 
-  // Gamification state (would come from backend in production)
-  const [gameStats, setGameStats] = useState({
-    streak: 7,
-    streakActive: true,
-    dailyGoal: 3,
-    dailyProgress: 2,
-    xp: 1250,
-    level: 12,
-    levelXP: 2000,
-  });
+  // Subtle pulse for pending badges
+  const badgePulse = useSharedValue(1);
+  useEffect(() => {
+    badgePulse.value = withRepeat(
+      withSequence(
+        withTiming(1.08, { duration: 1200 }),
+        withTiming(1, { duration: 1200 })
+      ),
+      -1,
+      true
+    );
+  }, []);
 
-  const achievements: Achievement[] = useMemo(() => [
-    { id: '1', icon: '🗳️', title: 'First Vote', description: 'Cast your first vote', unlocked: true, tier: 'bronze' },
-    { id: '2', icon: '🔥', title: 'Week Warrior', description: '7 day streak', unlocked: true, tier: 'silver' },
-    { id: '3', icon: '💡', title: 'Idea Maker', description: 'Create a proposal', unlocked: stats.created > 0, tier: 'bronze' },
-    { id: '4', icon: '🏆', title: 'Century Club', description: '100 votes cast', unlocked: stats.voted >= 100, tier: 'gold' },
-    { id: '5', icon: '⚡', title: 'Speed Voter', description: 'Vote within 1 hour', unlocked: false, tier: 'silver' },
-    { id: '6', icon: '🌟', title: 'Influencer', description: '10 proposals pass', unlocked: false, tier: 'platinum' },
-  ], [stats]);
+  const badgePulseStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: badgePulse.value }],
+  }));
 
   // ─── Data fetching ───
   const fetchDashboardData = useCallback(async () => {
@@ -426,15 +229,8 @@ export default function DashboardScreen() {
       setStats({ pending: pendingCount, voted: votedIds.size, created: createdCount });
       const filteredCommunities = isDemoAccount ? Object.values(communityMap) : Object.values(communityMap).filter((c) => c.proposalCount > 0);
       setCommunities(filteredCommunities);
-      setUrgentProposals(urgent.slice(0, 5));
+      setUrgentProposals(urgent.slice(0, 4));
       setIsVerified(isDemoAccount ? true : (verificationRes.data?.verified || false));
-      setAllProposals(proposals);
-
-      // Update game stats based on real data
-      setGameStats(prev => ({
-        ...prev,
-        dailyProgress: Math.min(votedIds.size % 3, 3), // Simulated daily progress
-      }));
     } catch (error) {
       console.error('Dashboard fetch error:', error);
     } finally { setLoading(false); setRefreshing(false); }
@@ -454,7 +250,14 @@ export default function DashboardScreen() {
 
   const navigateToProposals = () => router.push('/(tabs)/proposals');
 
-  const displayName = user?.name ? user.name.split(' ')[0] : 'Voter';
+  const displayName = user?.name ? user.name.split(' ')[0] : 'Citizen';
+  const primaryCommunity = communities.find(c => c.type === 'country');
+  const secondaryCommunities = communities.filter(c => c.type !== 'country');
+
+  const getGreeting = () => {
+    const h = new Date().getHours();
+    return h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
+  };
 
   if (loading) {
     return (
@@ -468,28 +271,22 @@ export default function DashboardScreen() {
     );
   }
 
-  const dailyGoalProgress = gameStats.dailyProgress / gameStats.dailyGoal;
-  const dailyGoalComplete = gameStats.dailyProgress >= gameStats.dailyGoal;
-
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView
-        contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 8 }]}
+        contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 12 }]}
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={GAME_COLORS.xp} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.gold} />}
       >
-        {/* ═══ Header ═══ */}
+        {/* ═══ CIVIC IDENTITY HEADER ═══ */}
         <Animated.View entering={FadeInDown.duration(400)} style={styles.header}>
           <View style={styles.headerLeft}>
-            <Text style={[styles.greeting, { color: colors.text }]}>Hey, {displayName}!</Text>
-            <View style={styles.levelRow}>
-              <LinearGradient colors={[GAME_COLORS.xp, GAME_COLORS.xpGlow]} style={styles.levelPill}>
-                <Text style={styles.levelPillText}>Lvl {gameStats.level}</Text>
-              </LinearGradient>
+            <Text style={[styles.greeting, { color: colors.textTertiary }]}>{getGreeting()}</Text>
+            <View style={styles.nameRow}>
+              <Text style={[styles.displayName, { color: colors.text }]}>{displayName}</Text>
               {isVerified && (
-                <View style={[styles.verifiedPill, { backgroundColor: GAME_COLORS.goal }]}>
-                  <Ionicons name="checkmark-circle" size={12} color="#FFF" />
-                  <Text style={styles.verifiedText}>Verified</Text>
+                <View style={[styles.verifiedBadge, { backgroundColor: colors.gold }]}>
+                  <Ionicons name="shield-checkmark" size={11} color={colors.background} />
                 </View>
               )}
             </View>
@@ -497,142 +294,173 @@ export default function DashboardScreen() {
           <View style={styles.headerRight}>
             <BallotDisplay size="sm" />
             <TouchableOpacity onPress={() => router.push('/(tabs)/profile')} activeOpacity={0.8}>
-              <LinearGradient colors={[GAME_COLORS.xp, GAME_COLORS.xpGlow]} style={styles.avatar}>
-                <Text style={styles.avatarText}>{user?.name ? user.name.charAt(0).toUpperCase() : 'U'}</Text>
+              <LinearGradient colors={[colors.gold, colors.goldDark || '#A68523']} style={styles.avatar}>
+                <Text style={[styles.avatarText, { color: colors.background }]}>
+                  {user?.name ? user.name.charAt(0).toUpperCase() : 'C'}
+                </Text>
               </LinearGradient>
             </TouchableOpacity>
           </View>
         </Animated.View>
 
-        {/* ═══ Stats Bar: Streak + Daily Goal ═══ */}
-        <Animated.View entering={FadeInUp.delay(100).duration(500)} style={styles.statsBar}>
-          {/* Streak */}
-          <View style={[styles.statBox, { backgroundColor: isDark ? 'rgba(255,149,0,0.1)' : 'rgba(255,149,0,0.08)' }]}>
-            <StreakFire streak={gameStats.streak} isActive={gameStats.streakActive} />
-          </View>
+        {/* Gold accent line */}
+        <Animated.View entering={FadeInDown.delay(50).duration(300)} style={[styles.accentLine, { backgroundColor: colors.gold }]} />
 
-          {/* Daily Goal Ring */}
-          <View style={[styles.statBox, styles.goalBox, { backgroundColor: isDark ? 'rgba(52,199,89,0.1)' : 'rgba(52,199,89,0.08)' }]}>
-            <View style={styles.goalRingWrap}>
-              <GoalRing
-                size={70}
-                strokeWidth={6}
-                progress={dailyGoalProgress}
-                color={GAME_COLORS.goal}
-                trackColor={isDark ? 'rgba(52,199,89,0.2)' : 'rgba(52,199,89,0.15)'}
-              />
-              <View style={styles.goalRingInner}>
-                {dailyGoalComplete ? (
-                  <Ionicons name="checkmark" size={24} color={GAME_COLORS.goal} />
-                ) : (
-                  <Text style={[styles.goalRingText, { color: colors.text }]}>
-                    {gameStats.dailyProgress}/{gameStats.dailyGoal}
-                  </Text>
-                )}
+        {/* ═══ VOICE CARD (HERO) ═══ */}
+        <Animated.View entering={FadeInUp.delay(100).duration(500)} style={styles.voiceCard}>
+          <LinearGradient
+            colors={[`${colors.gold}08`, colors.surface, colors.surface]}
+            style={[StyleSheet.absoluteFill, { borderRadius: 20 }]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 0, y: 1 }}
+          />
+          <View style={[styles.voiceCardBorder, { borderColor: `${colors.gold}20` }]}>
+            {stats.pending === 0 ? (
+              // Caught up state
+              <View style={styles.voiceContent}>
+                <View style={[styles.caughtUpIcon, { backgroundColor: `${colors.success}15` }]}>
+                  <Ionicons name="checkmark-circle" size={40} color={colors.success} />
+                </View>
+                <Text style={[styles.voiceHeadline, { color: colors.text }]}>All voices heard</Text>
+                <Text style={[styles.voiceSubtext, { color: colors.textSecondary }]}>
+                  You've voted on every proposal available to you
+                </Text>
+                <View style={styles.voiceStats}>
+                  <Text style={[styles.voiceStatNumber, { color: colors.gold }]}>{stats.voted}</Text>
+                  <Text style={[styles.voiceStatLabel, { color: colors.textTertiary }]}>voices raised</Text>
+                </View>
               </View>
-            </View>
-            <Text style={[styles.goalLabel, { color: colors.textSecondary }]}>
-              {dailyGoalComplete ? 'Goal complete!' : 'Daily Goal'}
-            </Text>
-          </View>
-
-          {/* Total Votes */}
-          <View style={[styles.statBox, { backgroundColor: isDark ? 'rgba(0,122,255,0.1)' : 'rgba(0,122,255,0.08)' }]}>
-            <Text style={[styles.statNumber, { color: GAME_COLORS.badge }]}>{stats.voted}</Text>
-            <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Total Votes</Text>
+            ) : (
+              // Pending votes state
+              <View style={styles.voiceContent}>
+                <Text style={[styles.voiceCount, { color: colors.text }]}>{stats.voted}</Text>
+                <Text style={[styles.voiceLabel, { color: colors.textSecondary }]}>voices raised</Text>
+                <Text style={[styles.voiceSubtext, { color: colors.textTertiary, marginTop: SPACING.md }]}>
+                  Your voice shapes {primaryCommunity?.name || 'democracy'}'s future
+                </Text>
+                <Animated.View style={[styles.pendingBadge, { backgroundColor: colors.gold }, badgePulseStyle]}>
+                  <Text style={[styles.pendingText, { color: colors.background }]}>
+                    {stats.pending} awaiting your vote
+                  </Text>
+                </Animated.View>
+              </View>
+            )}
           </View>
         </Animated.View>
 
-        {/* ═══ XP Progress ═══ */}
-        <Animated.View entering={FadeInUp.delay(200).duration(500)}>
-          <XPBar currentXP={gameStats.xp} levelXP={gameStats.levelXP} level={gameStats.level} />
-        </Animated.View>
+        {/* ═══ JURISDICTION STACK ═══ */}
+        {communities.length > 0 && (
+          <Animated.View entering={FadeInUp.delay(200).duration(500)} style={styles.section}>
+            <Text style={[styles.sectionLabel, { color: colors.textTertiary }]}>YOUR JURISDICTIONS</Text>
 
-        {/* ═══ Daily Quests ═══ */}
-        <Animated.View entering={FadeInUp.delay(250).duration(500)} style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>Daily Quests</Text>
-            <View style={styles.sectionBadge}>
-              <Text style={styles.sectionBadgeText}>+XP</Text>
-            </View>
-          </View>
+            {/* Primary (Country) */}
+            {primaryCommunity && (
+              <TouchableOpacity
+                style={[styles.primaryJurisdiction, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                onPress={navigateToProposals}
+                activeOpacity={0.8}
+              >
+                <View style={styles.jurisdictionHeader}>
+                  <Text style={styles.primaryFlag}>{primaryCommunity.icon}</Text>
+                  <View style={styles.primaryInfo}>
+                    <Text style={[styles.primaryName, { color: colors.text }]}>{primaryCommunity.name}</Text>
+                    <Text style={[styles.primaryMeta, { color: colors.textTertiary }]}>
+                      {primaryCommunity.proposalCount} proposals · {primaryCommunity.proposalCount - primaryCommunity.unvotedCount} voted
+                    </Text>
+                  </View>
+                  {primaryCommunity.unvotedCount > 0 && (
+                    <View style={[styles.primaryBadge, { backgroundColor: colors.gold }]}>
+                      <Text style={[styles.primaryBadgeText, { color: colors.background }]}>{primaryCommunity.unvotedCount}</Text>
+                    </View>
+                  )}
+                </View>
+                {/* Participation bar */}
+                <View style={[styles.participationTrack, { backgroundColor: `${colors.gold}15` }]}>
+                  <View
+                    style={[
+                      styles.participationFill,
+                      {
+                        backgroundColor: colors.gold,
+                        width: `${primaryCommunity.proposalCount > 0 ? ((primaryCommunity.proposalCount - primaryCommunity.unvotedCount) / primaryCommunity.proposalCount) * 100 : 0}%`,
+                      },
+                    ]}
+                  />
+                </View>
+              </TouchableOpacity>
+            )}
 
-          <QuestCard
-            title="Cast 3 Votes"
-            description="Vote on any 3 proposals today"
-            progress={gameStats.dailyProgress}
-            total={3}
-            xpReward={50}
-            icon="🗳️"
-            color={GAME_COLORS.goal}
-            onPress={navigateToProposals}
-            index={0}
-          />
+            {/* Secondary (State/City chips) */}
+            {secondaryCommunities.length > 0 && (
+              <View style={styles.secondaryRow}>
+                {secondaryCommunities.map((c, idx) => (
+                  <JurisdictionChip key={c.id} community={c} onPress={navigateToProposals} index={idx} />
+                ))}
+              </View>
+            )}
+          </Animated.View>
+        )}
 
-          {urgentProposals.length > 0 && (
-            <QuestCard
-              title="Beat the Clock"
-              description={`Vote on "${urgentProposals[0].title.slice(0, 25)}..."`}
-              progress={0}
-              total={1}
-              xpReward={25}
-              icon="⏰"
-              color={GAME_COLORS.streak}
-              onPress={() => router.push({ pathname: '/(tabs)/proposals', params: { proposalId: urgentProposals[0].id } })}
-              index={1}
-            />
-          )}
-
-          <QuestCard
-            title="Community Explorer"
-            description="View all proposals in your country"
-            progress={1}
-            total={1}
-            xpReward={15}
-            icon="🌍"
-            color={GAME_COLORS.badge}
-            onPress={navigateToProposals}
-            index={2}
-          />
-        </Animated.View>
-
-        {/* ═══ Achievements ═══ */}
-        <Animated.View entering={FadeInUp.delay(400).duration(500)} style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>Achievements</Text>
-            <TouchableOpacity activeOpacity={0.7}>
-              <Text style={[styles.seeAll, { color: GAME_COLORS.xp }]}>See All</Text>
-            </TouchableOpacity>
-          </View>
-
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.achievementsScroll}
-          >
-            {achievements.map((achievement, idx) => (
-              <AchievementBadge key={achievement.id} achievement={achievement} index={idx} />
+        {/* ═══ REQUIRING ATTENTION ═══ */}
+        {urgentProposals.length > 0 && (
+          <Animated.View entering={FadeInUp.delay(350).duration(500)} style={styles.section}>
+            <Text style={[styles.sectionLabel, { color: colors.textTertiary }]}>REQUIRING YOUR VOTE</Text>
+            {urgentProposals.map((p, idx) => (
+              <AttentionCard
+                key={p.id}
+                proposal={p}
+                onPress={() => router.push({ pathname: '/(tabs)/proposals', params: { proposalId: p.id } })}
+                index={idx}
+              />
             ))}
-          </ScrollView>
+          </Animated.View>
+        )}
+
+        {/* ═══ YOUR IMPACT ═══ */}
+        <Animated.View entering={FadeInUp.delay(450).duration(500)} style={styles.impactRow}>
+          <TouchableOpacity
+            style={[styles.impactPill, { backgroundColor: colors.surface, borderColor: colors.border }]}
+            onPress={() => router.push('/modals/voting-history')}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.impactNumber, { color: colors.success }]}>{stats.voted}</Text>
+            <Text style={[styles.impactLabel, { color: colors.textTertiary }]}>Voted</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.impactPill, { backgroundColor: colors.surface, borderColor: colors.border }]}
+            onPress={() => router.push('/modals/my-proposals')}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.impactNumber, { color: colors.gold }]}>{stats.created}</Text>
+            <Text style={[styles.impactLabel, { color: colors.textTertiary }]}>Created</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.impactPill, { backgroundColor: colors.surface, borderColor: colors.border }]}
+            onPress={navigateToProposals}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.impactNumber, { color: colors.info || '#60A5FA' }]}>{communities.length}</Text>
+            <Text style={[styles.impactLabel, { color: colors.textTertiary }]}>Communities</Text>
+          </TouchableOpacity>
         </Animated.View>
 
-        {/* ═══ Vote CTA ═══ */}
+        {/* ═══ PRIMARY CTA ═══ */}
         {stats.pending > 0 && (
-          <Animated.View entering={FadeInUp.delay(500).duration(500)} style={styles.ctaSection}>
+          <Animated.View entering={FadeInUp.delay(550).duration(500)} style={styles.ctaSection}>
             <TouchableOpacity
-              style={styles.ctaButton}
               onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); navigateToProposals(); }}
               activeOpacity={0.9}
             >
               <LinearGradient
-                colors={[GAME_COLORS.goal, GAME_COLORS.goalGlow]}
-                style={styles.ctaGradient}
+                colors={[colors.gold, colors.goldDark || '#A68523']}
+                style={styles.ctaButton}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
               >
-                <Text style={styles.ctaText}>Start Voting</Text>
+                <Text style={[styles.ctaText, { color: colors.background }]}>Cast Your Vote</Text>
                 <View style={styles.ctaBadge}>
-                  <Text style={styles.ctaBadgeText}>{stats.pending} pending</Text>
+                  <Text style={[styles.ctaBadgeText, { color: colors.gold }]}>{stats.pending}</Text>
                 </View>
               </LinearGradient>
             </TouchableOpacity>
@@ -657,182 +485,191 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: SPACING.md,
-    marginBottom: SPACING.sm,
+    paddingVertical: SPACING.sm,
   },
   headerLeft: {},
   headerRight: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm },
-  greeting: { ...TYPOGRAPHY.headlineMedium, fontWeight: '800' },
-  levelRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.xs, marginTop: 4 },
-  levelPill: {
-    paddingHorizontal: SPACING.sm,
-    paddingVertical: 3,
+  greeting: { ...TYPOGRAPHY.labelMedium },
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.xs },
+  displayName: { ...TYPOGRAPHY.headlineMedium, fontWeight: '700' },
+  verifiedBadge: {
+    width: 20,
+    height: 20,
     borderRadius: 10,
-  },
-  levelPillText: { color: '#FFF', fontSize: 11, fontWeight: '700' },
-  verifiedPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    paddingHorizontal: SPACING.xs,
-    paddingVertical: 3,
-    borderRadius: 10,
-  },
-  verifiedText: { color: '#FFF', fontSize: 11, fontWeight: '600' },
-  avatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  avatarText: { color: '#FFF', fontSize: 18, fontWeight: '700' },
+  avatar: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarText: { fontSize: 17, fontWeight: '700' },
 
-  // Stats Bar
-  statsBar: {
+  // Accent line
+  accentLine: {
+    height: 2,
+    width: 40,
+    borderRadius: 1,
+    marginTop: SPACING.sm,
+    marginBottom: SPACING.lg,
+    opacity: 0.6,
+  },
+
+  // Voice Card
+  voiceCard: {
+    borderRadius: 20,
+    marginBottom: SPACING.xl,
+    overflow: 'hidden',
+  },
+  voiceCardBorder: {
+    borderWidth: 1,
+    borderRadius: 20,
+    padding: SPACING.xl,
+  },
+  voiceContent: { alignItems: 'center' },
+  voiceCount: { fontSize: 64, fontWeight: '800', fontVariant: ['tabular-nums'], lineHeight: 72 },
+  voiceLabel: { ...TYPOGRAPHY.bodyLarge, marginTop: -SPACING.xs },
+  voiceHeadline: { ...TYPOGRAPHY.headlineMedium, fontWeight: '700', marginTop: SPACING.md },
+  voiceSubtext: { ...TYPOGRAPHY.bodyMedium, textAlign: 'center', marginTop: SPACING.xs },
+  voiceStats: { flexDirection: 'row', alignItems: 'baseline', gap: SPACING.xs, marginTop: SPACING.lg },
+  voiceStatNumber: { fontSize: 28, fontWeight: '700', fontVariant: ['tabular-nums'] },
+  voiceStatLabel: { ...TYPOGRAPHY.bodyMedium },
+  caughtUpIcon: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pendingBadge: {
+    marginTop: SPACING.lg,
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.sm,
+    borderRadius: 20,
+  },
+  pendingText: { ...TYPOGRAPHY.labelMedium, fontWeight: '600' },
+
+  // Section
+  section: { marginBottom: SPACING.xl },
+  sectionLabel: {
+    ...TYPOGRAPHY.labelSmall,
+    fontWeight: '600',
+    letterSpacing: 1,
+    marginBottom: SPACING.md,
+  },
+
+  // Primary Jurisdiction
+  primaryJurisdiction: {
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: SPACING.md,
+    marginBottom: SPACING.sm,
+  },
+  jurisdictionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  primaryFlag: { fontSize: 32, marginRight: SPACING.md },
+  primaryInfo: { flex: 1 },
+  primaryName: { ...TYPOGRAPHY.headlineSmall, fontWeight: '700' },
+  primaryMeta: { ...TYPOGRAPHY.labelSmall, marginTop: 2 },
+  primaryBadge: {
+    minWidth: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: SPACING.sm,
+  },
+  primaryBadgeText: { fontSize: 13, fontWeight: '700' },
+  participationTrack: {
+    height: 4,
+    borderRadius: 2,
+    marginTop: SPACING.md,
+    overflow: 'hidden',
+  },
+  participationFill: { height: '100%', borderRadius: 2 },
+
+  // Secondary jurisdictions
+  secondaryRow: {
+    flexDirection: 'row',
+    gap: SPACING.sm,
+  },
+  jurisdictionChip: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: SPACING.sm,
+    borderRadius: 12,
+    gap: SPACING.xs,
+  },
+  jurisdictionIcon: { fontSize: 18 },
+  jurisdictionName: { ...TYPOGRAPHY.labelMedium, fontWeight: '600', flex: 1 },
+  jurisdictionBadge: {
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 6,
+  },
+  jurisdictionBadgeText: { fontSize: 11, fontWeight: '700', color: '#000' },
+
+  // Attention Card
+  attentionCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: SPACING.md,
+    borderRadius: 12,
+    borderLeftWidth: 3,
+    marginBottom: SPACING.sm,
+  },
+  attentionContent: { flex: 1 },
+  attentionTitle: { ...TYPOGRAPHY.bodyMedium, fontWeight: '600' },
+  attentionMeta: { flexDirection: 'row', alignItems: 'center', marginTop: SPACING.xs, gap: SPACING.sm },
+  categoryTag: {
+    paddingHorizontal: SPACING.xs,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  categoryText: { ...TYPOGRAPHY.labelSmall, fontWeight: '600' },
+  attentionTime: { ...TYPOGRAPHY.labelSmall },
+
+  // Impact Row
+  impactRow: {
     flexDirection: 'row',
     gap: SPACING.sm,
     marginBottom: SPACING.lg,
   },
-  statBox: {
+  impactPill: {
     flex: 1,
     alignItems: 'center',
-    justifyContent: 'center',
     paddingVertical: SPACING.md,
-    borderRadius: 16,
-  },
-  goalBox: { flex: 1.3 },
-  statNumber: { fontSize: 28, fontWeight: '800', fontVariant: ['tabular-nums'] },
-  statLabel: { ...TYPOGRAPHY.labelSmall, marginTop: 2 },
-
-  // Streak Fire
-  streakFireContainer: { alignItems: 'center' },
-  streakGlow: {
-    position: 'absolute',
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    top: -5,
-  },
-  fireEmoji: { fontSize: 32 },
-  streakCount: { fontSize: 20, fontWeight: '800', marginTop: -4 },
-  streakLabel: { ...TYPOGRAPHY.labelSmall },
-
-  // Goal Ring
-  goalRingWrap: { alignItems: 'center', justifyContent: 'center' },
-  goalRingInner: { position: 'absolute', alignItems: 'center', justifyContent: 'center' },
-  goalRingText: { fontSize: 14, fontWeight: '700' },
-  goalLabel: { ...TYPOGRAPHY.labelSmall, marginTop: SPACING.xs },
-
-  // XP Bar
-  xpContainer: { marginBottom: SPACING.lg },
-  xpHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: SPACING.xs },
-  xpLevelBadge: { marginRight: SPACING.sm },
-  xpLevelGradient: {
-    width: 28,
-    height: 28,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  xpLevelText: { color: '#FFF', fontSize: 13, fontWeight: '800' },
-  xpText: { ...TYPOGRAPHY.bodySmall },
-  xpTrack: { height: 10, borderRadius: 5, overflow: 'hidden' },
-  xpFill: { height: '100%', borderRadius: 5 },
-
-  // Section
-  section: { marginBottom: SPACING.lg },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: SPACING.md,
-  },
-  sectionTitle: { ...TYPOGRAPHY.headlineSmall, fontWeight: '700' },
-  sectionBadge: {
-    backgroundColor: GAME_COLORS.xp,
-    paddingHorizontal: SPACING.sm,
-    paddingVertical: 2,
-    borderRadius: 8,
-  },
-  sectionBadgeText: { color: '#FFF', fontSize: 11, fontWeight: '700' },
-  seeAll: { ...TYPOGRAPHY.labelMedium, fontWeight: '600' },
-
-  // Quest Card
-  questCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: SPACING.md,
-    borderRadius: 16,
-    borderWidth: 1.5,
-    marginBottom: SPACING.sm,
-    overflow: 'hidden',
-  },
-  questIconWrap: {
-    width: 44,
-    height: 44,
     borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: SPACING.sm,
+    borderWidth: 1,
   },
-  questIcon: { fontSize: 22 },
-  questContent: { flex: 1 },
-  questTitle: { ...TYPOGRAPHY.bodyMedium, fontWeight: '700' },
-  questDesc: { ...TYPOGRAPHY.labelSmall, marginTop: 1 },
-  questProgressRow: { flexDirection: 'row', alignItems: 'center', marginTop: SPACING.xs, gap: SPACING.xs },
-  questTrack: { flex: 1, height: 6, borderRadius: 3 },
-  questFill: { height: '100%', borderRadius: 3 },
-  questProgressText: { ...TYPOGRAPHY.labelSmall, fontWeight: '600', minWidth: 28 },
-  questXP: {
-    alignItems: 'center',
-    paddingHorizontal: SPACING.sm,
-    paddingVertical: SPACING.xs,
-    borderRadius: 10,
-    marginLeft: SPACING.sm,
-  },
-  questXPText: { fontSize: 14, fontWeight: '800' },
-  questXPLabel: { fontSize: 9, fontWeight: '600' },
-
-  // Achievements
-  achievementsScroll: { paddingRight: SPACING.lg },
-  achievementBadge: {
-    width: 90,
-    alignItems: 'center',
-    padding: SPACING.sm,
-    borderRadius: 14,
-    borderWidth: 2,
-    marginRight: SPACING.sm,
-  },
-  achievementIcon: { fontSize: 32, marginBottom: 4 },
-  achievementTitle: { ...TYPOGRAPHY.labelSmall, fontWeight: '600', textAlign: 'center' },
-  achievementCheck: {
-    position: 'absolute',
-    top: 6,
-    right: 6,
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  impactNumber: { fontSize: 22, fontWeight: '700', fontVariant: ['tabular-nums'] },
+  impactLabel: { ...TYPOGRAPHY.labelSmall, marginTop: 2 },
 
   // CTA
   ctaSection: { marginTop: SPACING.sm },
-  ctaButton: { borderRadius: 16, overflow: 'hidden' },
-  ctaGradient: {
+  ctaButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: SPACING.md + 4,
+    paddingVertical: SPACING.md + 2,
+    borderRadius: 14,
     gap: SPACING.sm,
   },
-  ctaText: { color: '#FFF', ...TYPOGRAPHY.headlineSmall, fontWeight: '700' },
+  ctaText: { ...TYPOGRAPHY.headlineSmall, fontWeight: '700' },
   ctaBadge: {
-    backgroundColor: 'rgba(255,255,255,0.25)',
+    backgroundColor: 'rgba(0,0,0,0.15)',
     paddingHorizontal: SPACING.sm,
     paddingVertical: 4,
     borderRadius: 10,
   },
-  ctaBadgeText: { color: '#FFF', fontSize: 12, fontWeight: '600' },
+  ctaBadgeText: { fontSize: 13, fontWeight: '700' },
 });
