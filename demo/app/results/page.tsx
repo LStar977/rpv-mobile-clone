@@ -180,7 +180,7 @@ export default function ResultsPage() {
         </motion.div>
 
         <p className="text-center text-[11px] font-mono text-paper/30 tracking-wider uppercase mb-8">
-          Updated every 60s · Verifiable on Base
+          Every voice verified · Results updated live
         </p>
 
         {/* Investor CTA */}

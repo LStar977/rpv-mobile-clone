@@ -53,10 +53,10 @@ export default function LandingPage() {
               </div>
               <div>
                 <div className="text-[14px] font-medium text-paper mb-0.5">
-                  Verified, anonymous, permanent
+                  One person. One verified voice.
                 </div>
                 <div className="text-[13px] text-paper/60 leading-relaxed">
-                  Your identity stays private. Your eligibility is recorded on Base.
+                  Anonymous, anti-fraud, and built for your jurisdiction.
                 </div>
               </div>
             </div>
@@ -65,7 +65,7 @@ export default function LandingPage() {
           <Button href="/verify">Participate</Button>
 
           <p className="text-center text-[11px] font-mono tracking-wider text-paper/40 mt-6 uppercase">
-            Verified by Represent · Recorded on Base
+            Verified public consensus · Built for democracy
           </p>
         </motion.div>
       </div>
