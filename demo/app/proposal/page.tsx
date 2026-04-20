@@ -122,8 +122,8 @@ export default function ProposalPage() {
               transition-all duration-200
               ${
                 choice === 'oppose'
-                  ? 'bg-steel text-paper'
-                  : 'border-2 border-steel/60 text-steel hover:bg-steel/10'
+                  ? 'bg-danger text-paper'
+                  : 'border-2 border-danger/60 text-danger hover:bg-danger/10'
               }
               ${submitting && choice !== 'oppose' ? 'opacity-30' : ''}
             `}
