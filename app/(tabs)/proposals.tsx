@@ -572,10 +572,18 @@ function ProposalCard({
 
       {/* Header */}
       <View style={styles.cardHeader}>
-        <View style={[styles.categoryBadge, { backgroundColor: `${colors.gold}15` }]}>
-          <Text style={[styles.categoryText, { color: colors.gold }]}>
-            {proposal.category || 'General'}
-          </Text>
+        <View style={styles.headerBadges}>
+          <View style={[styles.categoryBadge, { backgroundColor: `${colors.gold}15` }]}>
+            <Text style={[styles.categoryText, { color: colors.gold }]}>
+              {proposal.category || 'General'}
+            </Text>
+          </View>
+          {proposal.source === 'civic-desk' && (
+            <View style={[styles.civicDeskBadge, { backgroundColor: `${colors.info}15` }]}>
+              <Ionicons name="newspaper-outline" size={10} color={colors.info} />
+              <Text style={[styles.civicDeskText, { color: colors.info }]}>Civic Desk</Text>
+            </View>
+          )}
         </View>
 
         <View style={styles.headerRight}>
@@ -2274,6 +2282,21 @@ const styles = StyleSheet.create({
     borderRadius: BORDER_RADIUS.full,
   },
   categoryText: { ...TYPOGRAPHY.labelSmall, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5 },
+  headerBadges: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+    flexWrap: 'wrap',
+  },
+  civicDeskBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: SPACING.xs,
+    borderRadius: BORDER_RADIUS.full,
+  },
+  civicDeskText: { ...TYPOGRAPHY.labelSmall, fontWeight: '500', fontSize: 10 },
   timeBadge: {
     flexDirection: 'row',
     alignItems: 'center',

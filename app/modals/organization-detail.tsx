@@ -53,55 +53,77 @@ function ProposalCard({
   index,
   isAdmin,
   onDelete,
+  onPress,
 }: {
   proposal: OrganizationProposal;
   index: number;
   isAdmin?: boolean;
   onDelete?: (proposalId: string) => void;
+  onPress?: () => void;
 }) {
   const { colors } = useTheme();
+  const hasVoted = !!proposal.userVote;
 
   return (
-    <Animated.View
-      entering={FadeInUp.delay(index * 100).duration(400)}
-      style={[styles.proposalCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
+    <TouchableOpacity
+      activeOpacity={0.8}
+      onPress={() => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        onPress?.();
+      }}
     >
-      <View style={styles.proposalCardHeader}>
-        {proposal.isOfficial && (
-          <View style={[styles.officialBadge, { backgroundColor: `${colors.gold}15` }]}>
-            <Ionicons name="ribbon" size={12} color={colors.gold} />
-            <Text style={[styles.officialBadgeText, { color: colors.gold }]}>Official</Text>
-          </View>
-        )}
-        {isAdmin && onDelete && (
-          <TouchableOpacity
-            style={[styles.proposalDeleteBtn, { backgroundColor: `${colors.error}15` }]}
-            onPress={() => onDelete(String(proposal.id))}
-          >
-            <Ionicons name="trash-outline" size={16} color={colors.error} />
-          </TouchableOpacity>
-        )}
-      </View>
-      <Text style={[styles.proposalTitle, { color: colors.text }]} numberOfLines={2}>
-        {proposal.title}
-      </Text>
-      <Text style={[styles.proposalDescription, { color: colors.textSecondary }]} numberOfLines={3}>
-        {proposal.description}
-      </Text>
-      <View style={styles.proposalMeta}>
-        <View style={styles.proposalVotes}>
-          <View style={styles.voteItem}>
-            <Ionicons name="thumbs-up" size={14} color={colors.success} />
-            <Text style={[styles.voteText, { color: colors.textSecondary }]}>{proposal.supportVotes}</Text>
-          </View>
-          <View style={styles.voteItem}>
-            <Ionicons name="thumbs-down" size={14} color={colors.error} />
-            <Text style={[styles.voteText, { color: colors.textSecondary }]}>{proposal.opposeVotes}</Text>
-          </View>
+      <Animated.View
+        entering={FadeInUp.delay(index * 100).duration(400)}
+        style={[styles.proposalCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
+      >
+        <View style={styles.proposalCardHeader}>
+          {proposal.isOfficial && (
+            <View style={[styles.officialBadge, { backgroundColor: `${colors.gold}15` }]}>
+              <Ionicons name="ribbon" size={12} color={colors.gold} />
+              <Text style={[styles.officialBadgeText, { color: colors.gold }]}>Official</Text>
+            </View>
+          )}
+          {hasVoted && (
+            <View style={[styles.officialBadge, { backgroundColor: `${colors.success}15` }]}>
+              <Ionicons name="checkmark-circle" size={12} color={colors.success} />
+              <Text style={[styles.officialBadgeText, { color: colors.success }]}>Voted</Text>
+            </View>
+          )}
+          <View style={{ flex: 1 }} />
+          {isAdmin && onDelete && (
+            <TouchableOpacity
+              style={[styles.proposalDeleteBtn, { backgroundColor: `${colors.error}15` }]}
+              onPress={(e) => {
+                e.stopPropagation?.();
+                onDelete(String(proposal.id));
+              }}
+            >
+              <Ionicons name="trash-outline" size={16} color={colors.error} />
+            </TouchableOpacity>
+          )}
+          <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} style={{ marginLeft: SPACING.sm }} />
         </View>
-        <Text style={[styles.proposalCategory, { color: colors.textTertiary }]}>{proposal.category}</Text>
-      </View>
-    </Animated.View>
+        <Text style={[styles.proposalTitle, { color: colors.text }]} numberOfLines={2}>
+          {proposal.title}
+        </Text>
+        <Text style={[styles.proposalDescription, { color: colors.textSecondary }]} numberOfLines={3}>
+          {proposal.description}
+        </Text>
+        <View style={styles.proposalMeta}>
+          <View style={styles.proposalVotes}>
+            <View style={styles.voteItem}>
+              <Ionicons name="thumbs-up" size={14} color={colors.success} />
+              <Text style={[styles.voteText, { color: colors.textSecondary }]}>{proposal.supportVotes}</Text>
+            </View>
+            <View style={styles.voteItem}>
+              <Ionicons name="thumbs-down" size={14} color={colors.error} />
+              <Text style={[styles.voteText, { color: colors.textSecondary }]}>{proposal.opposeVotes}</Text>
+            </View>
+          </View>
+          <Text style={[styles.proposalCategory, { color: colors.textTertiary }]}>{proposal.category}</Text>
+        </View>
+      </Animated.View>
+    </TouchableOpacity>
   );
 }
 
@@ -702,6 +724,24 @@ export default function OrganizationDetailScreen() {
                   index={index}
                   isAdmin={organization?.role === 'admin'}
                   onDelete={handleDeleteProposal}
+                  onPress={() => {
+                    router.push({
+                      pathname: '/modals/org-proposal-detail',
+                      params: {
+                        orgId: params.orgId,
+                        proposalId: String(proposal.id),
+                        title: proposal.title,
+                        description: proposal.description,
+                        category: proposal.category,
+                        supportVotes: String(proposal.supportVotes),
+                        opposeVotes: String(proposal.opposeVotes),
+                        deadline: proposal.deadline || '',
+                        userVote: proposal.userVote || '',
+                        isOfficial: String(proposal.isOfficial),
+                        orgName: organization?.name || '',
+                      },
+                    });
+                  }}
                 />
               ))
             )}
