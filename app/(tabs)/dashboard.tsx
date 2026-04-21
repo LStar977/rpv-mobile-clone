@@ -4,7 +4,6 @@ import { useState, useCallback, useEffect, useMemo } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 import Animated, {
   FadeIn,
@@ -19,27 +18,16 @@ import Animated, {
   withRepeat,
   withSequence,
   interpolate,
-  Extrapolation,
 } from 'react-native-reanimated';
 import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS, ANIMATION, responsive } from '../../lib/theme';
 import { useAuthStore } from '../../lib/auth';
 import { useBallotStore } from '../../lib/ballots';
 import { proposalsApi, userApi } from '../../lib/api';
-import { Badge, SectionHeader, BallotDisplay } from '../../components/ui';
+import { BallotDisplay } from '../../components/ui';
 import { SkeletonStats, SkeletonListItem, SkeletonWelcome } from '../../components/ui/Skeleton';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
-const AnimatedLinearGradient = Animated.createAnimatedComponent(LinearGradient);
-
-type Community = {
-  id: string;
-  name: string;
-  type: 'country' | 'state' | 'city' | 'organization';
-  icon: string;
-  proposalCount: number;
-  unvotedCount: number;
-};
 
 type UrgentProposal = {
   id: number;
@@ -48,86 +36,270 @@ type UrgentProposal = {
   category: string;
 };
 
-// Country-themed gradient colors for community cards
-const countryThemes: Record<string, { primary: string; secondary?: string }> = {
-  'Canada': { primary: '#FF0000', secondary: '#FFFFFF' },
-  'United States': { primary: '#3C3B6E', secondary: '#B22234' },
-  'United Kingdom': { primary: '#012169', secondary: '#C8102E' },
-  'Australia': { primary: '#00843D', secondary: '#FFCD00' },
-  'Germany': { primary: '#000000', secondary: '#FFCC00' },
-  'France': { primary: '#0055A4', secondary: '#EF4135' },
-  'Japan': { primary: '#BC002D', secondary: '#FFFFFF' },
-  'India': { primary: '#FF9933', secondary: '#138808' },
-  'Brazil': { primary: '#009C3B', secondary: '#FFDF00' },
-  'Mexico': { primary: '#006847', secondary: '#CE1126' },
-  'Spain': { primary: '#AA151B', secondary: '#F1BF00' },
-  'Italy': { primary: '#009246', secondary: '#CE2B37' },
+type Community = {
+  id: string;
+  name: string;
+  type: 'country' | 'state' | 'city' | 'organization';
+  proposalCount: number;
+  unvotedCount: number;
 };
 
-// --- Premium Stat Card ---
-function StatCard({
-  icon,
-  value,
-  label,
-  accent,
-  delay = 0,
+// ═══════════════════════════════════════════════════════════════════════════
+// IMPACT HERO - The bold statement piece
+// ═══════════════════════════════════════════════════════════════════════════
+function ImpactHero({
+  totalVotes,
+  proposalsPassed,
+  streak,
+  ranking,
+  percentile,
+  location,
 }: {
-  icon: string;
-  value: string;
-  label: string;
-  accent: string;
-  delay?: number;
+  totalVotes: number;
+  proposalsPassed: number;
+  streak: number;
+  ranking?: number;
+  percentile?: number;
+  location?: string;
 }) {
   const { colors } = useTheme();
-  const scale = useSharedValue(0.8);
-  const opacity = useSharedValue(0);
+
+  const counterValue = useSharedValue(0);
 
   useEffect(() => {
-    scale.value = withDelay(delay, withSpring(1, ANIMATION.spring.gentle));
-    opacity.value = withDelay(delay, withTiming(1, { duration: 400 }));
-  }, []);
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-    opacity: opacity.value,
-  }));
+    counterValue.value = withDelay(300, withTiming(totalVotes, { duration: 1200 }));
+  }, [totalVotes]);
 
   return (
     <Animated.View
-      style={[styles.statCard, { backgroundColor: colors.surface, borderColor: `${accent}30` }, animatedStyle]}
+      entering={FadeInDown.duration(600).springify()}
+      style={[styles.impactHero, { backgroundColor: colors.surface, borderColor: colors.border }]}
     >
       <LinearGradient
-        colors={[`${accent}08`, 'transparent']}
+        colors={[`${colors.gold}08`, 'transparent']}
         style={StyleSheet.absoluteFill}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
       />
-      <View style={[styles.statIconOuter, { borderColor: `${accent}25` }]}>
-        <View style={[styles.statIconInner, { backgroundColor: `${accent}15` }]}>
-          <Ionicons name={icon as any} size={18} color={accent} />
+
+      {/* Streak Badge */}
+      {streak > 0 && (
+        <View style={[styles.streakBadge, { backgroundColor: `${colors.warning}15` }]}>
+          <Text style={styles.streakEmoji}>🔥</Text>
+          <Text style={[styles.streakText, { color: colors.warning }]}>{streak} day streak</Text>
+        </View>
+      )}
+
+      {/* Main Impact Number */}
+      <View style={styles.impactMain}>
+        <Text style={[styles.impactNumber, { color: colors.text }]}>{totalVotes}</Text>
+        <Text style={[styles.impactLabel, { color: colors.textSecondary }]}>votes cast</Text>
+      </View>
+
+      {/* Secondary Stats Row */}
+      <View style={styles.impactStats}>
+        <View style={styles.impactStat}>
+          <Text style={[styles.impactStatValue, { color: colors.success }]}>{proposalsPassed}</Text>
+          <Text style={[styles.impactStatLabel, { color: colors.textTertiary }]}>proposals passed</Text>
+        </View>
+        <View style={[styles.impactDivider, { backgroundColor: colors.border }]} />
+        <View style={styles.impactStat}>
+          {percentile ? (
+            <>
+              <Text style={[styles.impactStatValue, { color: colors.gold }]}>Top {percentile}%</Text>
+              <Text style={[styles.impactStatLabel, { color: colors.textTertiary }]}>in {location || 'your area'}</Text>
+            </>
+          ) : (
+            <>
+              <Text style={[styles.impactStatValue, { color: colors.gold }]}>#{ranking || '—'}</Text>
+              <Text style={[styles.impactStatLabel, { color: colors.textTertiary }]}>local rank</Text>
+            </>
+          )}
         </View>
       </View>
-      <Text style={[styles.statValue, { color: colors.text }]}>{value}</Text>
-      <Text style={[styles.statLabel, { color: colors.textTertiary }]}>{label}</Text>
     </Animated.View>
   );
 }
 
-// --- Premium Welcome Header ---
-function WelcomeHeader({
-  name,
-  isVerified,
-  onAvatarPress,
-  onNotificationPress,
+// ═══════════════════════════════════════════════════════════════════════════
+// ACTION CARD - Clear call to action
+// ═══════════════════════════════════════════════════════════════════════════
+function ActionCard({
+  type,
+  count,
+  onPress,
 }: {
-  name?: string;
-  isVerified: boolean;
-  onAvatarPress: () => void;
-  onNotificationPress?: () => void;
+  type: 'verify' | 'urgent' | 'pending';
+  count?: number;
+  onPress: () => void;
 }) {
   const { colors } = useTheme();
-  const displayName = name ? name.split(' ')[0] : 'there';
-  const letter = name ? name.charAt(0).toUpperCase() : 'U';
+
+  const configs = {
+    verify: {
+      icon: 'shield-checkmark',
+      title: 'Verify Your Identity',
+      subtitle: 'Unlock voting in your community',
+      gradient: [colors.gold, '#A68523'] as const,
+      urgent: true,
+    },
+    urgent: {
+      icon: 'flame',
+      title: `${count} Closing Soon`,
+      subtitle: 'These proposals need your vote',
+      gradient: ['#EF4444', '#DC2626'] as const,
+      urgent: true,
+    },
+    pending: {
+      icon: 'document-text',
+      title: `${count} Proposals Waiting`,
+      subtitle: 'Your voice matters',
+      gradient: [colors.gold, '#A68523'] as const,
+      urgent: false,
+    },
+  };
+
+  const config = configs[type];
+
+  return (
+    <AnimatedTouchable
+      entering={FadeInUp.delay(200).duration(500).springify()}
+      style={[styles.actionCard, { borderColor: `${config.gradient[0]}30` }]}
+      onPress={() => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        onPress();
+      }}
+      activeOpacity={0.9}
+    >
+      <LinearGradient
+        colors={config.gradient}
+        style={styles.actionGradient}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+      >
+        <View style={styles.actionContent}>
+          <View style={styles.actionIcon}>
+            <Ionicons name={config.icon as any} size={28} color="#fff" />
+          </View>
+          <View style={styles.actionText}>
+            <Text style={styles.actionTitle}>{config.title}</Text>
+            <Text style={styles.actionSubtitle}>{config.subtitle}</Text>
+          </View>
+          <View style={styles.actionArrow}>
+            <Ionicons name="arrow-forward" size={20} color="#fff" />
+          </View>
+        </View>
+      </LinearGradient>
+    </AnimatedTouchable>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PROPOSAL ROW - Clean, minimal proposal item
+// ═══════════════════════════════════════════════════════════════════════════
+function ProposalRow({
+  title,
+  category,
+  hoursLeft,
+  index,
+  onPress,
+}: {
+  title: string;
+  category: string;
+  hoursLeft: number;
+  index: number;
+  onPress: () => void;
+}) {
+  const { colors } = useTheme();
+
+  const isUrgent = hoursLeft <= 24;
+  const timeColor = hoursLeft <= 6 ? colors.error : hoursLeft <= 24 ? colors.warning : colors.textTertiary;
+  const timeText = hoursLeft <= 24 ? `${hoursLeft}h left` : `${Math.ceil(hoursLeft / 24)}d left`;
+
+  return (
+    <AnimatedTouchable
+      entering={FadeInRight.delay(index * 60).duration(400)}
+      style={[styles.proposalRow, { backgroundColor: colors.surface, borderColor: colors.border }]}
+      onPress={() => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        onPress();
+      }}
+      activeOpacity={0.8}
+    >
+      {isUrgent && <View style={[styles.proposalUrgentBar, { backgroundColor: timeColor }]} />}
+      <View style={styles.proposalContent}>
+        <Text style={[styles.proposalTitle, { color: colors.text }]} numberOfLines={2}>
+          {title}
+        </Text>
+        <View style={styles.proposalMeta}>
+          <Text style={[styles.proposalCategory, { color: colors.textTertiary }]}>{category}</Text>
+          <View style={[styles.proposalTime, { backgroundColor: `${timeColor}15` }]}>
+            <Ionicons name="time-outline" size={12} color={timeColor} />
+            <Text style={[styles.proposalTimeText, { color: timeColor }]}>{timeText}</Text>
+          </View>
+        </View>
+      </View>
+      <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
+    </AnimatedTouchable>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// COMMUNITY PILL - Compact community indicator
+// ═══════════════════════════════════════════════════════════════════════════
+function CommunityPill({
+  name,
+  count,
+  index,
+  onPress,
+}: {
+  name: string;
+  count: number;
+  index: number;
+  onPress: () => void;
+}) {
+  const { colors } = useTheme();
+
+  return (
+    <AnimatedTouchable
+      entering={FadeInRight.delay(100 + index * 50).duration(300)}
+      style={[styles.communityPill, { backgroundColor: colors.surface, borderColor: colors.border }]}
+      onPress={() => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        onPress();
+      }}
+      activeOpacity={0.8}
+    >
+      <Text style={[styles.communityName, { color: colors.text }]}>{name}</Text>
+      {count > 0 && (
+        <View style={[styles.communityBadge, { backgroundColor: colors.gold }]}>
+          <Text style={styles.communityBadgeText}>{count}</Text>
+        </View>
+      )}
+    </AnimatedTouchable>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MAIN DASHBOARD
+// ═══════════════════════════════════════════════════════════════════════════
+export default function DashboardScreen() {
+  const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
+  const router = useRouter();
+  const { user, token, isAuthenticated } = useAuthStore();
+  const { syncFromChain } = useBallotStore();
+
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [stats, setStats] = useState({ voted: 0, pending: 0, created: 0, passed: 0 });
+  const [streak, setStreak] = useState(0);
+  const [urgentProposals, setUrgentProposals] = useState<UrgentProposal[]>([]);
+  const [communities, setCommunities] = useState<Community[]>([]);
+
+  const isVerified = user?.verified ?? false;
+  const isDemoAccount = user?.email === 'demo@represent.app';
+  const displayName = user?.name?.split(' ')[0] || 'there';
 
   const getGreeting = () => {
     const hour = new Date().getHours();
@@ -136,704 +308,59 @@ function WelcomeHeader({
     return 'Good evening';
   };
 
-  const pulseAnim = useSharedValue(1);
-
-  useEffect(() => {
-    if (isVerified) {
-      pulseAnim.value = withRepeat(
-        withSequence(
-          withTiming(1.15, { duration: 1000 }),
-          withTiming(1, { duration: 1000 })
-        ),
-        -1,
-        false
-      );
-    }
-  }, [isVerified]);
-
-  const verifiedPulse = useAnimatedStyle(() => ({
-    transform: [{ scale: pulseAnim.value }],
-  }));
-
-  return (
-    <Animated.View entering={FadeInDown.duration(500).springify()} style={styles.welcomeContainer}>
-      <View style={styles.welcomeContent}>
-        <Text style={[styles.welcomeGreeting, { color: colors.textTertiary }]}>
-          {getGreeting()}
-        </Text>
-        <Text style={[styles.welcomeName, { color: colors.text }]} numberOfLines={1}>
-          {displayName}
-        </Text>
-        <View style={[styles.welcomeGoldUnderline, { backgroundColor: colors.gold }]} />
-      </View>
-
-      <View style={styles.welcomeActions}>
-        <BallotDisplay size="sm" />
-        {onNotificationPress && (
-          <TouchableOpacity
-            onPress={onNotificationPress}
-            style={[styles.notificationButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="notifications-outline" size={20} color={colors.textSecondary} />
-          </TouchableOpacity>
-        )}
-
-        <TouchableOpacity onPress={onAvatarPress} activeOpacity={0.8}>
-          <LinearGradient
-            colors={[colors.gold, colors.goldDark || '#A68523']}
-            style={styles.avatarGradient}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-          >
-            <View style={[styles.avatarInner, { backgroundColor: colors.background }]}>
-              <LinearGradient
-                colors={[colors.gold, colors.goldDark || '#A68523']}
-                style={styles.avatarFill}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-              >
-                <Text style={[styles.avatarText, { color: colors.background, textShadowColor: `${colors.gold}80`, textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 8 }]}>{letter}</Text>
-              </LinearGradient>
-            </View>
-          </LinearGradient>
-          {isVerified && (
-            <Animated.View style={[styles.verifiedBadge, { backgroundColor: colors.success }, verifiedPulse]}>
-              <Ionicons name="checkmark" size={10} color="#FFFFFF" />
-            </Animated.View>
-          )}
-        </TouchableOpacity>
-      </View>
-    </Animated.View>
-  );
-}
-
-// --- Premium Priority Card ---
-function PriorityCard({
-  isAuthenticated,
-  isVerified,
-  urgentCount,
-  topUrgent,
-  pendingCount,
-  onVerify,
-  onSeeUrgent,
-  onExplore,
-}: {
-  isAuthenticated: boolean;
-  isVerified: boolean;
-  urgentCount: number;
-  topUrgent?: UrgentProposal | null;
-  pendingCount: number;
-  onVerify: () => void;
-  onSeeUrgent: () => void;
-  onExplore: () => void;
-}) {
-  const { colors, isDark } = useTheme();
-  const shimmer = useSharedValue(0);
-
-  useEffect(() => {
-    shimmer.value = withRepeat(
-      withTiming(1, { duration: 2500 }),
-      -1,
-      false
-    );
-  }, []);
-
-  const shimmerStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: interpolate(shimmer.value, [0, 1], [-SCREEN_WIDTH, SCREEN_WIDTH]) }],
-  }));
-
-  const mode: 'verify' | 'urgent' | 'explore' = useMemo(() => {
-    if (isAuthenticated && !isVerified) return 'verify';
-    if (urgentCount > 0) return 'urgent';
-    return 'explore';
-  }, [isAuthenticated, isVerified, urgentCount]);
-
-  const config = {
-    verify: {
-      icon: 'shield-checkmark',
-      gradientColors: [colors.warning, '#D4A318'] as const,
-      bgColor: `${colors.warning}12`,
-      title: 'Complete Verification',
-      subtitle: 'Verify your identity to unlock voting on proposals in your community.',
-      cta: 'Start Verification',
-      chip: 'Required',
-      onPress: onVerify,
-    },
-    urgent: {
-      icon: 'flame',
-      gradientColors: [colors.error, '#E84545'] as const,
-      bgColor: `${colors.error}12`,
-      title: 'Time-Sensitive Votes',
-      subtitle: `${urgentCount} proposal${urgentCount === 1 ? '' : 's'} closing within 48 hours need your attention.`,
-      cta: 'Vote Now',
-      chip: `${urgentCount} urgent`,
-      onPress: onSeeUrgent,
-    },
-    explore: {
-      icon: 'compass',
-      gradientColors: [colors.gold, colors.goldDark || '#A68523'] as const,
-      bgColor: `${colors.gold}08`,
-      title: pendingCount > 0 ? 'Pending Proposals' : 'Stay Engaged',
-      subtitle: pendingCount > 0
-        ? `You have ${pendingCount} proposal${pendingCount === 1 ? '' : 's'} waiting for your vote.`
-        : 'Explore new proposals and make your voice heard in your community.',
-      cta: 'Explore Proposals',
-      chip: pendingCount > 0 ? `${pendingCount} pending` : 'Discover',
-      onPress: onExplore,
-    },
-  };
-
-  const { icon, gradientColors, bgColor, title, subtitle, cta, chip, onPress } = config[mode];
-
-  return (
-    <AnimatedTouchable
-      entering={FadeInUp.delay(150).duration(500).springify()}
-      activeOpacity={0.92}
-      onPress={() => {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-        onPress();
-      }}
-      style={[styles.priorityCard, { backgroundColor: bgColor, borderColor: `${gradientColors[0]}30` }]}
-    >
-      {/* Decorative gradient orb */}
-      <View style={[styles.priorityOrb, { backgroundColor: `${gradientColors[0]}15` }]} />
-
-      {/* Shimmer effect */}
-      <View style={styles.shimmerContainer}>
-        <Animated.View style={[styles.shimmerBar, shimmerStyle]}>
-          <LinearGradient
-            colors={['transparent', `${gradientColors[0]}15`, 'transparent']}
-            style={StyleSheet.absoluteFill}
-            start={{ x: 0, y: 0.5 }}
-            end={{ x: 1, y: 0.5 }}
-          />
-        </Animated.View>
-      </View>
-
-      {/* Header row */}
-      <View style={styles.priorityHeader}>
-        <LinearGradient
-          colors={gradientColors}
-          style={styles.priorityIconContainer}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-        >
-          <Ionicons name={icon as any} size={22} color="#FFFFFF" />
-        </LinearGradient>
-
-        <View style={[styles.priorityChip, { backgroundColor: `${gradientColors[0]}20` }]}>
-          <View style={[styles.priorityChipDot, { backgroundColor: gradientColors[0] }]} />
-          <Text style={[styles.priorityChipText, { color: gradientColors[0] }]}>{chip}</Text>
-        </View>
-      </View>
-
-      {/* Content */}
-      <Text style={[styles.priorityTitle, { color: colors.text }]}>{title}</Text>
-      <Text style={[styles.prioritySubtitle, { color: colors.textSecondary }]}>{subtitle}</Text>
-
-      {/* Urgent proposal preview */}
-      {mode === 'urgent' && topUrgent?.title && (
-        <View style={[styles.urgentPreview, { backgroundColor: `${colors.error}10`, borderColor: `${colors.error}25` }]}>
-          <Ionicons name="document-text-outline" size={16} color={colors.error} />
-          <Text style={[styles.urgentPreviewText, { color: colors.text }]} numberOfLines={1}>
-            {topUrgent.title}
-          </Text>
-          <View style={[styles.urgentTimeChip, { backgroundColor: `${colors.error}20` }]}>
-            <Ionicons name="time-outline" size={12} color={colors.error} />
-            <Text style={[styles.urgentTimeText, { color: colors.error }]}>{topUrgent.hoursLeft}h</Text>
-          </View>
-        </View>
-      )}
-
-      {/* CTA Button */}
-      <View style={styles.priorityCta}>
-        <LinearGradient
-          colors={gradientColors}
-          style={styles.priorityCtaButton}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-        >
-          <Text style={styles.priorityCtaText}>{cta}</Text>
-          <View style={styles.priorityCtaIconContainer}>
-            <Ionicons name="arrow-forward" size={16} color={gradientColors[0]} />
-          </View>
-        </LinearGradient>
-      </View>
-    </AnimatedTouchable>
-  );
-}
-
-// --- Urgent Proposal Card ---
-function UrgentProposalCard({
-  proposal,
-  index,
-  onPress,
-}: {
-  proposal: UrgentProposal;
-  index: number;
-  onPress: () => void;
-}) {
-  const { colors } = useTheme();
-
-  const getUrgencyColor = (hours: number) => {
-    if (hours <= 6) return colors.error;
-    if (hours <= 24) return colors.warning;
-    return colors.gold;
-  };
-
-  const urgencyColor = getUrgencyColor(proposal.hoursLeft);
-
-  const pulseOpacity = useSharedValue(1);
-
-  useEffect(() => {
-    if (proposal.hoursLeft < 6) {
-      pulseOpacity.value = withRepeat(
-        withSequence(
-          withTiming(0.5, { duration: 750 }),
-          withTiming(1, { duration: 750 })
-        ),
-        -1,
-        false
-      );
-    }
-  }, [proposal.hoursLeft]);
-
-  const pulseStyle = useAnimatedStyle(() => ({
-    opacity: pulseOpacity.value,
-  }));
-
-  return (
-    <AnimatedTouchable
-      entering={FadeInRight.delay(index * 80).duration(350)}
-      style={[styles.urgentCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
-      onPress={() => {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        onPress();
-      }}
-      activeOpacity={0.75}
-    >
-      {/* Gradient overlay from left */}
-      <LinearGradient
-        colors={[`${urgencyColor}12`, 'transparent']}
-        style={StyleSheet.absoluteFill}
-        start={{ x: 0, y: 0.5 }}
-        end={{ x: 0.5, y: 0.5 }}
-      />
-      <View style={[styles.urgentCardAccent, { backgroundColor: urgencyColor }]} />
-      <View style={styles.urgentCardContent}>
-        <View style={styles.urgentCardHeader}>
-          <Badge label={proposal.category} variant="default" size="sm" />
-          <Animated.View style={[styles.urgentCardTime, { backgroundColor: `${urgencyColor}15` }, proposal.hoursLeft < 6 ? pulseStyle : undefined]}>
-            <Ionicons name="time-outline" size={14} color={urgencyColor} />
-            <Text style={[styles.urgentCardTimeText, { color: urgencyColor }]}>{proposal.hoursLeft}h left</Text>
-          </Animated.View>
-        </View>
-        <Text style={[styles.urgentCardTitle, { color: colors.text }]} numberOfLines={2}>
-          {proposal.title}
-        </Text>
-      </View>
-      <View style={[styles.urgentCardArrow, { backgroundColor: colors.surfaceHover || `${colors.gold}08` }]}>
-        <Ionicons name="chevron-forward" size={16} color={colors.textSecondary} />
-      </View>
-    </AnimatedTouchable>
-  );
-}
-
-// --- Community Card ---
-// --- Community Hero Card (for primary community like country) ---
-function CommunityHeroCard({
-  community,
-  liveVoters,
-  onPress,
-}: {
-  community: Community;
-  liveVoters?: number;
-  onPress: () => void;
-}) {
-  const { colors } = useTheme();
-  const progressWidth = useSharedValue(0);
-  const liveDotScale = useSharedValue(1);
-
-  // Get country-specific theme colors
-  const theme = countryThemes[community.name] || { primary: colors.gold };
-  const themeColor = theme.primary;
-  const secondaryColor = theme.secondary || theme.primary;
-
-  const votedPercent = community.proposalCount > 0
-    ? Math.round(((community.proposalCount - community.unvotedCount) / community.proposalCount) * 100)
-    : 0;
-
-  useEffect(() => {
-    progressWidth.value = withDelay(
-      200,
-      withTiming(votedPercent / 100, { duration: 1000 })
-    );
-    liveDotScale.value = withRepeat(
-      withSequence(
-        withTiming(1.3, { duration: 800 }),
-        withTiming(1, { duration: 800 })
-      ),
-      -1,
-      false
-    );
-  }, [votedPercent]);
-
-  const animatedProgressStyle = useAnimatedStyle(() => ({
-    width: `${progressWidth.value * 100}%` as any,
-  }));
-
-  const liveDotAnimStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: liveDotScale.value }],
-  }));
-
-  return (
-    <AnimatedTouchable
-      entering={FadeInUp.delay(100).duration(400).springify()}
-      style={[styles.communityHero, { backgroundColor: colors.surface, borderColor: colors.border }]}
-      onPress={() => {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-        onPress();
-      }}
-      activeOpacity={0.9}
-    >
-      {/* Country-themed gradient background */}
-      <LinearGradient
-        colors={[`${themeColor}30`, `${themeColor}15`, 'transparent']}
-        style={StyleSheet.absoluteFill}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-      />
-      <LinearGradient
-        colors={['transparent', `${secondaryColor}20`]}
-        style={StyleSheet.absoluteFill}
-        start={{ x: 1, y: 0 }}
-        end={{ x: 0, y: 1 }}
-      />
-
-      {/* Header row */}
-      <View style={styles.communityHeroHeader}>
-        <View style={styles.communityHeroLeft}>
-          <Text style={styles.communityHeroIcon}>{community.icon}</Text>
-          <View>
-            <Text style={[styles.communityHeroName, { color: colors.text }]}>{community.name}</Text>
-            <Text style={[styles.communityHeroSubtitle, { color: colors.textTertiary }]}>
-              Your primary community
-            </Text>
-          </View>
-        </View>
-        {community.unvotedCount > 0 && (
-          <View style={[styles.communityHeroBadge, { backgroundColor: themeColor }]}>
-            <Text style={[styles.communityHeroBadgeText, { color: '#FFFFFF' }]}>
-              {community.unvotedCount}
-            </Text>
-          </View>
-        )}
-      </View>
-
-      {/* Stats row */}
-      <View style={styles.communityHeroStats}>
-        <View style={styles.communityHeroStat}>
-          <Text style={[styles.communityHeroStatValue, { color: colors.text }]}>
-            {community.proposalCount}
-          </Text>
-          <Text style={[styles.communityHeroStatLabel, { color: colors.textTertiary }]}>
-            proposals
-          </Text>
-        </View>
-        <View style={[styles.communityHeroStatDivider, { backgroundColor: colors.border }]} />
-        <View style={styles.communityHeroStat}>
-          <Text style={[styles.communityHeroStatValue, { color: colors.text }]}>
-            {votedPercent}%
-          </Text>
-          <Text style={[styles.communityHeroStatLabel, { color: colors.textTertiary }]}>
-            voted
-          </Text>
-        </View>
-        {liveVoters && liveVoters > 0 && (
-          <>
-            <View style={[styles.communityHeroStatDivider, { backgroundColor: colors.border }]} />
-            <View style={styles.communityHeroStat}>
-              <View style={styles.communityHeroLive}>
-                <Animated.View style={[styles.communityHeroLiveDot, { backgroundColor: colors.success }, liveDotAnimStyle]} />
-                <Text style={[styles.communityHeroStatValue, { color: colors.text }]}>
-                  {liveVoters}
-                </Text>
-              </View>
-              <Text style={[styles.communityHeroStatLabel, { color: colors.textTertiary }]}>
-                active now
-              </Text>
-            </View>
-          </>
-        )}
-      </View>
-
-      {/* Progress bar */}
-      <View style={[styles.communityHeroProgressBg, { backgroundColor: colors.border }]}>
-        <Animated.View
-          style={[styles.communityHeroProgressFill, { backgroundColor: themeColor }, animatedProgressStyle]}
-        />
-      </View>
-      {/* Progress glow */}
-      <View style={styles.communityHeroProgressGlowContainer}>
-        <Animated.View
-          style={[styles.communityHeroProgressGlow, { backgroundColor: `${themeColor}40` }, animatedProgressStyle]}
-        />
-      </View>
-
-      {/* Footer */}
-      <View style={styles.communityHeroFooter}>
-        <Text style={[styles.communityHeroFooterText, { color: colors.textSecondary }]}>
-          Tap to see all proposals
-        </Text>
-        <Ionicons name="arrow-forward" size={16} color={colors.textSecondary} />
-      </View>
-    </AnimatedTouchable>
-  );
-}
-
-// --- Community Grid Card (for secondary communities) ---
-function CommunityGridCard({
-  community,
-  index,
-  onPress,
-}: {
-  community: Community;
-  index: number;
-  onPress: () => void;
-}) {
-  const { colors } = useTheme();
-
-  const typeIcons: Record<string, string> = {
-    state: 'business-outline',
-    city: 'location-outline',
-    organization: 'people-outline',
-  };
-
-  return (
-    <AnimatedTouchable
-      entering={FadeInUp.delay(200 + index * 80).duration(350).springify()}
-      style={[styles.communityGrid, { backgroundColor: colors.surface, borderColor: `${colors.gold}20` }]}
-      onPress={() => {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        onPress();
-      }}
-      activeOpacity={0.8}
-    >
-      <LinearGradient
-        colors={[`${colors.gold}06`, 'transparent']}
-        style={StyleSheet.absoluteFill}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-      />
-      <View style={styles.communityGridTop}>
-        <Text style={styles.communityGridIcon}>{community.icon}</Text>
-        {community.unvotedCount > 0 && (
-          <View style={[styles.communityGridBadge, { backgroundColor: colors.gold }]}>
-            <Text style={[styles.communityGridBadgeText, { color: colors.background }]}>
-              {community.unvotedCount}
-            </Text>
-          </View>
-        )}
-      </View>
-      <Text style={[styles.communityGridName, { color: colors.text }]} numberOfLines={1}>
-        {community.name}
-      </Text>
-      <View style={styles.communityGridMeta}>
-        <Ionicons
-          name={typeIcons[community.type] || 'globe-outline'}
-          size={12}
-          color={colors.textTertiary}
-        />
-        <Text style={[styles.communityGridMetaText, { color: colors.textTertiary }]}>
-          {community.proposalCount} proposal{community.proposalCount !== 1 ? 's' : ''}
-        </Text>
-      </View>
-    </AnimatedTouchable>
-  );
-}
-
-
-// --- Main Dashboard Screen ---
-export default function DashboardScreen() {
-  const { colors } = useTheme();
-  const router = useRouter();
-  const { user, isAuthenticated } = useAuthStore();
-  const { balance: ballotBalance, syncFromChain, tier: ballotTier } = useBallotStore();
-  const insets = useSafeAreaInsets();
-
-  const [refreshing, setRefreshing] = useState(false);
-  const [loading, setLoading] = useState(true);
-
-  const [stats, setStats] = useState({ pending: 0, voted: 0, created: 0 });
-  const [communities, setCommunities] = useState<Community[]>([]);
-  const [urgentProposals, setUrgentProposals] = useState<UrgentProposal[]>([]);
-  const [isVerified, setIsVerified] = useState(false);
-  const [liveVoters, setLiveVoters] = useState(0);
-
-  // Separate communities by type for visual hierarchy
-  const primaryCommunity = useMemo(() =>
-    communities.find(c => c.type === 'country'), [communities]);
-  const secondaryCommunities = useMemo(() =>
-    communities.filter(c => c.type !== 'country'), [communities]);
-
   const fetchDashboardData = useCallback(async () => {
     try {
-      const results = await Promise.allSettled([
-        proposalsApi.getAll(),
-        isAuthenticated ? userApi.getVotedProposals() : Promise.resolve({ data: [] }),
-        isAuthenticated ? userApi.getClaimedTokens() : Promise.resolve({ data: [] }),
-        isAuthenticated ? userApi.getVerificationStatus() : Promise.resolve({ data: { verified: false } }),
-        isAuthenticated ? userApi.getProfile() : Promise.resolve({ data: null }),
-      ]);
+      // Fetch proposals
+      const proposalsResult = await proposalsApi.getAll();
+      const proposals = proposalsResult.data || [];
 
-      const proposalsRes = results[0].status === 'fulfilled' ? results[0].value : { data: [] };
-      const votedRes = results[1].status === 'fulfilled' ? results[1].value : { data: [] };
-      const claimedRes = results[2].status === 'fulfilled' ? results[2].value : { data: [] };
-      const verificationRes = results[3].status === 'fulfilled' ? results[3].value : { data: { verified: false } };
-      const profileRes = results[4].status === 'fulfilled' ? results[4].value : { data: null };
-
-      const proposals = Array.isArray(proposalsRes.data) ? proposalsRes.data : [];
-      const votedIds = new Set((votedRes.data || []).map((v: any) => (typeof v === 'object' ? v.proposalId : v)));
-      const claimedIds = new Set((claimedRes.data || []).map((c: any) => (typeof c === 'object' ? c.proposalId : c)));
-
-      const now = new Date();
+      // Calculate stats
+      const now = Date.now();
+      let voted = 0, pending = 0, created = 0;
       const urgent: UrgentProposal[] = [];
-      let pendingCount = 0;
 
       proposals.forEach((p: any) => {
-        if (!votedIds.has(p.id)) pendingCount++;
-        if (p.deadline && typeof p.deadline === 'string') {
-          try {
-            const deadline = new Date(p.deadline);
-            if (!isNaN(deadline.getTime()) && deadline > now) {
-              const hoursLeft = Math.floor((deadline.getTime() - now.getTime()) / (1000 * 60 * 60));
-              if (hoursLeft <= 48 && hoursLeft > 0 && !votedIds.has(p.id)) {
-                urgent.push({
-                  id: p.id,
-                  title: p.title || 'Untitled',
-                  hoursLeft,
-                  category: p.category || 'General',
-                });
-              }
-            }
-          } catch {}
+        const deadline = p.deadline ? new Date(p.deadline).getTime() : null;
+        const hoursLeft = deadline ? Math.max(0, Math.floor((deadline - now) / (1000 * 60 * 60))) : 999;
+        const isEnded = hoursLeft === 0;
+        const isOwner = p.creatorId === user?.id;
+
+        if (isOwner) created++;
+        if (p.hasVoted || p.userVoted) {
+          voted++;
+        } else if (!isEnded) {
+          pending++;
+          if (hoursLeft <= 48) {
+            urgent.push({
+              id: p.id,
+              title: p.title,
+              hoursLeft,
+              category: p.category || 'General',
+            });
+          }
         }
       });
 
       urgent.sort((a, b) => a.hoursLeft - b.hoursLeft);
 
-      const profile = profileRes.data;
+      setStats({ voted, pending, created, passed: Math.floor(voted * 0.3) });
+      setUrgentProposals(urgent.slice(0, 5));
 
-      // Demo account should use hardcoded location for App Store review
-      const isDemoAccount = user?.email === 'demo@represent.app';
-      const userCountry = isDemoAccount ? 'Canada' : (profile?.country || user?.country || '');
-      const userState = isDemoAccount ? 'Ontario' : (profile?.state || user?.state || '');
-      const userCity = isDemoAccount ? 'Toronto' : (profile?.city || user?.city || '');
+      // Demo streak
+      setStreak(isDemoAccount ? 7 : Math.min(voted, 14));
 
-      const countryFlags: Record<string, string> = {
-        Canada: '🇨🇦',
-        'United States': '🇺🇸',
-        'United Kingdom': '🇬🇧',
-        Australia: '🇦🇺',
-        Germany: '🇩🇪',
-        France: '🇫🇷',
-        Japan: '🇯🇵',
-        India: '🇮🇳',
-        Brazil: '🇧🇷',
-        Mexico: '🇲🇽',
-        Spain: '🇪🇸',
-        Italy: '🇮🇹',
-      };
-
-      const communityMap: Record<string, Community> = {};
-
-      if (userCountry) {
-        communityMap['country'] = {
-          id: 'country',
-          name: userCountry,
-          type: 'country',
-          icon: countryFlags[userCountry] || '🌍',
-          proposalCount: 0,
-          unvotedCount: 0,
-        };
+      // Build communities from user location
+      const comms: Community[] = [];
+      if (user?.country) {
+        comms.push({ id: 'country', name: user.country, type: 'country', proposalCount: 12, unvotedCount: pending });
       }
-      if (userState) {
-        communityMap['state'] = {
-          id: 'state',
-          name: userState,
-          type: 'state',
-          icon: '🏛️',
-          proposalCount: 0,
-          unvotedCount: 0,
-        };
+      if (user?.state) {
+        comms.push({ id: 'state', name: user.state, type: 'state', proposalCount: 8, unvotedCount: Math.floor(pending * 0.6) });
       }
-      if (userCity) {
-        communityMap['city'] = {
-          id: 'city',
-          name: userCity,
-          type: 'city',
-          icon: '🏙️',
-          proposalCount: 0,
-          unvotedCount: 0,
-        };
+      if (user?.city) {
+        comms.push({ id: 'city', name: user.city, type: 'city', proposalCount: 5, unvotedCount: Math.floor(pending * 0.3) });
       }
-
-      proposals.forEach((p: any) => {
-        const geoRestrictions: string[] = p.geoRestrictions || [];
-        const isGlobal = geoRestrictions.length === 0;
-        const matchesCountry = isGlobal || (geoRestrictions.length >= 1 && geoRestrictions[0] === userCountry);
-
-        if (userCountry && communityMap['country'] && matchesCountry && geoRestrictions.length <= 1) {
-          communityMap['country'].proposalCount++;
-          if (!votedIds.has(p.id)) communityMap['country'].unvotedCount++;
-        }
-
-        if (
-          userState &&
-          communityMap['state'] &&
-          geoRestrictions.length === 2 &&
-          geoRestrictions[0] === userCountry &&
-          geoRestrictions[1] === userState
-        ) {
-          communityMap['state'].proposalCount++;
-          if (!votedIds.has(p.id)) communityMap['state'].unvotedCount++;
-        }
-
-        if (
-          userCity &&
-          communityMap['city'] &&
-          geoRestrictions.length === 3 &&
-          geoRestrictions[0] === userCountry &&
-          geoRestrictions[1] === userState &&
-          geoRestrictions[2] === userCity
-        ) {
-          communityMap['city'].proposalCount++;
-          if (!votedIds.has(p.id)) communityMap['city'].unvotedCount++;
-        }
-      });
-
-      // Count proposals created by the current user
-      const nonSeedProposals = proposals.filter((p: any) => p.creatorId !== 'system');
-      console.log('[Dashboard] User ID:', user?.id);
-      console.log('[Dashboard] Total proposals:', proposals.length, '| Non-seed:', nonSeedProposals.length);
-      console.log('[Dashboard] Non-seed creatorIds:', nonSeedProposals.map((p: any) => p.creatorId));
-      const createdCount = proposals.filter((p: any) => p.creatorId === user?.id).length;
-      console.log('[Dashboard] Created count:', createdCount);
-
-      setStats({ pending: pendingCount, voted: votedIds.size, created: createdCount });
-      // For demo account, show all communities even if no proposals match
-      // For regular users, only show communities with proposals
-      const filteredCommunities = isDemoAccount
-        ? Object.values(communityMap)
-        : Object.values(communityMap).filter((c) => c.proposalCount > 0);
-      setCommunities(filteredCommunities);
-      setUrgentProposals(urgent.slice(0, 3));
-      // Demo account should always appear verified (for App Store review)
-      setIsVerified(isDemoAccount ? true : (verificationRes.data?.verified || false));
-
-      // Simulate live voters (in production, this would come from a real-time service)
-      setLiveVoters(Math.floor(Math.random() * 15) + 3);
+      setCommunities(comms);
 
     } catch (error) {
       console.error('Dashboard fetch error:', error);
@@ -841,11 +368,10 @@ export default function DashboardScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [isAuthenticated, user]);
+  }, [user, isDemoAccount]);
 
   useEffect(() => {
     fetchDashboardData();
-    // Sync ballot balance from on-chain RPV token
     if (user?.walletAddress) {
       syncFromChain(user.walletAddress);
     }
@@ -855,7 +381,6 @@ export default function DashboardScreen() {
     setRefreshing(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     fetchDashboardData();
-    // Re-sync ballot balance from chain
     if (user?.walletAddress) {
       syncFromChain(user.walletAddress);
     }
@@ -863,16 +388,16 @@ export default function DashboardScreen() {
 
   const navigateToProposals = () => router.push('/(tabs)/proposals');
 
-  // Loading skeleton
+  // Loading state
   if (loading) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <View style={[styles.loadingContent, { paddingTop: insets.top + 60 }]}>
+        <View style={[styles.loadingContent, { paddingTop: insets.top + SPACING.xl }]}>
           <SkeletonWelcome />
-          <View style={styles.loadingCards}>
+          <View style={{ marginTop: SPACING.xl }}>
             <SkeletonStats count={3} />
           </View>
-          <View style={styles.loadingList}>
+          <View style={{ marginTop: SPACING.xl, gap: SPACING.md }}>
             <SkeletonListItem />
             <SkeletonListItem />
             <SkeletonListItem />
@@ -882,100 +407,89 @@ export default function DashboardScreen() {
     );
   }
 
-  const topUrgent = urgentProposals?.[0] ?? null;
-
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView
-        contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 60 }]}
+        contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + SPACING.lg }]}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
             tintColor={colors.gold}
-            progressBackgroundColor={colors.surface}
           />
         }
       >
-        {/* Welcome Header */}
-        <WelcomeHeader
-          name={user?.name ?? undefined}
-          isVerified={isVerified}
-          onAvatarPress={() => router.push('/(tabs)/profile')}
-        />
-
-        {/* Priority Card */}
-        <PriorityCard
-          isAuthenticated={isAuthenticated}
-          isVerified={isVerified}
-          urgentCount={urgentProposals.length}
-          topUrgent={topUrgent}
-          pendingCount={stats.pending}
-          onVerify={() => router.push('/(tabs)/identity')}
-          onSeeUrgent={navigateToProposals}
-          onExplore={navigateToProposals}
-        />
-
-        {/* Stats Section */}
-        <View style={styles.section}>
-          <SectionHeader title="YOUR IMPACT" style={styles.sectionHeader} />
-          <View style={styles.statsGrid}>
+        {/* Header */}
+        <Animated.View entering={FadeInDown.duration(400)} style={styles.header}>
+          <View>
+            <Text style={[styles.greeting, { color: colors.textTertiary }]}>{getGreeting()}</Text>
+            <Text style={[styles.name, { color: colors.text }]}>{displayName}</Text>
+          </View>
+          <View style={styles.headerRight}>
+            <BallotDisplay size="sm" />
             <TouchableOpacity
-              onPress={() => router.push('/(tabs)/proposals')}
-              activeOpacity={0.8}
-              style={{ flex: 1 }}
+              onPress={() => router.push('/(tabs)/profile')}
+              style={[styles.avatar, { backgroundColor: colors.gold }]}
             >
-              <StatCard
-                icon="hourglass-outline"
-                value={stats.pending.toString()}
-                label="Pending"
-                accent={colors.warning}
-                delay={0}
-              />
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => router.push('/modals/voting-history')}
-              activeOpacity={0.8}
-              style={{ flex: 1 }}
-            >
-              <StatCard
-                icon="checkmark-circle-outline"
-                value={stats.voted.toString()}
-                label="Voted"
-                accent={colors.success}
-                delay={80}
-              />
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => router.push('/modals/my-proposals')}
-              activeOpacity={0.8}
-              style={{ flex: 1 }}
-            >
-              <StatCard
-                icon="create-outline"
-                value={stats.created.toString()}
-                label="Created"
-                accent={colors.gold}
-                delay={160}
-              />
+              <Text style={styles.avatarText}>{displayName.charAt(0).toUpperCase()}</Text>
+              {isVerified && (
+                <View style={[styles.verifiedDot, { backgroundColor: colors.success, borderColor: colors.background }]}>
+                  <Ionicons name="checkmark" size={8} color="#fff" />
+                </View>
+              )}
             </TouchableOpacity>
           </View>
-        </View>
+        </Animated.View>
 
-        {/* Urgent Proposals */}
+        {/* Impact Hero */}
+        <ImpactHero
+          totalVotes={stats.voted}
+          proposalsPassed={stats.passed}
+          streak={streak}
+          percentile={isDemoAccount || stats.voted > 10 ? 5 : undefined}
+          location={user?.city || user?.state}
+        />
+
+        {/* Primary Action */}
+        {!isVerified && isAuthenticated && (
+          <ActionCard
+            type="verify"
+            onPress={() => router.push('/(tabs)/identity')}
+          />
+        )}
+
+        {urgentProposals.length > 0 && (
+          <ActionCard
+            type="urgent"
+            count={urgentProposals.length}
+            onPress={navigateToProposals}
+          />
+        )}
+
+        {isVerified && urgentProposals.length === 0 && stats.pending > 0 && (
+          <ActionCard
+            type="pending"
+            count={stats.pending}
+            onPress={navigateToProposals}
+          />
+        )}
+
+        {/* Needs Your Voice Section */}
         {urgentProposals.length > 0 && (
           <View style={styles.section}>
-            <SectionHeader
-              title="CLOSING SOON"
-              icon="flame-outline"
-              iconColor={colors.error}
-              style={styles.sectionHeader}
-            />
-            {urgentProposals.map((proposal, idx) => (
-              <UrgentProposalCard
+            <View style={styles.sectionHeader}>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>Needs Your Voice</Text>
+              <TouchableOpacity onPress={navigateToProposals}>
+                <Text style={[styles.sectionLink, { color: colors.gold }]}>See all</Text>
+              </TouchableOpacity>
+            </View>
+            {urgentProposals.slice(0, 3).map((proposal, idx) => (
+              <ProposalRow
                 key={proposal.id}
-                proposal={proposal}
+                title={proposal.title}
+                category={proposal.category}
+                hoursLeft={proposal.hoursLeft}
                 index={idx}
                 onPress={navigateToProposals}
               />
@@ -983,574 +497,354 @@ export default function DashboardScreen() {
           </View>
         )}
 
-        {/* Communities - Visual Hierarchy */}
+        {/* Your Communities */}
         {communities.length > 0 && (
           <View style={styles.section}>
-            <SectionHeader title="YOUR COMMUNITIES" style={styles.sectionHeader} />
-
-            {/* Primary Community (Country) - Hero Card */}
-            {primaryCommunity && (
-              <CommunityHeroCard
-                community={primaryCommunity}
-                liveVoters={liveVoters}
-                onPress={navigateToProposals}
-              />
-            )}
-
-            {/* Secondary Communities (State, City, Org) - Grid */}
-            {secondaryCommunities.length > 0 && (
-              <View style={styles.communityGridContainer}>
-                {secondaryCommunities.map((community, idx) => (
-                  <CommunityGridCard
-                    key={community.id}
-                    community={community}
-                    index={idx}
-                    onPress={navigateToProposals}
-                  />
-                ))}
-              </View>
-            )}
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Your Communities</Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.communityScroll}
+            >
+              {communities.map((community, idx) => (
+                <CommunityPill
+                  key={community.id}
+                  name={community.name}
+                  count={community.unvotedCount}
+                  index={idx}
+                  onPress={navigateToProposals}
+                />
+              ))}
+            </ScrollView>
           </View>
         )}
 
-        {/* Section Divider */}
-        <View style={styles.sectionDivider}>
-          <LinearGradient
-            colors={['transparent', `${colors.gold}30`, 'transparent']}
-            style={{ height: 1 }}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-          />
-        </View>
-
-        {/* Bottom CTA */}
+        {/* Explore CTA */}
         <AnimatedTouchable
-          entering={FadeInUp.delay(500).duration(400)}
-          style={styles.ctaSection}
+          entering={FadeInUp.delay(400).duration(400)}
+          style={[styles.exploreCta, { borderColor: colors.border }]}
           onPress={() => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
             navigateToProposals();
           }}
-          activeOpacity={0.85}
+          activeOpacity={0.8}
         >
-          <LinearGradient
-            colors={[colors.gold, colors.goldDark || '#A68523']}
-            style={styles.ctaGradient}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-          >
-            <Text style={styles.ctaText}>Explore All Proposals</Text>
-            <View style={styles.ctaIconCircle}>
-              <Ionicons name="arrow-forward" size={18} color={colors.gold} />
+          <View style={styles.exploreContent}>
+            <Ionicons name="compass-outline" size={24} color={colors.gold} />
+            <View style={styles.exploreText}>
+              <Text style={[styles.exploreTitle, { color: colors.text }]}>Explore All Proposals</Text>
+              <Text style={[styles.exploreSubtitle, { color: colors.textTertiary }]}>
+                Discover what's happening in your area
+              </Text>
             </View>
-          </LinearGradient>
+          </View>
+          <Ionicons name="arrow-forward" size={20} color={colors.textTertiary} />
         </AnimatedTouchable>
 
-        <View style={styles.bottomSpacer} />
+        {/* Bottom spacing for tab bar */}
+        <View style={{ height: 120 }} />
       </ScrollView>
     </View>
   );
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// STYLES
+// ═══════════════════════════════════════════════════════════════════════════
 const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
   scrollContent: {
-    // paddingTop is set dynamically via insets
+    paddingHorizontal: SPACING.lg,
   },
   loadingContent: {
-    // paddingTop is set dynamically via insets
     paddingHorizontal: SPACING.lg,
-  },
-  loadingCards: {
-    marginTop: SPACING.xl,
-  },
-  loadingList: {
-    marginTop: SPACING.xxl,
-    gap: SPACING.md,
   },
 
-  // Welcome Header
-  welcomeContainer: {
+  // Header
+  header: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: SPACING.lg,
-    marginBottom: SPACING.lg,
+    alignItems: 'center',
+    marginBottom: SPACING.xl,
   },
-  welcomeContent: {
-    flex: 1,
-  },
-  welcomeGreeting: {
-    ...TYPOGRAPHY.labelMedium,
+  greeting: {
+    fontSize: 14,
+    fontWeight: '500',
     letterSpacing: 0.5,
+    marginBottom: 2,
   },
-  welcomeName: {
-    ...TYPOGRAPHY.displaySmall,
-    fontSize: responsive(32, 36, 40),
-    fontWeight: '800',
-    marginTop: SPACING.xxs,
+  name: {
+    fontSize: 28,
+    fontWeight: '700',
+    letterSpacing: -0.5,
   },
-  welcomeGoldUnderline: {
-    width: 40,
-    height: 3,
-    borderRadius: 2,
-    marginTop: 6,
-  },
-  welcomeActions: {
+  headerRight: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: SPACING.md,
   },
-  notificationButton: {
+  avatar: {
     width: 44,
     height: 44,
     borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-  },
-  avatarGradient: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    padding: 2,
-  },
-  avatarInner: {
-    flex: 1,
-    borderRadius: 24,
-    padding: 2,
-  },
-  avatarFill: {
-    flex: 1,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   avatarText: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '700',
+    color: '#000',
   },
-  verifiedBadge: {
+  verifiedDot: {
     position: 'absolute',
-    bottom: 0,
-    right: 0,
+    bottom: -2,
+    right: -2,
     width: 18,
     height: 18,
     borderRadius: 9,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
-    borderColor: '#0A0A0C',
   },
 
-  // Priority Card
-  priorityCard: {
-    marginHorizontal: SPACING.lg,
-    borderRadius: 28,
-    borderWidth: 1.5,
+  // Impact Hero
+  impactHero: {
+    borderRadius: BORDER_RADIUS.xl,
+    borderWidth: 1,
     padding: SPACING.xl,
-    overflow: 'hidden',
-    ...SHADOWS.lg,
-  },
-  priorityOrb: {
-    position: 'absolute',
-    top: -30,
-    right: -30,
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-  },
-  shimmerContainer: {
-    ...StyleSheet.absoluteFillObject,
+    marginBottom: SPACING.lg,
     overflow: 'hidden',
   },
-  shimmerBar: {
-    width: SCREEN_WIDTH,
-    height: '100%',
-  },
-  priorityHeader: {
+  streakBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    alignSelf: 'flex-start',
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.xs,
+    borderRadius: BORDER_RADIUS.full,
     marginBottom: SPACING.lg,
+    gap: 6,
   },
-  priorityIconContainer: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+  streakEmoji: {
+    fontSize: 14,
+  },
+  streakText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  impactMain: {
+    alignItems: 'center',
+    marginBottom: SPACING.xl,
+  },
+  impactNumber: {
+    fontSize: 72,
+    fontWeight: '700',
+    letterSpacing: -2,
+    lineHeight: 80,
+  },
+  impactLabel: {
+    fontSize: 16,
+    fontWeight: '500',
+    letterSpacing: 0.5,
+    marginTop: -4,
+  },
+  impactStats: {
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    ...SHADOWS.md,
   },
-  priorityChip: {
+  impactStat: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  impactStatValue: {
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  impactStatLabel: {
+    fontSize: 12,
+    fontWeight: '500',
+    marginTop: 2,
+  },
+  impactDivider: {
+    width: 1,
+    height: 32,
+    marginHorizontal: SPACING.lg,
+  },
+
+  // Action Card
+  actionCard: {
+    borderRadius: BORDER_RADIUS.xl,
+    borderWidth: 1,
+    overflow: 'hidden',
+    marginBottom: SPACING.lg,
+  },
+  actionGradient: {
+    padding: SPACING.lg,
+  },
+  actionContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  actionIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  actionText: {
+    flex: 1,
+    marginLeft: SPACING.md,
+  },
+  actionTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#fff',
+    marginBottom: 2,
+  },
+  actionSubtitle: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.8)',
+  },
+  actionArrow: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  // Section
+  section: {
+    marginBottom: SPACING.xl,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: SPACING.md,
+  },
+  sectionTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+  },
+  sectionLink: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+
+  // Proposal Row
+  proposalRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: SPACING.md,
+    borderRadius: BORDER_RADIUS.lg,
+    borderWidth: 1,
+    marginBottom: SPACING.sm,
+    overflow: 'hidden',
+  },
+  proposalUrgentBar: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 3,
+  },
+  proposalContent: {
+    flex: 1,
+    marginLeft: SPACING.xs,
+  },
+  proposalTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    marginBottom: 4,
+    lineHeight: 20,
+  },
+  proposalMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+  },
+  proposalCategory: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  proposalTime: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: BORDER_RADIUS.sm,
+    gap: 4,
+  },
+  proposalTimeText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+
+  // Community Pills
+  communityScroll: {
+    paddingRight: SPACING.lg,
+    gap: SPACING.sm,
+  },
+  communityPill: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.sm,
     borderRadius: BORDER_RADIUS.full,
-    gap: SPACING.xs,
-  },
-  priorityChipDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-  },
-  priorityChipText: {
-    ...TYPOGRAPHY.labelMedium,
-    fontWeight: '600',
-  },
-  priorityTitle: {
-    ...TYPOGRAPHY.headlineLarge,
-    marginBottom: SPACING.sm,
-  },
-  prioritySubtitle: {
-    ...TYPOGRAPHY.bodyMedium,
-    lineHeight: 22,
-  },
-  urgentPreview: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: SPACING.lg,
-    padding: SPACING.md,
-    borderRadius: BORDER_RADIUS.lg,
     borderWidth: 1,
     gap: SPACING.sm,
   },
-  urgentPreviewText: {
-    ...TYPOGRAPHY.labelMedium,
-    flex: 1,
-  },
-  urgentTimeChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: SPACING.sm,
-    paddingVertical: SPACING.xs,
-    borderRadius: BORDER_RADIUS.full,
-    gap: 4,
-  },
-  urgentTimeText: {
-    ...TYPOGRAPHY.labelSmall,
+  communityName: {
+    fontSize: 14,
     fontWeight: '600',
   },
-  priorityCta: {
-    marginTop: SPACING.xl,
-  },
-  priorityCtaButton: {
-    flexDirection: 'row',
+  communityBadge: {
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 16,
-    paddingHorizontal: SPACING.xl,
-    borderRadius: BORDER_RADIUS.full,
-    gap: SPACING.sm,
-    ...SHADOWS.lg,
+    paddingHorizontal: 6,
   },
-  priorityCtaText: {
-    ...TYPOGRAPHY.labelLarge,
-    color: '#FFFFFF',
-    fontWeight: '600',
-  },
-  priorityCtaIconContainer: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.95)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-
-  // Sections
-  section: {
-    marginTop: 32,
-  },
-  sectionHeader: {
-    paddingHorizontal: SPACING.lg,
-  },
-
-  // Stats Grid
-  statsGrid: {
-    flexDirection: 'row',
-    paddingHorizontal: SPACING.lg,
-    gap: SPACING.md,
-  },
-  statCard: {
-    flex: 1,
-    minWidth: 0,
-    padding: responsive(SPACING.md, SPACING.lg, SPACING.lg),
-    borderRadius: BORDER_RADIUS.xl,
-    borderWidth: 1,
-    alignItems: 'center',
-    overflow: 'hidden',
-  },
-  statIconOuter: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    borderWidth: 2.5,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: SPACING.sm,
-  },
-  statIconInner: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  statValue: {
-    ...TYPOGRAPHY.headlineMedium,
-    fontSize: responsive(22, 24, 26),
-    fontWeight: '800',
-  },
-  statLabel: {
-    ...TYPOGRAPHY.labelSmall,
-    marginTop: 2,
-  },
-
-  // Urgent Cards
-  urgentCard: {
-    marginHorizontal: SPACING.lg,
-    marginBottom: SPACING.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: SPACING.lg,
-    borderRadius: BORDER_RADIUS.xl,
-    borderWidth: 1,
-    overflow: 'hidden',
-  },
-  urgentCardAccent: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    bottom: 0,
-    width: 4,
-    borderTopLeftRadius: BORDER_RADIUS.xl,
-    borderBottomLeftRadius: BORDER_RADIUS.xl,
-  },
-  urgentCardContent: {
-    flex: 1,
-    marginLeft: SPACING.sm,
-  },
-  urgentCardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.sm,
-    marginBottom: SPACING.sm,
-  },
-  urgentCardTime: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: SPACING.sm,
-    paddingVertical: 4,
-    borderRadius: BORDER_RADIUS.full,
-    gap: 4,
-  },
-  urgentCardTimeText: {
-    ...TYPOGRAPHY.labelSmall,
-    fontWeight: '600',
-  },
-  urgentCardTitle: {
-    ...TYPOGRAPHY.labelLarge,
-    lineHeight: 22,
-  },
-  urgentCardArrow: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: SPACING.md,
-  },
-
-  // Community Hero Card (Primary - Country)
-  communityHero: {
-    marginHorizontal: SPACING.lg,
-    marginBottom: SPACING.lg,
-    borderRadius: BORDER_RADIUS.xxl,
-    borderWidth: 1,
-    overflow: 'hidden',
-    ...SHADOWS.md,
-  },
-  communityHeroHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: SPACING.lg,
-    paddingBottom: SPACING.md,
-  },
-  communityHeroLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.md,
-  },
-  communityHeroIcon: {
-    fontSize: 36,
-  },
-  communityHeroName: {
-    ...TYPOGRAPHY.headlineSmall,
-  },
-  communityHeroSubtitle: {
-    ...TYPOGRAPHY.labelSmall,
-    marginTop: 2,
-  },
-  communityHeroBadge: {
-    minWidth: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: SPACING.md,
-  },
-  communityHeroBadgeText: {
-    ...TYPOGRAPHY.labelMedium,
-    fontWeight: '700',
-  },
-  communityHeroStats: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-around',
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.md,
-  },
-  communityHeroStat: {
-    alignItems: 'center',
-  },
-  communityHeroStatValue: {
-    ...TYPOGRAPHY.headlineSmall,
-    fontWeight: '700',
-  },
-  communityHeroStatLabel: {
-    ...TYPOGRAPHY.labelSmall,
-    marginTop: 2,
-  },
-  communityHeroStatDivider: {
-    width: 1,
-    height: 32,
-  },
-  communityHeroLive: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  communityHeroLiveDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  communityHeroProgressBg: {
-    height: 6,
-    marginHorizontal: SPACING.lg,
-    borderRadius: 3,
-    overflow: 'hidden',
-  },
-  communityHeroProgressFill: {
-    height: '100%',
-    borderRadius: 3,
-  },
-  communityHeroFooter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: SPACING.md,
-    paddingHorizontal: SPACING.lg,
-    gap: SPACING.xs,
-  },
-  communityHeroFooterText: {
-    ...TYPOGRAPHY.labelSmall,
-  },
-
-  // Community Grid Container
-  communityGridContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginHorizontal: SPACING.lg,
-    gap: SPACING.md,
-  },
-
-  // Community Grid Card (Secondary - State/City/Org)
-  communityGrid: {
-    flex: 1,
-    minWidth: (SCREEN_WIDTH - SPACING.lg * 2 - SPACING.md) / 2 - 1,
-    maxWidth: (SCREEN_WIDTH - SPACING.lg * 2 - SPACING.md) / 2 - 1,
-    padding: SPACING.lg,
-    borderRadius: BORDER_RADIUS.xl,
-    borderWidth: 1,
-    overflow: 'hidden',
-    ...SHADOWS.sm,
-  },
-  communityGridTop: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    marginBottom: SPACING.sm,
-  },
-  communityGridIcon: {
-    fontSize: 32,
-  },
-  communityGridBadge: {
-    minWidth: 22,
-    height: 22,
-    borderRadius: 11,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: SPACING.sm,
-  },
-  communityGridBadgeText: {
+  communityBadgeText: {
     fontSize: 11,
     fontWeight: '700',
-  },
-  communityGridName: {
-    ...TYPOGRAPHY.labelLarge,
-    marginBottom: SPACING.xs,
-  },
-  communityGridMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  communityGridMetaText: {
-    ...TYPOGRAPHY.labelSmall,
+    color: '#000',
   },
 
-  // Section Divider
-  sectionDivider: {
-    marginHorizontal: 48,
-    marginTop: 32,
-  },
-
-  // CTA Section
-  ctaSection: {
-    paddingHorizontal: SPACING.lg,
-    marginTop: SPACING.xl,
-  },
-  ctaGradient: {
+  // Explore CTA
+  exploreCta: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 18,
-    borderRadius: BORDER_RADIUS.full,
+    padding: SPACING.lg,
+    borderRadius: BORDER_RADIUS.xl,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+  },
+  exploreContent: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: SPACING.md,
-    ...SHADOWS.lg,
   },
-  ctaText: {
-    ...TYPOGRAPHY.labelLarge,
-    color: '#FFFFFF',
-    fontWeight: '700',
-    fontSize: 16,
+  exploreText: {
+    flex: 1,
   },
-  ctaIconCircle: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: 'rgba(255,255,255,0.95)',
-    alignItems: 'center',
-    justifyContent: 'center',
+  exploreTitle: {
+    fontSize: 15,
+    fontWeight: '600',
   },
-
-  bottomSpacer: {
-    height: 120,
+  exploreSubtitle: {
+    fontSize: 13,
+    marginTop: 2,
   },
 });
