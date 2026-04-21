@@ -7,61 +7,93 @@ const RPC_URL = 'https://sepolia.base.org';
 // ERC-20 balanceOf function selector: keccak256("balanceOf(address)")[:4]
 const BALANCE_OF_SELECTOR = '0x70a08231';
 
+// Retry configuration
+const MAX_RETRIES = 3;
+const RETRY_DELAYS = [500, 1000, 2000]; // Exponential backoff
+
+export interface RPVBalanceResult {
+  balance: number;
+  error: boolean;
+  errorMessage?: string;
+}
+
+async function fetchWithTimeout(url: string, options: RequestInit, timeout = 5000): Promise<Response> {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeout);
+  try {
+    const response = await fetch(url, { ...options, signal: controller.signal });
+    clearTimeout(id);
+    return response;
+  } catch (error) {
+    clearTimeout(id);
+    throw error;
+  }
+}
+
+async function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 /**
  * Get RPV token balance for a wallet address using direct RPC call
- * @param walletAddress - The wallet address to check
- * @returns The token balance as a number (human-readable, not wei)
+ * Returns structured result with error flag for proper handling
  */
-export async function getRPVBalance(walletAddress: string): Promise<number> {
+export async function getRPVBalance(walletAddress: string): Promise<RPVBalanceResult> {
   console.log('[RPV] Fetching balance for wallet:', walletAddress);
 
-  try {
-    if (!walletAddress) {
-      console.log('[RPV] No wallet address provided');
-      return 0;
-    }
-
-    // Pad address to 32 bytes (remove 0x, pad to 64 chars)
-    const paddedAddress = walletAddress.toLowerCase().replace('0x', '').padStart(64, '0');
-    const data = BALANCE_OF_SELECTOR + paddedAddress;
-
-    const response = await fetch(RPC_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        jsonrpc: '2.0',
-        id: 1,
-        method: 'eth_call',
-        params: [
-          {
-            to: RPV_TOKEN_ADDRESS,
-            data: data,
-          },
-          'latest',
-        ],
-      }),
-    });
-
-    const json = await response.json();
-    console.log('[RPV] RPC response:', JSON.stringify(json));
-
-    if (json.error) {
-      console.error('[RPV] RPC error:', json.error);
-      return 0;
-    }
-
-    // Parse the hex result (it's a uint256 in wei)
-    const balanceWei = BigInt(json.result || '0x0');
-    // Convert from wei (18 decimals) to human-readable
-    const balance = Number(balanceWei) / 1e18;
-
-    console.log('[RPV] Balance wei:', balanceWei.toString(), '| Formatted:', balance);
-
-    return balance;
-  } catch (error) {
-    console.error('[RPV] Error fetching balance:', error);
-    return 0;
+  if (!walletAddress) {
+    console.log('[RPV] No wallet address provided');
+    return { balance: 0, error: false };
   }
+
+  const paddedAddress = walletAddress.toLowerCase().replace('0x', '').padStart(64, '0');
+  const data = BALANCE_OF_SELECTOR + paddedAddress;
+
+  let lastError: string | undefined;
+
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      if (attempt > 0) {
+        const delay = RETRY_DELAYS[attempt - 1] || 2000;
+        console.log(`[RPV] Retry attempt ${attempt}/${MAX_RETRIES} after ${delay}ms`);
+        await sleep(delay);
+      }
+
+      const response = await fetchWithTimeout(RPC_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: 1,
+          method: 'eth_call',
+          params: [
+            { to: RPV_TOKEN_ADDRESS, data },
+            'latest',
+          ],
+        }),
+      });
+
+      const json = await response.json();
+      console.log('[RPV] RPC response:', JSON.stringify(json));
+
+      if (json.error) {
+        lastError = json.error.message || 'RPC error';
+        console.error('[RPV] RPC error:', json.error);
+        continue;
+      }
+
+      const balanceWei = BigInt(json.result || '0x0');
+      const balance = Number(balanceWei) / 1e18;
+
+      console.log('[RPV] Balance wei:', balanceWei.toString(), '| Formatted:', balance);
+      return { balance, error: false };
+
+    } catch (error: any) {
+      lastError = error?.message || 'Network error';
+      console.error(`[RPV] Fetch attempt ${attempt + 1} failed:`, error);
+    }
+  }
+
+  console.error('[RPV] All retry attempts exhausted');
+  return { balance: 0, error: true, errorMessage: lastError };
 }

@@ -19,8 +19,7 @@ export default function VerificationPaymentScreen() {
 
   const handleStartVerification = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    // Navigate directly to identity verification (Veriff)
-    router.replace('/modals/verify-identity');
+    router.replace('/modals/veriff');
   };
 
   const handleViewPremium = () => {

@@ -215,6 +215,14 @@ async function apiRequest<T>(
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       console.error(`API Error: ${response.status}`, errorData);
+
+      // Handle auth expiration - trigger re-auth flow
+      if (response.status === 401) {
+        console.log('[API] Token expired or invalid, triggering re-auth');
+        useAuthStore.getState().checkAuth();
+        return { data: null, error: 'Session expired. Please sign in again.' };
+      }
+
       const errorMessage = errorData.error || errorData.message || `HTTP ${response.status}`;
       const requiresVerification =
         errorMessage.includes('passport') ||

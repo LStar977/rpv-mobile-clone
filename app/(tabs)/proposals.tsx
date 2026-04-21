@@ -1100,11 +1100,14 @@ export default function ProposalsScreen() {
     }
 
     setVotingProposalId(proposalId as number);
+    const { restoreBallot, tier: currentTier } = useBallotStore.getState();
+
     try {
       // First claim the token if not already claimed
       if (!claimedTokens.has(proposalId as number)) {
         const claimResult = await proposalsApi.claimVoteToken(proposalId as number);
         if (claimResult.error) {
+          if (currentTier !== 'premium') restoreBallot();
           Alert.alert('Error', claimResult.error);
           setVotingProposalId(null);
           return;
@@ -1115,6 +1118,7 @@ export default function ProposalsScreen() {
       // Then submit the vote
       const result = await proposalsApi.submitVote(proposalId, vote);
       if (result.error) {
+        if (currentTier !== 'premium') restoreBallot();
         Alert.alert('Error', result.error);
         return;
       }
@@ -1164,6 +1168,7 @@ export default function ProposalsScreen() {
         syncFromChain(user.walletAddress);
       }
     } catch {
+      if (currentTier !== 'premium') restoreBallot();
       Alert.alert('Error', 'Failed to submit vote. Please try again.');
     } finally {
       setVotingProposalId(null);
