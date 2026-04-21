@@ -8,11 +8,10 @@ import Animated, {
   withDelay,
   withSequence,
   runOnJS,
+  Easing,
 } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
-import { useTheme, SPACING, TYPOGRAPHY, ANIMATION } from '../../lib/theme';
-import { ConfettiParticles } from './ConfettiParticles';
-import { soundEffects } from '../../lib/sounds';
+import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, ANIMATION } from '../../lib/theme';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -36,72 +35,31 @@ export function VoteConfirmationOverlay({
   const textTranslateY = useSharedValue(20);
   const ringScale = useSharedValue(0.8);
   const ringOpacity = useSharedValue(0);
-  const pulseScale = useSharedValue(1);
-  const glowOpacity = useSharedValue(0);
 
   const isSupport = voteType === 'support';
   const iconColor = isSupport ? colors.success : colors.error;
   const iconName = isSupport ? 'checkmark-circle' : 'close-circle';
   const voteText = isSupport ? 'Vote Supported' : 'Vote Opposed';
-  const subtitleText = isSupport
-    ? 'Your voice has been recorded'
-    : 'Your opposition has been noted';
-
-  // Confetti colors based on vote type
-  const confettiColors = isSupport
-    ? ['#D4AF37', '#FFD700', '#2BB673', '#4ADE80', '#60A5FA']
-    : ['#D4AF37', '#FFD700', '#DC2626', '#EF4444', '#FB923C'];
 
   useEffect(() => {
     if (visible) {
-      // Play sound effect
-      if (isSupport) {
-        soundEffects.voteSuccess();
-      } else {
-        soundEffects.voteOppose();
-      }
-
       // Animate in
       overlayOpacity.value = withTiming(1, { duration: 200 });
 
-      // Glow pulse animation
-      glowOpacity.value = withDelay(
-        50,
-        withSequence(
-          withTiming(0.6, { duration: 200 }),
-          withTiming(0.3, { duration: 300 })
-        )
-      );
-
       // Ring pulse animation
-      ringOpacity.value = withDelay(100, withTiming(0.4, { duration: 200 }));
-      ringScale.value = withDelay(
-        100,
-        withSequence(
-          withSpring(1.3, ANIMATION.spring.bouncy),
-          withTiming(1.6, { duration: 500 })
-        )
-      );
-      ringOpacity.value = withDelay(
-        100,
-        withSequence(
-          withTiming(0.4, { duration: 200 }),
-          withDelay(300, withTiming(0, { duration: 400 }))
-        )
-      );
+      ringOpacity.value = withDelay(100, withTiming(0.3, { duration: 200 }));
+      ringScale.value = withDelay(100, withSequence(
+        withSpring(1.2, ANIMATION.spring.bouncy),
+        withTiming(1.5, { duration: 400 }),
+      ));
+      ringOpacity.value = withDelay(100, withSequence(
+        withTiming(0.3, { duration: 200 }),
+        withDelay(200, withTiming(0, { duration: 300 })),
+      ));
 
-      // Icon animation - scale up with rotation and pulse
+      // Icon animation - scale up with rotation
       iconScale.value = withDelay(150, withSpring(1, ANIMATION.spring.bouncy));
       iconRotation.value = withDelay(150, withSpring(0, ANIMATION.spring.bouncy));
-
-      // Pulse effect on icon
-      pulseScale.value = withDelay(
-        400,
-        withSequence(
-          withSpring(1.1, { damping: 8, stiffness: 400 }),
-          withSpring(1, { damping: 10, stiffness: 200 })
-        )
-      );
 
       // Text fade in
       textOpacity.value = withDelay(350, withTiming(1, { duration: 250 }));
@@ -112,14 +70,10 @@ export function VoteConfirmationOverlay({
         // Animate out
         textOpacity.value = withTiming(0, { duration: 150 });
         iconScale.value = withTiming(0.8, { duration: 150 });
-        glowOpacity.value = withTiming(0, { duration: 150 });
-        overlayOpacity.value = withDelay(
-          100,
-          withTiming(0, { duration: 200 }, () => {
-            runOnJS(onDismiss)();
-          })
-        );
-      }, 1800);
+        overlayOpacity.value = withDelay(100, withTiming(0, { duration: 200 }, () => {
+          runOnJS(onDismiss)();
+        }));
+      }, 1500);
 
       return () => clearTimeout(timeout);
     } else {
@@ -131,10 +85,8 @@ export function VoteConfirmationOverlay({
       textTranslateY.value = 20;
       ringScale.value = 0.8;
       ringOpacity.value = 0;
-      pulseScale.value = 1;
-      glowOpacity.value = 0;
     }
-  }, [visible, isSupport]);
+  }, [visible]);
 
   const overlayStyle = useAnimatedStyle(() => ({
     opacity: overlayOpacity.value,
@@ -143,7 +95,7 @@ export function VoteConfirmationOverlay({
 
   const iconContainerStyle = useAnimatedStyle(() => ({
     transform: [
-      { scale: iconScale.value * pulseScale.value },
+      { scale: iconScale.value },
       { rotate: `${iconRotation.value}deg` },
     ],
   }));
@@ -158,71 +110,46 @@ export function VoteConfirmationOverlay({
     transform: [{ translateY: textTranslateY.value }],
   }));
 
-  const glowStyle = useAnimatedStyle(() => ({
-    opacity: glowOpacity.value,
-    transform: [{ scale: 1.5 }],
-  }));
-
   if (!visible && overlayOpacity.value === 0) {
     return null;
   }
 
   return (
     <Animated.View style={[styles.overlay, overlayStyle]}>
-      {/* Confetti for support votes */}
-      <ConfettiParticles
-        visible={visible}
-        colors={confettiColors}
-        particleCount={isSupport ? 60 : 30}
-        duration={2000}
-      />
-
       <View style={styles.content}>
-        {/* Animated outer ring */}
-        <Animated.View
-          style={[styles.ring, { borderColor: iconColor }, ringStyle]}
-        />
-
-        {/* Second ring for depth */}
+        {/* Animated ring */}
         <Animated.View
           style={[
             styles.ring,
-            styles.ringInner,
             { borderColor: iconColor },
             ringStyle,
           ]}
         />
 
-        {/* Icon container with enhanced glow */}
+        {/* Icon container with glow */}
         <Animated.View style={[styles.iconContainer, iconContainerStyle]}>
-          {/* Outer glow */}
-          <Animated.View
-            style={[
-              styles.iconGlowOuter,
-              { backgroundColor: iconColor },
-              glowStyle,
-            ]}
-          />
-
-          {/* Inner glow */}
           <View
             style={[
               styles.iconGlow,
               { backgroundColor: iconColor, shadowColor: iconColor },
             ]}
           />
-
-          {/* Icon circle */}
           <View style={[styles.iconCircle, { backgroundColor: iconColor }]}>
-            <Ionicons name={iconName} size={64} color="#fff" />
+            <Ionicons
+              name={iconName}
+              size={64}
+              color="#fff"
+            />
           </View>
         </Animated.View>
 
         {/* Text */}
         <Animated.View style={[styles.textContainer, textStyle]}>
-          <Text style={[styles.title, { color: colors.text }]}>{voteText}</Text>
+          <Text style={[styles.title, { color: colors.text }]}>
+            {voteText}
+          </Text>
           <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-            {subtitleText}
+            Your voice has been recorded
           </Text>
         </Animated.View>
       </View>
@@ -233,7 +160,7 @@ export function VoteConfirmationOverlay({
 const styles = StyleSheet.create({
   overlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.9)',
+    backgroundColor: 'rgba(0, 0, 0, 0.85)',
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 9999,
@@ -244,38 +171,25 @@ const styles = StyleSheet.create({
   },
   ring: {
     position: 'absolute',
-    width: 160,
-    height: 160,
-    borderRadius: 80,
-    borderWidth: 3,
-  },
-  ringInner: {
     width: 140,
     height: 140,
     borderRadius: 70,
-    borderWidth: 2,
-    opacity: 0.5,
+    borderWidth: 3,
   },
   iconContainer: {
     alignItems: 'center',
     justifyContent: 'center',
   },
-  iconGlowOuter: {
-    position: 'absolute',
-    width: 140,
-    height: 140,
-    borderRadius: 70,
-  },
   iconGlow: {
     position: 'absolute',
-    width: 110,
-    height: 110,
-    borderRadius: 55,
-    opacity: 0.4,
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    opacity: 0.3,
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.6,
-    shadowRadius: 40,
-    elevation: 25,
+    shadowOpacity: 0.5,
+    shadowRadius: 30,
+    elevation: 20,
   },
   iconCircle: {
     width: 100,
