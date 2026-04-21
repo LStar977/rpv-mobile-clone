@@ -21,6 +21,7 @@ import Animated, {
   FadeInUp,
   useAnimatedStyle,
   useSharedValue,
+  withDelay,
   withRepeat,
   withSequence,
   withTiming,
@@ -337,6 +338,24 @@ function CivicBadge({
   );
 }
 
+// Count-up number used in stat rows
+function CountUpNumber({ value, delay = 0, style }: { value: number; delay?: number; style?: any }) {
+  const [display, setDisplay] = useState(0);
+  const animated = useSharedValue(0);
+
+  useEffect(() => {
+    animated.value = withDelay(delay, withTiming(value, { duration: 1000, easing: Easing.out(Easing.cubic) }));
+    const id = setInterval(() => {
+      const current = Math.round(animated.value);
+      setDisplay(current);
+      if (current >= value) clearInterval(id);
+    }, 16);
+    return () => clearInterval(id);
+  }, [value, delay]);
+
+  return <Text style={style}>{display}</Text>;
+}
+
 // Quick Stats Component
 function QuickStats({
   votesCount,
@@ -352,17 +371,17 @@ function QuickStats({
   return (
     <View style={[styles.quickStats, { backgroundColor: colors.surface, borderColor: colors.border }]}>
       <View style={styles.statItem}>
-        <Text style={[styles.statValue, { color: colors.text }]}>{votesCount}</Text>
+        <CountUpNumber value={votesCount} delay={100} style={[styles.statValue, { color: colors.text }]} />
         <Text style={[styles.statLabel, { color: colors.textTertiary }]}>Votes</Text>
       </View>
       <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
       <View style={styles.statItem}>
-        <Text style={[styles.statValue, { color: colors.text }]}>{proposalsCount}</Text>
+        <CountUpNumber value={proposalsCount} delay={250} style={[styles.statValue, { color: colors.text }]} />
         <Text style={[styles.statLabel, { color: colors.textTertiary }]}>Proposals</Text>
       </View>
       <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
       <View style={styles.statItem}>
-        <Text style={[styles.statValue, { color: colors.text }]}>{streakDays}</Text>
+        <CountUpNumber value={streakDays} delay={400} style={[styles.statValue, { color: colors.text }]} />
         <Text style={[styles.statLabel, { color: colors.textTertiary }]}>Day Streak</Text>
       </View>
     </View>

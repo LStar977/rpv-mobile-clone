@@ -237,8 +237,7 @@ function PremiumHeader({
 function FeaturedProposalHero({
   title,
   institution,
-  daysLeft,
-  hoursLeft,
+  deadline,
   participants,
   totalPending,
   onVotePress,
@@ -246,8 +245,7 @@ function FeaturedProposalHero({
 }: {
   title: string;
   institution: string;
-  daysLeft: number;
-  hoursLeft: number;
+  deadline: number; // epoch ms
   participants: number;
   totalPending: number;
   onVotePress: () => void;
@@ -256,6 +254,38 @@ function FeaturedProposalHero({
   const participationPercent = Math.min((participants / 20000) * 100, 100);
   const progressWidth = useSharedValue(0);
 
+  // Live countdown — recompute every 30s
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 30000);
+    return () => clearInterval(id);
+  }, []);
+
+  const remainingMs = Math.max(deadline - now, 0);
+  const days = Math.floor(remainingMs / 86400000);
+  const hours = Math.floor((remainingMs % 86400000) / 3600000);
+  const minutes = Math.floor((remainingMs % 3600000) / 60000);
+  const isUrgent = remainingMs > 0 && remainingMs < 3600000; // <1h
+  const isEnded = remainingMs === 0;
+
+  // Urgency pulse
+  const pulse = useSharedValue(1);
+  useEffect(() => {
+    if (isUrgent) {
+      pulse.value = withRepeat(
+        withSequence(
+          withTiming(1.04, { duration: 700, easing: Easing.out(Easing.quad) }),
+          withTiming(1, { duration: 700, easing: Easing.in(Easing.quad) })
+        ),
+        -1,
+        true
+      );
+    } else {
+      pulse.value = withTiming(1, { duration: 200 });
+    }
+  }, [isUrgent]);
+  const pulseStyle = useAnimatedStyle(() => ({ transform: [{ scale: pulse.value }] }));
+
   useEffect(() => {
     progressWidth.value = withDelay(600, withTiming(participationPercent, { duration: 1200 }));
   }, [participationPercent]);
@@ -263,6 +293,8 @@ function FeaturedProposalHero({
   const progressStyle = useAnimatedStyle(() => ({
     width: `${progressWidth.value}%`,
   }));
+
+  const urgencyColor = isUrgent ? '#FF4D4F' : BRAND.gold;
 
   return (
     <Animated.View entering={FadeInUp.duration(500).delay(100)}>
@@ -278,13 +310,32 @@ function FeaturedProposalHero({
           <Text style={styles.heroTitle}>{title}</Text>
 
           {/* Countdown */}
-          <View style={styles.countdownRow}>
-            <Ionicons name="time-outline" size={16} color={BRAND.gold} />
-            <Text style={styles.countdownText}>
-              <Text style={styles.countdownNumber}>{daysLeft}</Text>d{' '}
-              <Text style={styles.countdownNumber}>{hoursLeft}</Text>h remaining
+          <Animated.View style={[styles.countdownRow, pulseStyle]}>
+            <Ionicons
+              name={isEnded ? 'lock-closed-outline' : 'time-outline'}
+              size={16}
+              color={urgencyColor}
+            />
+            <Text style={[styles.countdownText, isUrgent && { color: urgencyColor }]}>
+              {isEnded ? (
+                'Voting closed'
+              ) : days >= 1 ? (
+                <>
+                  <Text style={[styles.countdownNumber, isUrgent && { color: urgencyColor }]}>{days}</Text>d{' '}
+                  <Text style={[styles.countdownNumber, isUrgent && { color: urgencyColor }]}>{hours}</Text>h remaining
+                </>
+              ) : hours >= 1 ? (
+                <>
+                  <Text style={[styles.countdownNumber, isUrgent && { color: urgencyColor }]}>{hours}</Text>h{' '}
+                  <Text style={[styles.countdownNumber, isUrgent && { color: urgencyColor }]}>{minutes}</Text>m remaining
+                </>
+              ) : (
+                <>
+                  <Text style={[styles.countdownNumber, { color: urgencyColor }]}>{minutes}</Text>m remaining
+                </>
+              )}
             </Text>
-          </View>
+          </Animated.View>
 
           {/* Participation bar */}
           <View style={styles.participationSection}>
@@ -475,12 +526,12 @@ export default function DashboardScreen() {
   const displayName = user?.name?.split(' ')[0] || 'Lance';
 
   // Mock data as specified
+  const featuredDeadline = useRef(Date.now() + 3 * 86400000 + 14 * 3600000).current;
   const mockData = {
     featured: {
       title: 'Downtown Arena District Plan',
       institution: 'City of Calgary',
-      daysLeft: 3,
-      hoursLeft: 14,
+      deadline: featuredDeadline,
       participants: 12847,
     },
     stats: {
@@ -494,10 +545,10 @@ export default function DashboardScreen() {
       { icon: 'checkmark-circle', text: 'Your vote on School Board Budget was recorded', time: '1d ago' },
     ],
     communities: [
-      { name: 'Canada', icon: '🇨🇦', proposalCount: 29, activeCount: 7, isPrimary: true },
-      { name: 'Alberta', icon: '🏔️', proposalCount: 12, activeCount: 4 },
-      { name: 'Calgary', icon: '🌆', proposalCount: 8, activeCount: 3 },
-      { name: 'Ward 7', icon: '📍', proposalCount: 2, activeCount: 1 },
+      { name: 'Canada', icon: '🇨🇦', proposalCount: 29, activeCount: 7, isPrimary: true, scope: 'country' as const },
+      { name: 'Alberta', icon: '🏔️', proposalCount: 12, activeCount: 4, scope: 'state' as const },
+      { name: 'Calgary', icon: '🌆', proposalCount: 8, activeCount: 3, scope: 'city' as const },
+      { name: 'Ward 7', icon: '📍', proposalCount: 2, activeCount: 1, scope: 'ward' as const },
     ],
   };
 
@@ -536,8 +587,7 @@ export default function DashboardScreen() {
         <FeaturedProposalHero
           title={mockData.featured.title}
           institution={mockData.featured.institution}
-          daysLeft={mockData.featured.daysLeft}
-          hoursLeft={mockData.featured.hoursLeft}
+          deadline={mockData.featured.deadline}
           participants={mockData.featured.participants}
           totalPending={mockData.stats.awaiting - 1}
           onVotePress={navigateToProposals}
@@ -593,7 +643,20 @@ export default function DashboardScreen() {
                 isPrimary={community.isPrimary}
                 gradientColors={community.isPrimary ? [BRAND.gold, BRAND.goldDark] : undefined}
                 index={idx}
-                onPress={navigateToProposals}
+                onPress={() => {
+                  if (community.isPrimary) {
+                    navigateToProposals();
+                  } else {
+                    router.push({
+                      pathname: '/modals/community-proposals',
+                      params: {
+                        scope: community.scope,
+                        scopeName: community.name,
+                        icon: community.icon,
+                      },
+                    });
+                  }
+                }}
               />
             ))}
           </ScrollView>

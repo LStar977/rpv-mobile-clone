@@ -1,4 +1,5 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Platform, RefreshControl } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useState, useEffect, useCallback } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
@@ -128,6 +129,7 @@ export default function ProfileScreen() {
   const { user, logout, token } = useAuthStore();
   const insets = useSafeAreaInsets();
   const [userTier, setUserTier] = useState<UserTier>('free');
+  const [refreshing, setRefreshing] = useState(false);
 
   // Fetch user's subscription tier
   const fetchTier = useCallback(async () => {
@@ -172,6 +174,13 @@ export default function ProfileScreen() {
     }, [fetchTier])
   );
 
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    await fetchTier();
+    setRefreshing(false);
+  }, [fetchTier]);
+
   const handleLogout = () => {
     Alert.alert('Log Out', 'Are you sure you want to log out?', [
       { text: 'Cancel', style: 'cancel' },
@@ -207,20 +216,51 @@ export default function ProfileScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <ScrollView contentContainerStyle={[styles.content, { paddingTop: insets.top + 36 }]} showsVerticalScrollIndicator={false}>
-        {/* Profile Header */}
+      <ScrollView
+        contentContainerStyle={[styles.content, { paddingTop: insets.top + 36 }]}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.gold} />
+        }
+      >
+        {/* Profile Header — tier-reactive gradient */}
         <Animated.View
           entering={FadeInDown.duration(500)}
-          style={[styles.profileCard, { backgroundColor: colors.surface, borderColor: colors.gold }]}
+          style={[
+            styles.profileCard,
+            {
+              backgroundColor: colors.surface,
+              borderColor:
+                userTier === 'premium'
+                  ? colors.gold
+                  : userTier === 'verified'
+                  ? `${colors.gold}80`
+                  : colors.border,
+            },
+          ]}
         >
           <LinearGradient
-            colors={[`${colors.gold}10`, 'transparent']}
+            colors={
+              userTier === 'premium'
+                ? [`${colors.gold}33`, `${colors.gold}10`, 'transparent']
+                : userTier === 'verified'
+                ? [`${colors.gold}1A`, 'transparent']
+                : ['rgba(148,163,184,0.10)', 'transparent']
+            }
             style={StyleSheet.absoluteFill}
             start={{ x: 0.5, y: 0 }}
             end={{ x: 0.5, y: 1 }}
           />
 
-          <View style={[styles.avatar, { backgroundColor: colors.gold, ...SHADOWS.glow }]}>
+          <View
+            style={[
+              styles.avatar,
+              {
+                backgroundColor: colors.gold,
+                ...(userTier === 'premium' ? SHADOWS.glow : SHADOWS.md),
+              },
+            ]}
+          >
             <Text style={[styles.avatarText, { color: colors.background }]}>{getInitial()}</Text>
           </View>
 
