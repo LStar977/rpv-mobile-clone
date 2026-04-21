@@ -548,7 +548,6 @@ export default function DashboardScreen() {
       { name: 'Canada', icon: '🇨🇦', proposalCount: 29, activeCount: 7, isPrimary: true, scope: 'country' as const },
       { name: 'Alberta', icon: '🏔️', proposalCount: 12, activeCount: 4, scope: 'state' as const },
       { name: 'Calgary', icon: '🌆', proposalCount: 8, activeCount: 3, scope: 'city' as const },
-      { name: 'Ward 7', icon: '📍', proposalCount: 2, activeCount: 1, scope: 'ward' as const },
     ],
   };
 
