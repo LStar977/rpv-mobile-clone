@@ -5,6 +5,7 @@ import { View } from 'react-native';
 import { ThemeProvider, useTheme } from '../lib/theme';
 import { STRIPE_PUBLISHABLE_KEY, MERCHANT_IDENTIFIER } from '../lib/stripe';
 import { initIAP, endIAP } from '../lib/iap';
+import { soundEffects } from '../lib/sounds';
 import { TutorialOverlay } from '../components/tutorial';
 
 // Conditionally import StripeProvider to handle missing native module
@@ -20,7 +21,11 @@ function ThemedStack() {
 
   useEffect(() => {
     initIAP();
-    return () => endIAP();
+    soundEffects.init();
+    return () => {
+      endIAP();
+      soundEffects.unload();
+    };
   }, []);
 
   return (
