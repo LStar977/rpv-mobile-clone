@@ -1403,10 +1403,6 @@ export default function ProposalsScreen() {
 
           <View style={styles.headerActions}>
             <BallotDisplay size="sm" />
-            <ViewModeToggle
-              mode={viewMode}
-              onToggle={() => setViewMode((m) => (m === 'swipe' ? 'list' : 'swipe'))}
-            />
 
             <TouchableOpacity
               style={[

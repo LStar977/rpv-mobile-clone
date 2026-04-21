@@ -1,6 +1,7 @@
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -129,42 +130,47 @@ export default function ProfileScreen() {
   const [userTier, setUserTier] = useState<UserTier>('free');
 
   // Fetch user's subscription tier
-  useEffect(() => {
-    const fetchTier = async () => {
-      // Demo account should appear as premium (for App Store review)
-      const isDemoAccount = user?.email === 'demo@represent.app';
-      if (isDemoAccount) {
-        setUserTier('premium');
-        return;
-      }
+  const fetchTier = useCallback(async () => {
+    const isDemoAccount = user?.email === 'demo@represent.app';
+    if (isDemoAccount) {
+      setUserTier('premium');
+      return;
+    }
 
-      if (!token) return;
+    if (!token) return;
 
-      try {
-        const response = await fetch(`${API_URL}/api/stripe/subscription`, {
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-        });
+    try {
+      const response = await fetch(`${API_URL}/api/stripe/subscription`, {
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+      });
 
-        if (response.ok) {
-          const data = await response.json();
-          if (data.tier === 'premium' && data.status === 'active') {
-            setUserTier('premium');
-          } else if (data.verificationPaid || data.tier === 'verified') {
-            setUserTier('verified');
-          } else {
-            setUserTier('free');
-          }
+      if (response.ok) {
+        const data = await response.json();
+        if (data.tier === 'premium' && data.status === 'active') {
+          setUserTier('premium');
+        } else if (data.verificationPaid || data.tier === 'verified') {
+          setUserTier('verified');
+        } else {
+          setUserTier('free');
         }
-      } catch (error) {
-        console.error('Failed to fetch subscription:', error);
       }
-    };
-
-    fetchTier();
+    } catch (error) {
+      console.error('Failed to fetch subscription:', error);
+    }
   }, [token, user?.email]);
+
+  useEffect(() => {
+    fetchTier();
+  }, [fetchTier]);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchTier();
+    }, [fetchTier])
+  );
 
   const handleLogout = () => {
     Alert.alert('Log Out', 'Are you sure you want to log out?', [

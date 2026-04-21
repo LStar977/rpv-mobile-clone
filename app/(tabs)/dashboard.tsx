@@ -591,7 +591,7 @@ export default function DashboardScreen() {
                 proposalCount={community.proposalCount}
                 activeCount={community.activeCount}
                 isPrimary={community.isPrimary}
-                gradientColors={community.isPrimary ? ['#8B0000', '#1a0505'] : undefined}
+                gradientColors={community.isPrimary ? [BRAND.gold, BRAND.goldDark] : undefined}
                 index={idx}
                 onPress={navigateToProposals}
               />
