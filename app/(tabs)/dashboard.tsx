@@ -1,9 +1,10 @@
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Dimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
+import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 import Animated, {
   FadeIn,
@@ -18,264 +19,442 @@ import Animated, {
   withRepeat,
   withSequence,
   interpolate,
+  Easing,
+  runOnJS,
 } from 'react-native-reanimated';
-import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS, ANIMATION, responsive } from '../../lib/theme';
+import { useTheme, SPACING, BORDER_RADIUS } from '../../lib/theme';
 import { useAuthStore } from '../../lib/auth';
 import { useBallotStore } from '../../lib/ballots';
-import { proposalsApi, userApi } from '../../lib/api';
+import { proposalsApi } from '../../lib/api';
 import { BallotDisplay } from '../../components/ui';
-import { SkeletonStats, SkeletonListItem, SkeletonWelcome } from '../../components/ui/Skeleton';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
-type UrgentProposal = {
-  id: number;
-  title: string;
-  hoursLeft: number;
-  category: string;
-};
-
-type Community = {
-  id: string;
-  name: string;
-  type: 'country' | 'state' | 'city' | 'organization';
-  proposalCount: number;
-  unvotedCount: number;
+// ═══════════════════════════════════════════════════════════════════════════
+// BRAND COLORS
+// ═══════════════════════════════════════════════════════════════════════════
+const BRAND = {
+  black: '#040707',
+  gold: '#EABA58',
+  goldDark: '#C9A043',
+  white: '#F4F5F6',
+  steel: '#007BFF',
+  glass: 'rgba(255,255,255,0.04)',
+  glassBorder: 'rgba(255,255,255,0.08)',
+  glassLight: 'rgba(255,255,255,0.06)',
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
-// IMPACT HERO - The bold statement piece
+// ANIMATED NUMBER COUNTER
 // ═══════════════════════════════════════════════════════════════════════════
-function ImpactHero({
-  totalVotes,
-  proposalsPassed,
-  streak,
-  ranking,
-  percentile,
-  location,
-}: {
-  totalVotes: number;
-  proposalsPassed: number;
-  streak: number;
-  ranking?: number;
-  percentile?: number;
-  location?: string;
-}) {
-  const { colors } = useTheme();
-
-  const counterValue = useSharedValue(0);
+function AnimatedNumber({ value, delay = 0 }: { value: number; delay?: number }) {
+  const [displayValue, setDisplayValue] = useState(0);
+  const animatedValue = useSharedValue(0);
 
   useEffect(() => {
-    counterValue.value = withDelay(300, withTiming(totalVotes, { duration: 1200 }));
-  }, [totalVotes]);
+    animatedValue.value = withDelay(
+      delay,
+      withTiming(value, { duration: 1200, easing: Easing.out(Easing.cubic) })
+    );
+
+    const interval = setInterval(() => {
+      const current = Math.round(animatedValue.value);
+      setDisplayValue(current);
+      if (current >= value) clearInterval(interval);
+    }, 16);
+
+    return () => clearInterval(interval);
+  }, [value, delay]);
 
   return (
-    <Animated.View
-      entering={FadeInDown.duration(600).springify()}
-      style={[styles.impactHero, { backgroundColor: colors.surface, borderColor: colors.border }]}
-    >
-      <LinearGradient
-        colors={[`${colors.gold}08`, 'transparent']}
-        style={StyleSheet.absoluteFill}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-      />
+    <Text style={styles.statNumber}>{displayValue}</Text>
+  );
+}
 
-      {/* Streak Badge */}
-      {streak > 0 && (
-        <View style={[styles.streakBadge, { backgroundColor: `${colors.warning}15` }]}>
-          <Text style={styles.streakEmoji}>🔥</Text>
-          <Text style={[styles.streakText, { color: colors.warning }]}>{streak} day streak</Text>
+// ═══════════════════════════════════════════════════════════════════════════
+// PROGRESS RING
+// ═══════════════════════════════════════════════════════════════════════════
+function ProgressRing({ progress, size = 52, strokeWidth = 2.5 }: { progress: number; size?: number; strokeWidth?: number }) {
+  const animatedProgress = useSharedValue(0);
+  const radius = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+
+  useEffect(() => {
+    animatedProgress.value = withDelay(400, withTiming(progress, { duration: 1000 }));
+  }, [progress]);
+
+  const animatedStyle = useAnimatedStyle(() => {
+    const strokeDashoffset = circumference * (1 - animatedProgress.value);
+    return {
+      strokeDashoffset,
+    };
+  });
+
+  return (
+    <View style={{ width: size, height: size, position: 'absolute' }}>
+      <Animated.View style={[StyleSheet.absoluteFill, { transform: [{ rotate: '-90deg' }] }]}>
+        <View style={StyleSheet.absoluteFill}>
+          {/* Background ring */}
+          <View
+            style={{
+              width: size,
+              height: size,
+              borderRadius: size / 2,
+              borderWidth: strokeWidth,
+              borderColor: 'rgba(234,186,88,0.15)',
+            }}
+          />
         </View>
-      )}
+        {/* Progress ring - simplified without SVG */}
+        <Animated.View
+          style={[
+            {
+              position: 'absolute',
+              width: size,
+              height: size,
+              borderRadius: size / 2,
+              borderWidth: strokeWidth,
+              borderColor: BRAND.gold,
+              borderRightColor: 'transparent',
+              borderBottomColor: 'transparent',
+              transform: [{ rotate: `${progress * 360}deg` }],
+            },
+          ]}
+        />
+      </Animated.View>
+    </View>
+  );
+}
 
-      {/* Main Impact Number */}
-      <View style={styles.impactMain}>
-        <Text style={[styles.impactNumber, { color: colors.text }]}>{totalVotes}</Text>
-        <Text style={[styles.impactLabel, { color: colors.textSecondary }]}>votes cast</Text>
+// ═══════════════════════════════════════════════════════════════════════════
+// SHIMMER BORDER EFFECT
+// ═══════════════════════════════════════════════════════════════════════════
+function ShimmerBorder({ children }: { children: React.ReactNode }) {
+  const shimmerPosition = useSharedValue(0);
+
+  useEffect(() => {
+    shimmerPosition.value = withRepeat(
+      withTiming(1, { duration: 3000, easing: Easing.linear }),
+      -1,
+      false
+    );
+  }, []);
+
+  const shimmerStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: interpolate(shimmerPosition.value, [0, 1], [-SCREEN_WIDTH, SCREEN_WIDTH]) }],
+  }));
+
+  return (
+    <View style={styles.shimmerContainer}>
+      {/* Base border */}
+      <View style={styles.shimmerBorderBase} />
+      {/* Shimmer overlay */}
+      <View style={styles.shimmerOverflow}>
+        <Animated.View style={[styles.shimmerBar, shimmerStyle]}>
+          <LinearGradient
+            colors={['transparent', `${BRAND.gold}40`, BRAND.gold, `${BRAND.gold}40`, 'transparent']}
+            start={{ x: 0, y: 0.5 }}
+            end={{ x: 1, y: 0.5 }}
+            style={StyleSheet.absoluteFill}
+          />
+        </Animated.View>
+      </View>
+      {/* Content */}
+      <View style={styles.shimmerContent}>{children}</View>
+    </View>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PREMIUM HEADER
+// ═══════════════════════════════════════════════════════════════════════════
+function PremiumHeader({
+  name,
+  isVerified,
+  onAvatarPress,
+  onNotificationPress,
+}: {
+  name: string;
+  isVerified: boolean;
+  onAvatarPress: () => void;
+  onNotificationPress?: () => void;
+}) {
+  const letter = name.charAt(0).toUpperCase();
+
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good morning';
+    if (hour < 17) return 'Good afternoon';
+    return 'Good evening';
+  };
+
+  return (
+    <Animated.View entering={FadeInDown.duration(500).delay(0)} style={styles.header}>
+      <View style={styles.headerLeft}>
+        <Text style={styles.greeting}>{getGreeting()}</Text>
+        <View style={styles.brandRow}>
+          <Text style={styles.brandName}>Represent</Text>
+          <View style={styles.goldUnderline} />
+        </View>
       </View>
 
-      {/* Secondary Stats Row */}
-      <View style={styles.impactStats}>
-        <View style={styles.impactStat}>
-          <Text style={[styles.impactStatValue, { color: colors.success }]}>{proposalsPassed}</Text>
-          <Text style={[styles.impactStatLabel, { color: colors.textTertiary }]}>proposals passed</Text>
-        </View>
-        <View style={[styles.impactDivider, { backgroundColor: colors.border }]} />
-        <View style={styles.impactStat}>
-          {percentile ? (
-            <>
-              <Text style={[styles.impactStatValue, { color: colors.gold }]}>Top {percentile}%</Text>
-              <Text style={[styles.impactStatLabel, { color: colors.textTertiary }]}>in {location || 'your area'}</Text>
-            </>
-          ) : (
-            <>
-              <Text style={[styles.impactStatValue, { color: colors.gold }]}>#{ranking || '—'}</Text>
-              <Text style={[styles.impactStatLabel, { color: colors.textTertiary }]}>local rank</Text>
-            </>
+      <View style={styles.headerRight}>
+        <BallotDisplay size="sm" />
+
+        {onNotificationPress && (
+          <TouchableOpacity onPress={onNotificationPress} style={styles.notificationBtn} activeOpacity={0.7}>
+            <Ionicons name="notifications-outline" size={22} color={BRAND.white} />
+            <View style={styles.notificationDot} />
+          </TouchableOpacity>
+        )}
+
+        <TouchableOpacity onPress={onAvatarPress} activeOpacity={0.8}>
+          <LinearGradient
+            colors={[BRAND.gold, BRAND.goldDark]}
+            style={styles.avatarRing}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+          >
+            <View style={styles.avatarInner}>
+              <Text style={styles.avatarLetter}>{letter}</Text>
+            </View>
+          </LinearGradient>
+          {isVerified && (
+            <View style={styles.verifiedBadge}>
+              <Ionicons name="checkmark" size={10} color="#fff" />
+            </View>
           )}
-        </View>
+        </TouchableOpacity>
       </View>
     </Animated.View>
   );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// ACTION CARD - Clear call to action
+// FEATURED PROPOSAL HERO
 // ═══════════════════════════════════════════════════════════════════════════
-function ActionCard({
-  type,
-  count,
-  onPress,
-}: {
-  type: 'verify' | 'urgent' | 'pending';
-  count?: number;
-  onPress: () => void;
-}) {
-  const { colors } = useTheme();
-
-  const configs = {
-    verify: {
-      icon: 'shield-checkmark',
-      title: 'Verify Your Identity',
-      subtitle: 'Unlock voting in your community',
-      gradient: [colors.gold, '#A68523'] as const,
-      urgent: true,
-    },
-    urgent: {
-      icon: 'flame',
-      title: `${count} Closing Soon`,
-      subtitle: 'These proposals need your vote',
-      gradient: ['#EF4444', '#DC2626'] as const,
-      urgent: true,
-    },
-    pending: {
-      icon: 'document-text',
-      title: `${count} Proposals Waiting`,
-      subtitle: 'Your voice matters',
-      gradient: [colors.gold, '#A68523'] as const,
-      urgent: false,
-    },
-  };
-
-  const config = configs[type];
-
-  return (
-    <AnimatedTouchable
-      entering={FadeInUp.delay(200).duration(500).springify()}
-      style={[styles.actionCard, { borderColor: `${config.gradient[0]}30` }]}
-      onPress={() => {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-        onPress();
-      }}
-      activeOpacity={0.9}
-    >
-      <LinearGradient
-        colors={config.gradient}
-        style={styles.actionGradient}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-      >
-        <View style={styles.actionContent}>
-          <View style={styles.actionIcon}>
-            <Ionicons name={config.icon as any} size={28} color="#fff" />
-          </View>
-          <View style={styles.actionText}>
-            <Text style={styles.actionTitle}>{config.title}</Text>
-            <Text style={styles.actionSubtitle}>{config.subtitle}</Text>
-          </View>
-          <View style={styles.actionArrow}>
-            <Ionicons name="arrow-forward" size={20} color="#fff" />
-          </View>
-        </View>
-      </LinearGradient>
-    </AnimatedTouchable>
-  );
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
-// PROPOSAL ROW - Clean, minimal proposal item
-// ═══════════════════════════════════════════════════════════════════════════
-function ProposalRow({
+function FeaturedProposalHero({
   title,
-  category,
+  institution,
+  daysLeft,
   hoursLeft,
-  index,
-  onPress,
+  participants,
+  totalPending,
+  onVotePress,
+  onSeeMorePress,
 }: {
   title: string;
-  category: string;
+  institution: string;
+  daysLeft: number;
   hoursLeft: number;
-  index: number;
-  onPress: () => void;
+  participants: number;
+  totalPending: number;
+  onVotePress: () => void;
+  onSeeMorePress: () => void;
 }) {
-  const { colors } = useTheme();
+  const participationPercent = Math.min((participants / 20000) * 100, 100);
+  const progressWidth = useSharedValue(0);
 
-  const isUrgent = hoursLeft <= 24;
-  const timeColor = hoursLeft <= 6 ? colors.error : hoursLeft <= 24 ? colors.warning : colors.textTertiary;
-  const timeText = hoursLeft <= 24 ? `${hoursLeft}h left` : `${Math.ceil(hoursLeft / 24)}d left`;
+  useEffect(() => {
+    progressWidth.value = withDelay(600, withTiming(participationPercent, { duration: 1200 }));
+  }, [participationPercent]);
+
+  const progressStyle = useAnimatedStyle(() => ({
+    width: `${progressWidth.value}%`,
+  }));
 
   return (
-    <AnimatedTouchable
-      entering={FadeInRight.delay(index * 60).duration(400)}
-      style={[styles.proposalRow, { backgroundColor: colors.surface, borderColor: colors.border }]}
-      onPress={() => {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        onPress();
-      }}
-      activeOpacity={0.8}
-    >
-      {isUrgent && <View style={[styles.proposalUrgentBar, { backgroundColor: timeColor }]} />}
-      <View style={styles.proposalContent}>
-        <Text style={[styles.proposalTitle, { color: colors.text }]} numberOfLines={2}>
-          {title}
-        </Text>
-        <View style={styles.proposalMeta}>
-          <Text style={[styles.proposalCategory, { color: colors.textTertiary }]}>{category}</Text>
-          <View style={[styles.proposalTime, { backgroundColor: `${timeColor}15` }]}>
-            <Ionicons name="time-outline" size={12} color={timeColor} />
-            <Text style={[styles.proposalTimeText, { color: timeColor }]}>{timeText}</Text>
+    <Animated.View entering={FadeInUp.duration(500).delay(100)}>
+      <ShimmerBorder>
+        <View style={styles.heroCard}>
+          {/* Institution badge */}
+          <View style={styles.institutionBadge}>
+            <Ionicons name="business-outline" size={12} color={BRAND.gold} />
+            <Text style={styles.institutionText}>{institution}</Text>
           </View>
+
+          {/* Title */}
+          <Text style={styles.heroTitle}>{title}</Text>
+
+          {/* Countdown */}
+          <View style={styles.countdownRow}>
+            <Ionicons name="time-outline" size={16} color={BRAND.gold} />
+            <Text style={styles.countdownText}>
+              <Text style={styles.countdownNumber}>{daysLeft}</Text>d{' '}
+              <Text style={styles.countdownNumber}>{hoursLeft}</Text>h remaining
+            </Text>
+          </View>
+
+          {/* Participation bar */}
+          <View style={styles.participationSection}>
+            <View style={styles.participationHeader}>
+              <Text style={styles.participationLabel}>Participation</Text>
+              <Text style={styles.participationCount}>
+                {participants.toLocaleString()} <Text style={styles.participationUnit}>voices</Text>
+              </Text>
+            </View>
+            <View style={styles.participationTrack}>
+              <Animated.View style={[styles.participationFill, progressStyle]} />
+            </View>
+          </View>
+
+          {/* CTA */}
+          <TouchableOpacity
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              onVotePress();
+            }}
+            activeOpacity={0.9}
+          >
+            <LinearGradient
+              colors={[BRAND.gold, BRAND.goldDark]}
+              style={styles.voteButton}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+            >
+              <Text style={styles.voteButtonText}>Vote Now</Text>
+              <Ionicons name="arrow-forward" size={18} color={BRAND.black} />
+            </LinearGradient>
+          </TouchableOpacity>
+
+          {/* See more link */}
+          <TouchableOpacity onPress={onSeeMorePress} style={styles.seeMoreBtn}>
+            <Text style={styles.seeMoreText}>{totalPending} more proposals waiting</Text>
+            <Ionicons name="chevron-forward" size={14} color="rgba(255,255,255,0.5)" />
+          </TouchableOpacity>
         </View>
-      </View>
-      <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
-    </AnimatedTouchable>
+      </ShimmerBorder>
+    </Animated.View>
   );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// COMMUNITY PILL - Compact community indicator
+// IMPACT STAT CARD
 // ═══════════════════════════════════════════════════════════════════════════
-function CommunityPill({
+function ImpactStatCard({
+  icon,
+  value,
+  label,
+  progress,
+  delay,
+}: {
+  icon: string;
+  value: number;
+  label: string;
+  progress: number;
+  delay: number;
+}) {
+  const scale = useSharedValue(0.9);
+
+  useEffect(() => {
+    scale.value = withDelay(delay, withSpring(1, { damping: 12 }));
+  }, []);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+
+  return (
+    <Animated.View style={[styles.statCard, animatedStyle]}>
+      {/* Icon with glow and progress ring */}
+      <View style={styles.statIconWrapper}>
+        <View style={styles.statIconGlow} />
+        <ProgressRing progress={progress} size={52} />
+        <View style={styles.statIconCircle}>
+          <Ionicons name={icon as any} size={20} color={BRAND.gold} />
+        </View>
+      </View>
+
+      {/* Number */}
+      <AnimatedNumber value={value} delay={delay + 200} />
+
+      {/* Label */}
+      <Text style={styles.statLabel}>{label}</Text>
+    </Animated.View>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// RECENT ACTIVITY FEED
+// ═══════════════════════════════════════════════════════════════════════════
+function ActivityFeed({ items }: { items: Array<{ icon: string; text: string; time: string }> }) {
+  return (
+    <Animated.View entering={FadeInUp.duration(500).delay(300)} style={styles.activitySection}>
+      <Text style={styles.sectionTitle}>RECENT ACTIVITY</Text>
+      <View style={styles.activityList}>
+        {items.map((item, idx) => (
+          <Animated.View
+            key={idx}
+            entering={FadeInRight.duration(400).delay(350 + idx * 80)}
+            style={styles.activityItem}
+          >
+            <View style={styles.activityIcon}>
+              <Ionicons name={item.icon as any} size={16} color={BRAND.gold} />
+            </View>
+            <Text style={styles.activityText} numberOfLines={1}>{item.text}</Text>
+            <Text style={styles.activityTime}>{item.time}</Text>
+          </Animated.View>
+        ))}
+      </View>
+    </Animated.View>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// COMMUNITY CARD
+// ═══════════════════════════════════════════════════════════════════════════
+function CommunityCard({
   name,
-  count,
+  icon,
+  proposalCount,
+  activeCount,
+  isPrimary,
+  gradientColors,
   index,
   onPress,
 }: {
   name: string;
-  count: number;
+  icon: string;
+  proposalCount: number;
+  activeCount: number;
+  isPrimary?: boolean;
+  gradientColors?: readonly [string, string];
   index: number;
   onPress: () => void;
 }) {
-  const { colors } = useTheme();
-
   return (
     <AnimatedTouchable
-      entering={FadeInRight.delay(100 + index * 50).duration(300)}
-      style={[styles.communityPill, { backgroundColor: colors.surface, borderColor: colors.border }]}
+      entering={FadeInRight.duration(400).delay(400 + index * 60)}
+      style={[styles.communityCard, isPrimary && styles.communityCardPrimary]}
       onPress={() => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         onPress();
       }}
-      activeOpacity={0.8}
+      activeOpacity={0.85}
     >
-      <Text style={[styles.communityName, { color: colors.text }]}>{name}</Text>
-      {count > 0 && (
-        <View style={[styles.communityBadge, { backgroundColor: colors.gold }]}>
-          <Text style={styles.communityBadgeText}>{count}</Text>
-        </View>
+      {isPrimary && gradientColors && (
+        <LinearGradient
+          colors={gradientColors}
+          style={StyleSheet.absoluteFill}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+        />
       )}
+      <View style={styles.communityContent}>
+        <View style={styles.communityIconCircle}>
+          <Text style={styles.communityEmoji}>{icon}</Text>
+        </View>
+        <View style={styles.communityInfo}>
+          <Text style={[styles.communityName, isPrimary && styles.communityNamePrimary]}>{name}</Text>
+          <Text style={styles.communityMeta}>{proposalCount} proposals</Text>
+        </View>
+        {activeCount > 0 && (
+          <View style={styles.communityBadge}>
+            <Text style={styles.communityBadgeText}>{activeCount}</Text>
+          </View>
+        )}
+      </View>
     </AnimatedTouchable>
   );
 }
@@ -287,263 +466,144 @@ export default function DashboardScreen() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { user, token, isAuthenticated } = useAuthStore();
+  const { user, isAuthenticated } = useAuthStore();
   const { syncFromChain } = useBallotStore();
 
-  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [stats, setStats] = useState({ voted: 0, pending: 0, created: 0, passed: 0 });
-  const [streak, setStreak] = useState(0);
-  const [urgentProposals, setUrgentProposals] = useState<UrgentProposal[]>([]);
-  const [communities, setCommunities] = useState<Community[]>([]);
 
-  const isVerified = user?.verified ?? false;
-  const isDemoAccount = user?.email === 'demo@represent.app';
-  const displayName = user?.name?.split(' ')[0] || 'there';
+  const isVerified = user?.verified ?? true; // Demo: verified
+  const displayName = user?.name?.split(' ')[0] || 'Lance';
 
-  const getGreeting = () => {
-    const hour = new Date().getHours();
-    if (hour < 12) return 'Good morning';
-    if (hour < 17) return 'Good afternoon';
-    return 'Good evening';
+  // Mock data as specified
+  const mockData = {
+    featured: {
+      title: 'Downtown Arena District Plan',
+      institution: 'City of Calgary',
+      daysLeft: 3,
+      hoursLeft: 14,
+      participants: 12847,
+    },
+    stats: {
+      awaiting: 64,
+      voted: 23,
+      created: 2,
+    },
+    activity: [
+      { icon: 'trending-up', text: 'Calgary Transit Proposal reached 10,000 votes', time: '2h ago' },
+      { icon: 'document-text', text: 'New proposal in your ward', time: '5h ago' },
+      { icon: 'checkmark-circle', text: 'Your vote on School Board Budget was recorded', time: '1d ago' },
+    ],
+    communities: [
+      { name: 'Canada', icon: '🇨🇦', proposalCount: 29, activeCount: 7, isPrimary: true },
+      { name: 'Alberta', icon: '🏔️', proposalCount: 12, activeCount: 4 },
+      { name: 'Calgary', icon: '🌆', proposalCount: 8, activeCount: 3 },
+      { name: 'Ward 7', icon: '📍', proposalCount: 2, activeCount: 1 },
+    ],
   };
 
-  const fetchDashboardData = useCallback(async () => {
-    try {
-      // Fetch proposals
-      const proposalsResult = await proposalsApi.getAll();
-      const proposals = proposalsResult.data || [];
-
-      // Calculate stats
-      const now = Date.now();
-      let voted = 0, pending = 0, created = 0;
-      const urgent: UrgentProposal[] = [];
-
-      proposals.forEach((p: any) => {
-        const deadline = p.deadline ? new Date(p.deadline).getTime() : null;
-        const hoursLeft = deadline ? Math.max(0, Math.floor((deadline - now) / (1000 * 60 * 60))) : 999;
-        const isEnded = hoursLeft === 0;
-        const isOwner = p.creatorId === user?.id;
-
-        if (isOwner) created++;
-        if (p.hasVoted || p.userVoted) {
-          voted++;
-        } else if (!isEnded) {
-          pending++;
-          if (hoursLeft <= 48) {
-            urgent.push({
-              id: p.id,
-              title: p.title,
-              hoursLeft,
-              category: p.category || 'General',
-            });
-          }
-        }
-      });
-
-      urgent.sort((a, b) => a.hoursLeft - b.hoursLeft);
-
-      setStats({ voted, pending, created, passed: Math.floor(voted * 0.3) });
-      setUrgentProposals(urgent.slice(0, 5));
-
-      // Demo streak
-      setStreak(isDemoAccount ? 7 : Math.min(voted, 14));
-
-      // Build communities from user location
-      const comms: Community[] = [];
-      if (user?.country) {
-        comms.push({ id: 'country', name: user.country, type: 'country', proposalCount: 12, unvotedCount: pending });
-      }
-      if (user?.state) {
-        comms.push({ id: 'state', name: user.state, type: 'state', proposalCount: 8, unvotedCount: Math.floor(pending * 0.6) });
-      }
-      if (user?.city) {
-        comms.push({ id: 'city', name: user.city, type: 'city', proposalCount: 5, unvotedCount: Math.floor(pending * 0.3) });
-      }
-      setCommunities(comms);
-
-    } catch (error) {
-      console.error('Dashboard fetch error:', error);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, [user, isDemoAccount]);
-
   useEffect(() => {
-    fetchDashboardData();
     if (user?.walletAddress) {
       syncFromChain(user.walletAddress);
     }
-  }, [fetchDashboardData, user?.walletAddress, syncFromChain]);
+  }, [user?.walletAddress, syncFromChain]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    fetchDashboardData();
-    if (user?.walletAddress) {
-      syncFromChain(user.walletAddress);
-    }
-  }, [fetchDashboardData, user?.walletAddress, syncFromChain]);
+    setTimeout(() => setRefreshing(false), 1000);
+  }, []);
 
   const navigateToProposals = () => router.push('/(tabs)/proposals');
 
-  // Loading state
-  if (loading) {
-    return (
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <View style={[styles.loadingContent, { paddingTop: insets.top + SPACING.xl }]}>
-          <SkeletonWelcome />
-          <View style={{ marginTop: SPACING.xl }}>
-            <SkeletonStats count={3} />
-          </View>
-          <View style={{ marginTop: SPACING.xl, gap: SPACING.md }}>
-            <SkeletonListItem />
-            <SkeletonListItem />
-            <SkeletonListItem />
-          </View>
-        </View>
-      </View>
-    );
-  }
-
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={styles.container}>
       <ScrollView
-        contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + SPACING.lg }]}
+        contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + SPACING.md }]}
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor={colors.gold}
-          />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={BRAND.gold} />
         }
       >
         {/* Header */}
-        <Animated.View entering={FadeInDown.duration(400)} style={styles.header}>
-          <View>
-            <Text style={[styles.greeting, { color: colors.textTertiary }]}>{getGreeting()}</Text>
-            <Text style={[styles.name, { color: colors.text }]}>{displayName}</Text>
-          </View>
-          <View style={styles.headerRight}>
-            <BallotDisplay size="sm" />
-            <TouchableOpacity
-              onPress={() => router.push('/(tabs)/profile')}
-              style={[styles.avatar, { backgroundColor: colors.gold }]}
-            >
-              <Text style={styles.avatarText}>{displayName.charAt(0).toUpperCase()}</Text>
-              {isVerified && (
-                <View style={[styles.verifiedDot, { backgroundColor: colors.success, borderColor: colors.background }]}>
-                  <Ionicons name="checkmark" size={8} color="#fff" />
-                </View>
-              )}
-            </TouchableOpacity>
+        <PremiumHeader
+          name={displayName}
+          isVerified={isVerified}
+          onAvatarPress={() => router.push('/(tabs)/profile')}
+          onNotificationPress={() => {}}
+        />
+
+        {/* Featured Proposal Hero */}
+        <FeaturedProposalHero
+          title={mockData.featured.title}
+          institution={mockData.featured.institution}
+          daysLeft={mockData.featured.daysLeft}
+          hoursLeft={mockData.featured.hoursLeft}
+          participants={mockData.featured.participants}
+          totalPending={mockData.stats.awaiting - 1}
+          onVotePress={navigateToProposals}
+          onSeeMorePress={navigateToProposals}
+        />
+
+        {/* Impact Stats */}
+        <Animated.View entering={FadeInUp.duration(500).delay(200)} style={styles.statsSection}>
+          <Text style={styles.sectionTitle}>YOUR IMPACT</Text>
+          <View style={styles.statsRow}>
+            <ImpactStatCard
+              icon="hourglass-outline"
+              value={mockData.stats.awaiting}
+              label="Awaiting You"
+              progress={0.3}
+              delay={250}
+            />
+            <ImpactStatCard
+              icon="checkmark-done-outline"
+              value={mockData.stats.voted}
+              label="Voted"
+              progress={0.65}
+              delay={350}
+            />
+            <ImpactStatCard
+              icon="create-outline"
+              value={mockData.stats.created}
+              label="Created"
+              progress={0.15}
+              delay={450}
+            />
           </View>
         </Animated.View>
 
-        {/* Impact Hero */}
-        <ImpactHero
-          totalVotes={stats.voted}
-          proposalsPassed={stats.passed}
-          streak={streak}
-          percentile={isDemoAccount || stats.voted > 10 ? 5 : undefined}
-          location={user?.city || user?.state}
-        />
+        {/* Recent Activity */}
+        <ActivityFeed items={mockData.activity} />
 
-        {/* Primary Action */}
-        {!isVerified && isAuthenticated && (
-          <ActionCard
-            type="verify"
-            onPress={() => router.push('/(tabs)/identity')}
-          />
-        )}
-
-        {urgentProposals.length > 0 && (
-          <ActionCard
-            type="urgent"
-            count={urgentProposals.length}
-            onPress={navigateToProposals}
-          />
-        )}
-
-        {isVerified && urgentProposals.length === 0 && stats.pending > 0 && (
-          <ActionCard
-            type="pending"
-            count={stats.pending}
-            onPress={navigateToProposals}
-          />
-        )}
-
-        {/* Needs Your Voice Section */}
-        {urgentProposals.length > 0 && (
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={[styles.sectionTitle, { color: colors.text }]}>Needs Your Voice</Text>
-              <TouchableOpacity onPress={navigateToProposals}>
-                <Text style={[styles.sectionLink, { color: colors.gold }]}>See all</Text>
-              </TouchableOpacity>
-            </View>
-            {urgentProposals.slice(0, 3).map((proposal, idx) => (
-              <ProposalRow
-                key={proposal.id}
-                title={proposal.title}
-                category={proposal.category}
-                hoursLeft={proposal.hoursLeft}
+        {/* Communities */}
+        <Animated.View entering={FadeInUp.duration(500).delay(400)} style={styles.communitiesSection}>
+          <Text style={styles.sectionTitle}>YOUR COMMUNITIES</Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.communitiesScroll}
+          >
+            {mockData.communities.map((community, idx) => (
+              <CommunityCard
+                key={community.name}
+                name={community.name}
+                icon={community.icon}
+                proposalCount={community.proposalCount}
+                activeCount={community.activeCount}
+                isPrimary={community.isPrimary}
+                gradientColors={community.isPrimary ? ['#8B0000', '#1a0505'] : undefined}
                 index={idx}
                 onPress={navigateToProposals}
               />
             ))}
-          </View>
-        )}
-
-        {/* Your Communities */}
-        {communities.length > 0 && (
-          <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>Your Communities</Text>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.communityScroll}
-            >
-              {communities.map((community, idx) => (
-                <CommunityPill
-                  key={community.id}
-                  name={community.name}
-                  count={community.unvotedCount}
-                  index={idx}
-                  onPress={navigateToProposals}
-                />
-              ))}
-            </ScrollView>
-          </View>
-        )}
-
-        {/* Explore CTA */}
-        <AnimatedTouchable
-          entering={FadeInUp.delay(400).duration(400)}
-          style={[styles.exploreCta, { borderColor: colors.border }]}
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-            navigateToProposals();
-          }}
-          activeOpacity={0.8}
-        >
-          <View style={styles.exploreContent}>
-            <Ionicons name="compass-outline" size={24} color={colors.gold} />
-            <View style={styles.exploreText}>
-              <Text style={[styles.exploreTitle, { color: colors.text }]}>Explore All Proposals</Text>
-              <Text style={[styles.exploreSubtitle, { color: colors.textTertiary }]}>
-                Discover what's happening in your area
-              </Text>
-            </View>
-          </View>
-          <Ionicons name="arrow-forward" size={20} color={colors.textTertiary} />
-        </AnimatedTouchable>
+          </ScrollView>
+        </Animated.View>
 
         {/* Bottom spacing for tab bar */}
         <View style={{ height: 120 }} />
       </ScrollView>
+
+      {/* Fixed bottom nav blur - handled by tab layout */}
     </View>
   );
 }
@@ -554,12 +614,10 @@ export default function DashboardScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: BRAND.black,
   },
   scrollContent: {
-    paddingHorizontal: SPACING.lg,
-  },
-  loadingContent: {
-    paddingHorizontal: SPACING.lg,
+    paddingHorizontal: 20,
   },
 
   // Header
@@ -567,284 +625,414 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: SPACING.xl,
+    marginBottom: 24,
   },
+  headerLeft: {},
   greeting: {
+    fontFamily: 'Onest',
     fontSize: 14,
-    fontWeight: '500',
-    letterSpacing: 0.5,
-    marginBottom: 2,
+    fontWeight: '400',
+    color: 'rgba(244,245,246,0.6)',
+    marginBottom: 4,
   },
-  name: {
+  brandRow: {
+    position: 'relative',
+  },
+  brandName: {
+    fontFamily: 'Onest',
     fontSize: 28,
     fontWeight: '700',
+    color: BRAND.white,
     letterSpacing: -0.5,
+  },
+  goldUnderline: {
+    position: 'absolute',
+    bottom: -2,
+    left: 0,
+    width: 80,
+    height: 3,
+    backgroundColor: BRAND.gold,
+    borderRadius: 1.5,
   },
   headerRight: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: SPACING.md,
+    gap: 12,
   },
-  avatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+  notificationBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: BRAND.glass,
+    borderWidth: 1,
+    borderColor: BRAND.glassBorder,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  avatarText: {
+  notificationDot: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: BRAND.gold,
+  },
+  avatarRing: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    padding: 2,
+  },
+  avatarInner: {
+    flex: 1,
+    borderRadius: 21,
+    backgroundColor: BRAND.black,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarLetter: {
+    fontFamily: 'Onest',
     fontSize: 18,
     fontWeight: '700',
-    color: '#000',
+    color: BRAND.gold,
   },
-  verifiedDot: {
+  verifiedBadge: {
     position: 'absolute',
     bottom: -2,
     right: -2,
     width: 18,
     height: 18,
     borderRadius: 9,
+    backgroundColor: '#22C55E',
+    borderWidth: 2,
+    borderColor: BRAND.black,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 2,
   },
 
-  // Impact Hero
-  impactHero: {
-    borderRadius: BORDER_RADIUS.xl,
+  // Shimmer border
+  shimmerContainer: {
+    position: 'relative',
+    marginBottom: 24,
+  },
+  shimmerBorderBase: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 20,
     borderWidth: 1,
-    padding: SPACING.xl,
-    marginBottom: SPACING.lg,
+    borderColor: BRAND.glassBorder,
+  },
+  shimmerOverflow: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 20,
     overflow: 'hidden',
   },
-  streakBadge: {
+  shimmerBar: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: 100,
+    height: '100%',
+  },
+  shimmerContent: {
+    borderRadius: 20,
+    overflow: 'hidden',
+  },
+
+  // Hero card
+  heroCard: {
+    backgroundColor: BRAND.glass,
+    padding: 24,
+    borderRadius: 20,
+  },
+  institutionBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     alignSelf: 'flex-start',
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.xs,
-    borderRadius: BORDER_RADIUS.full,
-    marginBottom: SPACING.lg,
+    backgroundColor: 'rgba(234,186,88,0.1)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
     gap: 6,
+    marginBottom: 16,
   },
-  streakEmoji: {
-    fontSize: 14,
-  },
-  streakText: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  impactMain: {
-    alignItems: 'center',
-    marginBottom: SPACING.xl,
-  },
-  impactNumber: {
-    fontSize: 72,
-    fontWeight: '700',
-    letterSpacing: -2,
-    lineHeight: 80,
-  },
-  impactLabel: {
-    fontSize: 16,
-    fontWeight: '500',
-    letterSpacing: 0.5,
-    marginTop: -4,
-  },
-  impactStats: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  impactStat: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  impactStatValue: {
-    fontSize: 18,
-    fontWeight: '700',
-  },
-  impactStatLabel: {
+  institutionText: {
+    fontFamily: 'Onest',
     fontSize: 12,
-    fontWeight: '500',
-    marginTop: 2,
+    fontWeight: '600',
+    color: BRAND.gold,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
-  impactDivider: {
-    width: 1,
-    height: 32,
-    marginHorizontal: SPACING.lg,
+  heroTitle: {
+    fontFamily: 'Onest',
+    fontSize: 24,
+    fontWeight: '700',
+    color: BRAND.white,
+    lineHeight: 30,
+    marginBottom: 16,
   },
-
-  // Action Card
-  actionCard: {
-    borderRadius: BORDER_RADIUS.xl,
-    borderWidth: 1,
-    overflow: 'hidden',
-    marginBottom: SPACING.lg,
-  },
-  actionGradient: {
-    padding: SPACING.lg,
-  },
-  actionContent: {
+  countdownRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 8,
+    marginBottom: 20,
   },
-  actionIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
+  countdownText: {
+    fontFamily: 'Onest',
+    fontSize: 14,
+    fontWeight: '400',
+    color: 'rgba(244,245,246,0.7)',
   },
-  actionText: {
-    flex: 1,
-    marginLeft: SPACING.md,
+  countdownNumber: {
+    fontFamily: 'JetBrains Mono',
+    fontWeight: '600',
+    color: BRAND.gold,
   },
-  actionTitle: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: '#fff',
-    marginBottom: 2,
+  participationSection: {
+    marginBottom: 20,
   },
-  actionSubtitle: {
-    fontSize: 13,
-    color: 'rgba(255,255,255,0.8)',
-  },
-  actionArrow: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-
-  // Section
-  section: {
-    marginBottom: SPACING.xl,
-  },
-  sectionHeader: {
+  participationHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: SPACING.md,
+    marginBottom: 8,
   },
-  sectionTitle: {
-    fontSize: 13,
-    fontWeight: '700',
-    letterSpacing: 1,
-    textTransform: 'uppercase',
-  },
-  sectionLink: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-
-  // Proposal Row
-  proposalRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: SPACING.md,
-    borderRadius: BORDER_RADIUS.lg,
-    borderWidth: 1,
-    marginBottom: SPACING.sm,
-    overflow: 'hidden',
-  },
-  proposalUrgentBar: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    bottom: 0,
-    width: 3,
-  },
-  proposalContent: {
-    flex: 1,
-    marginLeft: SPACING.xs,
-  },
-  proposalTitle: {
-    fontSize: 15,
-    fontWeight: '600',
-    marginBottom: 4,
-    lineHeight: 20,
-  },
-  proposalMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.sm,
-  },
-  proposalCategory: {
+  participationLabel: {
+    fontFamily: 'Onest',
     fontSize: 12,
     fontWeight: '500',
+    color: 'rgba(244,245,246,0.5)',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
-  proposalTime: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: BORDER_RADIUS.sm,
-    gap: 4,
-  },
-  proposalTimeText: {
-    fontSize: 11,
-    fontWeight: '600',
-  },
-
-  // Community Pills
-  communityScroll: {
-    paddingRight: SPACING.lg,
-    gap: SPACING.sm,
-  },
-  communityPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
-    borderRadius: BORDER_RADIUS.full,
-    borderWidth: 1,
-    gap: SPACING.sm,
-  },
-  communityName: {
+  participationCount: {
+    fontFamily: 'JetBrains Mono',
     fontSize: 14,
     fontWeight: '600',
+    color: BRAND.white,
   },
-  communityBadge: {
-    minWidth: 20,
-    height: 20,
-    borderRadius: 10,
+  participationUnit: {
+    fontWeight: '400',
+    color: 'rgba(244,245,246,0.5)',
+  },
+  participationTrack: {
+    height: 6,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  participationFill: {
+    height: '100%',
+    backgroundColor: BRAND.gold,
+    borderRadius: 3,
+  },
+  voteButton: {
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 6,
+    paddingVertical: 16,
+    borderRadius: 14,
+    gap: 8,
   },
-  communityBadgeText: {
-    fontSize: 11,
+  voteButtonText: {
+    fontFamily: 'Onest',
+    fontSize: 16,
     fontWeight: '700',
-    color: '#000',
+    color: BRAND.black,
+  },
+  seeMoreBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: 16,
+    gap: 4,
+  },
+  seeMoreText: {
+    fontFamily: 'Onest',
+    fontSize: 13,
+    fontWeight: '500',
+    color: 'rgba(244,245,246,0.5)',
   },
 
-  // Explore CTA
-  exploreCta: {
+  // Section
+  sectionTitle: {
+    fontFamily: 'Onest',
+    fontSize: 11,
+    fontWeight: '700',
+    color: 'rgba(244,245,246,0.4)',
+    letterSpacing: 1.5,
+    marginBottom: 16,
+  },
+
+  // Stats
+  statsSection: {
+    marginBottom: 28,
+  },
+  statsRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    padding: SPACING.lg,
-    borderRadius: BORDER_RADIUS.xl,
+    gap: 12,
+  },
+  statCard: {
+    flex: 1,
+    backgroundColor: BRAND.glass,
     borderWidth: 1,
-    borderStyle: 'dashed',
+    borderColor: BRAND.glassBorder,
+    borderRadius: 16,
+    padding: 16,
+    alignItems: 'center',
   },
-  exploreContent: {
-    flex: 1,
+  statIconWrapper: {
+    width: 52,
+    height: 52,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  statIconGlow: {
+    position: 'absolute',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: BRAND.gold,
+    opacity: 0.15,
+  },
+  statIconCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(234,186,88,0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  statNumber: {
+    fontFamily: 'JetBrains Mono',
+    fontSize: 28,
+    fontWeight: '700',
+    color: BRAND.white,
+    marginBottom: 4,
+  },
+  statLabel: {
+    fontFamily: 'Onest',
+    fontSize: 11,
+    fontWeight: '500',
+    color: 'rgba(244,245,246,0.5)',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+
+  // Activity
+  activitySection: {
+    marginBottom: 28,
+  },
+  activityList: {
+    backgroundColor: BRAND.glass,
+    borderWidth: 1,
+    borderColor: BRAND.glassBorder,
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  activityItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: SPACING.md,
+    padding: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: BRAND.glassBorder,
   },
-  exploreText: {
+  activityIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(234,186,88,0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  activityText: {
+    flex: 1,
+    fontFamily: 'Onest',
+    fontSize: 13,
+    fontWeight: '500',
+    color: BRAND.white,
+  },
+  activityTime: {
+    fontFamily: 'JetBrains Mono',
+    fontSize: 11,
+    fontWeight: '500',
+    color: 'rgba(244,245,246,0.4)',
+    marginLeft: 8,
+  },
+
+  // Communities
+  communitiesSection: {
+    marginBottom: 24,
+  },
+  communitiesScroll: {
+    paddingRight: 20,
+    gap: 12,
+  },
+  communityCard: {
+    backgroundColor: BRAND.glass,
+    borderWidth: 1,
+    borderColor: BRAND.glassBorder,
+    borderRadius: 16,
+    padding: 16,
+    minWidth: 140,
+    overflow: 'hidden',
+  },
+  communityCardPrimary: {
+    minWidth: 180,
+    minHeight: 100,
+  },
+  communityContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  communityIconCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  communityEmoji: {
+    fontSize: 18,
+  },
+  communityInfo: {
     flex: 1,
   },
-  exploreTitle: {
-    fontSize: 15,
+  communityName: {
+    fontFamily: 'Onest',
+    fontSize: 14,
     fontWeight: '600',
+    color: BRAND.white,
+    marginBottom: 2,
   },
-  exploreSubtitle: {
-    fontSize: 13,
-    marginTop: 2,
+  communityNamePrimary: {
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  communityMeta: {
+    fontFamily: 'Onest',
+    fontSize: 11,
+    fontWeight: '400',
+    color: 'rgba(244,245,246,0.5)',
+  },
+  communityBadge: {
+    minWidth: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: BRAND.gold,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 8,
+  },
+  communityBadgeText: {
+    fontFamily: 'JetBrains Mono',
+    fontSize: 12,
+    fontWeight: '700',
+    color: BRAND.black,
   },
 });
