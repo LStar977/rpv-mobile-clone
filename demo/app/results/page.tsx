@@ -90,9 +90,9 @@ export default function ResultsPage() {
                 <div className="font-mono text-[10px] tracking-[0.2em] text-paper/40 uppercase mb-1">
                   Oppose
                 </div>
-                <div className="font-display text-[32px] leading-none font-semibold text-steel">
+                <div className="font-display text-[32px] leading-none font-semibold text-danger">
                   {results.opposePct}
-                  <span className="text-[18px] text-steel/60">%</span>
+                  <span className="text-[18px] text-danger/60">%</span>
                 </div>
               </div>
             </div>
@@ -109,7 +109,7 @@ export default function ResultsPage() {
                 initial={{ width: 0 }}
                 animate={{ width: `${results.opposePct}%` }}
                 transition={{ delay: 0.3, duration: 1, ease: [0.22, 1, 0.36, 1] }}
-                className="h-full bg-steel"
+                className="h-full bg-danger"
               />
             </div>
 
@@ -180,7 +180,7 @@ export default function ResultsPage() {
         </motion.div>
 
         <p className="text-center text-[11px] font-mono text-paper/30 tracking-wider uppercase mb-8">
-          Updated every 60s · Verifiable on Base
+          Every voice verified · Results updated live
         </p>
 
         {/* Investor CTA */}

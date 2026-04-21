@@ -1,6 +1,6 @@
 import { Alert } from 'react-native';
-import * as Haptics from 'expo-haptics';
 import { badgesApi } from './api';
+import { soundEffects } from './sounds';
 
 // Badge display names and icons
 const BADGE_INFO: Record<string, { name: string; emoji: string; description: string }> = {
@@ -123,8 +123,8 @@ export async function checkForNewBadges(): Promise<void> {
           description: badge.description || 'You earned a new badge!',
         };
 
-        // Haptic feedback
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        // Play celebration sound with haptics
+        soundEffects.badgeUnlock();
 
         // Show celebratory alert
         Alert.alert(

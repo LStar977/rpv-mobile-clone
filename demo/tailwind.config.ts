@@ -10,6 +10,7 @@ const config: Config = {
         goldDark: '#C99A3F',
         paper: '#F4F5F6',
         steel: '#007BFF',
+        danger: '#DC2626',
         success: '#2BB673',
         border: '#1A1E22',
       },

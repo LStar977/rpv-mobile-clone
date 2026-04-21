@@ -16,10 +16,10 @@ const jetbrains = JetBrains_Mono({
 
 export const metadata: Metadata = {
   title: 'Represent — Verified public consensus',
-  description: 'Your city wants to know what you think. Verified voices, cryptographically recorded on Base.',
+  description: 'Your city wants to know what you think. Verified public consensus, built for democracy.',
   openGraph: {
     title: 'Represent',
-    description: 'Verified public consensus. Recorded on Base.',
+    description: 'Verified public consensus. Built for democracy.',
     type: 'website',
   },
 };

@@ -62,6 +62,8 @@ export {
 
 // Overlays & Feedback
 export { VoteConfirmationOverlay } from './VoteConfirmationOverlay';
+export { ConfettiParticles } from './ConfettiParticles';
+export { MilestoneCelebration } from './MilestoneCelebration';
 
 // Tier Badges
 export { TierBadge, TierCard } from './TierBadge';
@@ -72,3 +74,6 @@ export { UpgradeModal } from './UpgradeModal';
 
 // Ballots
 export { BallotDisplay } from './BallotDisplay';
+
+// Charts & Visualizations
+export { AnimatedRadarChart } from './AnimatedRadarChart';

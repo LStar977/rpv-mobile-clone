@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Check, ExternalLink, Copy } from 'lucide-react';
+import { Check, Copy } from 'lucide-react';
 import { Shell } from '@/components/Shell';
 import { Button } from '@/components/Button';
 import { Card } from '@/components/Card';
@@ -60,12 +60,11 @@ export default function ConfirmPage() {
           transition={{ delay: 0.3 }}
           className="text-center mb-8"
         >
-          <h1 className="font-display text-[24px] leading-tight font-semibold tracking-tight text-paper mb-2">
-            Your response has been<br />
-            cryptographically recorded.
+          <h1 className="font-display text-[28px] leading-tight font-semibold tracking-tight text-paper mb-2">
+            Your voice has been counted.
           </h1>
           <p className="text-[14px] text-paper/60">
-            Permanent. Anonymous. Verifiable by anyone.
+            Anonymous. Permanent. Verified.
           </p>
         </motion.div>
 
@@ -80,36 +79,30 @@ export default function ConfirmPage() {
                 Receipt
               </span>
               <span className="font-mono text-[10px] tracking-wider text-paper/40 uppercase">
-                {receipt.network}
+                #{receipt.block.toLocaleString()}
               </span>
             </div>
 
             <dl className="space-y-3">
               <div className="flex items-center justify-between">
-                <dt className="text-[12px] text-paper/50">Block</dt>
-                <dd className="font-mono text-[13px] text-paper">
-                  {receipt.block.toLocaleString()}
-                </dd>
-              </div>
-              <div className="flex items-center justify-between">
-                <dt className="text-[12px] text-paper/50">Transaction</dt>
-                <dd className="flex items-center gap-2">
-                  <code className="font-mono text-[13px] text-paper">
-                    {truncateHash(receipt.txHash)}
-                  </code>
-                  <button
-                    onClick={handleCopy}
-                    className="text-paper/40 hover:text-gold transition-colors"
-                    aria-label="Copy hash"
-                  >
-                    <Copy size={13} />
-                  </button>
-                </dd>
-              </div>
-              <div className="flex items-center justify-between">
                 <dt className="text-[12px] text-paper/50">Response</dt>
                 <dd className="font-display text-[13px] font-medium text-paper capitalize">
                   {choice || '—'}
+                </dd>
+              </div>
+              <div className="flex items-center justify-between">
+                <dt className="text-[12px] text-paper/50">Jurisdiction</dt>
+                <dd className="font-display text-[13px] font-medium text-paper">
+                  Calgary · Ward 7
+                </dd>
+              </div>
+              <div className="flex items-center justify-between">
+                <dt className="text-[12px] text-paper/50">Status</dt>
+                <dd className="flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-success" />
+                  <span className="font-display text-[13px] font-medium text-success">
+                    Verified
+                  </span>
                 </dd>
               </div>
               <div className="flex items-center justify-between">
@@ -118,26 +111,36 @@ export default function ConfirmPage() {
               </div>
             </dl>
 
+            <div className="mt-4 pt-4 border-t border-paper/10 flex items-center justify-between">
+              <span className="text-[11px] text-paper/40">Proof</span>
+              <div className="flex items-center gap-2">
+                <code className="font-mono text-[11px] text-paper/60">
+                  {truncateHash(receipt.txHash)}
+                </code>
+                <button
+                  onClick={handleCopy}
+                  className="text-paper/40 hover:text-gold transition-colors"
+                  aria-label="Copy proof hash"
+                >
+                  <Copy size={12} />
+                </button>
+              </div>
+            </div>
+
             {copied && (
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 className="mt-3 text-center text-[11px] font-mono text-success uppercase tracking-wider"
               >
-                Hash copied
+                Proof copied
               </motion.div>
             )}
           </Card>
 
-          <a
-            href={`https://basescan.org/tx/${receipt.txHash}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center justify-center gap-1.5 text-[12px] text-paper/50 hover:text-gold transition-colors mb-8"
-          >
-            View on BaseScan
-            <ExternalLink size={12} />
-          </a>
+          <p className="text-center text-[11px] font-mono tracking-wider text-paper/30 uppercase mb-8">
+            Every response is independently verifiable
+          </p>
         </motion.div>
 
         <motion.div
