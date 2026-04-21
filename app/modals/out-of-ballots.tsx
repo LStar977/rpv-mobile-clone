@@ -1,11 +1,14 @@
+import { useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS } from '../../lib/theme';
 import { useBallotStore } from '../../lib/ballots';
+import { useAuthStore } from '../../lib/auth';
 import { BallotIcon, BallotIconFilled } from '../../components/icons';
 
 const PURCHASE_PACKS = [
@@ -16,7 +19,16 @@ const PURCHASE_PACKS = [
 
 export default function OutOfBallotsModal() {
   const { colors } = useTheme();
-  const { tier, balance } = useBallotStore();
+  const { tier, balance, syncFromChain } = useBallotStore();
+  const user = useAuthStore((s) => s.user);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (user?.walletAddress) {
+        syncFromChain(user.walletAddress);
+      }
+    }, [user?.walletAddress, syncFromChain])
+  );
 
   const handlePurchase = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);

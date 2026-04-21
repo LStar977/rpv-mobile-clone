@@ -572,10 +572,18 @@ function ProposalCard({
 
       {/* Header */}
       <View style={styles.cardHeader}>
-        <View style={[styles.categoryBadge, { backgroundColor: `${colors.gold}15` }]}>
-          <Text style={[styles.categoryText, { color: colors.gold }]}>
-            {proposal.category || 'General'}
-          </Text>
+        <View style={styles.headerBadges}>
+          <View style={[styles.categoryBadge, { backgroundColor: `${colors.gold}15` }]}>
+            <Text style={[styles.categoryText, { color: colors.gold }]}>
+              {proposal.category || 'General'}
+            </Text>
+          </View>
+          {proposal.source === 'civic-desk' && (
+            <View style={[styles.civicDeskBadge, { backgroundColor: `${colors.info}15` }]}>
+              <Ionicons name="newspaper-outline" size={10} color={colors.info} />
+              <Text style={[styles.civicDeskText, { color: colors.info }]}>Civic Desk</Text>
+            </View>
+          )}
         </View>
 
         <View style={styles.headerRight}>
@@ -1100,11 +1108,14 @@ export default function ProposalsScreen() {
     }
 
     setVotingProposalId(proposalId as number);
+    const { restoreBallot, tier: currentTier } = useBallotStore.getState();
+
     try {
       // First claim the token if not already claimed
       if (!claimedTokens.has(proposalId as number)) {
         const claimResult = await proposalsApi.claimVoteToken(proposalId as number);
         if (claimResult.error) {
+          if (currentTier !== 'premium') restoreBallot();
           Alert.alert('Error', claimResult.error);
           setVotingProposalId(null);
           return;
@@ -1115,6 +1126,7 @@ export default function ProposalsScreen() {
       // Then submit the vote
       const result = await proposalsApi.submitVote(proposalId, vote);
       if (result.error) {
+        if (currentTier !== 'premium') restoreBallot();
         Alert.alert('Error', result.error);
         return;
       }
@@ -1164,6 +1176,7 @@ export default function ProposalsScreen() {
         syncFromChain(user.walletAddress);
       }
     } catch {
+      if (currentTier !== 'premium') restoreBallot();
       Alert.alert('Error', 'Failed to submit vote. Please try again.');
     } finally {
       setVotingProposalId(null);
@@ -1398,10 +1411,6 @@ export default function ProposalsScreen() {
 
           <View style={styles.headerActions}>
             <BallotDisplay size="sm" />
-            <ViewModeToggle
-              mode={viewMode}
-              onToggle={() => setViewMode((m) => (m === 'swipe' ? 'list' : 'swipe'))}
-            />
 
             <TouchableOpacity
               style={[
@@ -2273,6 +2282,21 @@ const styles = StyleSheet.create({
     borderRadius: BORDER_RADIUS.full,
   },
   categoryText: { ...TYPOGRAPHY.labelSmall, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5 },
+  headerBadges: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+    flexWrap: 'wrap',
+  },
+  civicDeskBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: SPACING.xs,
+    borderRadius: BORDER_RADIUS.full,
+  },
+  civicDeskText: { ...TYPOGRAPHY.labelSmall, fontWeight: '500', fontSize: 10 },
   timeBadge: {
     flexDirection: 'row',
     alignItems: 'center',

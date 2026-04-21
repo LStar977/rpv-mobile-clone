@@ -6,6 +6,7 @@ const API_BASE_URL = 'https://representportal.com';
 const DEMO_ORGS_STORAGE_KEY = '@represent_demo_organizations';
 const DEMO_PROPOSALS_STORAGE_KEY = '@represent_demo_proposals';
 const DELETED_PROPOSALS_STORAGE_KEY = '@represent_deleted_proposals';
+const ORG_VOTES_STORAGE_KEY = '@represent_org_votes';
 
 // Helper to check if current user is demo account
 function isDemoAccount(): boolean {
@@ -38,6 +39,7 @@ export interface OrganizationProposal extends Proposal {
   organizationId: string;
   organizationName: string;
   isOfficial: boolean;
+  userVote?: 'support' | 'oppose' | null;
 }
 
 // Demo organization data for App Store review
@@ -171,6 +173,8 @@ export interface Proposal {
   deadline: string | null;
   createdAt: string;
   creatorId: string;
+  creatorName?: string;
+  source?: 'civic-desk' | 'user' | 'legislative';
   geoRestrictions?: string[];
   status?: string;
   voteType?: string;
@@ -215,6 +219,14 @@ async function apiRequest<T>(
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       console.error(`API Error: ${response.status}`, errorData);
+
+      // Handle auth expiration - trigger re-auth flow
+      if (response.status === 401) {
+        console.log('[API] Token expired or invalid, triggering re-auth');
+        useAuthStore.getState().checkAuth();
+        return { data: null, error: 'Session expired. Please sign in again.' };
+      }
+
       const errorMessage = errorData.error || errorData.message || `HTTP ${response.status}`;
       const requiresVerification =
         errorMessage.includes('passport') ||
@@ -483,6 +495,20 @@ export const organizationsApi = {
   },
 
   async getOrganizationProposals(orgId: string): Promise<ApiResponse<OrganizationProposal[]>> {
+    // Helper to merge user votes into proposals
+    const mergeUserVotes = async (proposals: OrganizationProposal[]): Promise<OrganizationProposal[]> => {
+      try {
+        const votesStored = await AsyncStorage.getItem(ORG_VOTES_STORAGE_KEY);
+        const votes: Record<string, 'support' | 'oppose'> = votesStored ? JSON.parse(votesStored) : {};
+        return proposals.map(p => ({
+          ...p,
+          userVote: votes[`${orgId}:${p.id}`] || null,
+        }));
+      } catch (e) {
+        return proposals;
+      }
+    };
+
     // For demo accounts, also check local storage for proposals
     if (isDemoAccount()) {
       let localProposals: OrganizationProposal[] = [];
@@ -512,7 +538,8 @@ export const organizationsApi = {
       // For seed organization, also include seed proposals (filtered by deleted IDs)
       if (orgId === DEMO_ORGANIZATION_ID) {
         const filteredSeedProposals = SEED_ORGANIZATION_PROPOSALS.filter(p => !deletedIds.includes(String(p.id)));
-        return { data: [...filteredSeedProposals, ...localProposals], error: null };
+        const allProposals = [...filteredSeedProposals, ...localProposals];
+        return { data: await mergeUserVotes(allProposals), error: null };
       }
 
       // For other demo orgs, return local proposals + backend
@@ -521,13 +548,15 @@ export const organizationsApi = {
       if (Array.isArray(result.data)) backendProposals = result.data;
       else if (result.data?.proposals) backendProposals = result.data.proposals;
 
-      return { data: [...localProposals, ...backendProposals], error: null };
+      const allProposals = [...localProposals, ...backendProposals];
+      return { data: await mergeUserVotes(allProposals), error: null };
     }
 
     const result = await apiRequest<any>(`/api/organizations/${orgId}/proposals`);
-    if (Array.isArray(result.data)) return { data: result.data, error: null };
-    if (result.data?.proposals) return { data: result.data.proposals, error: null };
-    return { data: [], error: result.error };
+    let proposals: OrganizationProposal[] = [];
+    if (Array.isArray(result.data)) proposals = result.data;
+    else if (result.data?.proposals) proposals = result.data.proposals;
+    return { data: await mergeUserVotes(proposals), error: result.error };
   },
 
   async getOrganizationAnnouncements(orgId: string): Promise<ApiResponse<any[]>> {
@@ -656,6 +685,88 @@ export const organizationsApi = {
       },
       error: result.error,
     };
+  },
+
+  async voteOnProposal(
+    orgId: string,
+    proposalId: string,
+    vote: 'support' | 'oppose'
+  ): Promise<ApiResponse<{ success: boolean; supportVotes: number; opposeVotes: number }>> {
+    // For demo accounts, handle voting locally
+    if (isDemoAccount()) {
+      try {
+        // Load existing votes
+        const votesStored = await AsyncStorage.getItem(ORG_VOTES_STORAGE_KEY);
+        const votes: Record<string, 'support' | 'oppose'> = votesStored ? JSON.parse(votesStored) : {};
+
+        // Check if already voted
+        const voteKey = `${orgId}:${proposalId}`;
+        if (votes[voteKey]) {
+          return { data: null, error: 'You have already voted on this proposal' };
+        }
+
+        // Record the vote
+        votes[voteKey] = vote;
+        await AsyncStorage.setItem(ORG_VOTES_STORAGE_KEY, JSON.stringify(votes));
+
+        // Update vote counts in the proposal
+        // First check seed proposals
+        const seedProposal = SEED_ORGANIZATION_PROPOSALS.find(p => String(p.id) === proposalId);
+        if (seedProposal) {
+          const newSupport = seedProposal.supportVotes + (vote === 'support' ? 1 : 0);
+          const newOppose = seedProposal.opposeVotes + (vote === 'oppose' ? 1 : 0);
+          return { data: { success: true, supportVotes: newSupport, opposeVotes: newOppose }, error: null };
+        }
+
+        // Check locally stored proposals
+        const stored = await AsyncStorage.getItem(DEMO_PROPOSALS_STORAGE_KEY);
+        if (stored) {
+          const proposals: OrganizationProposal[] = JSON.parse(stored);
+          const proposalIndex = proposals.findIndex(p => String(p.id) === proposalId);
+          if (proposalIndex >= 0) {
+            if (vote === 'support') {
+              proposals[proposalIndex].supportVotes += 1;
+            } else {
+              proposals[proposalIndex].opposeVotes += 1;
+            }
+            await AsyncStorage.setItem(DEMO_PROPOSALS_STORAGE_KEY, JSON.stringify(proposals));
+            return {
+              data: {
+                success: true,
+                supportVotes: proposals[proposalIndex].supportVotes,
+                opposeVotes: proposals[proposalIndex].opposeVotes,
+              },
+              error: null,
+            };
+          }
+        }
+
+        // Fallback - just return success with incremented counts
+        return { data: { success: true, supportVotes: 1, opposeVotes: 0 }, error: null };
+      } catch (e) {
+        console.error('Failed to vote on demo proposal:', e);
+        return { data: null, error: 'Failed to record vote' };
+      }
+    }
+
+    // For regular accounts, call the backend API
+    return apiRequest(`/api/organizations/${orgId}/proposals/${proposalId}/vote`, {
+      method: 'POST',
+      body: JSON.stringify({ vote }),
+    });
+  },
+
+  async getUserOrgVotes(): Promise<Record<string, 'support' | 'oppose'>> {
+    if (isDemoAccount()) {
+      try {
+        const stored = await AsyncStorage.getItem(ORG_VOTES_STORAGE_KEY);
+        return stored ? JSON.parse(stored) : {};
+      } catch (e) {
+        return {};
+      }
+    }
+    // For real accounts, votes would come from the backend with proposals
+    return {};
   },
 
   // Member management

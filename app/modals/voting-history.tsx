@@ -388,6 +388,19 @@ export default function VotingHistoryScreen() {
                 ? 'Try adjusting your filters to see more votes'
                 : 'Vote on proposals to see your history here'}
             </Text>
+            {votedProposals.length === 0 && (
+              <TouchableOpacity
+                style={[styles.emptyCtaButton, { backgroundColor: colors.gold }]}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                  router.back();
+                  setTimeout(() => router.push('/(tabs)/proposals'), 100);
+                }}
+              >
+                <Ionicons name="hand-right-outline" size={18} color="#000" />
+                <Text style={styles.emptyCtaText}>Start Voting</Text>
+              </TouchableOpacity>
+            )}
           </Animated.View>
         )}
 
@@ -605,5 +618,20 @@ const styles = StyleSheet.create({
   emptySubtext: {
     ...TYPOGRAPHY.bodyMedium,
     textAlign: 'center',
+    marginBottom: SPACING.md,
+  },
+  emptyCtaButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.xs,
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.xl,
+    borderRadius: BORDER_RADIUS.full,
+    marginTop: SPACING.sm,
+  },
+  emptyCtaText: {
+    ...TYPOGRAPHY.labelLarge,
+    color: '#000',
+    fontWeight: '600',
   },
 });

@@ -1,6 +1,8 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Platform, RefreshControl } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -127,44 +129,57 @@ export default function ProfileScreen() {
   const { user, logout, token } = useAuthStore();
   const insets = useSafeAreaInsets();
   const [userTier, setUserTier] = useState<UserTier>('free');
+  const [refreshing, setRefreshing] = useState(false);
 
   // Fetch user's subscription tier
-  useEffect(() => {
-    const fetchTier = async () => {
-      // Demo account should appear as premium (for App Store review)
-      const isDemoAccount = user?.email === 'demo@represent.app';
-      if (isDemoAccount) {
-        setUserTier('premium');
-        return;
-      }
+  const fetchTier = useCallback(async () => {
+    const isDemoAccount = user?.email === 'demo@represent.app';
+    if (isDemoAccount) {
+      setUserTier('premium');
+      return;
+    }
 
-      if (!token) return;
+    if (!token) return;
 
-      try {
-        const response = await fetch(`${API_URL}/api/stripe/subscription`, {
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-        });
+    try {
+      const response = await fetch(`${API_URL}/api/stripe/subscription`, {
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+      });
 
-        if (response.ok) {
-          const data = await response.json();
-          if (data.tier === 'premium' && data.status === 'active') {
-            setUserTier('premium');
-          } else if (data.verificationPaid || data.tier === 'verified') {
-            setUserTier('verified');
-          } else {
-            setUserTier('free');
-          }
+      if (response.ok) {
+        const data = await response.json();
+        if (data.tier === 'premium' && data.status === 'active') {
+          setUserTier('premium');
+        } else if (data.verificationPaid || data.tier === 'verified') {
+          setUserTier('verified');
+        } else {
+          setUserTier('free');
         }
-      } catch (error) {
-        console.error('Failed to fetch subscription:', error);
       }
-    };
-
-    fetchTier();
+    } catch (error) {
+      console.error('Failed to fetch subscription:', error);
+    }
   }, [token, user?.email]);
+
+  useEffect(() => {
+    fetchTier();
+  }, [fetchTier]);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchTier();
+    }, [fetchTier])
+  );
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    await fetchTier();
+    setRefreshing(false);
+  }, [fetchTier]);
 
   const handleLogout = () => {
     Alert.alert('Log Out', 'Are you sure you want to log out?', [
@@ -201,20 +216,51 @@ export default function ProfileScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <ScrollView contentContainerStyle={[styles.content, { paddingTop: insets.top + 36 }]} showsVerticalScrollIndicator={false}>
-        {/* Profile Header */}
+      <ScrollView
+        contentContainerStyle={[styles.content, { paddingTop: insets.top + 36 }]}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.gold} />
+        }
+      >
+        {/* Profile Header — tier-reactive gradient */}
         <Animated.View
           entering={FadeInDown.duration(500)}
-          style={[styles.profileCard, { backgroundColor: colors.surface, borderColor: colors.gold }]}
+          style={[
+            styles.profileCard,
+            {
+              backgroundColor: colors.surface,
+              borderColor:
+                userTier === 'premium'
+                  ? colors.gold
+                  : userTier === 'verified'
+                  ? `${colors.gold}80`
+                  : colors.border,
+            },
+          ]}
         >
           <LinearGradient
-            colors={[`${colors.gold}10`, 'transparent']}
+            colors={
+              userTier === 'premium'
+                ? [`${colors.gold}33`, `${colors.gold}10`, 'transparent']
+                : userTier === 'verified'
+                ? [`${colors.gold}1A`, 'transparent']
+                : ['rgba(148,163,184,0.10)', 'transparent']
+            }
             style={StyleSheet.absoluteFill}
             start={{ x: 0.5, y: 0 }}
             end={{ x: 0.5, y: 1 }}
           />
 
-          <View style={[styles.avatar, { backgroundColor: colors.gold, ...SHADOWS.glow }]}>
+          <View
+            style={[
+              styles.avatar,
+              {
+                backgroundColor: colors.gold,
+                ...(userTier === 'premium' ? SHADOWS.glow : SHADOWS.md),
+              },
+            ]}
+          >
             <Text style={[styles.avatarText, { color: colors.background }]}>{getInitial()}</Text>
           </View>
 

@@ -1,91 +1,124 @@
 import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getRPVBalance } from './rpv-token';
 
 interface BallotState {
   balance: number;
   tier: 'free' | 'verified' | 'premium';
   isLoading: boolean;
+  fetchError: boolean;
   lastSyncedAt: number | null;
   walletAddress: string | null;
+  _hasHydrated: boolean;
 
   // Actions
-  initialize: () => void;
+  setHasHydrated: (state: boolean) => void;
   setTier: (tier: 'free' | 'verified' | 'premium') => void;
   syncFromChain: (walletAddress: string) => Promise<void>;
-  spendBallot: () => boolean; // Optimistic update for UI
+  spendBallot: () => boolean;
+  restoreBallot: () => void;
   canVote: () => boolean;
 }
 
-export const useBallotStore = create<BallotState>((set, get) => ({
-  balance: 0,
-  tier: 'free',
-  isLoading: true,
-  lastSyncedAt: null,
-  walletAddress: null,
+export const useBallotStore = create<BallotState>()(
+  persist(
+    (set, get) => ({
+      balance: 0,
+      tier: 'free',
+      isLoading: true,
+      fetchError: false,
+      lastSyncedAt: null,
+      walletAddress: null,
+      _hasHydrated: false,
 
-  initialize: () => {
-    // No longer loading from AsyncStorage - will sync from chain
-    set({ isLoading: false });
-  },
+      setHasHydrated: (state) => {
+        set({ _hasHydrated: state, isLoading: !state });
+      },
 
-  setTier: (tier) => {
-    set({ tier });
-  },
+      setTier: (tier) => {
+        set({ tier });
+      },
 
-  /**
-   * Sync ballot balance from on-chain RPV token balance
-   */
-  syncFromChain: async (walletAddress: string) => {
-    console.log('[Ballots] syncFromChain called with:', walletAddress);
+      syncFromChain: async (walletAddress: string) => {
+        console.log('[Ballots] syncFromChain called with:', walletAddress);
 
-    if (!walletAddress) {
-      console.log('[Ballots] No wallet address, setting balance to 0');
-      set({ balance: 0, isLoading: false, walletAddress: null });
-      return;
+        if (!walletAddress) {
+          console.log('[Ballots] No wallet address, setting balance to 0');
+          set({ balance: 0, isLoading: false, fetchError: false, walletAddress: null });
+          return;
+        }
+
+        const currentBalance = get().balance;
+        set({ isLoading: true, walletAddress, fetchError: false });
+
+        try {
+          const result = await getRPVBalance(walletAddress);
+
+          if (result.error) {
+            console.warn('[Ballots] RPC fetch failed, keeping cached balance:', currentBalance);
+            set({
+              isLoading: false,
+              fetchError: true,
+            });
+            return;
+          }
+
+          console.log('[Ballots] Got RPV balance:', result.balance, '| Setting to:', Math.floor(result.balance));
+          set({
+            balance: Math.floor(result.balance),
+            isLoading: false,
+            fetchError: false,
+            lastSyncedAt: Date.now(),
+          });
+        } catch (error) {
+          console.error('[Ballots] Failed to sync RPV balance:', error);
+          set({ isLoading: false, fetchError: true });
+        }
+      },
+
+      spendBallot: () => {
+        const { balance, tier } = get();
+
+        if (tier === 'premium') {
+          return true;
+        }
+
+        if (balance <= 0) {
+          return false;
+        }
+
+        set({ balance: balance - 1 });
+        return true;
+      },
+
+      restoreBallot: () => {
+        const { balance, tier } = get();
+        if (tier !== 'premium') {
+          set({ balance: balance + 1 });
+        }
+      },
+
+      canVote: () => {
+        const { balance, tier } = get();
+        return tier === 'premium' || balance > 0;
+      },
+    }),
+    {
+      name: 'represent-ballots',
+      storage: createJSONStorage(() => AsyncStorage),
+      partialize: (state) => ({
+        balance: state.balance,
+        tier: state.tier,
+        lastSyncedAt: state.lastSyncedAt,
+        walletAddress: state.walletAddress,
+      }),
+      onRehydrateStorage: () => (state) => {
+        state?.setHasHydrated(true);
+      },
     }
-
-    set({ isLoading: true, walletAddress });
-
-    try {
-      const balance = await getRPVBalance(walletAddress);
-      console.log('[Ballots] Got RPV balance:', balance, '| Setting to:', Math.floor(balance));
-      set({
-        balance: Math.floor(balance), // RPV tokens = ballots (1:1)
-        isLoading: false,
-        lastSyncedAt: Date.now(),
-      });
-    } catch (error) {
-      console.error('[Ballots] Failed to sync RPV balance:', error);
-      set({ isLoading: false });
-    }
-  },
-
-  /**
-   * Optimistic balance deduction for immediate UI feedback
-   * Actual balance will be synced from chain after vote API call
-   */
-  spendBallot: () => {
-    const { balance, tier } = get();
-
-    // Premium users have unlimited ballots
-    if (tier === 'premium') {
-      return true;
-    }
-
-    if (balance <= 0) {
-      return false;
-    }
-
-    // Optimistic update - will be corrected on next chain sync
-    set({ balance: balance - 1 });
-    return true;
-  },
-
-  canVote: () => {
-    const { balance, tier } = get();
-    return tier === 'premium' || balance > 0;
-  },
-}));
+  )
+);
 
 // Helper to format time remaining (kept for compatibility)
 export function formatTimeRemaining(ms: number): string {

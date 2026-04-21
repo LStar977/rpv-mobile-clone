@@ -4,7 +4,14 @@ import { useTheme } from '../../lib/theme';
 export default function ModalsLayout() {
   const { colors } = useTheme();
   return (
-    <Stack screenOptions={{ headerShown: false, presentation: 'modal', contentStyle: { backgroundColor: colors.background } }}>
+    <Stack
+      screenOptions={{
+        headerShown: false,
+        presentation: 'modal',
+        gestureEnabled: true,
+        contentStyle: { backgroundColor: colors.background },
+      }}
+    >
       <Stack.Screen name="veriff" />
       <Stack.Screen name="subscription" />
       <Stack.Screen name="receipt" />
@@ -14,9 +21,14 @@ export default function ModalsLayout() {
       <Stack.Screen name="analytics" />
       <Stack.Screen name="organizations" />
       <Stack.Screen name="organization-detail" />
+      <Stack.Screen name="org-proposal-detail" />
       <Stack.Screen name="verification-payment" />
       <Stack.Screen name="create-organization" />
       <Stack.Screen name="admin" />
+      <Stack.Screen name="out-of-ballots" />
+      <Stack.Screen name="purchase-ballots" />
+      <Stack.Screen name="my-proposals" />
+      <Stack.Screen name="community-proposals" />
     </Stack>
   );
 }

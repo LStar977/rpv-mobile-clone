@@ -64,6 +64,7 @@ export {
 export { VoteConfirmationOverlay } from './VoteConfirmationOverlay';
 export { ConfettiParticles } from './ConfettiParticles';
 export { MilestoneCelebration } from './MilestoneCelebration';
+export { EmptyState } from './EmptyState';
 
 // Tier Badges
 export { TierBadge, TierCard } from './TierBadge';

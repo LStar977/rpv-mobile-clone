@@ -1,6 +1,16 @@
-import { Audio } from 'expo-av';
 import { Platform } from 'react-native';
 import { haptics } from './haptics';
+
+// Conditionally import expo-av to handle missing native module
+let Audio: any = null;
+let audioAvailable = false;
+
+try {
+  Audio = require('expo-av').Audio;
+  audioAvailable = true;
+} catch (e) {
+  // expo-av native module not available - sound features will use haptics only
+}
 
 /**
  * Sound effects system for premium audio feedback
@@ -38,7 +48,7 @@ const SOUND_CONFIG = {
  * Initialize the audio system
  */
 export async function initSounds(): Promise<void> {
-  if (soundsLoaded) return;
+  if (soundsLoaded || !audioAvailable || !Audio) return;
 
   try {
     await Audio.setAudioModeAsync({
@@ -48,7 +58,7 @@ export async function initSounds(): Promise<void> {
     });
     soundsLoaded = true;
   } catch (e) {
-    console.warn('Audio initialization failed:', e);
+    // Audio init failed - will use haptics only
   }
 }
 

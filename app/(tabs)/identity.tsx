@@ -21,6 +21,7 @@ import Animated, {
   FadeInUp,
   useAnimatedStyle,
   useSharedValue,
+  withDelay,
   withRepeat,
   withSequence,
   withTiming,
@@ -337,6 +338,24 @@ function CivicBadge({
   );
 }
 
+// Count-up number used in stat rows
+function CountUpNumber({ value, delay = 0, style }: { value: number; delay?: number; style?: any }) {
+  const [display, setDisplay] = useState(0);
+  const animated = useSharedValue(0);
+
+  useEffect(() => {
+    animated.value = withDelay(delay, withTiming(value, { duration: 1000, easing: Easing.out(Easing.cubic) }));
+    const id = setInterval(() => {
+      const current = Math.round(animated.value);
+      setDisplay(current);
+      if (current >= value) clearInterval(id);
+    }, 16);
+    return () => clearInterval(id);
+  }, [value, delay]);
+
+  return <Text style={style}>{display}</Text>;
+}
+
 // Quick Stats Component
 function QuickStats({
   votesCount,
@@ -352,17 +371,17 @@ function QuickStats({
   return (
     <View style={[styles.quickStats, { backgroundColor: colors.surface, borderColor: colors.border }]}>
       <View style={styles.statItem}>
-        <Text style={[styles.statValue, { color: colors.text }]}>{votesCount}</Text>
+        <CountUpNumber value={votesCount} delay={100} style={[styles.statValue, { color: colors.text }]} />
         <Text style={[styles.statLabel, { color: colors.textTertiary }]}>Votes</Text>
       </View>
       <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
       <View style={styles.statItem}>
-        <Text style={[styles.statValue, { color: colors.text }]}>{proposalsCount}</Text>
+        <CountUpNumber value={proposalsCount} delay={250} style={[styles.statValue, { color: colors.text }]} />
         <Text style={[styles.statLabel, { color: colors.textTertiary }]}>Proposals</Text>
       </View>
       <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
       <View style={styles.statItem}>
-        <Text style={[styles.statValue, { color: colors.text }]}>{streakDays}</Text>
+        <CountUpNumber value={streakDays} delay={400} style={[styles.statValue, { color: colors.text }]} />
         <Text style={[styles.statLabel, { color: colors.textTertiary }]}>Day Streak</Text>
       </View>
     </View>
@@ -386,10 +405,10 @@ export default function IdentityScreen() {
 
   const [profile, setProfile] = useState<ProfileState | null>(null);
   const [startingKyc, setStartingKyc] = useState(false);
+  const [isPremium, setIsPremium] = useState(false);
+  const [hasPaidVerification, setHasPaidVerification] = useState(false);
 
-  // Verification is now free - payment state no longer needed
-
-  // Mock stats - in real app, fetch from API
+  // Stats from API
   const [stats, setStats] = useState({ votes: 0, proposals: 0, streak: 0 });
 
   // Tutorial target refs
@@ -404,11 +423,13 @@ export default function IdentityScreen() {
       const results = await Promise.allSettled([
         isAuthenticated ? userApi.getVerificationStatus() : Promise.resolve({ data: { verified: false } }),
         isAuthenticated ? userApi.getProfile() : Promise.resolve({ data: null }),
+        isAuthenticated ? userApi.getVotedProposals() : Promise.resolve({ data: [] }),
       ]);
 
       const verificationRes =
         results[0].status === 'fulfilled' ? results[0].value : { data: { verified: false } };
       const profileRes = results[1].status === 'fulfilled' ? results[1].value : { data: null };
+      const votedRes = results[2].status === 'fulfilled' ? results[2].value : { data: [] };
 
       const v = verificationRes?.data || {};
       const p = profileRes?.data || null;
@@ -446,11 +467,12 @@ export default function IdentityScreen() {
         }
       }
 
-      // Mock stats - replace with real API call
+      // Set real stats from API data
+      const votedProposals = votedRes?.data || [];
       setStats({
-        votes: Math.floor(Math.random() * 50),
-        proposals: Math.floor(Math.random() * 5),
-        streak: Math.floor(Math.random() * 14)
+        votes: Array.isArray(votedProposals) ? votedProposals.length : 0,
+        proposals: 0,
+        streak: 0,
       });
     } catch (e) {
       console.error('Identity fetch error:', e);
