@@ -364,7 +364,7 @@ export default function OrganizationsScreen() {
                     <Ionicons name="business" size={24} color="#000" />
                   </View>
                   <View style={styles.upsellText}>
-                    <Text style={[styles.upsellTitle, { color: colors.text }]}>Create Your Organization</Text>
+                    <Text style={[styles.upsellTitle, { color: colors.text, fontFamily: 'Georgia' }]}>Create Your Organization</Text>
                     <Text style={[styles.upsellDescription, { color: colors.textSecondary }]}>
                       Start at $29/month for unions, nonprofits, and community groups.
                     </Text>
@@ -427,7 +427,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   headerTitle: {
-    ...TYPOGRAPHY.headlineSmall,
+    fontFamily: 'Georgia',
+    fontSize: 20,
+    fontWeight: '500',
   },
   addButton: {
     width: 40,
@@ -466,8 +468,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   statValue: {
-    ...TYPOGRAPHY.headlineLarge,
-    fontWeight: '700',
+    fontFamily: 'Georgia',
+    fontSize: 28,
+    fontWeight: '500',
   },
   statLabel: {
     ...TYPOGRAPHY.labelSmall,
@@ -509,8 +512,9 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.xxs,
   },
   orgName: {
-    ...TYPOGRAPHY.labelLarge,
-    fontWeight: '600',
+    fontFamily: 'Georgia',
+    fontSize: 16,
+    fontWeight: '500',
   },
   orgDescription: {
     ...TYPOGRAPHY.bodySmall,
@@ -558,7 +562,9 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.xl,
   },
   emptyTitle: {
-    ...TYPOGRAPHY.headlineSmall,
+    fontFamily: 'Georgia',
+    fontSize: 22,
+    fontWeight: '500',
     marginBottom: SPACING.sm,
   },
   emptyDescription: {
