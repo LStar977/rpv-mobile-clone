@@ -535,115 +535,6 @@ const voteHeaderStyles = StyleSheet.create({
   },
 });
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// SWIPE DECISION RAIL - Replaces big action buttons
-// ═══════════════════════════════════════════════════════════════════════════════
-function SwipeDecisionRail() {
-  return (
-    <View style={decisionRailStyles.container}>
-      <View style={decisionRailStyles.railRow}>
-        {/* Left rail - oppose */}
-        <View style={decisionRailStyles.railLeft}>
-          <Text style={[decisionRailStyles.railLabel, { color: RED }]}>OPPOSE</Text>
-          <View style={[decisionRailStyles.railLine, { backgroundColor: RED }]}>
-            <Svg width={16} height={16} viewBox="0 0 16 16" style={decisionRailStyles.arrowIcon}>
-              <Path d="M14 8H2M6 4l-4 4 4 4" stroke={RED} strokeWidth={1.4} fill="none" strokeLinecap="round" strokeLinejoin="round" />
-            </Svg>
-          </View>
-        </View>
-
-        {/* Center icons */}
-        <View style={decisionRailStyles.centerIcons}>
-          <TouchableOpacity style={decisionRailStyles.centerBtn}>
-            <Ionicons name="bookmark-outline" size={16} color={FG_MUTED} />
-          </TouchableOpacity>
-          <TouchableOpacity style={decisionRailStyles.centerBtn}>
-            <Ionicons name="refresh-outline" size={14} color={FG_MUTED} />
-          </TouchableOpacity>
-          <TouchableOpacity style={decisionRailStyles.centerBtn}>
-            <Ionicons name="play-skip-forward-outline" size={14} color={FG_MUTED} />
-          </TouchableOpacity>
-        </View>
-
-        {/* Right rail - support */}
-        <View style={decisionRailStyles.railRight}>
-          <View style={[decisionRailStyles.railLine, { backgroundColor: GREEN }]}>
-            <Svg width={16} height={16} viewBox="0 0 16 16" style={[decisionRailStyles.arrowIcon, { right: -2 }]}>
-              <Path d="M2 8h12M10 4l4 4-4 4" stroke={GREEN} strokeWidth={1.4} fill="none" strokeLinecap="round" strokeLinejoin="round" />
-            </Svg>
-          </View>
-          <Text style={[decisionRailStyles.railLabel, { color: GREEN }]}>SUPPORT</Text>
-        </View>
-      </View>
-
-      {/* Hint */}
-      <Text style={decisionRailStyles.hint}>Swipe to decide · tap to read</Text>
-    </View>
-  );
-}
-
-const decisionRailStyles = StyleSheet.create({
-  container: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 102,
-    paddingHorizontal: 28,
-  },
-  railRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  railLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  railRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  railLabel: {
-    fontSize: 9,
-    fontWeight: '600',
-    letterSpacing: 2,
-  },
-  railLine: {
-    width: 60,
-    height: 1,
-    position: 'relative',
-  },
-  arrowIcon: {
-    position: 'absolute',
-    top: -8,
-  },
-  centerIcons: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  centerBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: BG_RAISED,
-    borderWidth: 1,
-    borderColor: LINE_STRONG,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  hint: {
-    textAlign: 'center',
-    marginTop: 12,
-    fontSize: 9.5,
-    color: FG_FAINT,
-    letterSpacing: 2,
-    textTransform: 'uppercase',
-  },
-});
-
 // Helper to check if a proposal is a seed proposal (for local-only voting)
 const isSeedProposal = (id: number | string): boolean =>
   typeof id === 'string' && id.startsWith('seed-');
@@ -2491,9 +2382,6 @@ export default function ProposalsScreen() {
                   />
                 )).reverse()}
               </View>
-
-              {/* Swipe decision rail */}
-              <SwipeDecisionRail />
             </View>
           )}
         </GestureHandlerRootView>
