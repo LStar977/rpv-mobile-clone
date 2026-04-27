@@ -34,7 +34,7 @@ import Svg, { Circle, Path, Line } from 'react-native-svg';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-// ── Sentinel Premium Design Tokens ───────────────────────────────────
+// ── Sentinel Premium Design Tokens (static fallbacks for StyleSheet) ───
 const SN_G = '#EABA58';       // Gold primary
 const SN_GD = '#C89A3E';      // Gold dark
 const SN_GL = '#F4D28C';      // Gold light
@@ -50,6 +50,28 @@ const SN_GREEN = '#34C759';   // Success/aligned
 const SN_RED = '#E5605A';     // Error/violating
 const SN_AMBER = '#F0A542';   // Warning/at risk
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
+
+// Dynamic hook for components to get theme-aware colors
+function useSentinelColors() {
+  const { colors, isDark } = useTheme();
+  return {
+    G: colors.gold,
+    GD: colors.goldDark,
+    GL: colors.goldLight,
+    BG: colors.background,
+    BG_CARD: colors.surface,
+    BG_RAISED: colors.surfaceElevated,
+    LINE: colors.border,
+    LINE_STRONG: colors.borderStrong,
+    FG: colors.text,
+    FG_MUTED: colors.textSecondary,
+    FG_FAINT: colors.textTertiary,
+    GREEN: colors.success,
+    RED: colors.error,
+    AMBER: colors.warning,
+    isDark,
+  };
+}
 
 const API_URL = 'https://representportal.com';
 const STORAGE_KEY = 'sentinel_analysis_history';
@@ -220,6 +242,7 @@ function SentinelMark({ size = 22, color = SN_G }: { size?: number; color?: stri
 
 // ── ScoreDial — radial meter for verdict cards ───────────────────────
 function ScoreDial({ score = 50, color = SN_RED, size = 56 }: { score?: number; color?: string; size?: number }) {
+  const sn = useSentinelColors();
   const r = (size - 8) / 2;
   const c = 2 * Math.PI * r;
   const offset = c * (1 - score / 100);
@@ -233,7 +256,7 @@ function ScoreDial({ score = 50, color = SN_RED, size = 56 }: { score?: number; 
           cy={size / 2}
           r={r}
           fill="none"
-          stroke={SN_LINE_STRONG}
+          stroke={sn.LINE_STRONG}
           strokeWidth={2}
         />
         {/* Score arc */}
@@ -284,7 +307,8 @@ function ScoreDial({ score = 50, color = SN_RED, size = 56 }: { score?: number; 
 }
 
 // ── Premium Eyebrow ──────────────────────────────────────────────────
-function SnEyebrow({ children, color = SN_FG_FAINT }: { children: React.ReactNode; color?: string }) {
+function SnEyebrow({ children, color }: { children: React.ReactNode; color?: string }) {
+  const sn = useSentinelColors();
   return (
     <Text style={{
       fontFamily: 'System',
@@ -292,7 +316,7 @@ function SnEyebrow({ children, color = SN_FG_FAINT }: { children: React.ReactNod
       fontWeight: '600',
       letterSpacing: 2.2,
       textTransform: 'uppercase',
-      color,
+      color: color || sn.FG_FAINT,
     }}>{children}</Text>
   );
 }
@@ -417,6 +441,7 @@ function QuickStatsRow({ analyses }: { analyses: Analysis[] }) {
 
 // ── Premium Header ───────────────────────────────────────────────────
 function SnHeader({ isPremium }: { isPremium: boolean }) {
+  const sn = useSentinelColors();
   return (
     <Animated.View entering={FadeInDown.duration(400)} style={snStyles.header}>
       {/* Premium badge */}
@@ -424,9 +449,9 @@ function SnHeader({ isPremium }: { isPremium: boolean }) {
         <View style={snStyles.headerTopRow}>
           <View style={snStyles.premiumHallmark}>
             <Svg width={9} height={9} viewBox="0 0 12 12">
-              <Path d="M6 1l1.5 3 3.5.5-2.5 2.5.6 3.5L6 8.8 2.9 10.5l.6-3.5L1 4.5 4.5 4 6 1z" fill={SN_G} />
+              <Path d="M6 1l1.5 3 3.5.5-2.5 2.5.6 3.5L6 8.8 2.9 10.5l.6-3.5L1 4.5 4.5 4 6 1z" fill={sn.G} />
             </Svg>
-            <Text style={snStyles.premiumText}>Premium</Text>
+            <Text style={[snStyles.premiumText, { color: sn.FG_FAINT }]}>Premium</Text>
           </View>
         </View>
       )}
@@ -434,13 +459,13 @@ function SnHeader({ isPremium }: { isPremium: boolean }) {
       {/* Main header row: icon + title */}
       <View style={snStyles.headerMain}>
         <View style={snStyles.headerIconBox}>
-          <SentinelMark size={28} color={SN_GL} />
+          <SentinelMark size={28} color={sn.GL} />
         </View>
         <View style={{ flex: 1 }}>
-          <Text style={snStyles.headerTitle}>
+          <Text style={[snStyles.headerTitle, { color: sn.FG }]}>
             Sentinel AI
           </Text>
-          <Text style={snStyles.headerSubtitle}>
+          <Text style={[snStyles.headerSubtitle, { color: sn.FG_MUTED }]}>
             Governance Report Cards
           </Text>
         </View>
@@ -449,8 +474,9 @@ function SnHeader({ isPremium }: { isPremium: boolean }) {
   );
 }
 
-// ── Tribunal Tally (replaces QuickStatsRow) ──────────────────────────
+// ── Tribunal Tally (replaces QuickStatsRow) ���─────────────────────────
 function Tribunal({ analyses }: { analyses: Analysis[] }) {
+  const sn = useSentinelColors();
   const total = analyses.length;
   const atRisk = analyses.filter(a => a.analysis.overallVerdict === 'At Risk').length;
   const violating = analyses.filter(a => a.analysis.overallVerdict === 'Violating').length;
@@ -460,26 +486,26 @@ function Tribunal({ analyses }: { analyses: Analysis[] }) {
   const sessionCode = `SESSION ${String(now.getMonth() + 1).padStart(2, '0')}·${String(now.getDate()).padStart(2, '0')}`;
 
   const items = [
-    { label: 'Analyzed', count: String(total).padStart(2, '0'), color: SN_FG },
-    { label: 'At Risk', count: String(atRisk + violating).padStart(2, '0'), color: SN_AMBER },
-    { label: 'Aligned', count: String(aligned).padStart(2, '0'), color: SN_GREEN },
+    { label: 'Analyzed', count: String(total).padStart(2, '0'), color: sn.FG },
+    { label: 'At Risk', count: String(atRisk + violating).padStart(2, '0'), color: sn.AMBER },
+    { label: 'Aligned', count: String(aligned).padStart(2, '0'), color: sn.GREEN },
   ];
 
   return (
     <Animated.View entering={FadeInUp.delay(100).duration(400)} style={snStyles.tribunalContainer}>
-      <View style={snStyles.tribunalCard}>
+      <View style={[snStyles.tribunalCard, { backgroundColor: sn.BG_CARD, borderColor: sn.LINE }]}>
         {items.map((item, i) => (
           <View
             key={item.label}
             style={[
               snStyles.tribunalCell,
-              i < 2 && snStyles.tribunalCellBorder,
+              i < 2 && [snStyles.tribunalCellBorder, { borderRightColor: sn.LINE }],
             ]}
           >
             <Text style={[snStyles.tribunalNumber, { color: item.color }]}>
               {item.count}
             </Text>
-            <Text style={snStyles.tribunalLabel}>{item.label}</Text>
+            <Text style={[snStyles.tribunalLabel, { color: sn.FG_FAINT }]}>{item.label}</Text>
           </View>
         ))}
       </View>
@@ -497,6 +523,7 @@ function VerdictDossierCard({
   onPress: () => void;
   index: number;
 }) {
+  const sn = useSentinelColors();
   const averageScore = calculateAverageScore(analysis.analysis.categoryScores);
   const verdictColor = getVerdictColorPremium(analysis.analysis.overallVerdict);
   const now = new Date();
@@ -505,18 +532,18 @@ function VerdictDossierCard({
   return (
     <Animated.View entering={FadeInUp.delay(index * 80).duration(300)}>
       <TouchableOpacity
-        style={[snStyles.dossierCard, { borderLeftColor: verdictColor }]}
+        style={[snStyles.dossierCard, { borderLeftColor: verdictColor, backgroundColor: sn.BG_CARD, borderColor: sn.LINE }]}
         onPress={onPress}
         activeOpacity={0.7}
       >
         <ScoreDial score={averageScore} color={verdictColor} size={56} />
         <View style={snStyles.dossierContent}>
           <View style={snStyles.dossierMeta}>
-            <Text style={snStyles.dossierCode}>{caseCode}</Text>
+            <Text style={[snStyles.dossierCode, { color: sn.FG_FAINT }]}>{caseCode}</Text>
             <View style={snStyles.dossierDot} />
-            <Text style={snStyles.dossierScope}>{analysis.issueType}</Text>
+            <Text style={[snStyles.dossierScope, { color: sn.FG_MUTED }]}>{analysis.issueType}</Text>
           </View>
-          <Text style={snStyles.dossierTitle} numberOfLines={1}>
+          <Text style={[snStyles.dossierTitle, { color: sn.FG }]} numberOfLines={1}>
             {analysis.title}
           </Text>
           <View style={snStyles.dossierFooter}>
@@ -525,10 +552,10 @@ function VerdictDossierCard({
                 {analysis.analysis.overallVerdict}
               </Text>
             </View>
-            <Text style={snStyles.dossierDate}>{analysis.timestamp}</Text>
+            <Text style={[snStyles.dossierDate, { color: sn.FG_FAINT }]}>{analysis.timestamp}</Text>
           </View>
         </View>
-        <Ionicons name="chevron-forward" size={14} color={SN_FG_FAINT} />
+        <Ionicons name="chevron-forward" size={14} color={sn.FG_FAINT} />
       </TouchableOpacity>
     </Animated.View>
   );
@@ -536,16 +563,17 @@ function VerdictDossierCard({
 
 // ── Issue Type Chip ──────────────────────────────────────────────────
 function IssueChip({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
+  const sn = useSentinelColors();
   return (
     <TouchableOpacity
       onPress={onPress}
       style={[
         snStyles.issueChip,
-        active && snStyles.issueChipActive,
+        { borderColor: sn.LINE_STRONG, backgroundColor: active ? sn.G : 'transparent' },
       ]}
       activeOpacity={0.7}
     >
-      <Text style={[snStyles.issueChipText, active && snStyles.issueChipTextActive]}>
+      <Text style={[snStyles.issueChipText, { color: active ? '#1A1A1A' : sn.FG_MUTED }]}>
         {label}
       </Text>
     </TouchableOpacity>
@@ -574,32 +602,33 @@ function SubmissionDesk({
   onAnalyze: () => void;
   isPremium: boolean;
 }) {
+  const sn = useSentinelColors();
   const issueTypes = ['Policy', 'Statute', 'Charter', 'Treaty', 'Law', 'Other'];
 
   return (
-    <Animated.View entering={FadeInUp.delay(300).duration(400)} style={snStyles.deskContainer}>
+    <Animated.View entering={FadeInUp.delay(300).duration(400)} style={[snStyles.deskContainer, { borderColor: sn.LINE_STRONG }]}>
       <LinearGradient
-        colors={['#0E1014', '#0A0C0F']}
+        colors={sn.isDark ? ['#0E1014', '#0A0C0F'] : ['#FFFFFF', '#F8F6F3']}
         style={[StyleSheet.absoluteFill, { borderRadius: 18 }]}
       />
 
       {/* Header */}
       <View style={snStyles.deskHeader}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-          <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: SN_LINE, justifyContent: 'center', alignItems: 'center' }}>
-            <Text style={{ color: SN_FG, fontSize: 18 }}>+</Text>
+          <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: sn.LINE, justifyContent: 'center', alignItems: 'center' }}>
+            <Text style={{ color: sn.FG, fontSize: 18 }}>+</Text>
           </View>
-          <Text style={snStyles.deskTitle}>New Analysis</Text>
+          <Text style={[snStyles.deskTitle, { color: sn.FG }]}>New Analysis</Text>
         </View>
       </View>
 
       {/* Title field */}
       <View style={snStyles.fieldGroup}>
-        <Text style={snStyles.fieldLabel}>Document Title</Text>
+        <Text style={[snStyles.fieldLabel, { color: sn.FG_FAINT }]}>Document Title</Text>
         <TextInput
-          style={snStyles.titleInput}
+          style={[snStyles.titleInput, { color: sn.FG, borderColor: sn.LINE, backgroundColor: sn.isDark ? 'transparent' : sn.BG_RAISED }]}
           placeholder="e.g. Tax Reform Act, 2026"
-          placeholderTextColor={SN_FG_FAINT}
+          placeholderTextColor={sn.FG_FAINT}
           value={title}
           onChangeText={setTitle}
         />
@@ -607,7 +636,7 @@ function SubmissionDesk({
 
       {/* Issue type chips */}
       <View style={snStyles.fieldGroup}>
-        <Text style={snStyles.fieldLabel}>Issue Type</Text>
+        <Text style={[snStyles.fieldLabel, { color: sn.FG_FAINT }]}>Issue Type</Text>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -627,16 +656,16 @@ function SubmissionDesk({
       {/* Document text area with paper lines */}
       <View style={snStyles.fieldGroup}>
         <View style={snStyles.fieldLabelRow}>
-          <Text style={snStyles.fieldLabel}>Document Text</Text>
-          <Text style={snStyles.charCount}>{text.length.toLocaleString()} / 50,000</Text>
+          <Text style={[snStyles.fieldLabel, { color: sn.FG_FAINT }]}>Document Text</Text>
+          <Text style={[snStyles.charCount, { color: sn.FG_FAINT }]}>{text.length.toLocaleString()} / 50,000</Text>
         </View>
-        <View style={snStyles.textAreaContainer}>
+        <View style={[snStyles.textAreaContainer, { borderColor: sn.LINE, backgroundColor: sn.isDark ? 'transparent' : sn.BG_RAISED }]}>
           {/* Paper rule lines */}
           <View style={snStyles.paperLines} />
           <TextInput
-            style={snStyles.textArea}
+            style={[snStyles.textArea, { color: sn.FG }]}
             placeholder="Paste the governance text to analyze..."
-            placeholderTextColor={SN_FG_FAINT}
+            placeholderTextColor={sn.FG_FAINT}
             value={text}
             onChangeText={setText}
             multiline
@@ -655,7 +684,7 @@ function SubmissionDesk({
         activeOpacity={0.8}
       >
         <LinearGradient
-          colors={[SN_GL, SN_GD]}
+          colors={[sn.GL, sn.GD]}
           style={StyleSheet.absoluteFill}
           start={{ x: 0, y: 0 }}
           end={{ x: 0, y: 1 }}
@@ -683,9 +712,10 @@ function SubmissionDesk({
 
 // ── Footer Signature ─────────────────────────────────────────────────
 function SnFooterSig() {
+  const sn = useSentinelColors();
   return (
     <Animated.View entering={FadeInUp.delay(400).duration(400)} style={snStyles.footerContainer}>
-      <Text style={snStyles.footerQuote}>Sentinel evaluates documents against 155 principles of proper human governance and generates a report card with grades.</Text>
+      <Text style={[snStyles.footerQuote, { color: sn.FG_FAINT }]}>Sentinel evaluates documents against 155 principles of proper human governance and generates a report card with grades.</Text>
     </Animated.View>
   );
 }
@@ -1723,7 +1753,7 @@ export default function SentinelScreen() {
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: SN_BG }]}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 16 }]}

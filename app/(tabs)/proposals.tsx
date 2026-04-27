@@ -49,7 +49,7 @@ import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS, ANIMATION, respo
 import Svg, { Rect, Line, Ellipse, Path, Circle, G, Defs, LinearGradient as SvgLinearGradient, Stop } from 'react-native-svg';
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// PREMIUM DESIGN CONSTANTS - Institutional gold-on-black
+// PREMIUM DESIGN CONSTANTS - Institutional gold-on-black (static fallbacks)
 // ═══════════════════════════════════════════════════════════════════════════════
 const GOLD = '#EABA58';
 const GOLD_DARK = '#C89A3E';
@@ -67,6 +67,28 @@ const RED = '#FF6B6B';
 const BLUE = '#5B8FF9';
 const SERIF_FONT = Platform.OS === 'ios' ? 'Georgia' : 'serif';
 const MONO_FONT = Platform.OS === 'ios' ? 'Menlo' : 'monospace';
+
+// Dynamic hook for components to get theme-aware colors
+function useProposalColors() {
+  const { colors, isDark } = useTheme();
+  return {
+    GOLD: colors.gold,
+    GOLD_DARK: colors.goldDark,
+    GOLD_LIGHT: colors.goldLight,
+    BG: colors.background,
+    BG_CARD: colors.surface,
+    BG_RAISED: colors.surfaceElevated,
+    LINE: colors.border,
+    LINE_STRONG: colors.borderStrong,
+    FG: colors.text,
+    FG_MUTED: colors.textSecondary,
+    FG_FAINT: colors.textTertiary,
+    GREEN: colors.success,
+    RED: colors.error,
+    BLUE: '#5B8FF9',
+    isDark,
+  };
+}
 import { showVoteConfirmation } from '../../lib/notifications';
 import { VoteConfirmationOverlay, UpgradeModal, BallotDisplay } from '../../components/ui';
 import { checkForNewBadges } from '../../lib/badgeNotification';
@@ -311,19 +333,19 @@ function VoteHeader({
   onFilterChange: (filter: string) => void;
   insetTop: number;
 }) {
-  const { colors } = useTheme();
+  const pc = useProposalColors();
   const filters = ['All', 'Federal', 'Provincial', 'Municipal', 'Closing'];
 
   return (
-    <View style={{ paddingTop: insetTop + 8, backgroundColor: BG }}>
+    <View style={{ paddingTop: insetTop + 8, backgroundColor: pc.BG }}>
       {/* Title block */}
       <View style={voteHeaderStyles.titleBlock}>
         <View>
-          <Text style={voteHeaderStyles.serifTitle}>Proposals</Text>
+          <Text style={[voteHeaderStyles.serifTitle, { color: pc.FG }]}>Proposals</Text>
           <View style={voteHeaderStyles.subtitleRow}>
-            <Text style={voteHeaderStyles.subtitleText}>{activeCount} active</Text>
-            <View style={voteHeaderStyles.dotSeparator} />
-            <Text style={voteHeaderStyles.subtitleText}>{closingSoon} closing soon</Text>
+            <Text style={[voteHeaderStyles.subtitleText, { color: pc.FG_MUTED }]}>{activeCount} active</Text>
+            <View style={[voteHeaderStyles.dotSeparator, { backgroundColor: pc.LINE_STRONG }]} />
+            <Text style={[voteHeaderStyles.subtitleText, { color: pc.FG_MUTED }]}>{closingSoon} closing soon</Text>
           </View>
         </View>
       </View>
@@ -346,14 +368,14 @@ function VoteHeader({
               style={[
                 voteHeaderStyles.filterChip,
                 {
-                  backgroundColor: isActive ? GOLD : 'transparent',
-                  borderColor: isActive ? GOLD : LINE_STRONG,
+                  backgroundColor: isActive ? pc.GOLD : 'transparent',
+                  borderColor: isActive ? pc.GOLD : pc.LINE_STRONG,
                 },
               ]}
             >
               <Text style={[
                 voteHeaderStyles.filterChipText,
-                { color: isActive ? '#1A1206' : FG_MUTED },
+                { color: isActive ? '#1A1206' : pc.FG_MUTED },
               ]}>{label}</Text>
             </TouchableOpacity>
           );
@@ -364,24 +386,24 @@ function VoteHeader({
       <View style={voteHeaderStyles.progressSection}>
         <View style={voteHeaderStyles.progressRow}>
           <View style={voteHeaderStyles.counterRow}>
-            <Text style={voteHeaderStyles.counterNum}>
+            <Text style={[voteHeaderStyles.counterNum, { color: pc.FG }]}>
               {String(index + 1).padStart(2, '0')} / {String(total).padStart(2, '0')}
             </Text>
-            <Text style={voteHeaderStyles.counterLabel}>in queue</Text>
+            <Text style={[voteHeaderStyles.counterLabel, { color: pc.FG_FAINT }]}>in queue</Text>
           </View>
-          <Text style={voteHeaderStyles.percentText}>
+          <Text style={[voteHeaderStyles.percentText, { color: pc.FG_FAINT }]}>
             {total > 0 ? Math.round(((index + 1) / total) * 100) : 0}% reviewed
           </Text>
         </View>
-        <View style={voteHeaderStyles.progressBar}>
+        <View style={[voteHeaderStyles.progressBar, { backgroundColor: pc.LINE }]}>
           <LinearGradient
-            colors={[GOLD_DARK, GOLD, GOLD_LIGHT]}
+            colors={[pc.GOLD_DARK, pc.GOLD, pc.GOLD_LIGHT]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
             style={[voteHeaderStyles.progressFill, { width: `${total > 0 ? ((index + 1) / total) * 100 : 0}%` }]}
           />
           {[25, 50, 75].map(p => (
-            <View key={p} style={[voteHeaderStyles.progressTick, { left: `${p}%` }]} />
+            <View key={p} style={[voteHeaderStyles.progressTick, { left: `${p}%`, backgroundColor: pc.LINE_STRONG }]} />
           ))}
         </View>
       </View>
@@ -638,7 +660,7 @@ const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const BASE_CARD_HEIGHT_OFFSET = 280; // Space for header, tab bar, and margins
 
 function SwipeCard({ proposal, onSwipeLeft, onSwipeRight, onSwipeUp, onTap, isTopCard, cardIndex, cardHeight }: SwipeCardProps) {
-  const { colors } = useTheme();
+  const pc = useProposalColors();
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
   const rotation = useSharedValue(0);
@@ -751,12 +773,12 @@ function SwipeCard({ proposal, onSwipeLeft, onSwipeRight, onSwipeUp, onTap, isTo
   // Get category color for tag
   const getCategoryColor = () => {
     switch (category?.toLowerCase()) {
-      case 'economy': return GREEN;
-      case 'housing': return GOLD;
-      case 'transportation': case 'infrastructure': return BLUE;
+      case 'economy': return pc.GREEN;
+      case 'housing': return pc.GOLD;
+      case 'transportation': case 'infrastructure': return pc.BLUE;
       case 'environment': return '#22C55E';
       case 'healthcare': return '#EF4444';
-      default: return GOLD;
+      default: return pc.GOLD;
     }
   };
 
@@ -768,14 +790,14 @@ function SwipeCard({ proposal, onSwipeLeft, onSwipeRight, onSwipeUp, onTap, isTo
 
   return (
     <GestureDetector gesture={composedGesture}>
-      <Animated.View style={[premiumCardStyles.card, { height: cardHeight }, cardStyle]}>
+      <Animated.View style={[premiumCardStyles.card, { height: cardHeight, backgroundColor: pc.BG_CARD, borderColor: pc.LINE }, cardStyle]}>
         {/* Hero with SVG scene */}
         <View style={premiumCardStyles.heroContainer}>
           {proposal.imageUrl ? (
             <>
               <Image source={{ uri: proposal.imageUrl }} style={StyleSheet.absoluteFill} resizeMode="cover" />
               <LinearGradient
-                colors={['rgba(4,7,7,0.2)', 'rgba(4,7,7,0.55)', 'rgba(13,15,18,0.95)']}
+                colors={pc.isDark ? ['rgba(4,7,7,0.2)', 'rgba(4,7,7,0.55)', 'rgba(13,15,18,0.95)'] : ['rgba(255,255,255,0.2)', 'rgba(255,255,255,0.55)', 'rgba(250,248,245,0.95)']}
                 locations={[0, 0.5, 1]}
                 style={StyleSheet.absoluteFill}
               />
@@ -784,7 +806,7 @@ function SwipeCard({ proposal, onSwipeLeft, onSwipeRight, onSwipeUp, onTap, isTo
             <>
               {getSceneForCategory(category)}
               <LinearGradient
-                colors={['rgba(4,7,7,0.15)', 'transparent', 'transparent', 'rgba(13,15,18,0.95)']}
+                colors={pc.isDark ? ['rgba(4,7,7,0.15)', 'transparent', 'transparent', 'rgba(13,15,18,0.95)'] : ['rgba(255,255,255,0.15)', 'transparent', 'transparent', 'rgba(250,248,245,0.95)']}
                 locations={[0, 0.3, 0.75, 1]}
                 style={StyleSheet.absoluteFill}
               />
@@ -792,16 +814,16 @@ function SwipeCard({ proposal, onSwipeLeft, onSwipeRight, onSwipeUp, onTap, isTo
           )}
 
           {/* Location pill - top left */}
-          <View style={premiumCardStyles.locationPill}>
-            <Ionicons name="location" size={11} color={FG} />
-            <Text style={premiumCardStyles.locationText}>{location}</Text>
+          <View style={[premiumCardStyles.locationPill, { backgroundColor: pc.isDark ? 'rgba(4,7,7,0.55)' : 'rgba(255,255,255,0.75)' }]}>
+            <Ionicons name="location" size={11} color={pc.FG} />
+            <Text style={[premiumCardStyles.locationText, { color: pc.FG }]}>{location}</Text>
           </View>
 
           {/* Time remaining pill - top right */}
           {!isEnded && timeRemaining ? (
-            <View style={premiumCardStyles.timePill}>
-              <Ionicons name="time-outline" size={11} color={GOLD} />
-              <Text style={premiumCardStyles.timePillText}>{timeRemaining}</Text>
+            <View style={[premiumCardStyles.timePill, { borderColor: `${pc.GOLD}55`, backgroundColor: pc.isDark ? 'rgba(4,7,7,0.55)' : 'rgba(255,255,255,0.75)' }]}>
+              <Ionicons name="time-outline" size={11} color={pc.GOLD} />
+              <Text style={[premiumCardStyles.timePillText, { color: pc.GOLD }]}>{timeRemaining}</Text>
             </View>
           ) : null}
 
@@ -815,19 +837,19 @@ function SwipeCard({ proposal, onSwipeLeft, onSwipeRight, onSwipeUp, onTap, isTo
         {/* Swipe Indicators */}
         {isTopCard && !isEnded && (
           <>
-            <Animated.View style={[premiumCardStyles.swipeVeil, { backgroundColor: `${GREEN}20` }, supportIndicatorStyle]}>
-              <View style={[premiumCardStyles.swipeStamp, { borderColor: GREEN }]}>
-                <Text style={[premiumCardStyles.swipeStampText, { color: GREEN }]}>SUPPORT</Text>
+            <Animated.View style={[premiumCardStyles.swipeVeil, { backgroundColor: `${pc.GREEN}20` }, supportIndicatorStyle]}>
+              <View style={[premiumCardStyles.swipeStamp, { borderColor: pc.GREEN }]}>
+                <Text style={[premiumCardStyles.swipeStampText, { color: pc.GREEN }]}>SUPPORT</Text>
               </View>
             </Animated.View>
-            <Animated.View style={[premiumCardStyles.swipeVeil, { backgroundColor: `${RED}20` }, opposeIndicatorStyle]}>
-              <View style={[premiumCardStyles.swipeStamp, { borderColor: RED, right: 24, left: undefined }]}>
-                <Text style={[premiumCardStyles.swipeStampText, { color: RED }]}>OPPOSE</Text>
+            <Animated.View style={[premiumCardStyles.swipeVeil, { backgroundColor: `${pc.RED}20` }, opposeIndicatorStyle]}>
+              <View style={[premiumCardStyles.swipeStamp, { borderColor: pc.RED, right: 24, left: undefined }]}>
+                <Text style={[premiumCardStyles.swipeStampText, { color: pc.RED }]}>OPPOSE</Text>
               </View>
             </Animated.View>
             <Animated.View style={[premiumCardStyles.swipeVeilTop, skipIndicatorStyle]}>
-              <View style={[premiumCardStyles.swipeStamp, { borderColor: GOLD, transform: [{ rotate: '0deg' }] }]}>
-                <Text style={[premiumCardStyles.swipeStampText, { color: GOLD }]}>SKIP</Text>
+              <View style={[premiumCardStyles.swipeStamp, { borderColor: pc.GOLD, transform: [{ rotate: '0deg' }] }]}>
+                <Text style={[premiumCardStyles.swipeStampText, { color: pc.GOLD }]}>SKIP</Text>
               </View>
             </Animated.View>
           </>
@@ -836,47 +858,47 @@ function SwipeCard({ proposal, onSwipeLeft, onSwipeRight, onSwipeUp, onTap, isTo
         {/* Card body */}
         <View style={premiumCardStyles.cardBody}>
           {/* Tier label */}
-          <Text style={premiumCardStyles.refText}>{tierLabel}</Text>
+          <Text style={[premiumCardStyles.refText, { color: pc.GOLD }]}>{tierLabel}</Text>
 
           {/* Serif title */}
-          <Text style={premiumCardStyles.serifTitle} numberOfLines={2}>{proposal.title}</Text>
+          <Text style={[premiumCardStyles.serifTitle, { color: pc.FG }]} numberOfLines={2}>{proposal.title}</Text>
 
           {/* Proposer */}
           <View style={premiumCardStyles.proposerRow}>
-            <View style={premiumCardStyles.proposerAvatar}>
-              <Text style={premiumCardStyles.proposerDot}>·</Text>
+            <View style={[premiumCardStyles.proposerAvatar, { backgroundColor: pc.LINE_STRONG }]}>
+              <Text style={[premiumCardStyles.proposerDot, { color: pc.GOLD }]}>·</Text>
             </View>
-            <Text style={premiumCardStyles.proposerText}>
-              Proposed by <Text style={{ color: FG }}>{proposal.creatorName || 'Community Member'}</Text>
+            <Text style={[premiumCardStyles.proposerText, { color: pc.FG_MUTED }]}>
+              Proposed by <Text style={{ color: pc.FG }}>{proposal.creatorName || 'Community Member'}</Text>
             </Text>
           </View>
 
           {/* Description */}
-          <Text style={premiumCardStyles.description}>{proposal.description}</Text>
+          <Text style={[premiumCardStyles.description, { color: pc.FG_MUTED }]}>{proposal.description}</Text>
 
           {/* Sentiment ledger */}
           {totalVotes === 0 ? (
             <View style={premiumCardStyles.sentimentSection}>
-              <View style={premiumCardStyles.sentimentBarEmpty} />
-              <Text style={premiumCardStyles.noVotesText}>No votes yet</Text>
+              <View style={[premiumCardStyles.sentimentBarEmpty, { backgroundColor: pc.LINE }]} />
+              <Text style={[premiumCardStyles.noVotesText, { color: pc.FG_FAINT }]}>No votes yet</Text>
             </View>
           ) : (
             <View style={premiumCardStyles.sentimentSection}>
-              <View style={premiumCardStyles.sentimentBar}>
-                <View style={[premiumCardStyles.sentimentFillSupport, { width: `${supportPercent}%` }]} />
-                <View style={[premiumCardStyles.sentimentFillOppose, { width: `${100 - supportPercent}%` }]} />
+              <View style={[premiumCardStyles.sentimentBar, { backgroundColor: pc.LINE }]}>
+                <View style={[premiumCardStyles.sentimentFillSupport, { width: `${supportPercent}%`, backgroundColor: pc.GREEN }]} />
+                <View style={[premiumCardStyles.sentimentFillOppose, { width: `${100 - supportPercent}%`, backgroundColor: pc.RED }]} />
               </View>
               <View style={premiumCardStyles.sentimentStats}>
                 <View style={premiumCardStyles.sentimentStat}>
-                  <Text style={[premiumCardStyles.sentimentNum, { color: GREEN }]}>{(proposal.supportVotes || 0).toLocaleString()}</Text>
-                  <Text style={premiumCardStyles.sentimentLabel}>SUPPORT</Text>
+                  <Text style={[premiumCardStyles.sentimentNum, { color: pc.GREEN }]}>{(proposal.supportVotes || 0).toLocaleString()}</Text>
+                  <Text style={[premiumCardStyles.sentimentLabel, { color: pc.FG_FAINT }]}>SUPPORT</Text>
                 </View>
                 <View style={premiumCardStyles.sentimentPct}>
-                  <Text style={premiumCardStyles.sentimentPctText}>{supportPercent}%</Text>
+                  <Text style={[premiumCardStyles.sentimentPctText, { color: pc.FG_FAINT }]}>{supportPercent}%</Text>
                 </View>
                 <View style={premiumCardStyles.sentimentStatRight}>
-                  <Text style={[premiumCardStyles.sentimentNum, { color: RED }]}>{(proposal.opposeVotes || 0).toLocaleString()}</Text>
-                  <Text style={premiumCardStyles.sentimentLabel}>OPPOSE</Text>
+                  <Text style={[premiumCardStyles.sentimentNum, { color: pc.RED }]}>{(proposal.opposeVotes || 0).toLocaleString()}</Text>
+                  <Text style={[premiumCardStyles.sentimentLabel, { color: pc.FG_FAINT }]}>OPPOSE</Text>
                 </View>
               </View>
             </View>
@@ -2177,7 +2199,7 @@ export default function ProposalsScreen() {
   const detailIsVoting = detail ? votingProposalId === (detail.id as number) : false;
 
   return (
-    <View style={[styles.container, { backgroundColor: viewMode === 'swipe' ? BG : colors.background }]}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header - only show in list mode */}
       {viewMode !== 'swipe' && (
         <Animated.View entering={FadeInDown.duration(400)} style={[styles.header, { borderBottomColor: colors.border, paddingTop: insets.top + 16 }]}>

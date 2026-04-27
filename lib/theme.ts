@@ -152,45 +152,45 @@ export const DARK_COLORS = {
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// PREMIUM LIGHT THEME - Clean, Bright, Professional
+// PREMIUM LIGHT THEME - Warm, Institutional, Billion-Dollar Feel
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export const LIGHT_COLORS = {
-  // Backgrounds
-  background: '#FFFFFF',
-  backgroundElevated: '#FAFAFA',
-  backgroundSecondary: '#F5F5F7',
+  // Backgrounds - Warm ivory/cream, not clinical white
+  background: '#FAF8F5',
+  backgroundElevated: '#FFFDF9',
+  backgroundSecondary: '#F5F2ED',
 
-  // Surfaces
+  // Surfaces - White cards for contrast against warm background
   surface: '#FFFFFF',
   surfaceElevated: '#FFFFFF',
-  surfaceHighlight: '#F5F5F7',
-  surfacePressed: '#EBEBED',
+  surfaceHighlight: '#FBF9F6',
+  surfacePressed: '#F5F2ED',
 
-  // Borders
-  border: 'rgba(0, 0, 0, 0.08)',
-  borderSubtle: 'rgba(0, 0, 0, 0.05)',
-  borderStrong: 'rgba(0, 0, 0, 0.12)',
-  borderFocus: 'rgba(0, 0, 0, 0.20)',
+  // Borders - Warm undertones
+  border: 'rgba(30, 25, 20, 0.10)',
+  borderSubtle: 'rgba(30, 25, 20, 0.06)',
+  borderStrong: 'rgba(30, 25, 20, 0.15)',
+  borderFocus: 'rgba(30, 25, 20, 0.25)',
 
-  // Text
-  text: '#000000',
-  textPrimary: '#000000',
-  textSecondary: '#6B6B70',
-  textTertiary: '#9A9AA0',
-  textDisabled: '#C5C5CA',
+  // Text - Warm near-black, not pure black
+  text: '#1A1A1A',
+  textPrimary: '#1A1A1A',
+  textSecondary: '#5C5856',
+  textTertiary: '#8A8582',
+  textDisabled: '#B8B5B2',
   textInverse: '#FFFFFF',
 
-  // Brand Gold - Darker for light mode
-  gold: '#9E7E1E',
-  goldLight: '#C9A227',
-  goldDark: '#7A6217',
-  goldSurface: 'rgba(158, 126, 30, 0.08)',
-  goldSurfaceStrong: 'rgba(158, 126, 30, 0.15)',
-  goldSurfaceIntense: 'rgba(158, 126, 30, 0.25)',
-  goldGradientStart: '#C9A227',
-  goldGradientMiddle: '#9E7E1E',
-  goldGradientEnd: '#7A6217',
+  // Brand Gold - Rich antique gold for light backgrounds
+  gold: '#B8941C',
+  goldLight: '#D4A82E',
+  goldDark: '#8A700F',
+  goldSurface: 'rgba(184, 148, 28, 0.10)',
+  goldSurfaceStrong: 'rgba(184, 148, 28, 0.18)',
+  goldSurfaceIntense: 'rgba(184, 148, 28, 0.28)',
+  goldGradientStart: '#D4A82E',
+  goldGradientMiddle: '#B8941C',
+  goldGradientEnd: '#8A700F',
 
   // Semantic - Darker for light backgrounds
   success: '#059669',
@@ -247,15 +247,15 @@ export const LIGHT_COLORS = {
 
   // Legacy aliases for backward compatibility
   cardBg: '#FFFFFF',
-  cardBgLight: '#F5F5F7',
-  textMuted: '#8E8E93',
-  surfaceHover: '#F5F5F7',
-  borderLight: 'rgba(0, 0, 0, 0.05)',
+  cardBgLight: '#FBF9F6',
+  textMuted: '#8A8582',
+  surfaceHover: '#FBF9F6',
+  borderLight: 'rgba(30, 25, 20, 0.06)',
 
-  gradientGold: ['#C9A227', '#9E7E1E', '#7A6217'],
-  gradientDark: ['#FFFFFF', '#FAFAFA', '#F5F5F7'],
-  gradientCard: ['rgba(0,0,0,0.02)', 'rgba(0,0,0,0.05)'],
-  gradientHero: ['#FFFFFF', '#FAFAFA', '#F5F5F7'],
+  gradientGold: ['#D4A82E', '#B8941C', '#8A700F'],
+  gradientDark: ['#FAF8F5', '#F5F2ED', '#EDE9E3'],
+  gradientCard: ['rgba(30,25,20,0.02)', 'rgba(30,25,20,0.05)'],
+  gradientHero: ['#FAF8F5', '#F5F2ED', '#EDE9E3'],
   gradientSuccess: ['#059669', '#047857'],
   gradientAccent: ['#7C3AED', '#6366F1'],
 };

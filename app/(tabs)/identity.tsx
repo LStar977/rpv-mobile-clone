@@ -46,7 +46,7 @@ const CARD_HEIGHT = CARD_WIDTH * 0.63;
 
 const AnimatedLinearGradient = Animated.createAnimatedComponent(LinearGradient);
 
-// Premium design tokens
+// Premium design tokens - static fallbacks for StyleSheet
 const ID = {
   G: '#EABA58',
   GD: '#C89A3E',
@@ -63,6 +63,26 @@ const ID = {
   SERIF: 'Georgia',
   MONO: 'JetBrainsMono-Regular',
 };
+
+// Dynamic hook for components to get theme-aware colors
+function useIdentityColors() {
+  const { colors, isDark } = useTheme();
+  return {
+    G: colors.gold,
+    GD: colors.goldDark,
+    GL: colors.goldLight,
+    BG: colors.background,
+    BG_CARD: colors.surface,
+    BG_RAISED: colors.surfaceElevated,
+    LINE: colors.border,
+    LINE_STRONG: colors.borderStrong,
+    FG: colors.text,
+    FG_MUTED: colors.textSecondary,
+    FG_FAINT: colors.textTertiary,
+    GREEN: colors.success,
+    isDark,
+  };
+}
 
 type VerificationState = {
   verified: boolean;
@@ -141,19 +161,20 @@ function toRomanNumeral(num: number): string {
 
 // Premium ID Header
 function IdHeader({ folio }: { folio: string }) {
+  const id = useIdentityColors();
   return (
     <View style={premiumStyles.header}>
       <View style={premiumStyles.headerTop}>
         <View style={premiumStyles.headerBadge}>
-          <View style={premiumStyles.greenDot} />
-          <Text style={premiumStyles.eyebrow}>Verified</Text>
+          <View style={[premiumStyles.greenDot, { backgroundColor: id.GREEN }]} />
+          <Text style={[premiumStyles.eyebrow, { color: id.FG_FAINT }]}>Verified</Text>
         </View>
-        <Text style={premiumStyles.folioCode}>ID {folio}</Text>
+        <Text style={[premiumStyles.folioCode, { color: id.FG_FAINT }]}>ID {folio}</Text>
       </View>
-      <Text style={premiumStyles.headline}>
-        Your <Text style={premiumStyles.headlineItalic}>Identity</Text>
+      <Text style={[premiumStyles.headline, { color: id.FG }]}>
+        Your <Text style={[premiumStyles.headlineItalic, { color: id.GL }]}>Identity</Text>
       </Text>
-      <Text style={premiumStyles.subline}>
+      <Text style={[premiumStyles.subline, { color: id.FG_MUTED }]}>
         Your verified civic profile and activity.
       </Text>
     </View>
@@ -174,6 +195,7 @@ function PassportCard({
   folio: string;
   memberSince?: string;
 }) {
+  const id = useIdentityColors();
   const initials = useMemo(() => {
     if (!name) return 'RW';
     const parts = name.split(' ').filter(Boolean);
@@ -189,14 +211,14 @@ function PassportCard({
   const mrzLine2 = `RW${folio.replace(/[^0-9]/g, '')}<CAN8604012M2604264<<<<<<<<`;
 
   return (
-    <View style={premiumStyles.passportCard}>
+    <View style={[premiumStyles.passportCard, { backgroundColor: id.BG_CARD, borderColor: id.LINE_STRONG }]}>
       {/* Guilloché pattern */}
       <View style={premiumStyles.guilloche}>
         <Svg width="100%" height="100%" viewBox="0 0 400 260" preserveAspectRatio="none">
           <Defs>
             <Pattern id="guilloche" x="0" y="0" width="40" height="40" patternUnits="userSpaceOnUse">
-              <Path d="M 0 20 Q 10 0, 20 20 T 40 20" stroke={ID.G} fill="none" strokeWidth={0.5} opacity={0.07} />
-              <Path d="M 0 20 Q 10 40, 20 20 T 40 20" stroke={ID.G} fill="none" strokeWidth={0.5} opacity={0.07} />
+              <Path d="M 0 20 Q 10 0, 20 20 T 40 20" stroke={id.G} fill="none" strokeWidth={0.5} opacity={0.07} />
+              <Path d="M 0 20 Q 10 40, 20 20 T 40 20" stroke={id.G} fill="none" strokeWidth={0.5} opacity={0.07} />
             </Pattern>
           </Defs>
           <Rect width="400" height="260" fill="url(#guilloche)" />
@@ -204,57 +226,57 @@ function PassportCard({
       </View>
 
       {/* Top strip */}
-      <View style={premiumStyles.passportTop}>
+      <View style={[premiumStyles.passportTop, { borderBottomColor: id.LINE }]}>
         <View style={premiumStyles.passportLogo}>
           <Image source={require('../../assets/logo.png')} style={{ width: 22, height: 22 }} resizeMode="contain" />
-          <Text style={premiumStyles.passportBrand}>REPRESENT</Text>
+          <Text style={[premiumStyles.passportBrand, { color: id.G }]}>REPRESENT</Text>
         </View>
-        <Text style={premiumStyles.passportEst}>EST 2026</Text>
+        <Text style={[premiumStyles.passportEst, { color: id.FG_FAINT }]}>EST 2026</Text>
       </View>
 
       {/* Main section */}
       <View style={premiumStyles.passportMain}>
         {/* Portrait frame */}
-        <View style={premiumStyles.portraitFrame}>
-          <View style={[premiumStyles.cornerTick, { top: -1, left: -1 }]} />
-          <View style={[premiumStyles.cornerTick, { top: -1, right: -1, borderLeftWidth: 0, borderRightWidth: 1.5 }]} />
-          <View style={[premiumStyles.cornerTick, { bottom: -1, left: -1, borderTopWidth: 0, borderBottomWidth: 1.5 }]} />
-          <View style={[premiumStyles.cornerTick, { bottom: -1, right: -1, borderTopWidth: 0, borderBottomWidth: 1.5, borderLeftWidth: 0, borderRightWidth: 1.5 }]} />
-          <Text style={premiumStyles.initialsText} numberOfLines={1} adjustsFontSizeToFit>{initials}</Text>
+        <View style={[premiumStyles.portraitFrame, { borderColor: id.GD }]}>
+          <View style={[premiumStyles.cornerTick, { top: -1, left: -1, borderColor: id.G }]} />
+          <View style={[premiumStyles.cornerTick, { top: -1, right: -1, borderLeftWidth: 0, borderRightWidth: 1.5, borderColor: id.G }]} />
+          <View style={[premiumStyles.cornerTick, { bottom: -1, left: -1, borderTopWidth: 0, borderBottomWidth: 1.5, borderColor: id.G }]} />
+          <View style={[premiumStyles.cornerTick, { bottom: -1, right: -1, borderTopWidth: 0, borderBottomWidth: 1.5, borderLeftWidth: 0, borderRightWidth: 1.5, borderColor: id.G }]} />
+          <Text style={[premiumStyles.initialsText, { color: id.GL }]} numberOfLines={1} adjustsFontSizeToFit>{initials}</Text>
           {verified && (
-            <View style={premiumStyles.biometricTick}>
-              <Ionicons name="checkmark" size={10} color={ID.BG} />
+            <View style={[premiumStyles.biometricTick, { backgroundColor: id.GREEN }]}>
+              <Ionicons name="checkmark" size={10} color={id.BG} />
             </View>
           )}
         </View>
 
         {/* Info */}
         <View style={premiumStyles.passportInfo}>
-          <Text style={premiumStyles.registeredLabel}>Registered name</Text>
-          <Text style={premiumStyles.passportName}>{name || 'Your Name'}</Text>
+          <Text style={[premiumStyles.registeredLabel, { color: id.FG_FAINT }]}>Registered name</Text>
+          <Text style={[premiumStyles.passportName, { color: id.FG }]}>{name || 'Your Name'}</Text>
           <View style={premiumStyles.locationRow}>
             <Svg width={10} height={10} viewBox="0 0 12 12">
-              <Path d="M6 11s4-3.5 4-7a4 4 0 1 0-8 0c0 3.5 4 7 4 7z" stroke={ID.G} strokeWidth={1} fill="none" />
-              <Circle cx="6" cy="4" r="1.2" fill={ID.G} />
+              <Path d="M6 11s4-3.5 4-7a4 4 0 1 0-8 0c0 3.5 4 7 4 7z" stroke={id.G} strokeWidth={1} fill="none" />
+              <Circle cx="6" cy="4" r="1.2" fill={id.G} />
             </Svg>
-            <Text style={premiumStyles.locationText}>{location || 'Location not set'}</Text>
+            <Text style={[premiumStyles.locationText, { color: id.FG_MUTED }]}>{location || 'Location not set'}</Text>
           </View>
         </View>
       </View>
 
       {/* Register strip */}
-      <View style={premiumStyles.registerStrip}>
+      <View style={[premiumStyles.registerStrip, { borderTopColor: id.LINE }]}>
         <View style={premiumStyles.registerCell}>
-          <Text style={premiumStyles.registerLabel}>Joined</Text>
-          <Text style={premiumStyles.registerValue}>{memberSince || 'Apr 2026'}</Text>
+          <Text style={[premiumStyles.registerLabel, { color: id.FG_FAINT }]}>Joined</Text>
+          <Text style={[premiumStyles.registerValue, { color: id.FG }]}>{memberSince || 'Apr 2026'}</Text>
         </View>
-        <View style={[premiumStyles.registerCell, premiumStyles.registerCellMid]}>
-          <Text style={premiumStyles.registerLabel}>Folio</Text>
-          <Text style={premiumStyles.registerMono}>RW·{folio}</Text>
+        <View style={[premiumStyles.registerCell, premiumStyles.registerCellMid, { borderColor: id.LINE }]}>
+          <Text style={[premiumStyles.registerLabel, { color: id.FG_FAINT }]}>Folio</Text>
+          <Text style={[premiumStyles.registerMono, { color: id.FG }]}>RW·{folio}</Text>
         </View>
         <View style={premiumStyles.registerCell}>
-          <Text style={premiumStyles.registerLabel}>Status</Text>
-          <Text style={[premiumStyles.registerValue, { color: verified ? ID.GREEN : ID.FG_MUTED }]}>
+          <Text style={[premiumStyles.registerLabel, { color: id.FG_FAINT }]}>Status</Text>
+          <Text style={[premiumStyles.registerValue, { color: verified ? id.GREEN : id.FG_MUTED }]}>
             {verified ? 'Active' : 'Pending'}
           </Text>
         </View>
@@ -266,6 +288,7 @@ function PassportCard({
 
 // Activity Stats
 function StandingRegister({ votes, proposals, streak }: { votes: number; proposals: number; streak: number }) {
+  const id = useIdentityColors();
   const items = [
     { label: 'Votes cast', value: votes.toString().padStart(2, '0'), sub: 'all-time' },
     { label: 'Proposals', value: proposals.toString().padStart(2, '0'), sub: 'authored' },
@@ -274,14 +297,14 @@ function StandingRegister({ votes, proposals, streak }: { votes: number; proposa
   return (
     <View style={premiumStyles.standingSection}>
       <View style={premiumStyles.standingHeader}>
-        <Text style={premiumStyles.eyebrow}>Activity</Text>
+        <Text style={[premiumStyles.eyebrow, { color: id.FG_FAINT }]}>Activity</Text>
       </View>
-      <View style={premiumStyles.standingGrid}>
+      <View style={[premiumStyles.standingGrid, { backgroundColor: id.BG_CARD, borderColor: id.LINE }]}>
         {items.map((it, i) => (
-          <View key={i} style={[premiumStyles.standingCell, i < 2 && premiumStyles.standingCellBorder]}>
-            <Text style={premiumStyles.standingValue}>{it.value}</Text>
-            <Text style={premiumStyles.standingLabel}>{it.label}</Text>
-            <Text style={premiumStyles.standingSub}>{it.sub}</Text>
+          <View key={i} style={[premiumStyles.standingCell, i < 2 && [premiumStyles.standingCellBorder, { borderRightColor: id.LINE }]]}>
+            <Text style={[premiumStyles.standingValue, { color: id.FG }]}>{it.value}</Text>
+            <Text style={[premiumStyles.standingLabel, { color: id.FG_MUTED }]}>{it.label}</Text>
+            <Text style={[premiumStyles.standingSub, { color: id.FG_FAINT }]}>{it.sub}</Text>
           </View>
         ))}
       </View>
@@ -291,8 +314,9 @@ function StandingRegister({ votes, proposals, streak }: { votes: number; proposa
 
 // Engraved Seal Medallion
 function SealMedallion({ glyph, locked, tier }: { glyph: React.ReactNode; locked: boolean; tier: 'L' | 'E' }) {
-  const ringColor = locked ? ID.LINE_STRONG : ID.GD;
-  const innerColor = locked ? '#16191D' : '#181B20';
+  const id = useIdentityColors();
+  const ringColor = locked ? id.LINE_STRONG : id.GD;
+  const innerColor = locked ? (id.isDark ? '#16191D' : '#E8E4DF') : (id.isDark ? '#181B20' : '#F5F2ED');
 
   return (
     <View style={premiumStyles.sealContainer}>
@@ -370,6 +394,7 @@ function AchievementBadge({
   earned: boolean;
   onPress?: () => void;
 }) {
+  const id = useIdentityColors();
   const glyphId = badge.id === 'vote_streak_100' ? 'hero' :
     badge.id === 'early_adopter' ? 'rocket' :
     badge.id === 'global_citizen' ? 'globe' :
@@ -377,24 +402,25 @@ function AchievementBadge({
     badge.id === 'referral_20' ? 'hands' : 'shield';
 
   const tier = badge.tier === 'legendary' ? 'L' : 'E';
-  const glyphColor = earned ? ID.GL : ID.FG_FAINT;
+  const glyphColor = earned ? id.GL : id.FG_FAINT;
   const glyph = SealGlyphs[glyphId as keyof typeof SealGlyphs]?.(glyphColor) || SealGlyphs.shield(glyphColor);
 
   return (
     <TouchableOpacity
       style={[
         premiumStyles.achievementCard,
-        earned && premiumStyles.achievementCardEarned,
+        { backgroundColor: id.BG_CARD, borderColor: id.LINE },
+        earned && [premiumStyles.achievementCardEarned, { borderColor: id.GD }],
       ]}
       onPress={onPress}
       activeOpacity={0.7}
     >
-      <Text style={premiumStyles.achievementCheck}>{earned ? '✓' : '—'}</Text>
+      <Text style={[premiumStyles.achievementCheck, { color: id.FG_FAINT }]}>{earned ? '✓' : '—'}</Text>
       <SealMedallion glyph={glyph} locked={!earned} tier={tier} />
-      <Text style={[premiumStyles.achievementName, { color: earned ? ID.FG : ID.FG_MUTED }]}>
+      <Text style={[premiumStyles.achievementName, { color: earned ? id.FG : id.FG_MUTED }]}>
         {badge.name}
       </Text>
-      <Text style={[premiumStyles.achievementTier, { color: tier === 'L' ? ID.GL : '#B8A4D9', opacity: earned ? 1 : 0.55 }]}>
+      <Text style={[premiumStyles.achievementTier, { color: tier === 'L' ? id.GL : '#B8A4D9', opacity: earned ? 1 : 0.55 }]}>
         {tier === 'L' ? 'Legendary' : 'Epic'}
       </Text>
     </TouchableOpacity>
@@ -403,16 +429,17 @@ function AchievementBadge({
 
 // Progress Meter with segments
 function ProgressMeter({ earned, total }: { earned: number; total: number }) {
+  const id = useIdentityColors();
   const pct = Math.round((earned / total) * 100);
   return (
-    <View style={premiumStyles.progressCard}>
+    <View style={[premiumStyles.progressCard, { backgroundColor: id.BG_CARD, borderColor: id.LINE }]}>
       <View style={premiumStyles.progressHeader}>
         <View>
-          <Text style={premiumStyles.progressTitle}>Progress</Text>
+          <Text style={[premiumStyles.progressTitle, { color: id.FG }]}>Progress</Text>
         </View>
         <Text style={premiumStyles.progressCount}>
-          <Text style={{ color: ID.G }}>{earned}</Text>
-          <Text style={{ color: ID.FG_FAINT }}> / {total}</Text>
+          <Text style={{ color: id.G }}>{earned}</Text>
+          <Text style={{ color: id.FG_FAINT }}> / {total}</Text>
         </Text>
       </View>
       <View style={premiumStyles.progressBar}>
@@ -421,14 +448,15 @@ function ProgressMeter({ earned, total }: { earned: number; total: number }) {
             key={i}
             style={[
               premiumStyles.progressSegment,
-              i < earned && premiumStyles.progressSegmentFilled,
+              { backgroundColor: id.LINE_STRONG },
+              i < earned && [premiumStyles.progressSegmentFilled, { backgroundColor: id.G }],
             ]}
           />
         ))}
       </View>
       <View style={premiumStyles.progressFooter}>
-        <Text style={premiumStyles.timestamp}>NEXT · ACTIVE LEGISLATOR</Text>
-        <Text style={premiumStyles.timestamp}>{pct}%</Text>
+        <Text style={[premiumStyles.timestamp, { color: id.FG_FAINT }]}>NEXT · ACTIVE LEGISLATOR</Text>
+        <Text style={[premiumStyles.timestamp, { color: id.FG_FAINT }]}>{pct}%</Text>
       </View>
     </View>
   );
@@ -450,6 +478,7 @@ function AccountParticulars({
   verified: boolean;
   onCopyWallet?: () => void;
 }) {
+  const id = useIdentityColors();
   const rows = [
     { label: 'Name', value: name || '—', verified: true },
     { label: 'Email', value: email || '—', verified: true },
@@ -458,28 +487,28 @@ function AccountParticulars({
   ];
 
   return (
-    <View style={premiumStyles.particularsCard}>
-      <View style={premiumStyles.particularsHeader}>
+    <View style={[premiumStyles.particularsCard, { backgroundColor: id.BG_CARD, borderColor: id.LINE }]}>
+      <View style={[premiumStyles.particularsHeader, { borderBottomColor: id.LINE }]}>
         <View>
-          <Text style={premiumStyles.particularsTitle}>Account</Text>
+          <Text style={[premiumStyles.particularsTitle, { color: id.FG }]}>Account</Text>
         </View>
         {verified && (
           <View style={premiumStyles.verifiedPill}>
-            <Ionicons name="checkmark" size={9} color={ID.GREEN} />
-            <Text style={premiumStyles.verifiedPillText}>Verified</Text>
+            <Ionicons name="checkmark" size={9} color={id.GREEN} />
+            <Text style={[premiumStyles.verifiedPillText, { color: id.GREEN }]}>Verified</Text>
           </View>
         )}
       </View>
       {rows.map((r, i) => (
-        <View key={i} style={[premiumStyles.particularRow, i < rows.length - 1 && premiumStyles.particularRowBorder]}>
-          <Text style={premiumStyles.particularLabel}>{r.label}</Text>
-          <Text style={[premiumStyles.particularValue, r.mono && premiumStyles.monoText]}>{r.value}</Text>
+        <View key={i} style={[premiumStyles.particularRow, i < rows.length - 1 && [premiumStyles.particularRowBorder, { borderBottomColor: id.LINE }]]}>
+          <Text style={[premiumStyles.particularLabel, { color: id.FG_FAINT }]}>{r.label}</Text>
+          <Text style={[premiumStyles.particularValue, { color: id.FG }, r.mono && premiumStyles.monoText]}>{r.value}</Text>
           {r.action === 'copy' ? (
-            <TouchableOpacity onPress={onCopyWallet} style={premiumStyles.copyButton}>
-              <Ionicons name="copy-outline" size={13} color={ID.FG_MUTED} />
+            <TouchableOpacity onPress={onCopyWallet} style={[premiumStyles.copyButton, { backgroundColor: id.BG_RAISED, borderColor: id.LINE_STRONG }]}>
+              <Ionicons name="copy-outline" size={13} color={id.FG_MUTED} />
             </TouchableOpacity>
           ) : (
-            <View style={premiumStyles.verifiedDot} />
+            <View style={[premiumStyles.verifiedDot, { backgroundColor: id.GREEN }]} />
           )}
         </View>
       ))}
@@ -489,19 +518,20 @@ function AccountParticulars({
 
 // Verified Seal
 function VerifiedSeal({ verifiedAt, provider }: { verifiedAt?: string | null | undefined; provider?: string }) {
+  const id = useIdentityColors();
   const date = formatDate(verifiedAt) || '26 April 2026';
   return (
     <View style={premiumStyles.verifiedSeal}>
       <View style={premiumStyles.sealRing}>
         <Svg width={44} height={44} viewBox="0 0 44 44">
-          <Circle cx="22" cy="22" r="20" fill="rgba(52,199,89,0.1)" stroke={ID.GREEN} strokeWidth={0.6} />
-          <Circle cx="22" cy="22" r="16" fill="none" stroke={ID.GREEN} strokeWidth={0.3} strokeDasharray="1 2" />
-          <Path d="M14 22l5 5 11-12" stroke={ID.GREEN} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" fill="none" />
+          <Circle cx="22" cy="22" r="20" fill="rgba(52,199,89,0.1)" stroke={id.GREEN} strokeWidth={0.6} />
+          <Circle cx="22" cy="22" r="16" fill="none" stroke={id.GREEN} strokeWidth={0.3} strokeDasharray="1 2" />
+          <Path d="M14 22l5 5 11-12" stroke={id.GREEN} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" fill="none" />
         </Svg>
       </View>
       <View style={premiumStyles.sealInfo}>
-        <Text style={premiumStyles.sealTitle}>Identity verified</Text>
-        <Text style={premiumStyles.sealSubtitle}>Verified by {provider || 'Veriff'} on {date}</Text>
+        <Text style={[premiumStyles.sealTitle, { color: id.GREEN }]}>Identity verified</Text>
+        <Text style={[premiumStyles.sealSubtitle, { color: id.FG }]}>Verified by {provider || 'Veriff'} on {date}</Text>
       </View>
     </View>
   );
@@ -509,9 +539,10 @@ function VerifiedSeal({ verifiedAt, provider }: { verifiedAt?: string | null | u
 
 // Footer Signature
 function FooterSignature({ folio }: { folio: string }) {
+  const id = useIdentityColors();
   return (
     <View style={premiumStyles.footerSig}>
-      <Text style={premiumStyles.footerMono}>Represent · ID {folio}</Text>
+      <Text style={[premiumStyles.footerMono, { color: id.FG_FAINT }]}>Represent · ID {folio}</Text>
     </View>
   );
 }
@@ -743,17 +774,17 @@ export default function IdentityScreen() {
   // Loading state (after all hooks)
   if (loading) {
     return (
-      <View style={[premiumStyles.container, premiumStyles.loadingContainer]}>
-        <View style={premiumStyles.loadingCard}>
-          <ActivityIndicator size="small" color={ID.G} />
-          <Text style={premiumStyles.loadingText}>Loading identity...</Text>
+      <View style={[premiumStyles.container, premiumStyles.loadingContainer, { backgroundColor: colors.background }]}>
+        <View style={[premiumStyles.loadingCard, { backgroundColor: colors.surface }]}>
+          <ActivityIndicator size="small" color={colors.gold} />
+          <Text style={[premiumStyles.loadingText, { color: colors.text }]}>Loading identity...</Text>
         </View>
       </View>
     );
   }
 
   return (
-    <View style={premiumStyles.container}>
+    <View style={[premiumStyles.container, { backgroundColor: colors.background }]}>
       <ScrollView
         contentContainerStyle={[premiumStyles.scrollContent, { paddingTop: insets.top + 8 }]}
         showsVerticalScrollIndicator={false}
@@ -761,8 +792,8 @@ export default function IdentityScreen() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor={ID.G}
-            progressBackgroundColor={ID.BG_CARD}
+            tintColor={colors.gold}
+            progressBackgroundColor={colors.surface}
           />
         }
       >
@@ -786,16 +817,16 @@ export default function IdentityScreen() {
 
         {/* Verification CTA for unverified users */}
         {!verification.verified && isAuthenticated && (
-          <Animated.View entering={FadeInUp.delay(200).duration(400)} style={premiumStyles.verifyCta}>
+          <Animated.View entering={FadeInUp.delay(200).duration(400)} style={[premiumStyles.verifyCta, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <View style={premiumStyles.verifyCtaContent}>
-              <View style={premiumStyles.verifyCtaIcon}>
-                <Ionicons name="shield-checkmark-outline" size={24} color={ID.G} />
+              <View style={[premiumStyles.verifyCtaIcon, { backgroundColor: `${colors.gold}15` }]}>
+                <Ionicons name="shield-checkmark-outline" size={24} color={colors.gold} />
               </View>
               <View style={premiumStyles.verifyCtaText}>
-                <Text style={premiumStyles.verifyCtaTitle}>
+                <Text style={[premiumStyles.verifyCtaTitle, { color: colors.text }]}>
                   {verification.status === 'pending' ? 'Verification Pending' : 'Verify Your Identity'}
                 </Text>
-                <Text style={premiumStyles.verifyCtaSubtitle}>
+                <Text style={[premiumStyles.verifyCtaSubtitle, { color: colors.textSecondary }]}>
                   {verification.status === 'pending'
                     ? 'Your verification is being processed'
                     : 'Unlock voting and earn the Verified badge'
@@ -818,14 +849,14 @@ export default function IdentityScreen() {
 
         {/* Sign In CTA for unauthenticated users */}
         {!isAuthenticated && (
-          <Animated.View entering={FadeInUp.delay(200).duration(400)} style={premiumStyles.verifyCta}>
+          <Animated.View entering={FadeInUp.delay(200).duration(400)} style={[premiumStyles.verifyCta, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <View style={premiumStyles.verifyCtaContent}>
-              <View style={premiumStyles.verifyCtaIcon}>
-                <Ionicons name="log-in-outline" size={24} color={ID.G} />
+              <View style={[premiumStyles.verifyCtaIcon, { backgroundColor: `${colors.gold}15` }]}>
+                <Ionicons name="log-in-outline" size={24} color={colors.gold} />
               </View>
               <View style={premiumStyles.verifyCtaText}>
-                <Text style={premiumStyles.verifyCtaTitle}>Sign In Required</Text>
-                <Text style={premiumStyles.verifyCtaSubtitle}>
+                <Text style={[premiumStyles.verifyCtaTitle, { color: colors.text }]}>Sign In Required</Text>
+                <Text style={[premiumStyles.verifyCtaSubtitle, { color: colors.textSecondary }]}>
                   Sign in to access your civic identity
                 </Text>
               </View>
@@ -850,14 +881,14 @@ export default function IdentityScreen() {
         <Animated.View entering={FadeInUp.delay(400).duration(400)} style={premiumStyles.achievementsSection}>
           <View style={premiumStyles.achievementsHeader}>
             <View>
-              <Text style={premiumStyles.achievementsSectionTitle}>Achievements</Text>
+              <Text style={[premiumStyles.achievementsSectionTitle, { color: colors.text }]}>Achievements</Text>
             </View>
             <TouchableOpacity
               onPress={() => router.push('/modals/badges')}
               style={premiumStyles.viewAllButton}
             >
-              <Text style={premiumStyles.viewAllText}>View all {ALL_BADGES.length}</Text>
-              <Ionicons name="chevron-forward" size={10} color={ID.G} />
+              <Text style={[premiumStyles.viewAllText, { color: colors.gold }]}>View all {ALL_BADGES.length}</Text>
+              <Ionicons name="chevron-forward" size={10} color={colors.gold} />
             </TouchableOpacity>
           </View>
 

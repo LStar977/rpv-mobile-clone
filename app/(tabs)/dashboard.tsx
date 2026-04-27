@@ -6,14 +6,14 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import Svg, { Circle, Line, Path, Defs, LinearGradient as SvgLinearGradient, Stop, G as SvgG } from 'react-native-svg';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
-import { SPACING } from '../../lib/theme';
+import { SPACING, useTheme } from '../../lib/theme';
 import { useAuthStore } from '../../lib/auth';
 import { useBallotStore } from '../../lib/ballots';
 import { proposalsApi, userApi, type Proposal } from '../../lib/api';
 import { useFocusEffect } from 'expo-router';
 
 // ═══════════════════════════════════════════════════════════════════════════
-// DESIGN TOKENS — from Home Redesign.html
+// DESIGN TOKENS — from Home Redesign.html (static fallbacks for StyleSheet)
 // ═══════════════════════════════════════════════════════════════════════════
 const G_GOLD = '#EABA58';
 const G_GOLD_DARK = '#C89A3E';
@@ -32,6 +32,26 @@ const SERIF = 'Georgia';
 const SANS = 'Onest';
 const MONO = 'JetBrains Mono';
 
+// Dynamic hook for components to get theme-aware colors
+function useDashboardColors() {
+  const { colors, isDark } = useTheme();
+  return {
+    GOLD: colors.gold,
+    GOLD_DARK: colors.goldDark,
+    GOLD_LIGHT: colors.goldLight,
+    BG: colors.background,
+    BG_CARD: colors.surface,
+    BG_RAISED: colors.surfaceElevated,
+    LINE: colors.border,
+    LINE_STRONG: colors.borderStrong,
+    FG: colors.text,
+    FG_MUTED: colors.textSecondary,
+    FG_FAINT: colors.textTertiary,
+    GREEN: colors.success,
+    isDark,
+  };
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // MAIN
 // ═══════════════════════════════════════════════════════════════════════════
@@ -43,6 +63,7 @@ function classifyScope(p: Proposal): 'federal' | 'provincial' | 'municipal' {
 }
 
 export default function DashboardScreen() {
+  const dc = useDashboardColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user } = useAuthStore();
@@ -116,11 +137,11 @@ export default function DashboardScreen() {
     .slice(0, 3);
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: dc.BG }]}>
       <ScrollView
         contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + SPACING.md }]}
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={G_GOLD} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={dc.GOLD} />}
       >
         <TopBar name={displayName} city={userCity} state={userState} verified={isVerified} onAvatarPress={() => router.push('/(tabs)/profile')} />
         <Hero pendingCount={pendingCount} breakdown={breakdown} onBeginVoting={navigateToProposals} />
@@ -157,68 +178,70 @@ export default function DashboardScreen() {
 // PLACEHOLDER COMPONENTS (filled in via subsequent edits)
 // ═══════════════════════════════════════════════════════════════════════════
 function TopBar({ name, city, state, verified, onAvatarPress }: { name: string; city: string; state: string; verified: boolean; onAvatarPress: () => void }) {
+  const dc = useDashboardColors();
   const dateStr = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
   const statusText = verified ? `Verified · ${city}, ${state}` : `Unverified · ${city}, ${state}`;
-  const dotColor = verified ? GREEN : FG_FAINT;
+  const dotColor = verified ? dc.GREEN : dc.FG_FAINT;
   return (
     <Animated.View entering={FadeInDown.duration(500)} style={styles.topBar}>
       <View>
         <View style={styles.topBarLeftRow}>
           <View style={[styles.greenDot, { backgroundColor: dotColor }]} />
-          <Text style={styles.topBarStatus}>{statusText}</Text>
+          <Text style={[styles.topBarStatus, { color: dc.FG_MUTED }]}>{statusText}</Text>
         </View>
-        <Text style={styles.topBarDate}>{dateStr}</Text>
+        <Text style={[styles.topBarDate, { color: dc.FG_FAINT }]}>{dateStr}</Text>
       </View>
       <TouchableOpacity onPress={onAvatarPress} activeOpacity={0.8}>
         <LinearGradient
-          colors={['rgba(234,186,88,0.4)', 'rgba(234,186,88,0.05)']}
+          colors={[`${dc.GOLD}66`, `${dc.GOLD}0D`]}
           style={styles.avatarOuter}
           start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
         >
-          <View style={styles.avatarInner}>
-            <Text style={styles.avatarLetter}>{name.charAt(0).toUpperCase()}</Text>
+          <View style={[styles.avatarInner, { backgroundColor: dc.BG_CARD, borderColor: dc.LINE }]}>
+            <Text style={[styles.avatarLetter, { color: dc.GOLD }]}>{name.charAt(0).toUpperCase()}</Text>
           </View>
         </LinearGradient>
-        <View style={styles.avatarVerifiedDot} />
+        <View style={[styles.avatarVerifiedDot, { backgroundColor: dc.GREEN }]} />
       </TouchableOpacity>
     </Animated.View>
   );
 }
 function Hero({ pendingCount, breakdown, onBeginVoting }: { pendingCount: number; breakdown: { federal: number; provincial: number; municipal: number }; onBeginVoting: () => void }) {
+  const dc = useDashboardColors();
   const dateStr = new Date().toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' }).replace(/\//g, ' · ');
   const total = Math.max(breakdown.federal + breakdown.provincial + breakdown.municipal, 1);
   const isPlural = pendingCount !== 1;
   return (
-    <Animated.View entering={FadeInUp.duration(500).delay(100)} style={styles.hero}>
+    <Animated.View entering={FadeInUp.duration(500).delay(100)} style={[styles.hero, { backgroundColor: dc.BG_CARD, borderColor: dc.LINE }]}>
       <View style={styles.heroInner}>
         <View style={styles.heroHeader}>
-          <Text style={[styles.eyebrow, { color: G_GOLD }]}>Your Civic Inbox</Text>
-          <Text style={styles.heroDate}>{dateStr}</Text>
+          <Text style={[styles.eyebrow, { color: dc.GOLD }]}>Your Civic Inbox</Text>
+          <Text style={[styles.heroDate, { color: dc.FG_FAINT }]}>{dateStr}</Text>
         </View>
 
         <View style={styles.heroNumberRow}>
-          <Text style={styles.heroNumber}>{pendingCount}</Text>
+          <Text style={[styles.heroNumber, { color: dc.GOLD }]}>{pendingCount}</Text>
           <View style={styles.heroNumberLabel}>
-            <Text style={styles.heroNumberLabelText}>{isPlural ? 'proposals' : 'proposal'}</Text>
-            <Text style={styles.heroNumberLabelSub}>awaiting your voice</Text>
+            <Text style={[styles.heroNumberLabelText, { color: dc.FG }]}>{isPlural ? 'proposals' : 'proposal'}</Text>
+            <Text style={[styles.heroNumberLabelSub, { color: dc.FG_MUTED }]}>awaiting your voice</Text>
           </View>
         </View>
 
-        <View style={styles.breakdownBarTrack}>
-          {breakdown.federal > 0 && <View style={{ flex: breakdown.federal, backgroundColor: G_GOLD }} />}
-          {breakdown.provincial > 0 && <View style={{ flex: breakdown.provincial, backgroundColor: G_GOLD_LIGHT, opacity: 0.6 }} />}
-          {breakdown.municipal > 0 && <View style={{ flex: breakdown.municipal, backgroundColor: G_GOLD_DARK, opacity: 0.7 }} />}
-          {total === 0 && <View style={{ flex: 1, backgroundColor: LINE }} />}
+        <View style={[styles.breakdownBarTrack, { backgroundColor: dc.LINE }]}>
+          {breakdown.federal > 0 && <View style={{ flex: breakdown.federal, backgroundColor: dc.GOLD }} />}
+          {breakdown.provincial > 0 && <View style={{ flex: breakdown.provincial, backgroundColor: dc.GOLD_LIGHT, opacity: 0.6 }} />}
+          {breakdown.municipal > 0 && <View style={{ flex: breakdown.municipal, backgroundColor: dc.GOLD_DARK, opacity: 0.7 }} />}
+          {total === 0 && <View style={{ flex: 1, backgroundColor: dc.LINE }} />}
         </View>
         <View style={styles.breakdownLegend}>
-          <Text style={styles.breakdownLegendItem}><Text style={{ color: G_GOLD }}>● </Text>{breakdown.federal} federal</Text>
-          <Text style={styles.breakdownLegendItem}><Text style={{ color: G_GOLD_LIGHT }}>● </Text>{breakdown.provincial} provincial</Text>
-          <Text style={styles.breakdownLegendItem}><Text style={{ color: G_GOLD_DARK }}>● </Text>{breakdown.municipal} municipal</Text>
+          <Text style={[styles.breakdownLegendItem, { color: dc.FG_FAINT }]}><Text style={{ color: dc.GOLD }}>● </Text>{breakdown.federal} federal</Text>
+          <Text style={[styles.breakdownLegendItem, { color: dc.FG_FAINT }]}><Text style={{ color: dc.GOLD_LIGHT }}>● </Text>{breakdown.provincial} provincial</Text>
+          <Text style={[styles.breakdownLegendItem, { color: dc.FG_FAINT }]}><Text style={{ color: dc.GOLD_DARK }}>● </Text>{breakdown.municipal} municipal</Text>
         </View>
 
         <TouchableOpacity onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); onBeginVoting(); }} activeOpacity={0.9}>
           <LinearGradient
-            colors={[G_GOLD, G_GOLD_DARK]}
+            colors={[dc.GOLD, dc.GOLD_DARK]}
             style={styles.ctaBtn}
             start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }}
           >
@@ -235,6 +258,7 @@ function Hero({ pendingCount, breakdown, onBeginVoting }: { pendingCount: number
   );
 }
 function Featured({ proposal, onPress }: { proposal?: Proposal; onPress: () => void }) {
+  const dc = useDashboardColors();
   if (!proposal) return null;
   const deadlineMs = proposal.deadline ? new Date(proposal.deadline).getTime() : Date.now() + 7 * 86400000;
   const remainingMs = Math.max(deadlineMs - Date.now(), 0);
@@ -252,12 +276,12 @@ function Featured({ proposal, onPress }: { proposal?: Proposal; onPress: () => v
   return (
     <Animated.View entering={FadeInUp.duration(500).delay(200)} style={styles.sectionPad}>
       <View style={styles.sectionHeader}>
-        <Text style={styles.eyebrow}>Featured This Week</Text>
-        <Text style={[styles.sectionMetaMono, { color: G_GOLD }]}>{refCode}</Text>
+        <Text style={[styles.eyebrow, { color: dc.FG_FAINT }]}>Featured This Week</Text>
+        <Text style={[styles.sectionMetaMono, { color: dc.GOLD }]}>{refCode}</Text>
       </View>
 
       <TouchableOpacity onPress={onPress} activeOpacity={0.92}>
-        <View style={styles.featuredCard}>
+        <View style={[styles.featuredCard, { backgroundColor: dc.BG_CARD, borderColor: dc.LINE }]}>
           <View style={styles.featuredImage}>
             {proposal.imageUrl ? (
               <>
@@ -304,21 +328,21 @@ function Featured({ proposal, onPress }: { proposal?: Proposal; onPress: () => v
           </View>
 
           <View style={styles.featuredBody}>
-            <Text style={styles.featuredTitle} numberOfLines={2}>{proposal.title}</Text>
-            <Text style={styles.featuredDesc} numberOfLines={2}>{proposal.description}</Text>
-            <View style={styles.sentimentBar}>
+            <Text style={[styles.featuredTitle, { color: dc.FG }]} numberOfLines={2}>{proposal.title}</Text>
+            <Text style={[styles.featuredDesc, { color: dc.FG_MUTED }]} numberOfLines={2}>{proposal.description}</Text>
+            <View style={[styles.sentimentBar, { backgroundColor: dc.LINE }]}>
               {totalVotes > 0 ? (
                 <>
-                  <View style={{ flex: supportPct, backgroundColor: GREEN }} />
+                  <View style={{ flex: supportPct, backgroundColor: dc.GREEN }} />
                   <View style={{ flex: opposePct, backgroundColor: '#FF6B6B', opacity: 0.7 }} />
                 </>
               ) : (
-                <View style={{ flex: 1, backgroundColor: LINE }} />
+                <View style={{ flex: 1, backgroundColor: dc.LINE }} />
               )}
             </View>
             <View style={styles.sentimentLegend}>
-              <Text style={styles.sentimentLegendText}>{totalVotes > 0 ? `${supportPct}% support` : 'No votes yet'}</Text>
-              <Text style={styles.sentimentLegendText}>{totalVotes.toLocaleString()} {totalVotes === 1 ? 'voice' : 'voices'}</Text>
+              <Text style={[styles.sentimentLegendText, { color: dc.FG_FAINT }]}>{totalVotes > 0 ? `${supportPct}% support` : 'No votes yet'}</Text>
+              <Text style={[styles.sentimentLegendText, { color: dc.FG_FAINT }]}>{totalVotes.toLocaleString()} {totalVotes === 1 ? 'voice' : 'voices'}</Text>
             </View>
           </View>
         </View>
@@ -327,6 +351,7 @@ function Featured({ proposal, onPress }: { proposal?: Proposal; onPress: () => v
   );
 }
 function ImpactRing({ pending, voted, passed }: { pending: number; voted: number; passed: number }) {
+  const dc = useDashboardColors();
   const total = Math.max(pending + voted, 1);
   const r = 50, c = 2 * Math.PI * r;
   const votedDash = (voted / total) * c;
@@ -335,21 +360,21 @@ function ImpactRing({ pending, voted, passed }: { pending: number; voted: number
   return (
     <Animated.View entering={FadeInUp.duration(500).delay(300)} style={styles.sectionPad}>
       <View style={styles.sectionHeader}>
-        <Text style={styles.eyebrow}>Your Civic Record</Text>
-        <Text style={styles.sectionMeta}>Since Mar 2026</Text>
+        <Text style={[styles.eyebrow, { color: dc.FG_FAINT }]}>Your Civic Record</Text>
+        <Text style={[styles.sectionMeta, { color: dc.FG_FAINT }]}>Since Mar 2026</Text>
       </View>
 
-      <View style={styles.impactCard}>
+      <View style={[styles.impactCard, { backgroundColor: dc.BG_CARD, borderColor: dc.LINE }]}>
         <View style={styles.impactRow}>
           <View style={styles.impactRingWrap}>
             <Svg width={124} height={124} viewBox="0 0 124 124">
               <Defs>
                 <SvgLinearGradient id="ringG" x1="0" y1="0" x2="1" y2="1">
-                  <Stop offset="0%" stopColor={G_GOLD_LIGHT} />
-                  <Stop offset="100%" stopColor={G_GOLD_DARK} />
+                  <Stop offset="0%" stopColor={dc.GOLD_LIGHT} />
+                  <Stop offset="100%" stopColor={dc.GOLD_DARK} />
                 </SvgLinearGradient>
               </Defs>
-              <Circle cx={62} cy={62} r={r} fill="none" stroke={LINE_STRONG} strokeWidth={3} />
+              <Circle cx={62} cy={62} r={r} fill="none" stroke={dc.LINE_STRONG} strokeWidth={3} />
               <Circle
                 cx={62} cy={62} r={r} fill="none"
                 stroke="url(#ringG)" strokeWidth={6}
@@ -363,23 +388,23 @@ function ImpactRing({ pending, voted, passed }: { pending: number; voted: number
                   <Line key={i}
                     x1={62 + Math.cos(a) * r1} y1={62 + Math.sin(a) * r1}
                     x2={62 + Math.cos(a) * r2} y2={62 + Math.sin(a) * r2}
-                    stroke={LINE_STRONG} strokeWidth={0.7}
+                    stroke={dc.LINE_STRONG} strokeWidth={0.7}
                   />
                 );
               })}
             </Svg>
             <View style={styles.impactRingCenter}>
-              <Text style={styles.impactRingPct}>{pct}<Text style={styles.impactRingPctSign}>%</Text></Text>
-              <Text style={styles.impactRingLabel}>Voted</Text>
+              <Text style={[styles.impactRingPct, { color: dc.GOLD }]}>{pct}<Text style={[styles.impactRingPctSign, { color: dc.FG_MUTED }]}>%</Text></Text>
+              <Text style={[styles.impactRingLabel, { color: dc.FG_FAINT }]}>Voted</Text>
             </View>
           </View>
 
           <View style={styles.impactLedger}>
-            <LedgerRow label="Pending" value={String(pending)} tint={G_GOLD} />
-            <View style={styles.hairline} />
-            <LedgerRow label="Voted" value={String(voted)} tint={GREEN} />
-            <View style={styles.hairline} />
-            <LedgerRow label="Passed" value={String(passed)} tint={FG_FAINT} />
+            <LedgerRow label="Pending" value={String(pending)} tint={dc.GOLD} />
+            <View style={[styles.hairline, { backgroundColor: dc.LINE }]} />
+            <LedgerRow label="Voted" value={String(voted)} tint={dc.GREEN} />
+            <View style={[styles.hairline, { backgroundColor: dc.LINE }]} />
+            <LedgerRow label="Passed" value={String(passed)} tint={dc.FG_FAINT} />
           </View>
         </View>
       </View>
@@ -388,13 +413,14 @@ function ImpactRing({ pending, voted, passed }: { pending: number; voted: number
 }
 
 function LedgerRow({ label, value, tint }: { label: string; value: string; tint: string }) {
+  const dc = useDashboardColors();
   return (
     <View style={styles.ledgerRow}>
       <View style={styles.ledgerLabelRow}>
         <View style={[styles.ledgerDot, { backgroundColor: tint }]} />
-        <Text style={styles.ledgerLabel}>{label}</Text>
+        <Text style={[styles.ledgerLabel, { color: dc.FG_MUTED }]}>{label}</Text>
       </View>
-      <Text style={styles.ledgerValue}>{value}</Text>
+      <Text style={[styles.ledgerValue, { color: dc.FG }]}>{value}</Text>
     </View>
   );
 }
@@ -402,6 +428,7 @@ function Communities({ proposals, votedIds, country, state, city, onPrimaryPress
   proposals: Proposal[]; votedIds: Set<string>; country: string; state: string; city: string;
   onPrimaryPress: () => void; router: any;
 }) {
+  const dc = useDashboardColors();
   const now = Date.now();
   const countAt = (level: number, name: string) => {
     const matched = proposals.filter(p => {
@@ -424,11 +451,11 @@ function Communities({ proposals, votedIds, country, state, city, onPrimaryPress
   return (
     <Animated.View entering={FadeInUp.duration(500).delay(400)} style={styles.sectionPad}>
       <View style={styles.sectionHeader}>
-        <Text style={styles.eyebrow}>Your Communities</Text>
-        <Text style={styles.sectionMetaGold}>Manage</Text>
+        <Text style={[styles.eyebrow, { color: dc.FG_FAINT }]}>Your Communities</Text>
+        <Text style={[styles.sectionMetaGold, { color: dc.GOLD }]}>Manage</Text>
       </View>
 
-      <View style={styles.communityCard}>
+      <View style={[styles.communityCard, { backgroundColor: dc.BG_CARD, borderColor: dc.LINE }]}>
         {items.map((it, i) => (
           <CommunityRow key={it.name} {...it} last={i === items.length - 1}
             onPress={() => {
@@ -446,31 +473,33 @@ function Communities({ proposals, votedIds, country, state, city, onPrimaryPress
 function CommunityRow({ tier, name, meta, primary, flag, last, onPress }: {
   tier: string; name: string; meta: string; primary: boolean; flag: string; last: boolean; onPress: () => void;
 }) {
+  const dc = useDashboardColors();
   return (
     <TouchableOpacity onPress={onPress} activeOpacity={0.7}>
-      <View style={[styles.communityRow, !last && styles.communityRowBorder]}>
-        {primary && <View style={styles.communityPrimaryBar} />}
+      <View style={[styles.communityRow, !last && [styles.communityRowBorder, { borderBottomColor: dc.LINE }]]}>
+        {primary && <View style={[styles.communityPrimaryBar, { backgroundColor: dc.GOLD }]} />}
         <View style={[styles.communityFlag, {
-          backgroundColor: primary ? 'rgba(234,186,88,0.10)' : BG_RAISED,
-          borderColor: primary ? 'rgba(234,186,88,0.3)' : LINE_STRONG,
+          backgroundColor: primary ? `${dc.GOLD}1A` : dc.BG_RAISED,
+          borderColor: primary ? `${dc.GOLD}4D` : dc.LINE_STRONG,
         }]}>
-          <Text style={[styles.communityFlagText, { color: primary ? G_GOLD : FG_MUTED }]}>{flag}</Text>
+          <Text style={[styles.communityFlagText, { color: primary ? dc.GOLD : dc.FG_MUTED }]}>{flag}</Text>
         </View>
         <View style={{ flex: 1, minWidth: 0 }}>
           <View style={styles.communityNameRow}>
-            <Text style={styles.communityName}>{name}</Text>
-            <Text style={styles.communityTier}>{tier}</Text>
+            <Text style={[styles.communityName, { color: dc.FG }]}>{name}</Text>
+            <Text style={[styles.communityTier, { color: dc.FG_FAINT }]}>{tier}</Text>
           </View>
-          <Text style={styles.communityMeta}>{meta}</Text>
+          <Text style={[styles.communityMeta, { color: dc.FG_FAINT }]}>{meta}</Text>
         </View>
         <Svg width={7} height={12} viewBox="0 0 7 12">
-          <Path d="M1 1 L6 6 L1 11" stroke={FG_FAINT} strokeWidth={1.5} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+          <Path d="M1 1 L6 6 L1 11" stroke={dc.FG_FAINT} strokeWidth={1.5} fill="none" strokeLinecap="round" strokeLinejoin="round" />
         </Svg>
       </View>
     </TouchableOpacity>
   );
 }
 function SentinelDigest({ items }: { items: Proposal[] }) {
+  const dc = useDashboardColors();
   const now = Date.now();
   const formatRemaining = (deadline: string) => {
     const ms = new Date(deadline).getTime() - now;
@@ -510,14 +539,14 @@ function SentinelDigest({ items }: { items: Proposal[] }) {
   return (
     <Animated.View entering={FadeInUp.duration(500).delay(500)} style={styles.sectionPad}>
       <View style={styles.sectionHeader}>
-        <Text style={styles.eyebrow}>Sentinel Digest</Text>
-        <Text style={styles.sectionMetaMono}>Updated 2h ago</Text>
+        <Text style={[styles.eyebrow, { color: dc.FG_FAINT }]}>Sentinel Digest</Text>
+        <Text style={[styles.sectionMetaMono, { color: dc.FG_FAINT }]}>Updated 2h ago</Text>
       </View>
-      <View style={styles.communityCard}>
+      <View style={[styles.communityCard, { backgroundColor: dc.BG_CARD, borderColor: dc.LINE }]}>
         {rows.map((r, i) => (
           <View key={r.time}>
             <DigestRow {...r} />
-            {i < rows.length - 1 && <View style={styles.hairline} />}
+            {i < rows.length - 1 && <View style={[styles.hairline, { backgroundColor: dc.LINE }]} />}
           </View>
         ))}
       </View>
@@ -526,24 +555,26 @@ function SentinelDigest({ items }: { items: Proposal[] }) {
 }
 
 function DigestRow({ time, tag, headline, meta }: { time: string; tag: string; headline: string; meta: string }) {
-  const tagColor = tag === 'NEW' ? G_GOLD : tag === 'PASS' ? GREEN : FG_MUTED;
+  const dc = useDashboardColors();
+  const tagColor = tag === 'NEW' ? dc.GOLD : tag === 'PASS' ? dc.GREEN : dc.FG_MUTED;
   return (
     <View style={styles.digestRow}>
-      <Text style={styles.digestTime}>{time}</Text>
+      <Text style={[styles.digestTime, { color: dc.FG_FAINT }]}>{time}</Text>
       <Text style={[styles.digestTag, { color: tagColor, backgroundColor: `${tagColor}1A` }]}>{tag}</Text>
       <View style={{ flex: 1, minWidth: 0 }}>
-        <Text style={styles.digestHeadline}>{headline}</Text>
-        <Text style={styles.digestMeta}>{meta}</Text>
+        <Text style={[styles.digestHeadline, { color: dc.FG }]}>{headline}</Text>
+        <Text style={[styles.digestMeta, { color: dc.FG_FAINT }]}>{meta}</Text>
       </View>
     </View>
   );
 }
 function FooterSig() {
+  const dc = useDashboardColors();
   return (
     <View style={styles.footerSig}>
-      <View style={styles.footerLine} />
-      <Text style={styles.footerTagline}>Verified civic infrastructure.</Text>
-      <Text style={styles.footerMark}>Represent · Est. 2026</Text>
+      <View style={[styles.footerLine, { backgroundColor: dc.LINE }]} />
+      <Text style={[styles.footerTagline, { color: dc.FG_FAINT }]}>Verified civic infrastructure.</Text>
+      <Text style={[styles.footerMark, { color: dc.FG_FAINT }]}>Represent · Est. 2026</Text>
     </View>
   );
 }

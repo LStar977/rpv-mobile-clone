@@ -24,19 +24,39 @@ import type { UserTier } from '../../components/ui';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://representportal.com';
 
-// ── Profile Premium Design Tokens ────────────────────────────────────
-const PR_G = '#EABA58';       // Gold primary
-const PR_GD = '#C89A3E';      // Gold dark
-const PR_GL = '#F4D28C';      // Gold light
-const PR_BG = '#040707';      // Background
-const PR_BG_CARD = '#0D0F12'; // Card background
-const PR_BG_RAISED = '#15181C'; // Raised surface
-const PR_LINE = '#1E2228';    // Border/line
-const PR_LINE_STRONG = '#2A2F37'; // Strong border
-const PR_FG = '#F4F5F6';      // Primary text
-const PR_FG_MUTED = '#C7CACD'; // Secondary text
-const PR_FG_FAINT = '#8E9297'; // Tertiary text
-const PR_GREEN = '#34C759';   // Success/active
+// ── Profile colors - static fallbacks for StyleSheet ─────────────────
+// These are dark mode defaults; components override with useProfileColors()
+const PR_G = '#EABA58';
+const PR_GD = '#C89A3E';
+const PR_GL = '#F4D28C';
+const PR_BG = '#040707';
+const PR_BG_CARD = '#0D0F12';
+const PR_BG_RAISED = '#15181C';
+const PR_LINE = '#1E2228';
+const PR_LINE_STRONG = '#2A2F37';
+const PR_FG = '#F4F5F6';
+const PR_FG_MUTED = '#C7CACD';
+const PR_FG_FAINT = '#8E9297';
+const PR_GREEN = '#34C759';
+
+// Dynamic hook for components to get theme-aware colors
+function useProfileColors() {
+  const { colors } = useTheme();
+  return {
+    G: colors.gold,
+    GD: colors.goldDark,
+    GL: colors.goldLight,
+    BG: colors.background,
+    BG_CARD: colors.surface,
+    BG_RAISED: colors.surfaceElevated,
+    LINE: colors.border,
+    LINE_STRONG: colors.borderStrong,
+    FG: colors.text,
+    FG_MUTED: colors.textSecondary,
+    FG_FAINT: colors.textTertiary,
+    GREEN: colors.success,
+  };
+}
 
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
@@ -144,7 +164,8 @@ function ThemeChip({
 // ══════════════════════════════════════════════════════════════════════
 
 // ── Premium Eyebrow ──────────────────────────────────────────────────
-function PrEyebrow({ children, color = PR_FG_FAINT }: { children: React.ReactNode; color?: string }) {
+function PrEyebrow({ children, color }: { children: React.ReactNode; color?: string }) {
+  const pr = useProfileColors();
   return (
     <Text style={{
       fontFamily: 'System',
@@ -152,7 +173,7 @@ function PrEyebrow({ children, color = PR_FG_FAINT }: { children: React.ReactNod
       fontWeight: '600',
       letterSpacing: 2.2,
       textTransform: 'uppercase',
-      color,
+      color: color || pr.FG_FAINT,
     }}>{children}</Text>
   );
 }
@@ -182,12 +203,14 @@ function PortraitCard({
   isActive: boolean;
   onTierPress: () => void;
 }) {
+  const pr = useProfileColors();
+  const { isDark } = useTheme();
   const initials = name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() || 'U';
 
   return (
-    <Animated.View entering={FadeInUp.delay(100).duration(400)} style={prStyles.portraitCard}>
+    <Animated.View entering={FadeInUp.delay(100).duration(400)} style={[prStyles.portraitCard, { borderColor: pr.LINE_STRONG }]}>
       <LinearGradient
-        colors={['#11141A', '#0B0D11']}
+        colors={isDark ? ['#11141A', '#0B0D11'] : ['#FFFFFF', '#F8F6F3']}
         style={StyleSheet.absoluteFill}
       />
 
@@ -203,10 +226,10 @@ function PortraitCard({
           style={[
             prStyles.cornerTick,
             { top: c.top, left: c.left, right: c.right, bottom: c.bottom },
-            c.borders.includes('Top') && { borderTopWidth: 1, borderTopColor: `${PR_GD}A6` },
-            c.borders.includes('Bottom') && { borderBottomWidth: 1, borderBottomColor: `${PR_GD}A6` },
-            c.borders.includes('Left') && { borderLeftWidth: 1, borderLeftColor: `${PR_GD}A6` },
-            c.borders.includes('Right') && { borderRightWidth: 1, borderRightColor: `${PR_GD}A6` },
+            c.borders.includes('Top') && { borderTopWidth: 1, borderTopColor: `${pr.GD}A6` },
+            c.borders.includes('Bottom') && { borderBottomWidth: 1, borderBottomColor: `${pr.GD}A6` },
+            c.borders.includes('Left') && { borderLeftWidth: 1, borderLeftColor: `${pr.GD}A6` },
+            c.borders.includes('Right') && { borderRightWidth: 1, borderRightColor: `${pr.GD}A6` },
           ]}
         />
       ))}
@@ -215,40 +238,40 @@ function PortraitCard({
         {/* Monogram */}
         <View style={prStyles.monogramContainer}>
           <LinearGradient
-            colors={[PR_GL, PR_GD]}
+            colors={[pr.GL, pr.GD]}
             style={prStyles.monogramGradient}
             start={{ x: 0.3, y: 0 }}
             end={{ x: 0.7, y: 1 }}
           />
-          <Text style={prStyles.monogramText}>{initials}</Text>
+          <Text style={[prStyles.monogramText, { color: isDark ? '#1A1308' : '#1A1308' }]}>{initials}</Text>
           {/* Outer engraved ring */}
           <Svg width={74} height={74} viewBox="0 0 74 74" style={prStyles.monogramRing}>
-            <Circle cx={37} cy={37} r={35} fill="none" stroke={PR_GD} strokeWidth={0.5} strokeDasharray="1 3" opacity={0.6} />
+            <Circle cx={37} cy={37} r={35} fill="none" stroke={pr.GD} strokeWidth={0.5} strokeDasharray="1 3" opacity={0.6} />
           </Svg>
         </View>
 
         <View style={{ flex: 1, minWidth: 0 }}>
           <PrEyebrow>Registered name</PrEyebrow>
-          <Text style={prStyles.portraitName}>{name || 'Citizen'}</Text>
-          <Text style={prStyles.portraitEmail}>{email}</Text>
+          <Text style={[prStyles.portraitName, { color: pr.FG }]}>{name || 'Citizen'}</Text>
+          <Text style={[prStyles.portraitEmail, { color: pr.FG_MUTED }]}>{email}</Text>
         </View>
       </View>
 
       {/* Membership strip */}
-      <View style={prStyles.membershipStrip}>
+      <View style={[prStyles.membershipStrip, { borderTopColor: pr.LINE }]}>
         <TouchableOpacity style={prStyles.membershipCell} onPress={onTierPress} activeOpacity={0.7}>
-          <Text style={prStyles.membershipLabel}>TIER</Text>
-          <Text style={[prStyles.membershipValue, prStyles.tierValue]}>{tier}</Text>
+          <Text style={[prStyles.membershipLabel, { color: pr.FG_FAINT }]}>TIER</Text>
+          <Text style={[prStyles.membershipValue, prStyles.tierValue, { color: pr.GL }]}>{tier}</Text>
         </TouchableOpacity>
         <View style={prStyles.membershipCell}>
-          <Text style={prStyles.membershipLabel}>JOINED</Text>
-          <Text style={prStyles.membershipValue}>{memberSince}</Text>
+          <Text style={[prStyles.membershipLabel, { color: pr.FG_FAINT }]}>JOINED</Text>
+          <Text style={[prStyles.membershipValue, { color: pr.FG }]}>{memberSince}</Text>
         </View>
         <View style={prStyles.membershipCell}>
-          <Text style={prStyles.membershipLabel}>STANDING</Text>
+          <Text style={[prStyles.membershipLabel, { color: pr.FG_FAINT }]}>STANDING</Text>
           <View style={prStyles.standingRow}>
-            <View style={[prStyles.statusDot, { backgroundColor: isActive ? PR_GREEN : PR_FG_FAINT }]} />
-            <Text style={[prStyles.membershipValue, { color: isActive ? PR_GREEN : PR_FG_FAINT }]}>
+            <View style={[prStyles.statusDot, { backgroundColor: isActive ? pr.GREEN : pr.FG_FAINT, shadowColor: pr.GREEN }]} />
+            <Text style={[prStyles.membershipValue, { color: isActive ? pr.GREEN : pr.FG_FAINT }]}>
               {isActive ? 'Active' : 'Inactive'}
             </Text>
           </View>
@@ -259,13 +282,14 @@ function PortraitCard({
 }
 
 // ── Section Heading ──────────────────────────────────────────────────
-function PrSectionHeading({ roman, title, sub }: { roman: string; title: string; sub?: string }) {
+function PrSectionHeading({ roman, title, sub }: { roman?: string; title: string; sub?: string }) {
+  const pr = useProfileColors();
   return (
     <View style={prStyles.sectionHeading}>
-      <Text style={prStyles.sectionRoman}>{roman}</Text>
+      {roman && <Text style={[prStyles.sectionRoman, { color: pr.FG_FAINT }]}>{roman}</Text>}
       <View style={{ flex: 1 }}>
-        <Text style={prStyles.sectionTitle}>{title}</Text>
-        {sub && <Text style={prStyles.sectionSub}>{sub}</Text>}
+        <Text style={[prStyles.sectionTitle, { color: pr.FG }]}>{title}</Text>
+        {sub && <Text style={[prStyles.sectionSub, { color: pr.FG_FAINT }]}>{sub}</Text>}
       </View>
     </View>
   );
@@ -277,7 +301,7 @@ function PrRow({
   label,
   sub,
   value,
-  valueColor = PR_FG_MUTED,
+  valueColor,
   last,
   onPress,
 }: {
@@ -289,21 +313,22 @@ function PrRow({
   last?: boolean;
   onPress: () => void;
 }) {
+  const pr = useProfileColors();
   return (
     <TouchableOpacity
-      style={[prStyles.row, !last && prStyles.rowBorder]}
+      style={[prStyles.row, !last && { borderBottomWidth: 1, borderBottomColor: pr.LINE }]}
       onPress={onPress}
       activeOpacity={0.7}
     >
-      <View style={prStyles.rowIcon}>
-        <Ionicons name={icon} size={16} color={PR_GL} />
+      <View style={[prStyles.rowIcon, { backgroundColor: pr.BG_RAISED, borderColor: pr.LINE }]}>
+        <Ionicons name={icon} size={16} color={pr.GL} />
       </View>
       <View style={{ flex: 1, minWidth: 0 }}>
-        <Text style={prStyles.rowLabel}>{label}</Text>
-        {sub && <Text style={prStyles.rowSub}>{sub}</Text>}
+        <Text style={[prStyles.rowLabel, { color: pr.FG }]}>{label}</Text>
+        {sub && <Text style={[prStyles.rowSub, { color: pr.FG_FAINT }]}>{sub}</Text>}
       </View>
-      {value && <Text style={[prStyles.rowValue, { color: valueColor }]}>{value}</Text>}
-      <Ionicons name="chevron-forward" size={12} color={PR_FG_FAINT} />
+      {value && <Text style={[prStyles.rowValue, { color: valueColor || pr.FG_MUTED }]}>{value}</Text>}
+      <Ionicons name="chevron-forward" size={12} color={pr.FG_FAINT} />
     </TouchableOpacity>
   );
 }
@@ -316,16 +341,17 @@ function PrSection({
   children,
   delay = 0,
 }: {
-  roman: string;
+  roman?: string;
   title: string;
   sub?: string;
   children: React.ReactNode;
   delay?: number;
 }) {
+  const pr = useProfileColors();
   return (
     <Animated.View entering={FadeInUp.delay(delay).duration(400)} style={prStyles.section}>
       <PrSectionHeading roman={roman} title={title} sub={sub} />
-      <View style={prStyles.sectionCard}>
+      <View style={[prStyles.sectionCard, { backgroundColor: pr.BG_CARD, borderColor: pr.LINE }]}>
         {children}
       </View>
     </Animated.View>
@@ -340,17 +366,18 @@ function PrAppearance({
   currentTheme: ThemePreference;
   onThemeChange: (t: ThemePreference) => void;
 }) {
+  const pr = useProfileColors();
   const themeLabel = currentTheme === 'system' ? 'System' : currentTheme === 'dark' ? 'Dark' : 'Light';
 
   return (
     <Animated.View entering={FadeInUp.delay(400).duration(400)} style={prStyles.section}>
       <PrSectionHeading title="Appearance" />
-      <View style={prStyles.appearanceCard}>
+      <View style={[prStyles.appearanceCard, { backgroundColor: pr.BG_CARD, borderColor: pr.LINE }]}>
         <View style={prStyles.appearanceHeader}>
-          <Text style={prStyles.appearanceLabel}>
-            Currently set to <Text style={{ color: PR_GL, fontWeight: '600' }}>{themeLabel}</Text>
+          <Text style={[prStyles.appearanceLabel, { color: pr.FG_MUTED }]}>
+            Currently set to <Text style={{ color: pr.GL, fontWeight: '600' }}>{themeLabel}</Text>
           </Text>
-          <Text style={prStyles.appearanceVersion}>UI · v4.26</Text>
+          <Text style={[prStyles.appearanceVersion, { color: pr.FG_FAINT }]}>UI · v4.26</Text>
         </View>
         <View style={prStyles.appearanceRow}>
           {(['system', 'dark', 'light'] as ThemePreference[]).map((mode) => {
@@ -359,11 +386,19 @@ function PrAppearance({
             return (
               <TouchableOpacity
                 key={mode}
-                style={[prStyles.appearanceChip, active && prStyles.appearanceChipActive]}
+                style={[
+                  prStyles.appearanceChip,
+                  { borderColor: active ? pr.GD : pr.LINE_STRONG },
+                  active && { backgroundColor: `${pr.G}2E` }
+                ]}
                 onPress={() => onThemeChange(mode)}
                 activeOpacity={0.7}
               >
-                <Text style={[prStyles.appearanceChipText, active && prStyles.appearanceChipTextActive]}>
+                <Text style={[
+                  prStyles.appearanceChipText,
+                  { color: active ? pr.GL : pr.FG_MUTED },
+                  active && { fontWeight: '600' }
+                ]}>
                   {label}
                 </Text>
               </TouchableOpacity>
@@ -377,13 +412,14 @@ function PrAppearance({
 
 // ── Sign Out Button ──────────────────────────────────────────────────
 function PrSignOut({ onPress }: { onPress: () => void }) {
+  const pr = useProfileColors();
   return (
     <Animated.View entering={FadeInUp.delay(500).duration(400)} style={prStyles.signOutContainer}>
-      <TouchableOpacity style={prStyles.signOutButton} onPress={onPress} activeOpacity={0.7}>
-        <Ionicons name="log-out-outline" size={14} color={PR_FG_MUTED} />
-        <Text style={prStyles.signOutText}>Sign out</Text>
+      <TouchableOpacity style={[prStyles.signOutButton, { borderColor: pr.LINE_STRONG }]} onPress={onPress} activeOpacity={0.7}>
+        <Ionicons name="log-out-outline" size={14} color={pr.FG_MUTED} />
+        <Text style={[prStyles.signOutText, { color: pr.FG_MUTED }]}>Sign out</Text>
       </TouchableOpacity>
-      <Text style={prStyles.footerVersion}>
+      <Text style={[prStyles.footerVersion, { color: pr.FG_FAINT }]}>
         Represent <Text style={prStyles.footerVersionMono}>v1.0.0</Text>
       </Text>
     </Animated.View>
@@ -787,12 +823,12 @@ export default function ProfileScreen() {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: PR_BG }]}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView
         contentContainerStyle={[styles.content, { paddingTop: insets.top + 16 }]}
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={PR_G} />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.gold} />
         }
       >
         {/* Premium Header */}
@@ -813,12 +849,12 @@ export default function ProfileScreen() {
           <PrRow icon="business-outline" label="My organizations" value="3" onPress={() => navigateTo('/modals/organizations')} />
           <PrRow icon="time-outline" label="Voting history" sub="234 ballots cast" onPress={() => navigateTo('/modals/voting-history')} />
           <PrRow icon="analytics-outline" label="Analytics" sub="Patterns & impact" onPress={() => navigateTo('/modals/analytics')} />
-          <PrRow icon="trophy-outline" label="Badges & achievements" value="1 / 15" valueColor={PR_GL} last onPress={() => navigateTo('/modals/badges')} />
+          <PrRow icon="trophy-outline" label="Badges & achievements" value="1 / 15" valueColor={colors.goldLight} last onPress={() => navigateTo('/modals/badges')} />
         </PrSection>
 
         {/* Section II: Membership */}
         <PrSection title="Membership" delay={250}>
-          <PrRow icon="card-outline" label="Subscription" sub={`${tierLabel} tier`} value="Upgrade" valueColor={PR_GL} onPress={() => navigateTo('/modals/subscription')} />
+          <PrRow icon="card-outline" label="Subscription" sub={`${tierLabel} tier`} value="Upgrade" valueColor={colors.goldLight} onPress={() => navigateTo('/modals/subscription')} />
           {Platform.OS === 'ios' && (
             <PrRow
               icon="refresh-outline"
@@ -843,7 +879,7 @@ export default function ProfileScreen() {
           {adminApi.isAdmin() && (
             <PrRow icon="shield-checkmark-outline" label="Admin dashboard" sub="2 organizations" onPress={() => navigateTo('/modals/admin')} />
           )}
-          <PrRow icon="notifications-outline" label="Notifications" value="On" valueColor={PR_GREEN} onPress={() => navigateTo('/modals/privacy')} />
+          <PrRow icon="notifications-outline" label="Notifications" value="On" valueColor={colors.success} onPress={() => navigateTo('/modals/privacy')} />
           <PrRow icon="settings-outline" label="Settings & privacy" onPress={() => navigateTo('/modals/privacy')} />
           <PrRow icon="document-text-outline" label="Legal" last onPress={() => navigateTo('/modals/privacy')} />
         </PrSection>
