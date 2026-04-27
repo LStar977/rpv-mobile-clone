@@ -874,7 +874,7 @@ function SwipeCard({ proposal, onSwipeLeft, onSwipeRight, onSwipeUp, onTap, isTo
                 <View style={premiumCardStyles.sentimentPct}>
                   <Text style={premiumCardStyles.sentimentPctText}>{supportPercent}%</Text>
                 </View>
-                <View style={[premiumCardStyles.sentimentStat, { alignItems: 'flex-end' }]}>
+                <View style={premiumCardStyles.sentimentStatRight}>
                   <Text style={premiumCardStyles.sentimentLabel}>OPPOSE</Text>
                   <Text style={[premiumCardStyles.sentimentNum, { color: RED }]}>{(proposal.opposeVotes || 0).toLocaleString()}</Text>
                 </View>
@@ -1123,6 +1123,11 @@ const premiumCardStyles = StyleSheet.create({
     alignItems: 'center',
   },
   sentimentStat: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 6,
+  },
+  sentimentStatRight: {
     flexDirection: 'row',
     alignItems: 'baseline',
     gap: 6,
