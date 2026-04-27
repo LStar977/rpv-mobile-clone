@@ -316,17 +316,6 @@ function VoteHeader({
 
   return (
     <View style={{ paddingTop: insetTop + 8, backgroundColor: BG }}>
-      {/* Identity strip */}
-      <View style={voteHeaderStyles.identityStrip}>
-        <View style={voteHeaderStyles.statusRow}>
-          <View style={[voteHeaderStyles.statusDot, { backgroundColor: GREEN }]} />
-          <Text style={voteHeaderStyles.statusText}>Voting Session · Open</Text>
-        </View>
-        <Text style={voteHeaderStyles.dateText}>
-          {new Date().toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' }).replace(/\//g, ' · ')}
-        </Text>
-      </View>
-
       {/* Title block */}
       <View style={voteHeaderStyles.titleBlock}>
         <View>
@@ -646,7 +635,7 @@ interface SwipeCardProps {
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 // Base card height - will be adjusted with safe area insets in component
-const BASE_CARD_HEIGHT_OFFSET = 340; // Space for header, tab bar, and margins
+const BASE_CARD_HEIGHT_OFFSET = 280; // Space for header, tab bar, and margins
 
 function SwipeCard({ proposal, onSwipeLeft, onSwipeRight, onSwipeUp, onTap, isTopCard, cardIndex, cardHeight }: SwipeCardProps) {
   const { colors } = useTheme();
@@ -771,7 +760,6 @@ function SwipeCard({ proposal, onSwipeLeft, onSwipeRight, onSwipeUp, onTap, isTo
     }
   };
 
-  const dossierRef = getDossierRef(proposal);
   const tierLabel = getTierLabel(proposal.geoRestrictions);
   const categoryColor = getCategoryColor();
   const location = proposal.geoRestrictions && proposal.geoRestrictions.length > 0
@@ -809,6 +797,14 @@ function SwipeCard({ proposal, onSwipeLeft, onSwipeRight, onSwipeUp, onTap, isTo
             <Text style={premiumCardStyles.locationText}>{location}</Text>
           </View>
 
+          {/* Time remaining pill - top right */}
+          {!isEnded && timeRemaining ? (
+            <View style={premiumCardStyles.timePill}>
+              <Ionicons name="time-outline" size={11} color={GOLD} />
+              <Text style={premiumCardStyles.timePillText}>{timeRemaining}</Text>
+            </View>
+          ) : null}
+
           {/* Category tag - bottom left */}
           <View style={[premiumCardStyles.categoryTag, { borderColor: `${categoryColor}66` }]}>
             <View style={[premiumCardStyles.categoryDot, { backgroundColor: categoryColor }]} />
@@ -839,14 +835,8 @@ function SwipeCard({ proposal, onSwipeLeft, onSwipeRight, onSwipeUp, onTap, isTo
 
         {/* Card body */}
         <View style={premiumCardStyles.cardBody}>
-          {/* Dossier ref row */}
-          <View style={premiumCardStyles.refRow}>
-            <Text style={premiumCardStyles.refText}>{tierLabel} · {dossierRef}</Text>
-            <View style={premiumCardStyles.timeRow}>
-              <Ionicons name="time-outline" size={11} color={GOLD} />
-              <Text style={premiumCardStyles.timeText}>{timeRemaining || 'Open'}</Text>
-            </View>
-          </View>
+          {/* Tier label */}
+          <Text style={premiumCardStyles.refText}>{tierLabel}</Text>
 
           {/* Serif title */}
           <Text style={premiumCardStyles.serifTitle} numberOfLines={2}>{proposal.title}</Text>
@@ -865,43 +855,32 @@ function SwipeCard({ proposal, onSwipeLeft, onSwipeRight, onSwipeUp, onTap, isTo
           <Text style={premiumCardStyles.description} numberOfLines={2}>{proposal.description}</Text>
 
           {/* Sentiment ledger */}
-          <View style={premiumCardStyles.sentimentSection}>
-            <View style={premiumCardStyles.sentimentBar}>
-              <View style={[premiumCardStyles.sentimentFillSupport, { width: `${supportPercent}%` }]} />
-              <View style={[premiumCardStyles.sentimentFillOppose, { width: `${100 - supportPercent}%` }]} />
+          {totalVotes === 0 ? (
+            <View style={premiumCardStyles.sentimentSection}>
+              <View style={premiumCardStyles.sentimentBarEmpty} />
+              <Text style={premiumCardStyles.noVotesText}>No votes yet</Text>
             </View>
-            <View style={premiumCardStyles.sentimentStats}>
-              <View style={premiumCardStyles.sentimentStat}>
-                <Text style={[premiumCardStyles.sentimentNum, { color: GREEN }]}>{(proposal.supportVotes || 0).toLocaleString()}</Text>
-                <Text style={premiumCardStyles.sentimentLabel}>SUPPORT</Text>
+          ) : (
+            <View style={premiumCardStyles.sentimentSection}>
+              <View style={premiumCardStyles.sentimentBar}>
+                <View style={[premiumCardStyles.sentimentFillSupport, { width: `${supportPercent}%` }]} />
+                <View style={[premiumCardStyles.sentimentFillOppose, { width: `${100 - supportPercent}%` }]} />
               </View>
-              <View style={premiumCardStyles.sentimentPct}>
-                <Text style={premiumCardStyles.sentimentPctText}>{supportPercent}%</Text>
-              </View>
-              <View style={[premiumCardStyles.sentimentStat, { alignItems: 'flex-end' }]}>
-                <Text style={premiumCardStyles.sentimentLabel}>OPPOSE</Text>
-                <Text style={[premiumCardStyles.sentimentNum, { color: RED }]}>{(proposal.opposeVotes || 0).toLocaleString()}</Text>
-              </View>
-            </View>
-          </View>
-
-          {/* Footer */}
-          <View style={premiumCardStyles.cardFooter}>
-            <View style={premiumCardStyles.footerChips}>
-              <View style={premiumCardStyles.metaChip}>
-                <Ionicons name="document-text-outline" size={11} color={FG_MUTED} />
-                <Text style={premiumCardStyles.metaChipText}>Brief</Text>
-              </View>
-              <View style={premiumCardStyles.metaChip}>
-                <Ionicons name="chatbubble-outline" size={11} color={FG_MUTED} />
-                <Text style={premiumCardStyles.metaChipText}>{totalVotes}</Text>
+              <View style={premiumCardStyles.sentimentStats}>
+                <View style={premiumCardStyles.sentimentStat}>
+                  <Text style={[premiumCardStyles.sentimentNum, { color: GREEN }]}>{(proposal.supportVotes || 0).toLocaleString()}</Text>
+                  <Text style={premiumCardStyles.sentimentLabel}>SUPPORT</Text>
+                </View>
+                <View style={premiumCardStyles.sentimentPct}>
+                  <Text style={premiumCardStyles.sentimentPctText}>{supportPercent}%</Text>
+                </View>
+                <View style={[premiumCardStyles.sentimentStat, { alignItems: 'flex-end' }]}>
+                  <Text style={premiumCardStyles.sentimentLabel}>OPPOSE</Text>
+                  <Text style={[premiumCardStyles.sentimentNum, { color: RED }]}>{(proposal.opposeVotes || 0).toLocaleString()}</Text>
+                </View>
               </View>
             </View>
-            <View style={premiumCardStyles.dossierLink}>
-              <Text style={premiumCardStyles.dossierLinkText}>View dossier</Text>
-              <Ionicons name="arrow-forward" size={9} color={GOLD} />
-            </View>
-          </View>
+          )}
 
           {/* Ended Banner */}
           {isEnded && (
@@ -935,7 +914,7 @@ const premiumCardStyles = StyleSheet.create({
     elevation: 20,
   },
   heroContainer: {
-    height: 130,
+    height: 260,
     position: 'relative',
     overflow: 'hidden',
   },
@@ -958,6 +937,26 @@ const premiumCardStyles = StyleSheet.create({
     fontWeight: '500',
     color: FG,
     letterSpacing: -0.2,
+  },
+  timePill: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 11,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: 'rgba(4,7,7,0.55)',
+    borderWidth: 1,
+    borderColor: `${GOLD}55`,
+  },
+  timePillText: {
+    fontSize: 10.5,
+    fontWeight: '600',
+    color: GOLD,
+    letterSpacing: 0.3,
   },
   categoryTag: {
     position: 'absolute',
@@ -1026,8 +1025,9 @@ const premiumCardStyles = StyleSheet.create({
     fontFamily: MONO_FONT,
     fontSize: 9,
     color: FG_FAINT,
-    letterSpacing: 1.2,
+    letterSpacing: 1.4,
     textTransform: 'uppercase',
+    marginBottom: 8,
   },
   timeRow: {
     flexDirection: 'row',
@@ -1094,6 +1094,19 @@ const premiumCardStyles = StyleSheet.create({
     flexDirection: 'row',
     backgroundColor: LINE_COLOR,
     marginBottom: 10,
+  },
+  sentimentBarEmpty: {
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: LINE_COLOR,
+    marginBottom: 10,
+  },
+  noVotesText: {
+    fontSize: 11,
+    fontWeight: '500',
+    color: FG_FAINT,
+    letterSpacing: 0.4,
+    textAlign: 'center',
   },
   sentimentFillSupport: {
     height: '100%',

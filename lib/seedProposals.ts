@@ -6,13 +6,23 @@ const daysFromNow = (days: number): string =>
 
 const now = (): string => new Date().toISOString();
 
+// Deterministic hash from proposal id (so numbers stay stable per-render, per-id)
+const hashId = (id: string): number => {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = ((h << 5) - h + id.charCodeAt(i)) | 0;
+  return Math.abs(h);
+};
+
 // =============================================================================
 // SEED PROPOSALS - 50 Canada Proposals by Represent Civic Desk
 // These are curated civic questions authored by Represent for launch content.
-// Vote counts start at 0 - all votes are real user participation.
+// Vote counts use deterministic mock data while we finalize designs.
+// To return to real-only counts: set MOCK_VOTES = false below.
 // =============================================================================
 
-export const SEED_PROPOSALS: Proposal[] = [
+const MOCK_VOTES = true;
+
+const _RAW_SEED_PROPOSALS: Proposal[] = [
   // ===========================================================================
   // CANADA NATIONAL PROPOSALS (15)
   // ===========================================================================
@@ -807,6 +817,19 @@ export const SEED_PROPOSALS: Proposal[] = [
     imageUrl: 'https://images.unsplash.com/photo-1527684651119-a54b0ba3c587?w=800&h=1200&fit=crop',
   },
 ];
+
+// Apply deterministic mock vote counts (range: 200–14,000 total per proposal,
+// support ratio between 32% and 78% to avoid uniform-looking bars).
+export const SEED_PROPOSALS: Proposal[] = MOCK_VOTES
+  ? _RAW_SEED_PROPOSALS.map((p) => {
+      const h = hashId(String(p.id));
+      const total = 200 + (h % 13800);
+      const supportPct = 32 + ((h >> 8) % 47);
+      const supportVotes = Math.round((total * supportPct) / 100);
+      const opposeVotes = total - supportVotes;
+      return { ...p, supportVotes, opposeVotes };
+    })
+  : _RAW_SEED_PROPOSALS;
 
 // =============================================================================
 // HELPER FUNCTIONS
