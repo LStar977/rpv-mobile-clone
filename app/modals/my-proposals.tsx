@@ -281,7 +281,9 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.lg,
   },
   title: {
-    ...TYPOGRAPHY.headlineLarge,
+    fontFamily: 'Georgia',
+    fontSize: 26,
+    fontWeight: '500',
     marginBottom: SPACING.xs,
   },
   subtitle: {
@@ -307,8 +309,9 @@ const styles = StyleSheet.create({
     height: 30,
   },
   statsNumber: {
-    ...TYPOGRAPHY.headlineLarge,
-    fontWeight: '700',
+    fontFamily: 'Georgia',
+    fontSize: 28,
+    fontWeight: '500',
   },
   statsLabel: {
     ...TYPOGRAPHY.labelSmall,
@@ -329,7 +332,9 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.md,
   },
   emptyTitle: {
-    ...TYPOGRAPHY.headlineSmall,
+    fontFamily: 'Georgia',
+    fontSize: 20,
+    fontWeight: '500',
     marginBottom: SPACING.xs,
   },
   emptySubtitle: {
@@ -389,7 +394,9 @@ const styles = StyleSheet.create({
     ...TYPOGRAPHY.labelSmall,
   },
   proposalTitle: {
-    ...TYPOGRAPHY.headlineSmall,
+    fontFamily: 'Georgia',
+    fontSize: 18,
+    fontWeight: '500',
     marginBottom: SPACING.sm,
   },
   categoryBadge: {

@@ -313,11 +313,15 @@ const styles = StyleSheet.create({
     ...SHADOWS.glow,
   },
   successTitle: {
-    ...TYPOGRAPHY.h2,
+    fontFamily: 'Georgia',
+    fontSize: 24,
+    fontWeight: '500',
     marginBottom: SPACING.sm,
   },
   amount: {
-    ...TYPOGRAPHY.displayMedium,
+    fontFamily: 'Georgia',
+    fontSize: 40,
+    fontWeight: '500',
     marginBottom: SPACING['2xl'],
   },
   receiptCard: {
@@ -344,7 +348,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   productTitle: {
-    ...TYPOGRAPHY.h5,
+    fontFamily: 'Georgia',
+    fontSize: 16,
+    fontWeight: '500',
     marginBottom: SPACING.xs,
   },
   productDescription: {

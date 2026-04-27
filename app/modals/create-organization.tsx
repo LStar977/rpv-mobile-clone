@@ -634,7 +634,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   headerTitle: {
-    ...TYPOGRAPHY.headlineSmall,
+    fontFamily: 'Georgia',
+    fontSize: 20,
+    fontWeight: '500',
   },
   stepIndicator: {
     flexDirection: 'row',
@@ -682,7 +684,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   stepTitle: {
-    ...TYPOGRAPHY.headlineMedium,
+    fontFamily: 'Georgia',
+    fontSize: 22,
+    fontWeight: '500',
     marginBottom: SPACING.xs,
   },
   stepSubtitle: {
@@ -798,16 +802,18 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   tierName: {
-    ...TYPOGRAPHY.labelLarge,
-    fontWeight: '600',
+    fontFamily: 'Georgia',
+    fontSize: 16,
+    fontWeight: '500',
   },
   tierPriceRow: {
     flexDirection: 'row',
     alignItems: 'baseline',
   },
   tierPrice: {
-    ...TYPOGRAPHY.headlineSmall,
-    fontWeight: '700',
+    fontFamily: 'Georgia',
+    fontSize: 20,
+    fontWeight: '500',
   },
   tierPeriod: {
     ...TYPOGRAPHY.labelSmall,
@@ -872,8 +878,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   summaryName: {
-    ...TYPOGRAPHY.labelLarge,
-    fontWeight: '600',
+    fontFamily: 'Georgia',
+    fontSize: 16,
+    fontWeight: '500',
     marginBottom: SPACING.xxs,
   },
   summaryDescription: {
@@ -907,8 +914,9 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   summaryTotalValue: {
-    ...TYPOGRAPHY.headlineSmall,
-    fontWeight: '700',
+    fontFamily: 'Georgia',
+    fontSize: 20,
+    fontWeight: '500',
   },
 
   // Info Note
