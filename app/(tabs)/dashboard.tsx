@@ -9,6 +9,8 @@ import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { SPACING } from '../../lib/theme';
 import { useAuthStore } from '../../lib/auth';
 import { useBallotStore } from '../../lib/ballots';
+import { proposalsApi, userApi, type Proposal } from '../../lib/api';
+import { useFocusEffect } from 'expo-router';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // DESIGN TOKENS — from Home Redesign.html
@@ -33,27 +35,79 @@ const MONO = 'JetBrains Mono';
 // ═══════════════════════════════════════════════════════════════════════════
 // MAIN
 // ═══════════════════════════════════════════════════════════════════════════
+function classifyScope(p: Proposal): 'federal' | 'provincial' | 'municipal' {
+  const len = (p.geoRestrictions || []).length;
+  if (len >= 3) return 'municipal';
+  if (len === 2) return 'provincial';
+  return 'federal';
+}
+
 export default function DashboardScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user } = useAuthStore();
   const { syncFromChain } = useBallotStore();
   const [refreshing, setRefreshing] = useState(false);
+  const [proposals, setProposals] = useState<Proposal[]>([]);
+  const [votedIds, setVotedIds] = useState<Set<string>>(new Set());
 
   const displayName = user?.name?.split(' ')[0] || 'Lance';
-  const featuredDeadline = useRef(Date.now() + 3 * 86400000 + 14 * 3600000).current;
+  const userCity = user?.city || 'Calgary';
+  const userState = user?.state || 'AB';
+  const isVerified = user?.verified ?? true;
+
+  const loadData = useCallback(async () => {
+    const [propRes, votedRes] = await Promise.all([
+      proposalsApi.getAll(),
+      userApi.getVotedProposals(),
+    ]);
+    if (propRes.data) setProposals(propRes.data);
+    if (votedRes.data) setVotedIds(new Set(votedRes.data.map(String)));
+  }, []);
+
+  useEffect(() => { loadData(); }, [loadData]);
+  useFocusEffect(useCallback(() => { loadData(); }, [loadData]));
 
   useEffect(() => {
     if (user?.walletAddress) syncFromChain(user.walletAddress);
   }, [user?.walletAddress, syncFromChain]);
 
-  const onRefresh = useCallback(() => {
+  const onRefresh = useCallback(async () => {
     setRefreshing(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setTimeout(() => setRefreshing(false), 1000);
-  }, []);
+    await loadData();
+    setRefreshing(false);
+  }, [loadData]);
 
   const navigateToProposals = () => router.push('/(tabs)/proposals');
+
+  // Derived data
+  const now = Date.now();
+  const activeProposals = proposals.filter(p => {
+    if (!p.deadline) return true;
+    return new Date(p.deadline).getTime() > now;
+  });
+  const pendingProposals = activeProposals.filter(p => !votedIds.has(String(p.id)));
+  const pendingCount = pendingProposals.length;
+
+  const breakdown = { federal: 0, provincial: 0, municipal: 0 };
+  pendingProposals.forEach(p => { breakdown[classifyScope(p)]++; });
+
+  // Featured: pending proposal with closest upcoming deadline
+  const featured = pendingProposals
+    .filter(p => p.deadline)
+    .sort((a, b) => new Date(a.deadline!).getTime() - new Date(b.deadline!).getTime())[0];
+
+  // Impact stats
+  const votedCount = votedIds.size;
+  const passedCount = proposals.filter(p =>
+    votedIds.has(String(p.id)) && p.deadline && new Date(p.deadline).getTime() <= now
+  ).length;
+
+  // Recent proposals for digest
+  const recent = [...proposals]
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    .slice(0, 3);
 
   return (
     <View style={styles.container}>
@@ -62,12 +116,20 @@ export default function DashboardScreen() {
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={G_GOLD} />}
       >
-        <TopBar name={displayName} onAvatarPress={() => router.push('/(tabs)/profile')} />
-        <Hero onBeginVoting={navigateToProposals} />
-        <Featured deadline={featuredDeadline} onPress={navigateToProposals} />
-        <ImpactRing />
-        <Communities onPrimaryPress={navigateToProposals} router={router} />
-        <SentinelDigest />
+        <TopBar name={displayName} city={userCity} state={userState} verified={isVerified} onAvatarPress={() => router.push('/(tabs)/profile')} />
+        <Hero pendingCount={pendingCount} breakdown={breakdown} onBeginVoting={navigateToProposals} />
+        <Featured proposal={featured} onPress={navigateToProposals} />
+        <ImpactRing pending={pendingCount} voted={votedCount} passed={passedCount} />
+        <Communities
+          proposals={proposals}
+          votedIds={votedIds}
+          country={user?.country || 'Canada'}
+          state={userState}
+          city={userCity}
+          onPrimaryPress={navigateToProposals}
+          router={router}
+        />
+        <SentinelDigest items={recent} />
         <FooterSig />
         <View style={{ height: 120 }} />
       </ScrollView>
@@ -78,14 +140,16 @@ export default function DashboardScreen() {
 // ═══════════════════════════════════════════════════════════════════════════
 // PLACEHOLDER COMPONENTS (filled in via subsequent edits)
 // ═══════════════════════════════════════════════════════════════════════════
-function TopBar({ name, onAvatarPress }: { name: string; onAvatarPress: () => void }) {
+function TopBar({ name, city, state, verified, onAvatarPress }: { name: string; city: string; state: string; verified: boolean; onAvatarPress: () => void }) {
   const dateStr = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+  const statusText = verified ? `Verified · ${city}, ${state}` : `Unverified · ${city}, ${state}`;
+  const dotColor = verified ? GREEN : FG_FAINT;
   return (
     <Animated.View entering={FadeInDown.duration(500)} style={styles.topBar}>
       <View>
         <View style={styles.topBarLeftRow}>
-          <View style={styles.greenDot} />
-          <Text style={styles.topBarStatus}>Verified · Calgary, AB</Text>
+          <View style={[styles.greenDot, { backgroundColor: dotColor }]} />
+          <Text style={styles.topBarStatus}>{statusText}</Text>
         </View>
         <Text style={styles.topBarDate}>{dateStr}</Text>
       </View>
@@ -104,8 +168,10 @@ function TopBar({ name, onAvatarPress }: { name: string; onAvatarPress: () => vo
     </Animated.View>
   );
 }
-function Hero({ onBeginVoting }: { onBeginVoting: () => void }) {
+function Hero({ pendingCount, breakdown, onBeginVoting }: { pendingCount: number; breakdown: { federal: number; provincial: number; municipal: number }; onBeginVoting: () => void }) {
   const dateStr = new Date().toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' }).replace(/\//g, ' · ');
+  const total = Math.max(breakdown.federal + breakdown.provincial + breakdown.municipal, 1);
+  const isPlural = pendingCount !== 1;
   return (
     <Animated.View entering={FadeInUp.duration(500).delay(100)} style={styles.hero}>
       <View style={styles.heroInner}>
@@ -115,22 +181,23 @@ function Hero({ onBeginVoting }: { onBeginVoting: () => void }) {
         </View>
 
         <View style={styles.heroNumberRow}>
-          <Text style={styles.heroNumber}>64</Text>
+          <Text style={styles.heroNumber}>{pendingCount}</Text>
           <View style={styles.heroNumberLabel}>
-            <Text style={styles.heroNumberLabelText}>proposals</Text>
+            <Text style={styles.heroNumberLabelText}>{isPlural ? 'proposals' : 'proposal'}</Text>
             <Text style={styles.heroNumberLabelSub}>awaiting your voice</Text>
           </View>
         </View>
 
         <View style={styles.breakdownBarTrack}>
-          <View style={{ flex: 28, backgroundColor: G_GOLD }} />
-          <View style={{ flex: 14, backgroundColor: G_GOLD_LIGHT, opacity: 0.6 }} />
-          <View style={{ flex: 22, backgroundColor: G_GOLD_DARK, opacity: 0.7 }} />
+          {breakdown.federal > 0 && <View style={{ flex: breakdown.federal, backgroundColor: G_GOLD }} />}
+          {breakdown.provincial > 0 && <View style={{ flex: breakdown.provincial, backgroundColor: G_GOLD_LIGHT, opacity: 0.6 }} />}
+          {breakdown.municipal > 0 && <View style={{ flex: breakdown.municipal, backgroundColor: G_GOLD_DARK, opacity: 0.7 }} />}
+          {total === 0 && <View style={{ flex: 1, backgroundColor: LINE }} />}
         </View>
         <View style={styles.breakdownLegend}>
-          <Text style={styles.breakdownLegendItem}><Text style={{ color: G_GOLD }}>● </Text>28 federal</Text>
-          <Text style={styles.breakdownLegendItem}><Text style={{ color: G_GOLD_LIGHT }}>● </Text>14 provincial</Text>
-          <Text style={styles.breakdownLegendItem}><Text style={{ color: G_GOLD_DARK }}>● </Text>22 municipal</Text>
+          <Text style={styles.breakdownLegendItem}><Text style={{ color: G_GOLD }}>● </Text>{breakdown.federal} federal</Text>
+          <Text style={styles.breakdownLegendItem}><Text style={{ color: G_GOLD_LIGHT }}>● </Text>{breakdown.provincial} provincial</Text>
+          <Text style={styles.breakdownLegendItem}><Text style={{ color: G_GOLD_DARK }}>● </Text>{breakdown.municipal} municipal</Text>
         </View>
 
         <TouchableOpacity onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); onBeginVoting(); }} activeOpacity={0.9}>
@@ -151,16 +218,25 @@ function Hero({ onBeginVoting }: { onBeginVoting: () => void }) {
     </Animated.View>
   );
 }
-function Featured({ deadline, onPress }: { deadline: number; onPress: () => void }) {
-  const remainingMs = Math.max(deadline - Date.now(), 0);
+function Featured({ proposal, onPress }: { proposal?: Proposal; onPress: () => void }) {
+  if (!proposal) return null;
+  const deadlineMs = proposal.deadline ? new Date(proposal.deadline).getTime() : Date.now() + 7 * 86400000;
+  const remainingMs = Math.max(deadlineMs - Date.now(), 0);
   const days = Math.floor(remainingMs / 86400000);
-  const closeText = days > 1 ? `Closes in ${days} days` : days === 1 ? 'Closes in 1 day' : 'Closing today';
+  const hours = Math.floor((remainingMs % 86400000) / 3600000);
+  const closeText = days > 1 ? `Closes in ${days} days` : days === 1 ? 'Closes in 1 day' : hours > 0 ? `Closes in ${hours}h` : 'Closing today';
+  const totalVotes = proposal.supportVotes + proposal.opposeVotes;
+  const supportPct = totalVotes > 0 ? Math.round((proposal.supportVotes / totalVotes) * 100) : 0;
+  const opposePct = totalVotes > 0 ? 100 - supportPct : 0;
+  const scope = (proposal.geoRestrictions || []).length;
+  const tierLabel = scope >= 3 ? 'MUNI' : scope === 2 ? 'PROV' : 'FED';
+  const refCode = `${tierLabel} · ${String(proposal.id).slice(-3).padStart(3, '0').toUpperCase()}`;
 
   return (
     <Animated.View entering={FadeInUp.duration(500).delay(200)} style={styles.sectionPad}>
       <View style={styles.sectionHeader}>
         <Text style={styles.eyebrow}>Featured This Week</Text>
-        <Text style={[styles.sectionMetaMono, { color: G_GOLD }]}>FED · 03</Text>
+        <Text style={[styles.sectionMetaMono, { color: G_GOLD }]}>{refCode}</Text>
       </View>
 
       <TouchableOpacity onPress={onPress} activeOpacity={0.92}>
@@ -189,18 +265,21 @@ function Featured({ deadline, onPress }: { deadline: number; onPress: () => void
           </View>
 
           <View style={styles.featuredBody}>
-            <Text style={styles.featuredTitle}>International AI Safety Standards</Text>
-            <Text style={styles.featuredDesc}>
-              Bill C-27 establishes Canada's framework for foundation model auditing and incident reporting.
-            </Text>
+            <Text style={styles.featuredTitle} numberOfLines={2}>{proposal.title}</Text>
+            <Text style={styles.featuredDesc} numberOfLines={2}>{proposal.description}</Text>
             <View style={styles.sentimentBar}>
-              <View style={{ flex: 68, backgroundColor: GREEN }} />
-              <View style={{ flex: 18, backgroundColor: '#FF6B6B', opacity: 0.7 }} />
-              <View style={{ flex: 14, backgroundColor: FG_FAINT, opacity: 0.4 }} />
+              {totalVotes > 0 ? (
+                <>
+                  <View style={{ flex: supportPct, backgroundColor: GREEN }} />
+                  <View style={{ flex: opposePct, backgroundColor: '#FF6B6B', opacity: 0.7 }} />
+                </>
+              ) : (
+                <View style={{ flex: 1, backgroundColor: LINE }} />
+              )}
             </View>
             <View style={styles.sentimentLegend}>
-              <Text style={styles.sentimentLegendText}>68% support</Text>
-              <Text style={styles.sentimentLegendText}>12,847 voices</Text>
+              <Text style={styles.sentimentLegendText}>{totalVotes > 0 ? `${supportPct}% support` : 'No votes yet'}</Text>
+              <Text style={styles.sentimentLegendText}>{totalVotes.toLocaleString()} {totalVotes === 1 ? 'voice' : 'voices'}</Text>
             </View>
           </View>
         </View>
@@ -208,8 +287,8 @@ function Featured({ deadline, onPress }: { deadline: number; onPress: () => void
     </Animated.View>
   );
 }
-function ImpactRing() {
-  const total = 76, voted = 12;
+function ImpactRing({ pending, voted, passed }: { pending: number; voted: number; passed: number }) {
+  const total = Math.max(pending + voted, 1);
   const r = 50, c = 2 * Math.PI * r;
   const votedDash = (voted / total) * c;
   const pct = Math.round((voted / total) * 100);
@@ -257,11 +336,11 @@ function ImpactRing() {
           </View>
 
           <View style={styles.impactLedger}>
-            <LedgerRow label="Pending" value="64" tint={G_GOLD} />
+            <LedgerRow label="Pending" value={String(pending)} tint={G_GOLD} />
             <View style={styles.hairline} />
-            <LedgerRow label="Voted" value="12" tint={GREEN} />
+            <LedgerRow label="Voted" value={String(voted)} tint={GREEN} />
             <View style={styles.hairline} />
-            <LedgerRow label="Passed" value="0" tint={FG_FAINT} />
+            <LedgerRow label="Passed" value={String(passed)} tint={FG_FAINT} />
           </View>
         </View>
       </View>
@@ -280,11 +359,28 @@ function LedgerRow({ label, value, tint }: { label: string; value: string; tint:
     </View>
   );
 }
-function Communities({ onPrimaryPress, router }: { onPrimaryPress: () => void; router: any }) {
+function Communities({ proposals, votedIds, country, state, city, onPrimaryPress, router }: {
+  proposals: Proposal[]; votedIds: Set<string>; country: string; state: string; city: string;
+  onPrimaryPress: () => void; router: any;
+}) {
+  const now = Date.now();
+  const countAt = (level: number, name: string) => {
+    const matched = proposals.filter(p => {
+      const geo = p.geoRestrictions || [];
+      if (geo.length <= level) return false;
+      return geo[level].toLowerCase() === name.toLowerCase();
+    });
+    const active = matched.filter(p => !p.deadline || new Date(p.deadline).getTime() > now).length;
+    return { total: matched.length, active };
+  };
+  const fed = countAt(0, country);
+  const prov = countAt(1, state);
+  const mun = countAt(2, city);
+  const flagCode = (s: string) => s.slice(0, 2).toUpperCase();
   const items = [
-    { tier: 'Federal', name: 'Canada', meta: '29 proposals · 5 active', primary: true, flag: 'CA', scope: 'country' as const },
-    { tier: 'Provincial', name: 'Ontario', meta: '6 proposals · 1 active', primary: false, flag: 'ON', scope: 'state' as const },
-    { tier: 'Municipal', name: 'Toronto', meta: '5 proposals · 2 active', primary: false, flag: 'TO', scope: 'city' as const },
+    { tier: 'Federal', name: country, meta: `${fed.total} proposals · ${fed.active} active`, primary: true, flag: flagCode(country), scope: 'country' as const },
+    { tier: 'Provincial', name: state, meta: `${prov.total} proposals · ${prov.active} active`, primary: false, flag: flagCode(state), scope: 'state' as const },
+    { tier: 'Municipal', name: city, meta: `${mun.total} proposals · ${mun.active} active`, primary: false, flag: flagCode(city), scope: 'city' as const },
   ];
   return (
     <Animated.View entering={FadeInUp.duration(500).delay(400)} style={styles.sectionPad}>
@@ -335,12 +431,40 @@ function CommunityRow({ tier, name, meta, primary, flag, last, onPress }: {
     </TouchableOpacity>
   );
 }
-function SentinelDigest() {
-  const rows = [
-    { time: '08:42', tag: 'NEW', headline: 'Bill C-27 enters second reading', meta: 'Federal · 2h' },
-    { time: '07:15', tag: 'VOTE', headline: 'Calgary transit referendum closes Friday', meta: 'Municipal · 3h' },
-    { time: '06:30', tag: 'PASS', headline: 'Ontario housing act ratified, 71% support', meta: 'Provincial · 4h' },
-  ];
+function SentinelDigest({ items }: { items: Proposal[] }) {
+  const now = Date.now();
+  const formatRelative = (createdAt: string) => {
+    const diff = now - new Date(createdAt).getTime();
+    const hours = Math.floor(diff / 3600000);
+    if (hours < 1) return 'now';
+    if (hours < 24) return `${hours}h`;
+    return `${Math.floor(hours / 24)}d`;
+  };
+  const formatTime = (createdAt: string) => {
+    const d = new Date(createdAt);
+    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  };
+  const tagFor = (p: Proposal): string => {
+    const ageHours = (now - new Date(p.createdAt).getTime()) / 3600000;
+    if (ageHours < 24) return 'NEW';
+    if (p.deadline) {
+      const remaining = new Date(p.deadline).getTime() - now;
+      if (remaining <= 0) return 'PASS';
+      if (remaining < 86400000 * 2) return 'VOTE';
+    }
+    return 'NEW';
+  };
+  const tierLabel = (p: Proposal) => {
+    const len = (p.geoRestrictions || []).length;
+    return len >= 3 ? 'Municipal' : len === 2 ? 'Provincial' : 'Federal';
+  };
+  const rows = items.map(p => ({
+    time: formatTime(p.createdAt),
+    tag: tagFor(p),
+    headline: p.title,
+    meta: `${tierLabel(p)} · ${formatRelative(p.createdAt)}`,
+  }));
+  if (rows.length === 0) return null;
   return (
     <Animated.View entering={FadeInUp.duration(500).delay(500)} style={styles.sectionPad}>
       <View style={styles.sectionHeader}>
