@@ -46,6 +46,27 @@ import { useAuthStore } from '../../lib/auth';
 import { useBallotStore } from '../../lib/ballots';
 import { shareProposal } from '../../lib/share';
 import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS, ANIMATION, responsive } from '../../lib/theme';
+import Svg, { Rect, Line, Ellipse, Path, Circle, G, Defs, LinearGradient as SvgLinearGradient, Stop } from 'react-native-svg';
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PREMIUM DESIGN CONSTANTS - Institutional gold-on-black
+// ═══════════════════════════════════════════════════════════════════════════════
+const GOLD = '#EABA58';
+const GOLD_DARK = '#C89A3E';
+const GOLD_LIGHT = '#F4D28C';
+const BG = '#040707';
+const BG_CARD = '#0D0F12';
+const BG_RAISED = '#15181C';
+const LINE_COLOR = '#1E2228';
+const LINE_STRONG = '#2A2F37';
+const FG = '#F4F5F6';
+const FG_MUTED = '#C7CACD';
+const FG_FAINT = '#8E9297';
+const GREEN = '#34C759';
+const RED = '#FF6B6B';
+const BLUE = '#5B8FF9';
+const SERIF_FONT = Platform.OS === 'ios' ? 'Georgia' : 'serif';
+const MONO_FONT = Platform.OS === 'ios' ? 'Menlo' : 'monospace';
 import { showVoteConfirmation } from '../../lib/notifications';
 import { VoteConfirmationOverlay, UpgradeModal, BallotDisplay } from '../../components/ui';
 import { checkForNewBadges } from '../../lib/badgeNotification';
@@ -89,6 +110,539 @@ const categoryThemes: Record<string, { primary: string; secondary: string; icon:
 };
 
 const SWIPE_THRESHOLD = 120;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SVG SCENE ILLUSTRATIONS - Abstract gold line art for proposals
+// ═══════════════════════════════════════════════════════════════════════════════
+function HousingScene() {
+  return (
+    <Svg width="100%" height="100%" viewBox="0 0 360 180" preserveAspectRatio="xMidYMid slice" style={StyleSheet.absoluteFill}>
+      <Defs>
+        <SvgLinearGradient id="sky1" x1="0" y1="0" x2="0" y2="1">
+          <Stop offset="0%" stopColor="#1A2030" />
+          <Stop offset="100%" stopColor="#0A0D14" />
+        </SvgLinearGradient>
+      </Defs>
+      <Rect width="360" height="180" fill="url(#sky1)" />
+      <Ellipse cx="280" cy="40" rx="100" ry="50" fill={GOLD} opacity={0.08} />
+      <G fill="#0E1218" stroke={GOLD} strokeWidth={0.5} strokeOpacity={0.35}>
+        <Rect x={20} y={80} width={38} height={100} />
+        <Rect x={62} y={60} width={44} height={120} />
+        <Rect x={110} y={50} width={32} height={130} />
+        <Rect x={146} y={70} width={52} height={110} />
+        <Rect x={202} y={45} width={40} height={135} />
+        <Rect x={246} y={65} width={36} height={115} />
+        <Rect x={286} y={75} width={50} height={105} />
+      </G>
+      <G fill={GOLD} opacity={0.7}>
+        {[[28,100],[44,100],[28,120],[44,140],[70,80],[86,100],[70,120],[118,70],[130,90],[156,90],[176,110],[212,65],[228,85],[254,85],[294,95]].map(([x,y], i) => (
+          <Rect key={i} x={x} y={y} width={6} height={6} />
+        ))}
+      </G>
+      <Line x1={0} y1={180} x2={360} y2={180} stroke={GOLD} strokeWidth={0.5} opacity={0.4} />
+    </Svg>
+  );
+}
+
+function TransitScene() {
+  return (
+    <Svg width="100%" height="100%" viewBox="0 0 360 180" preserveAspectRatio="xMidYMid slice" style={StyleSheet.absoluteFill}>
+      <Defs>
+        <SvgLinearGradient id="sky2" x1="0" y1="0" x2="0" y2="1">
+          <Stop offset="0%" stopColor="#101522" />
+          <Stop offset="100%" stopColor="#08090F" />
+        </SvgLinearGradient>
+      </Defs>
+      <Rect width="360" height="180" fill="url(#sky2)" />
+      <Path d="M-20 150 Q 90 100 180 120 Q 270 140 380 80" stroke={GOLD} strokeWidth={2} fill="none" opacity={0.7} />
+      <Path d="M-20 165 Q 90 115 180 135 Q 270 155 380 95" stroke={GOLD} strokeWidth={0.8} fill="none" opacity={0.4} />
+      <G stroke={GOLD} strokeWidth={1} opacity={0.55}>
+        <Line x1={40} y1={130} x2={40} y2={180} />
+        <Line x1={100} y1={108} x2={100} y2={180} />
+        <Line x1={160} y1={120} x2={160} y2={180} />
+        <Line x1={220} y1={128} x2={220} y2={180} />
+        <Line x1={280} y1={118} x2={280} y2={180} />
+        <Line x1={320} y1={100} x2={320} y2={180} />
+      </G>
+      <Path d="M-20 150 Q 90 100 180 120 Q 270 140 380 80" stroke={GOLD_LIGHT} strokeWidth={1} strokeDasharray="3 6" fill="none" opacity={0.9} />
+      <G transform="translate(310, 30)" stroke={GOLD} strokeWidth={0.6} fill="none" opacity={0.6}>
+        <Circle r={14} />
+        <Line x1={0} y1={-14} x2={0} y2={14} />
+        <Line x1={-14} y1={0} x2={14} y2={0} />
+      </G>
+    </Svg>
+  );
+}
+
+function EconomyScene() {
+  return (
+    <Svg width="100%" height="100%" viewBox="0 0 360 180" preserveAspectRatio="xMidYMid slice" style={StyleSheet.absoluteFill}>
+      <Defs>
+        <SvgLinearGradient id="sky3" x1="0" y1="0" x2="0" y2="1">
+          <Stop offset="0%" stopColor="#1B1F2A" />
+          <Stop offset="100%" stopColor="#0A0D14" />
+        </SvgLinearGradient>
+      </Defs>
+      <Rect width="360" height="180" fill="url(#sky3)" />
+      {[0, 1, 2, 3, 4].map((i) => (
+        <G key={i} transform={`translate(${20 + i * 68}, 50)`}>
+          <Rect width={58} height={130} fill="#0E1218" stroke={GOLD} strokeWidth={0.6} strokeOpacity={0.5} />
+          <Rect x={6} y={14} width={46} height={60} fill="#070A10" stroke={GOLD} strokeOpacity={i === 1 || i === 3 ? 0.9 : 0.3} strokeWidth={0.6} />
+          <Line x1={0} y1={80} x2={58} y2={80} stroke={GOLD} strokeWidth={0.4} opacity={0.4} />
+          {(i === 1 || i === 3) && (
+            <G>
+              <Rect x={14} y={32} width={30} height={20} fill={BG} stroke={GOLD} strokeWidth={0.6} />
+            </G>
+          )}
+        </G>
+      ))}
+      <Line x1={0} y1={180} x2={360} y2={180} stroke={GOLD} strokeWidth={0.5} opacity={0.4} />
+    </Svg>
+  );
+}
+
+function EnvironmentScene() {
+  return (
+    <Svg width="100%" height="100%" viewBox="0 0 360 180" preserveAspectRatio="xMidYMid slice" style={StyleSheet.absoluteFill}>
+      <Defs>
+        <SvgLinearGradient id="sky4" x1="0" y1="0" x2="0" y2="1">
+          <Stop offset="0%" stopColor="#0F1A14" />
+          <Stop offset="100%" stopColor="#060A08" />
+        </SvgLinearGradient>
+      </Defs>
+      <Rect width="360" height="180" fill="url(#sky4)" />
+      <Ellipse cx="180" cy="200" rx="200" ry="60" fill={GOLD} opacity={0.05} />
+      {[40, 100, 160, 220, 280, 320].map((x, i) => (
+        <G key={i} transform={`translate(${x}, ${140 - (i % 3) * 20})`}>
+          <Line x1={0} y1={0} x2={0} y2={40 + (i % 2) * 20} stroke={GOLD} strokeWidth={1} opacity={0.6} />
+          <Path d={`M-12,-${10 + i * 3} Q0,-${25 + i * 3} 12,-${10 + i * 3}`} stroke={GOLD} strokeWidth={0.8} fill="none" opacity={0.5} />
+          <Path d={`M-8,-${18 + i * 3} Q0,-${30 + i * 3} 8,-${18 + i * 3}`} stroke={GOLD} strokeWidth={0.6} fill="none" opacity={0.4} />
+        </G>
+      ))}
+    </Svg>
+  );
+}
+
+function HealthcareScene() {
+  return (
+    <Svg width="100%" height="100%" viewBox="0 0 360 180" preserveAspectRatio="xMidYMid slice" style={StyleSheet.absoluteFill}>
+      <Defs>
+        <SvgLinearGradient id="sky5" x1="0" y1="0" x2="0" y2="1">
+          <Stop offset="0%" stopColor="#1A1520" />
+          <Stop offset="100%" stopColor="#0A080D" />
+        </SvgLinearGradient>
+      </Defs>
+      <Rect width="360" height="180" fill="url(#sky5)" />
+      <G transform="translate(180, 90)">
+        <Circle r={50} fill="none" stroke={GOLD} strokeWidth={1} opacity={0.3} />
+        <Circle r={35} fill="none" stroke={GOLD} strokeWidth={0.6} opacity={0.2} />
+        <Rect x={-5} y={-25} width={10} height={50} fill={GOLD} opacity={0.6} />
+        <Rect x={-25} y={-5} width={50} height={10} fill={GOLD} opacity={0.6} />
+      </G>
+      <Path d="M40 160 Q100 100 160 120 Q220 140 280 100 Q340 60 380 80" stroke={GOLD} strokeWidth={1} fill="none" opacity={0.3} />
+    </Svg>
+  );
+}
+
+function DefaultScene() {
+  return (
+    <Svg width="100%" height="100%" viewBox="0 0 360 180" preserveAspectRatio="xMidYMid slice" style={StyleSheet.absoluteFill}>
+      <Defs>
+        <SvgLinearGradient id="sky6" x1="0" y1="0" x2="0" y2="1">
+          <Stop offset="0%" stopColor="#1A1814" />
+          <Stop offset="100%" stopColor="#0A0908" />
+        </SvgLinearGradient>
+      </Defs>
+      <Rect width="360" height="180" fill="url(#sky6)" />
+      <G transform="translate(180, 90)" opacity={0.3}>
+        <Circle r={60} fill="none" stroke={GOLD} strokeWidth={1} strokeDasharray="4 4" />
+        <Circle r={40} fill="none" stroke={GOLD} strokeWidth={0.6} />
+        <Circle r={20} fill={GOLD} opacity={0.2} />
+      </G>
+      <Line x1={0} y1={180} x2={360} y2={180} stroke={GOLD} strokeWidth={0.5} opacity={0.3} />
+    </Svg>
+  );
+}
+
+function getSceneForCategory(category: string) {
+  switch (category?.toLowerCase()) {
+    case 'housing': return <HousingScene />;
+    case 'transportation': case 'infrastructure': return <TransitScene />;
+    case 'economy': return <EconomyScene />;
+    case 'environment': return <EnvironmentScene />;
+    case 'healthcare': return <HealthcareScene />;
+    default: return <DefaultScene />;
+  }
+}
+
+// Get tier label from geo restrictions
+function getTierLabel(geoRestrictions?: string[]): string {
+  if (!geoRestrictions || geoRestrictions.length === 0) return 'FEDERAL';
+  if (geoRestrictions.length === 1) return 'FEDERAL';
+  if (geoRestrictions.length === 2) return 'PROVINCIAL';
+  return 'MUNICIPAL';
+}
+
+// Generate dossier ref code from proposal
+function getDossierRef(proposal: Proposal): string {
+  const tier = getTierLabel(proposal.geoRestrictions);
+  const prefix = tier === 'FEDERAL' ? 'FED' : tier === 'PROVINCIAL' ? 'PROV' : 'MUN';
+  const idNum = String(proposal.id).match(/\d+/g)?.join('') || '0000';
+  return `${prefix}-${idNum.slice(-4).padStart(4, '0')}`;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PREMIUM VOTE HEADER - Institutional serif styling
+// ═══════════════════════════════════════════════════════════════════════════════
+function VoteHeader({
+  index,
+  total,
+  activeCount,
+  closingSoon,
+  selectedFilter,
+  onFilterChange,
+  insetTop,
+}: {
+  index: number;
+  total: number;
+  activeCount: number;
+  closingSoon: number;
+  selectedFilter: string;
+  onFilterChange: (filter: string) => void;
+  insetTop: number;
+}) {
+  const { colors } = useTheme();
+  const filters = ['All', 'Federal', 'Provincial', 'Municipal', 'Closing'];
+
+  return (
+    <View style={{ paddingTop: insetTop + 8, backgroundColor: BG }}>
+      {/* Identity strip */}
+      <View style={voteHeaderStyles.identityStrip}>
+        <View style={voteHeaderStyles.statusRow}>
+          <View style={[voteHeaderStyles.statusDot, { backgroundColor: GREEN }]} />
+          <Text style={voteHeaderStyles.statusText}>Voting Session · Open</Text>
+        </View>
+        <Text style={voteHeaderStyles.dateText}>
+          {new Date().toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' }).replace(/\//g, ' · ')}
+        </Text>
+      </View>
+
+      {/* Title block */}
+      <View style={voteHeaderStyles.titleBlock}>
+        <View>
+          <Text style={voteHeaderStyles.serifTitle}>Proposals</Text>
+          <View style={voteHeaderStyles.subtitleRow}>
+            <Text style={voteHeaderStyles.subtitleText}>{activeCount} active</Text>
+            <View style={voteHeaderStyles.dotSeparator} />
+            <Text style={voteHeaderStyles.subtitleText}>{closingSoon} closing soon</Text>
+          </View>
+        </View>
+      </View>
+
+      {/* Filter rail */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={voteHeaderStyles.filterRail}
+      >
+        {filters.map((label) => {
+          const isActive = selectedFilter === label;
+          return (
+            <TouchableOpacity
+              key={label}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                onFilterChange(label);
+              }}
+              style={[
+                voteHeaderStyles.filterChip,
+                {
+                  backgroundColor: isActive ? GOLD : 'transparent',
+                  borderColor: isActive ? GOLD : LINE_STRONG,
+                },
+              ]}
+            >
+              <Text style={[
+                voteHeaderStyles.filterChipText,
+                { color: isActive ? '#1A1206' : FG_MUTED },
+              ]}>{label}</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
+
+      {/* Progress counter */}
+      <View style={voteHeaderStyles.progressSection}>
+        <View style={voteHeaderStyles.progressRow}>
+          <View style={voteHeaderStyles.counterRow}>
+            <Text style={voteHeaderStyles.counterNum}>
+              {String(index + 1).padStart(2, '0')} / {String(total).padStart(2, '0')}
+            </Text>
+            <Text style={voteHeaderStyles.counterLabel}>in queue</Text>
+          </View>
+          <Text style={voteHeaderStyles.percentText}>
+            {total > 0 ? Math.round(((index + 1) / total) * 100) : 0}% reviewed
+          </Text>
+        </View>
+        <View style={voteHeaderStyles.progressBar}>
+          <LinearGradient
+            colors={[GOLD_DARK, GOLD, GOLD_LIGHT]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={[voteHeaderStyles.progressFill, { width: `${total > 0 ? ((index + 1) / total) * 100 : 0}%` }]}
+          />
+          {[25, 50, 75].map(p => (
+            <View key={p} style={[voteHeaderStyles.progressTick, { left: `${p}%` }]} />
+          ))}
+        </View>
+      </View>
+    </View>
+  );
+}
+
+const voteHeaderStyles = StyleSheet.create({
+  identityStrip: {
+    paddingHorizontal: 24,
+    paddingTop: 8,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  statusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  statusText: {
+    fontFamily: Platform.OS === 'ios' ? 'System' : 'sans-serif',
+    fontSize: 11,
+    fontWeight: '500',
+    letterSpacing: 1.5,
+    textTransform: 'uppercase',
+    color: FG_FAINT,
+  },
+  dateText: {
+    fontFamily: MONO_FONT,
+    fontSize: 9.5,
+    color: FG_FAINT,
+    letterSpacing: 1,
+  },
+  titleBlock: {
+    paddingHorizontal: 24,
+    paddingTop: 14,
+    paddingBottom: 18,
+  },
+  serifTitle: {
+    fontFamily: SERIF_FONT,
+    fontSize: 38,
+    fontWeight: '500',
+    color: FG,
+    letterSpacing: -1,
+  },
+  subtitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 8,
+  },
+  subtitleText: {
+    fontSize: 12,
+    color: FG_FAINT,
+    letterSpacing: -0.2,
+  },
+  dotSeparator: {
+    width: 2,
+    height: 2,
+    borderRadius: 1,
+    backgroundColor: FG_FAINT,
+  },
+  filterRail: {
+    paddingHorizontal: 24,
+    paddingBottom: 18,
+    gap: 6,
+  },
+  filterChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  filterChipText: {
+    fontSize: 11,
+    fontWeight: '500',
+    letterSpacing: 0.3,
+  },
+  progressSection: {
+    paddingHorizontal: 24,
+    paddingBottom: 16,
+  },
+  progressRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'baseline',
+    marginBottom: 10,
+  },
+  counterRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 8,
+  },
+  counterNum: {
+    fontFamily: MONO_FONT,
+    fontSize: 10.5,
+    fontWeight: '500',
+    color: FG,
+    letterSpacing: 0.5,
+  },
+  counterLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    letterSpacing: 1.5,
+    textTransform: 'uppercase',
+    color: GOLD,
+  },
+  percentText: {
+    fontFamily: MONO_FONT,
+    fontSize: 9,
+    color: FG_FAINT,
+    letterSpacing: 0.8,
+  },
+  progressBar: {
+    height: 2,
+    backgroundColor: LINE_COLOR,
+    borderRadius: 2,
+    overflow: 'visible',
+    position: 'relative',
+  },
+  progressFill: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    borderRadius: 2,
+  },
+  progressTick: {
+    position: 'absolute',
+    top: -2,
+    bottom: -2,
+    width: 1,
+    backgroundColor: BG,
+  },
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SWIPE DECISION RAIL - Replaces big action buttons
+// ═══════════════════════════════════════════════════════════════════════════════
+function SwipeDecisionRail() {
+  return (
+    <View style={decisionRailStyles.container}>
+      <View style={decisionRailStyles.railRow}>
+        {/* Left rail - oppose */}
+        <View style={decisionRailStyles.railLeft}>
+          <Text style={[decisionRailStyles.railLabel, { color: RED }]}>OPPOSE</Text>
+          <View style={[decisionRailStyles.railLine, { backgroundColor: RED }]}>
+            <Svg width={16} height={16} viewBox="0 0 16 16" style={decisionRailStyles.arrowIcon}>
+              <Path d="M14 8H2M6 4l-4 4 4 4" stroke={RED} strokeWidth={1.4} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+            </Svg>
+          </View>
+        </View>
+
+        {/* Center icons */}
+        <View style={decisionRailStyles.centerIcons}>
+          <TouchableOpacity style={decisionRailStyles.centerBtn}>
+            <Ionicons name="bookmark-outline" size={16} color={FG_MUTED} />
+          </TouchableOpacity>
+          <TouchableOpacity style={decisionRailStyles.centerBtn}>
+            <Ionicons name="refresh-outline" size={14} color={FG_MUTED} />
+          </TouchableOpacity>
+          <TouchableOpacity style={decisionRailStyles.centerBtn}>
+            <Ionicons name="play-skip-forward-outline" size={14} color={FG_MUTED} />
+          </TouchableOpacity>
+        </View>
+
+        {/* Right rail - support */}
+        <View style={decisionRailStyles.railRight}>
+          <View style={[decisionRailStyles.railLine, { backgroundColor: GREEN }]}>
+            <Svg width={16} height={16} viewBox="0 0 16 16" style={[decisionRailStyles.arrowIcon, { right: -2 }]}>
+              <Path d="M2 8h12M10 4l4 4-4 4" stroke={GREEN} strokeWidth={1.4} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+            </Svg>
+          </View>
+          <Text style={[decisionRailStyles.railLabel, { color: GREEN }]}>SUPPORT</Text>
+        </View>
+      </View>
+
+      {/* Hint */}
+      <Text style={decisionRailStyles.hint}>Swipe to decide · tap to read</Text>
+    </View>
+  );
+}
+
+const decisionRailStyles = StyleSheet.create({
+  container: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 102,
+    paddingHorizontal: 28,
+  },
+  railRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  railLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  railRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  railLabel: {
+    fontSize: 9,
+    fontWeight: '600',
+    letterSpacing: 2,
+  },
+  railLine: {
+    width: 60,
+    height: 1,
+    position: 'relative',
+  },
+  arrowIcon: {
+    position: 'absolute',
+    top: -8,
+  },
+  centerIcons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  centerBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: BG_RAISED,
+    borderWidth: 1,
+    borderColor: LINE_STRONG,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  hint: {
+    textAlign: 'center',
+    marginTop: 12,
+    fontSize: 9.5,
+    color: FG_FAINT,
+    letterSpacing: 2,
+    textTransform: 'uppercase',
+  },
+});
 
 // Helper to check if a proposal is a seed proposal (for local-only voting)
 const isSeedProposal = (id: number | string): boolean =>
@@ -314,132 +868,155 @@ function SwipeCard({ proposal, onSwipeLeft, onSwipeRight, onSwipeUp, onTap, isTo
     opacity: interpolate(translateY.value, [-SWIPE_THRESHOLD, 0], [1, 0], Extrapolation.CLAMP),
   }));
 
+  // Get category color for tag
+  const getCategoryColor = () => {
+    switch (category?.toLowerCase()) {
+      case 'economy': return GREEN;
+      case 'housing': return GOLD;
+      case 'transportation': case 'infrastructure': return BLUE;
+      case 'environment': return '#22C55E';
+      case 'healthcare': return '#EF4444';
+      default: return GOLD;
+    }
+  };
+
+  const dossierRef = getDossierRef(proposal);
+  const tierLabel = getTierLabel(proposal.geoRestrictions);
+  const categoryColor = getCategoryColor();
+  const location = proposal.geoRestrictions && proposal.geoRestrictions.length > 0
+    ? proposal.geoRestrictions[proposal.geoRestrictions.length - 1]
+    : 'Canada';
+
   return (
     <GestureDetector gesture={composedGesture}>
-      <Animated.View style={[styles.swipeCard, { backgroundColor: colors.surface, borderColor: colors.border, height: cardHeight }, cardStyle]}>
-        {/* Hero Image */}
-        {proposal.imageUrl ? (
-          <View style={styles.swipeCardImageContainer}>
-            <Image source={{ uri: proposal.imageUrl }} style={styles.swipeCardImage} resizeMode="cover" />
-            {/* Category-themed gradient overlay on image */}
-            <LinearGradient
-              colors={[`${theme.primary}40`, 'transparent']}
-              style={styles.swipeCardImageOverlayTop}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 0, y: 1 }}
-            />
-            <LinearGradient
-              colors={['transparent', 'rgba(0,0,0,0.5)', 'rgba(0,0,0,0.9)']}
-              locations={[0, 0.5, 1]}
-              style={styles.swipeCardImageOverlay}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 0, y: 1 }}
-            />
-          </View>
-        ) : (
-          <View style={[styles.swipeCardImageContainer, { backgroundColor: theme.primary + '20' }]}>
-            <LinearGradient
-              colors={[`${theme.primary}30`, `${theme.secondary}20`]}
-              style={StyleSheet.absoluteFill}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-            />
-            <Ionicons name={theme.icon as any} size={80} color={`${theme.primary}50`} />
-          </View>
-        )}
+      <Animated.View style={[premiumCardStyles.card, { height: cardHeight }, cardStyle]}>
+        {/* Hero with SVG scene */}
+        <View style={premiumCardStyles.heroContainer}>
+          {proposal.imageUrl ? (
+            <>
+              <Image source={{ uri: proposal.imageUrl }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+              <LinearGradient
+                colors={['rgba(4,7,7,0.2)', 'rgba(4,7,7,0.55)', 'rgba(13,15,18,0.95)']}
+                locations={[0, 0.5, 1]}
+                style={StyleSheet.absoluteFill}
+              />
+            </>
+          ) : (
+            <>
+              {getSceneForCategory(category)}
+              <LinearGradient
+                colors={['rgba(4,7,7,0.15)', 'transparent', 'transparent', 'rgba(13,15,18,0.95)']}
+                locations={[0, 0.3, 0.75, 1]}
+                style={StyleSheet.absoluteFill}
+              />
+            </>
+          )}
 
-        {/* Geo scope badge - top left */}
-        <View style={[styles.swipeGeoBadgeTopLeft, { backgroundColor: 'rgba(0,0,0,0.6)' }]}>
-          <Ionicons
-            name={proposal.geoRestrictions && proposal.geoRestrictions.length > 0 ? 'location' : 'globe-outline'}
-            size={14}
-            color="#fff"
-          />
-          <Text style={styles.swipeGeoText}>
-            {proposal.geoRestrictions && proposal.geoRestrictions.length > 0
-              ? proposal.geoRestrictions[proposal.geoRestrictions.length - 1]
-              : 'Global'}
-          </Text>
+          {/* Location pill - top left */}
+          <View style={premiumCardStyles.locationPill}>
+            <Ionicons name="location" size={11} color={FG} />
+            <Text style={premiumCardStyles.locationText}>{location}</Text>
+          </View>
+
+          {/* Category tag - bottom left */}
+          <View style={[premiumCardStyles.categoryTag, { borderColor: `${categoryColor}66` }]}>
+            <View style={[premiumCardStyles.categoryDot, { backgroundColor: categoryColor }]} />
+            <Text style={[premiumCardStyles.categoryText, { color: categoryColor }]}>{category.toUpperCase()}</Text>
+          </View>
         </View>
 
         {/* Swipe Indicators */}
         {isTopCard && !isEnded && (
           <>
-            <Animated.View style={[styles.swipeIndicatorFullScreen, styles.swipeIndicatorRight, supportIndicatorStyle]}>
-              <View style={[styles.swipeIndicatorCircle, { backgroundColor: colors.success }]}>
-                <Ionicons name="checkmark" size={48} color="#fff" />
+            <Animated.View style={[premiumCardStyles.swipeVeil, { backgroundColor: `${GREEN}20` }, supportIndicatorStyle]}>
+              <View style={[premiumCardStyles.swipeStamp, { borderColor: GREEN }]}>
+                <Text style={[premiumCardStyles.swipeStampText, { color: GREEN }]}>SUPPORT</Text>
               </View>
-              <Text style={[styles.swipeIndicatorTextLarge, { color: colors.success }]}>SUPPORT</Text>
             </Animated.View>
-            <Animated.View style={[styles.swipeIndicatorFullScreen, styles.swipeIndicatorLeft, opposeIndicatorStyle]}>
-              <View style={[styles.swipeIndicatorCircle, { backgroundColor: colors.error }]}>
-                <Ionicons name="close" size={48} color="#fff" />
+            <Animated.View style={[premiumCardStyles.swipeVeil, { backgroundColor: `${RED}20` }, opposeIndicatorStyle]}>
+              <View style={[premiumCardStyles.swipeStamp, { borderColor: RED, right: 24, left: undefined }]}>
+                <Text style={[premiumCardStyles.swipeStampText, { color: RED }]}>OPPOSE</Text>
               </View>
-              <Text style={[styles.swipeIndicatorTextLarge, { color: colors.error }]}>OPPOSE</Text>
             </Animated.View>
-            <Animated.View style={[styles.swipeIndicatorFullScreen, styles.swipeIndicatorTop, skipIndicatorStyle]}>
-              <View style={[styles.swipeIndicatorCircle, { backgroundColor: colors.gold }]}>
-                <Ionicons name="arrow-up" size={48} color="#fff" />
+            <Animated.View style={[premiumCardStyles.swipeVeilTop, skipIndicatorStyle]}>
+              <View style={[premiumCardStyles.swipeStamp, { borderColor: GOLD, transform: [{ rotate: '0deg' }] }]}>
+                <Text style={[premiumCardStyles.swipeStampText, { color: GOLD }]}>SKIP</Text>
               </View>
-              <Text style={[styles.swipeIndicatorTextLarge, { color: colors.gold }]}>SKIP</Text>
             </Animated.View>
           </>
         )}
 
-        {/* Content Overlay at Bottom */}
-        <View style={styles.swipeCardContentOverlay}>
-          {/* Category & Time badges */}
-          <View style={styles.swipeCardBadgeRow}>
-            <View style={[styles.swipeCategoryBadgeLarge, { backgroundColor: theme.primary }]}>
-              <Ionicons name={theme.icon as any} size={14} color="#fff" />
-              <Text style={styles.swipeCategoryTextLight}>{category}</Text>
+        {/* Card body */}
+        <View style={premiumCardStyles.cardBody}>
+          {/* Dossier ref row */}
+          <View style={premiumCardStyles.refRow}>
+            <Text style={premiumCardStyles.refText}>{tierLabel} · {dossierRef}</Text>
+            <View style={premiumCardStyles.timeRow}>
+              <Ionicons name="time-outline" size={11} color={GOLD} />
+              <Text style={premiumCardStyles.timeText}>{timeRemaining || 'Open'}</Text>
             </View>
-            {timeRemaining && (
-              <View style={[styles.swipeTimeBadgeLarge, { backgroundColor: isEnded ? colors.error : 'rgba(255,255,255,0.2)' }]}>
-                <Ionicons name="time-outline" size={14} color="#fff" />
-                <Text style={styles.swipeTimeTextLight}>{timeRemaining}</Text>
-              </View>
-            )}
           </View>
 
-          {/* Title */}
-          <Text style={styles.swipeCardTitleLarge} numberOfLines={2}>{proposal.title}</Text>
+          {/* Serif title */}
+          <Text style={premiumCardStyles.serifTitle} numberOfLines={2}>{proposal.title}</Text>
 
-          {/* Creator info */}
-          <View style={styles.swipeCreatorRow}>
-            <Ionicons name="person-circle-outline" size={14} color="rgba(255,255,255,0.6)" />
-            <Text style={styles.swipeCreatorText}>
-              Proposed by Community Member
+          {/* Proposer */}
+          <View style={premiumCardStyles.proposerRow}>
+            <View style={premiumCardStyles.proposerAvatar}>
+              <Text style={premiumCardStyles.proposerDot}>·</Text>
+            </View>
+            <Text style={premiumCardStyles.proposerText}>
+              Proposed by <Text style={{ color: FG }}>Community Member</Text>
             </Text>
           </View>
 
           {/* Description */}
-          <Text style={styles.swipeCardDescLarge} numberOfLines={2}>{proposal.description}</Text>
+          <Text style={premiumCardStyles.description} numberOfLines={2}>{proposal.description}</Text>
 
-          {/* Vote Progress */}
-          <View style={styles.swipeVoteSectionLarge}>
-            <View style={styles.swipeVoteBarBgLarge}>
-              <View style={[styles.swipeVoteBarFillLarge, { width: `${supportPercent}%`, backgroundColor: colors.success }]} />
-              <View style={[styles.swipeVoteBarOpposeSection, { width: `${100 - supportPercent}%`, backgroundColor: colors.error }]} />
+          {/* Sentiment ledger */}
+          <View style={premiumCardStyles.sentimentSection}>
+            <View style={premiumCardStyles.sentimentBar}>
+              <View style={[premiumCardStyles.sentimentFillSupport, { width: `${supportPercent}%` }]} />
+              <View style={[premiumCardStyles.sentimentFillOppose, { width: `${100 - supportPercent}%` }]} />
             </View>
-            <View style={styles.swipeVoteStatsLarge}>
-              <View style={styles.swipeVoteStatLarge}>
-                <Ionicons name="thumbs-up" size={18} color={colors.success} />
-                <Text style={[styles.swipeVoteCountLarge, { color: colors.success }]}>{(proposal.supportVotes || 0).toLocaleString()}</Text>
+            <View style={premiumCardStyles.sentimentStats}>
+              <View style={premiumCardStyles.sentimentStat}>
+                <Text style={[premiumCardStyles.sentimentNum, { color: GREEN }]}>{(proposal.supportVotes || 0).toLocaleString()}</Text>
+                <Text style={premiumCardStyles.sentimentLabel}>SUPPORT</Text>
               </View>
-              <Text style={styles.swipeVotePercentLarge}>{supportPercent}% support</Text>
-              <View style={styles.swipeVoteStatLarge}>
-                <Ionicons name="thumbs-down" size={18} color={colors.error} />
-                <Text style={[styles.swipeVoteCountLarge, { color: colors.error }]}>{(proposal.opposeVotes || 0).toLocaleString()}</Text>
+              <View style={premiumCardStyles.sentimentPct}>
+                <Text style={premiumCardStyles.sentimentPctText}>{supportPercent}%</Text>
+              </View>
+              <View style={[premiumCardStyles.sentimentStat, { alignItems: 'flex-end' }]}>
+                <Text style={premiumCardStyles.sentimentLabel}>OPPOSE</Text>
+                <Text style={[premiumCardStyles.sentimentNum, { color: RED }]}>{(proposal.opposeVotes || 0).toLocaleString()}</Text>
               </View>
             </View>
           </View>
 
-          {/* Ended Banner (shown inside card) */}
+          {/* Footer */}
+          <View style={premiumCardStyles.cardFooter}>
+            <View style={premiumCardStyles.footerChips}>
+              <View style={premiumCardStyles.metaChip}>
+                <Ionicons name="document-text-outline" size={11} color={FG_MUTED} />
+                <Text style={premiumCardStyles.metaChipText}>Brief</Text>
+              </View>
+              <View style={premiumCardStyles.metaChip}>
+                <Ionicons name="chatbubble-outline" size={11} color={FG_MUTED} />
+                <Text style={premiumCardStyles.metaChipText}>{totalVotes}</Text>
+              </View>
+            </View>
+            <View style={premiumCardStyles.dossierLink}>
+              <Text style={premiumCardStyles.dossierLinkText}>View dossier</Text>
+              <Ionicons name="arrow-forward" size={9} color={GOLD} />
+            </View>
+          </View>
+
+          {/* Ended Banner */}
           {isEnded && (
-            <View style={styles.swipeEndedBannerLarge}>
-              <Ionicons name="flag-outline" size={18} color="#fff" />
-              <Text style={styles.swipeEndedTextLarge}>Voting has ended</Text>
+            <View style={premiumCardStyles.endedBanner}>
+              <Ionicons name="flag-outline" size={14} color="#fff" />
+              <Text style={premiumCardStyles.endedText}>Voting has ended</Text>
             </View>
           )}
         </View>
@@ -447,6 +1024,289 @@ function SwipeCard({ proposal, onSwipeLeft, onSwipeRight, onSwipeUp, onTap, isTo
     </GestureDetector>
   );
 }
+
+// Premium card styles
+const premiumCardStyles = StyleSheet.create({
+  card: {
+    position: 'absolute',
+    left: 16,
+    right: 16,
+    top: 0,
+    backgroundColor: BG_CARD,
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: LINE_COLOR,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 24 },
+    shadowOpacity: 0.5,
+    shadowRadius: 48,
+    elevation: 20,
+  },
+  heroContainer: {
+    height: 130,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  locationPill: {
+    position: 'absolute',
+    top: 16,
+    left: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: 'rgba(4,7,7,0.55)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+  },
+  locationText: {
+    fontSize: 11,
+    fontWeight: '500',
+    color: FG,
+    letterSpacing: -0.2,
+  },
+  categoryTag: {
+    position: 'absolute',
+    bottom: 14,
+    left: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 4,
+    backgroundColor: 'rgba(4,7,7,0.7)',
+    borderWidth: 1,
+  },
+  categoryDot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+  },
+  categoryText: {
+    fontFamily: MONO_FONT,
+    fontSize: 9,
+    fontWeight: '600',
+    letterSpacing: 1.3,
+  },
+  swipeVeil: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 5,
+  },
+  swipeVeilTop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 100,
+    backgroundColor: `${GOLD}20`,
+    zIndex: 5,
+  },
+  swipeStamp: {
+    position: 'absolute',
+    top: 32,
+    left: 24,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 6,
+    borderWidth: 2,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    transform: [{ rotate: '-8deg' }],
+  },
+  swipeStampText: {
+    fontSize: 14,
+    fontWeight: '700',
+    letterSpacing: 3,
+  },
+  cardBody: {
+    padding: 16,
+    paddingTop: 14,
+  },
+  refRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'baseline',
+    marginBottom: 10,
+  },
+  refText: {
+    fontFamily: MONO_FONT,
+    fontSize: 9,
+    color: FG_FAINT,
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
+  },
+  timeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  timeText: {
+    fontSize: 9.5,
+    fontWeight: '500',
+    letterSpacing: 1.3,
+    textTransform: 'uppercase',
+    color: GOLD,
+  },
+  serifTitle: {
+    fontFamily: SERIF_FONT,
+    fontSize: 24,
+    fontWeight: '500',
+    color: FG,
+    lineHeight: 28,
+    letterSpacing: -0.5,
+    marginBottom: 10,
+  },
+  proposerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 10,
+  },
+  proposerAvatar: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: 'rgba(234,186,88,0.10)',
+    borderWidth: 1,
+    borderColor: 'rgba(234,186,88,0.35)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  proposerDot: {
+    fontFamily: SERIF_FONT,
+    fontSize: 9,
+    fontWeight: '600',
+    color: GOLD,
+  },
+  proposerText: {
+    fontSize: 11.5,
+    color: FG_MUTED,
+    letterSpacing: -0.2,
+  },
+  description: {
+    fontSize: 12.5,
+    color: FG_MUTED,
+    lineHeight: 18,
+    letterSpacing: -0.2,
+    marginBottom: 12,
+  },
+  sentimentSection: {
+    marginBottom: 10,
+  },
+  sentimentBar: {
+    height: 6,
+    borderRadius: 3,
+    overflow: 'hidden',
+    flexDirection: 'row',
+    backgroundColor: LINE_COLOR,
+    marginBottom: 10,
+  },
+  sentimentFillSupport: {
+    height: '100%',
+    backgroundColor: GREEN,
+  },
+  sentimentFillOppose: {
+    height: '100%',
+    backgroundColor: RED,
+    opacity: 0.8,
+  },
+  sentimentStats: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  sentimentStat: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 6,
+  },
+  sentimentNum: {
+    fontFamily: SERIF_FONT,
+    fontSize: 18,
+    fontWeight: '500',
+    letterSpacing: -0.5,
+  },
+  sentimentLabel: {
+    fontSize: 10,
+    fontWeight: '500',
+    color: FG_FAINT,
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
+  },
+  sentimentPct: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 4,
+    backgroundColor: BG_RAISED,
+    borderWidth: 1,
+    borderColor: LINE_STRONG,
+  },
+  sentimentPctText: {
+    fontFamily: MONO_FONT,
+    fontSize: 11,
+    fontWeight: '500',
+    color: FG,
+    letterSpacing: 0.3,
+  },
+  cardFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: LINE_COLOR,
+  },
+  footerChips: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  metaChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: 7,
+    backgroundColor: BG_RAISED,
+    borderWidth: 1,
+    borderColor: LINE_COLOR,
+  },
+  metaChipText: {
+    fontSize: 10.5,
+    fontWeight: '500',
+    color: FG_MUTED,
+    letterSpacing: -0.2,
+  },
+  dossierLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  dossierLinkText: {
+    fontSize: 10,
+    fontWeight: '600',
+    letterSpacing: 0.3,
+    color: GOLD,
+  },
+  endedBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 12,
+    paddingVertical: 10,
+    borderRadius: 8,
+    backgroundColor: 'rgba(239,68,68,0.15)',
+  },
+  endedText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#fff',
+  },
+});
 
 // --- View Mode Toggle ---
 function ViewModeToggle({ mode, onToggle }: { mode: 'swipe' | 'list'; onToggle: () => void }) {
@@ -1408,74 +2268,76 @@ export default function ProposalsScreen() {
   const detailIsVoting = detail ? votingProposalId === (detail.id as number) : false;
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Header */}
-      <Animated.View entering={FadeInDown.duration(400)} style={[styles.header, { borderBottomColor: colors.border, paddingTop: insets.top + 16 }]}>
-        <View style={styles.headerRow}>
-          <View>
-            <Text style={[styles.headerTitle, { color: colors.text }]}>Proposals</Text>
-            <Text style={[styles.headerSubtitle, { color: colors.textTertiary }]}>
-              {activeCount} active proposal{activeCount !== 1 ? 's' : ''}
-            </Text>
-          </View>
+    <View style={[styles.container, { backgroundColor: viewMode === 'swipe' ? BG : colors.background }]}>
+      {/* Header - only show in list mode */}
+      {viewMode !== 'swipe' && (
+        <Animated.View entering={FadeInDown.duration(400)} style={[styles.header, { borderBottomColor: colors.border, paddingTop: insets.top + 16 }]}>
+          <View style={styles.headerRow}>
+            <View>
+              <Text style={[styles.headerTitle, { color: colors.text }]}>Proposals</Text>
+              <Text style={[styles.headerSubtitle, { color: colors.textTertiary }]}>
+                {activeCount} active proposal{activeCount !== 1 ? 's' : ''}
+              </Text>
+            </View>
 
-          <View style={styles.headerActions}>
-            <BallotDisplay size="sm" />
+            <View style={styles.headerActions}>
+              <BallotDisplay size="sm" />
 
-            <TouchableOpacity
-              style={[
-                styles.filterBtn,
-                {
-                  backgroundColor: hasActiveFilters ? colors.gold : colors.surface,
-                  borderColor: hasActiveFilters ? colors.gold : colors.border,
-                },
-              ]}
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                setShowFilters(!showFilters);
-              }}
-            >
-              <Ionicons name="options-outline" size={18} color={hasActiveFilters ? '#000' : colors.text} />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                setShowCreateModal(true);
-              }}
-            >
-              <LinearGradient
-                colors={[colors.gold, colors.goldDark || '#A68523']}
-                style={styles.createBtn}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
+              <TouchableOpacity
+                style={[
+                  styles.filterBtn,
+                  {
+                    backgroundColor: hasActiveFilters ? colors.gold : colors.surface,
+                    borderColor: hasActiveFilters ? colors.gold : colors.border,
+                  },
+                ]}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  setShowFilters(!showFilters);
+                }}
               >
-                <Ionicons name="add" size={22} color="#000" />
-              </LinearGradient>
-            </TouchableOpacity>
-          </View>
-        </View>
+                <Ionicons name="options-outline" size={18} color={hasActiveFilters ? '#000' : colors.text} />
+              </TouchableOpacity>
 
-        {/* Search */}
-        <View style={[styles.searchBar, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <Ionicons name="search-outline" size={18} color={colors.textTertiary} />
-          <TextInput
-            style={[styles.searchInput, { color: colors.text }]}
-            placeholder="Search proposals..."
-            placeholderTextColor={colors.textTertiary}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-          />
-          {searchQuery ? (
-            <TouchableOpacity onPress={() => setSearchQuery('')}>
-              <Ionicons name="close-circle" size={18} color={colors.textTertiary} />
-            </TouchableOpacity>
-          ) : null}
-        </View>
-      </Animated.View>
+              <TouchableOpacity
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                  setShowCreateModal(true);
+                }}
+              >
+                <LinearGradient
+                  colors={[colors.gold, colors.goldDark || '#A68523']}
+                  style={styles.createBtn}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                >
+                  <Ionicons name="add" size={22} color="#000" />
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Search */}
+          <View style={[styles.searchBar, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <Ionicons name="search-outline" size={18} color={colors.textTertiary} />
+            <TextInput
+              style={[styles.searchInput, { color: colors.text }]}
+              placeholder="Search proposals..."
+              placeholderTextColor={colors.textTertiary}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+            />
+            {searchQuery ? (
+              <TouchableOpacity onPress={() => setSearchQuery('')}>
+                <Ionicons name="close-circle" size={18} color={colors.textTertiary} />
+              </TouchableOpacity>
+            ) : null}
+          </View>
+        </Animated.View>
+      )}
 
       {/* Filter Panel */}
-      {showFilters && (
+      {showFilters && viewMode !== 'swipe' && (
         <Animated.View
           entering={FadeInDown.duration(250)}
           style={[styles.filterPanel, { backgroundColor: colors.surface, borderColor: colors.border }]}
@@ -1561,8 +2423,8 @@ export default function ProposalsScreen() {
           )}
         </Animated.View>
       ) : viewMode === 'swipe' ? (
-        /* Swipe Mode */
-        <GestureHandlerRootView style={styles.swipeContainer}>
+        /* Swipe Mode - Premium Redesign */
+        <GestureHandlerRootView style={[styles.swipeContainer, { backgroundColor: BG }]}>
           {visibleSwipeCards.length === 0 ? (
             <Animated.View entering={FadeIn.duration(400)} style={styles.swipeEmptyState}>
               <View style={[styles.swipeEmptyIcon, { backgroundColor: `${colors.success}15` }]}>
@@ -1585,24 +2447,36 @@ export default function ProposalsScreen() {
               </TouchableOpacity>
             </Animated.View>
           ) : (
-            <>
-              {/* Progress indicator */}
-              <View style={styles.swipeProgress}>
-                <Text style={[styles.swipeProgressText, { color: colors.textTertiary }]}>
-                  {swipeIndex + 1} of {swipeableProposals.length} proposals
-                </Text>
-                <View style={[styles.swipeProgressBar, { backgroundColor: colors.border }]}>
-                  <View
-                    style={[
-                      styles.swipeProgressFill,
-                      { backgroundColor: colors.gold, width: `${((swipeIndex + 1) / swipeableProposals.length) * 100}%` },
-                    ]}
-                  />
-                </View>
-              </View>
+            <View style={{ flex: 1 }}>
+              {/* Premium Vote Header */}
+              <VoteHeader
+                index={swipeIndex}
+                total={swipeableProposals.length}
+                activeCount={activeCount}
+                closingSoon={filteredProposals.filter(p => {
+                  const tr = getTimeRemaining(p.deadline);
+                  return tr && tr.includes('d') && parseInt(tr) <= 3;
+                }).length}
+                selectedFilter={selectedGeoLevel === 'All' ? 'All' :
+                  selectedGeoLevel === 'National' ? 'Federal' :
+                  selectedGeoLevel === 'State/Province' ? 'Provincial' :
+                  selectedGeoLevel === 'City/Local' ? 'Municipal' : 'All'}
+                onFilterChange={(filter) => {
+                  const geoMap: Record<string, string> = {
+                    'All': 'All',
+                    'Federal': 'National',
+                    'Provincial': 'State/Province',
+                    'Municipal': 'City/Local',
+                    'Closing': 'All',
+                  };
+                  setSelectedGeoLevel(geoMap[filter] || 'All');
+                  if (filter === 'Closing') setSelectedStatus('Active');
+                }}
+                insetTop={insets.top}
+              />
 
               {/* Card stack */}
-              <View ref={swipeCardRef} style={styles.cardStack} collapsable={false}>
+              <View ref={swipeCardRef} style={[styles.cardStack, { marginTop: 8 }]} collapsable={false}>
                 {visibleSwipeCards.map((proposal, idx) => (
                   <SwipeCard
                     key={proposal.id}
@@ -1618,7 +2492,9 @@ export default function ProposalsScreen() {
                 )).reverse()}
               </View>
 
-            </>
+              {/* Swipe decision rail */}
+              <SwipeDecisionRail />
+            </View>
           )}
         </GestureHandlerRootView>
       ) : (
