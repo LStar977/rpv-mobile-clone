@@ -490,7 +490,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   headerTitle: {
-    ...TYPOGRAPHY.headlineSmall,
+    fontFamily: 'Georgia',
+    fontSize: 20,
+    fontWeight: '500',
   },
   content: {
     flex: 1,
@@ -507,8 +509,9 @@ const styles = StyleSheet.create({
     paddingTop: SPACING.md,
   },
   heroTitle: {
-    ...TYPOGRAPHY.headlineLarge,
-    fontSize: responsive(20, 22, 24),
+    fontFamily: 'Georgia',
+    fontSize: responsive(24, 26, 28),
+    fontWeight: '500',
     textAlign: 'center',
     marginBottom: SPACING.xs,
   },
@@ -552,7 +555,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   tierName: {
-    ...TYPOGRAPHY.headlineSmall,
+    fontFamily: 'Georgia',
+    fontSize: 18,
+    fontWeight: '500',
     marginBottom: 2,
   },
   tierDescription: {
@@ -564,9 +569,9 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.lg,
   },
   tierPrice: {
-    ...TYPOGRAPHY.displaySmall,
+    fontFamily: 'Georgia',
     fontSize: responsive(28, 32, 36),
-    fontWeight: '700',
+    fontWeight: '500',
   },
   tierPeriod: {
     ...TYPOGRAPHY.bodyMedium,
@@ -643,7 +648,9 @@ const styles = StyleSheet.create({
     marginTop: SPACING.md,
   },
   faqTitle: {
-    ...TYPOGRAPHY.headlineSmall,
+    fontFamily: 'Georgia',
+    fontSize: 20,
+    fontWeight: '500',
     marginBottom: SPACING.lg,
   },
   faqItem: {
