@@ -2437,170 +2437,173 @@ export default function ProposalsScreen() {
         </ScrollView>
       )}
 
-      {/* Detail Modal */}
+      {/* Detail Modal — premium institutional redesign */}
       <Modal visible={showDetailModal} animationType="slide" presentationStyle="pageSheet" onRequestClose={closeProposal}>
-        <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
-          <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
-            <TouchableOpacity onPress={closeProposal} style={styles.modalClose}>
-              <Ionicons name="chevron-down" size={24} color={colors.textSecondary} />
+        <View style={[detailStyles.container, { backgroundColor: BG }]}>
+          {/* Minimal floating header */}
+          <View style={detailStyles.header}>
+            <TouchableOpacity onPress={closeProposal} style={detailStyles.headerBtn} activeOpacity={0.7}>
+              <Ionicons name="chevron-down" size={20} color={FG} />
             </TouchableOpacity>
-
-            <Text style={[styles.modalTitle, { color: colors.text }]}>Proposal</Text>
-
             <TouchableOpacity
               onPress={() => {
                 if (!detail) return;
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                 shareProposal({ id: detail.id as number, title: detail.title, description: detail.description });
               }}
-              style={[styles.modalShare, { backgroundColor: colors.surface, borderColor: colors.border }]}
+              style={detailStyles.headerBtn}
+              activeOpacity={0.7}
             >
-              <Ionicons name="share-outline" size={18} color={colors.text} />
+              <Ionicons name="share-outline" size={16} color={FG} />
             </TouchableOpacity>
           </View>
 
-          {detail && (
-            <ScrollView contentContainerStyle={styles.modalContent} showsVerticalScrollIndicator={false}>
-              <View style={[styles.detailCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                <LinearGradient
-                  colors={[`${colors.gold}08`, 'transparent']}
-                  style={StyleSheet.absoluteFill}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                />
+          {detail && (() => {
+            const total = (detail.supportVotes || 0) + (detail.opposeVotes || 0);
+            const pct = total > 0 ? Math.round(((detail.supportVotes || 0) / total) * 100) : 0;
+            const tierLabel = getTierLabel(detail.geoRestrictions);
+            const category = detail.category || 'General';
+            const location = detail.geoRestrictions && detail.geoRestrictions.length > 0
+              ? detail.geoRestrictions[detail.geoRestrictions.length - 1]
+              : 'Canada';
+            const timeRemaining = getTimeRemaining(detail.deadline);
+            const ended = isProposalEnded(detail);
+            const cat = category.toLowerCase();
+            const categoryColor =
+              cat === 'economy' ? GREEN :
+              cat === 'housing' ? GOLD :
+              cat === 'transportation' || cat === 'infrastructure' ? BLUE :
+              cat === 'environment' ? '#22C55E' :
+              cat === 'healthcare' ? '#EF4444' : GOLD;
 
-                <View style={styles.detailHeaderRow}>
-                  <View style={[styles.categoryBadge, { backgroundColor: `${colors.gold}15` }]}>
-                    <Text style={[styles.categoryText, { color: colors.gold }]}>{detail.category || 'General'}</Text>
-                  </View>
-
-                  {detail.deadline && (
-                    <View
-                      style={[
-                        styles.timeBadge,
-                        { backgroundColor: isProposalEnded(detail) ? `${colors.error}15` : `${colors.gold}15` },
-                      ]}
-                    >
-                      <Ionicons
-                        name="time-outline"
-                        size={12}
-                        color={isProposalEnded(detail) ? colors.error : colors.gold}
-                      />
-                      <Text
-                        style={[styles.timeText, { color: isProposalEnded(detail) ? colors.error : colors.gold }]}
-                      >
-                        {getTimeRemaining(detail.deadline)}
-                      </Text>
-                    </View>
+            return (
+              <ScrollView contentContainerStyle={detailStyles.scrollContent} showsVerticalScrollIndicator={false}>
+                {/* Hero image with overlays */}
+                <View style={detailStyles.hero}>
+                  {detail.imageUrl ? (
+                    <Image source={{ uri: detail.imageUrl }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+                  ) : (
+                    <View style={[StyleSheet.absoluteFill, { backgroundColor: BG_RAISED }]} />
                   )}
-                </View>
-
-                {(detail.geoRestrictions || []).length > 0 && (
-                  <View style={[styles.geoTags, { marginTop: SPACING.sm }]}>
-                    {(detail.geoRestrictions || []).slice(0, 6).map((tag, i) => (
-                      <View key={i} style={[styles.geoTag, { backgroundColor: `${colors.info}12` }]}>
-                        <Ionicons name="location-outline" size={10} color={colors.info} />
-                        <Text style={[styles.geoTagText, { color: colors.info }]}>{tag}</Text>
-                      </View>
-                    ))}
+                  <LinearGradient
+                    colors={['rgba(4,7,7,0.25)', 'rgba(4,7,7,0.6)', 'rgba(4,7,7,1)']}
+                    locations={[0, 0.55, 1]}
+                    style={StyleSheet.absoluteFill}
+                  />
+                  <View style={detailStyles.heroLocationPill}>
+                    <Ionicons name="location" size={11} color={FG} />
+                    <Text style={detailStyles.heroLocationText}>{location}</Text>
                   </View>
-                )}
-
-                <Text style={[styles.detailTitle, { color: colors.text }]}>{detail.title}</Text>
-                <Text style={[styles.detailDesc, { color: colors.textSecondary }]}>{detail.description}</Text>
-
-                {detail.imageUrl && (
-                  <View style={[styles.imageWrapper, { marginTop: SPACING.lg }]}>
-                    <Image source={{ uri: detail.imageUrl }} style={styles.proposalImage} resizeMode="cover" />
-                  </View>
-                )}
-
-                {/* Vote Progress */}
-                <View style={[styles.voteSection, { marginTop: SPACING.xl }]}>
-                  {(() => {
-                    const total = (detail.supportVotes || 0) + (detail.opposeVotes || 0);
-                    const pct = total > 0 ? Math.round(((detail.supportVotes || 0) / total) * 100) : 50;
-                    return (
-                      <>
-                        <View style={[styles.voteBarBg, { backgroundColor: colors.error }]}>
-                          <Animated.View style={[styles.voteBarFill, { width: `${pct}%`, backgroundColor: colors.success }]} />
-                        </View>
-                        <View style={styles.voteStats}>
-                          <View style={styles.voteStat}>
-                            <View style={[styles.voteIconBg, { backgroundColor: `${colors.success}15` }]}>
-                              <Ionicons name="thumbs-up" size={12} color={colors.success} />
-                            </View>
-                            <Text style={[styles.voteCount, { color: colors.textSecondary }]}>
-                              {(detail.supportVotes || 0).toLocaleString()}
-                            </Text>
-                          </View>
-                          <View style={styles.voteStat}>
-                            <View style={[styles.voteIconBg, { backgroundColor: `${colors.error}15` }]}>
-                              <Ionicons name="thumbs-down" size={12} color={colors.error} />
-                            </View>
-                            <Text style={[styles.voteCount, { color: colors.textSecondary }]}>
-                              {(detail.opposeVotes || 0).toLocaleString()}
-                            </Text>
-                          </View>
-                        </View>
-                      </>
-                    );
-                  })()}
-                </View>
-
-                {/* Actions */}
-                <View style={{ marginTop: SPACING.xl }}>
-                  {isProposalEnded(detail) ? (
-                    <View style={[styles.statusBanner, { backgroundColor: `${colors.error}10` }]}>
-                      <Ionicons name="flag-outline" size={16} color={colors.error} />
-                      <Text style={[styles.statusText, { color: colors.error }]}>Voting has ended</Text>
+                  {!ended && timeRemaining ? (
+                    <View style={detailStyles.heroTimePill}>
+                      <Ionicons name="time-outline" size={11} color={GOLD} />
+                      <Text style={detailStyles.heroTimePillText}>{timeRemaining}</Text>
                     </View>
-                  ) : detailHasVoted ? (
-                    <View style={[styles.statusBanner, { backgroundColor: `${colors.success}10` }]}>
-                      <Ionicons name="checkmark-circle" size={16} color={colors.success} />
-                      <Text style={[styles.statusText, { color: colors.success }]}>You have voted</Text>
+                  ) : null}
+                  <View style={[detailStyles.heroCategoryTag, { borderColor: `${categoryColor}66` }]}>
+                    <View style={[detailStyles.heroCategoryDot, { backgroundColor: categoryColor }]} />
+                    <Text style={[detailStyles.heroCategoryText, { color: categoryColor }]}>{category.toUpperCase()}</Text>
+                  </View>
+                </View>
+
+                {/* Body */}
+                <View style={detailStyles.body}>
+                  <Text style={detailStyles.tierLabel}>{tierLabel}</Text>
+                  <Text style={detailStyles.title}>{detail.title}</Text>
+
+                  <View style={detailStyles.proposerRow}>
+                    <View style={detailStyles.proposerAvatar}>
+                      <Text style={detailStyles.proposerDot}>·</Text>
+                    </View>
+                    <Text style={detailStyles.proposerText}>
+                      Proposed by <Text style={{ color: FG }}>Represent Civic Desk</Text>
+                    </Text>
+                  </View>
+
+                  <Text style={detailStyles.description}>{detail.description}</Text>
+
+                  {/* Sentiment ledger */}
+                  {total === 0 ? (
+                    <View style={detailStyles.sentimentSection}>
+                      <View style={detailStyles.sentimentBarEmpty} />
+                      <Text style={detailStyles.noVotesText}>No votes yet</Text>
                     </View>
                   ) : (
-                    <View style={styles.voteActions}>
-                      <TouchableOpacity
-                        style={[styles.voteBtn, { backgroundColor: colors.success }, detailIsVoting && styles.btnDisabled]}
-                        onPress={() => detail && handleVote(detail.id as number, 'support')}
-                        disabled={detailIsVoting}
-                        activeOpacity={0.85}
-                      >
-                        {detailIsVoting ? (
-                          <ActivityIndicator size="small" color="#fff" />
-                        ) : (
-                          <>
-                            <Ionicons name="checkmark-circle" size={16} color="#fff" />
-                            <Text style={styles.voteBtnText}>Support</Text>
-                          </>
-                        )}
-                      </TouchableOpacity>
-
-                      <TouchableOpacity
-                        style={[styles.voteBtn, { backgroundColor: colors.error }, detailIsVoting && styles.btnDisabled]}
-                        onPress={() => detail && handleVote(detail.id as number, 'oppose')}
-                        disabled={detailIsVoting}
-                        activeOpacity={0.85}
-                      >
-                        {detailIsVoting ? (
-                          <ActivityIndicator size="small" color="#fff" />
-                        ) : (
-                          <>
-                            <Ionicons name="close-circle" size={16} color="#fff" />
-                            <Text style={styles.voteBtnText}>Oppose</Text>
-                          </>
-                        )}
-                      </TouchableOpacity>
+                    <View style={detailStyles.sentimentSection}>
+                      <View style={detailStyles.sentimentBar}>
+                        <View style={[detailStyles.sentimentFillSupport, { width: `${pct}%` }]} />
+                        <View style={[detailStyles.sentimentFillOppose, { width: `${100 - pct}%` }]} />
+                      </View>
+                      <View style={detailStyles.sentimentStats}>
+                        <View style={detailStyles.sentimentStat}>
+                          <Text style={[detailStyles.sentimentNum, { color: GREEN }]}>{(detail.supportVotes || 0).toLocaleString()}</Text>
+                          <Text style={detailStyles.sentimentLabel}>SUPPORT</Text>
+                        </View>
+                        <View style={detailStyles.sentimentPct}>
+                          <Text style={detailStyles.sentimentPctText}>{pct}%</Text>
+                        </View>
+                        <View style={detailStyles.sentimentStat}>
+                          <Text style={detailStyles.sentimentLabel}>OPPOSE</Text>
+                          <Text style={[detailStyles.sentimentNum, { color: RED }]}>{(detail.opposeVotes || 0).toLocaleString()}</Text>
+                        </View>
+                      </View>
+                      <Text style={detailStyles.totalVoices}>{total.toLocaleString()} total voices</Text>
                     </View>
                   )}
-                </View>
-              </View>
 
-              <View style={{ height: 120 }} />
-            </ScrollView>
-          )}
+                  {/* Vote actions */}
+                  <View style={detailStyles.actionRow}>
+                    {ended ? (
+                      <View style={detailStyles.statusBanner}>
+                        <Ionicons name="flag-outline" size={14} color={RED} />
+                        <Text style={[detailStyles.statusBannerText, { color: RED }]}>Voting has ended</Text>
+                      </View>
+                    ) : detailHasVoted ? (
+                      <View style={detailStyles.statusBanner}>
+                        <Ionicons name="checkmark-circle" size={14} color={GREEN} />
+                        <Text style={[detailStyles.statusBannerText, { color: GREEN }]}>You have voted</Text>
+                      </View>
+                    ) : (
+                      <View style={detailStyles.voteActions}>
+                        <TouchableOpacity
+                          style={[detailStyles.voteBtn, detailStyles.voteBtnSupport, detailIsVoting && { opacity: 0.5 }]}
+                          onPress={() => detail && handleVote(detail.id as number, 'support')}
+                          disabled={detailIsVoting}
+                          activeOpacity={0.7}
+                        >
+                          {detailIsVoting ? (
+                            <ActivityIndicator size="small" color={GREEN} />
+                          ) : (
+                            <>
+                              <Ionicons name="checkmark" size={16} color={GREEN} />
+                              <Text style={[detailStyles.voteBtnText, { color: GREEN }]}>Support</Text>
+                            </>
+                          )}
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[detailStyles.voteBtn, detailStyles.voteBtnOppose, detailIsVoting && { opacity: 0.5 }]}
+                          onPress={() => detail && handleVote(detail.id as number, 'oppose')}
+                          disabled={detailIsVoting}
+                          activeOpacity={0.7}
+                        >
+                          {detailIsVoting ? (
+                            <ActivityIndicator size="small" color={RED} />
+                          ) : (
+                            <>
+                              <Ionicons name="close" size={16} color={RED} />
+                              <Text style={[detailStyles.voteBtnText, { color: RED }]}>Oppose</Text>
+                            </>
+                          )}
+                        </TouchableOpacity>
+                      </View>
+                    )}
+                  </View>
+                </View>
+
+                <View style={{ height: 80 }} />
+              </ScrollView>
+            );
+          })()}
         </View>
       </Modal>
 
@@ -2962,6 +2965,301 @@ export default function ProposalsScreen() {
     </View>
   );
 }
+
+// Premium proposal detail modal styles
+const detailStyles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 18,
+    paddingTop: 14,
+    paddingBottom: 8,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 10,
+  },
+  headerBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(4,7,7,0.55)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  scrollContent: {
+    paddingBottom: 20,
+  },
+  // Hero
+  hero: {
+    width: '100%',
+    height: 320,
+    position: 'relative',
+    overflow: 'hidden',
+    backgroundColor: BG_RAISED,
+  },
+  heroLocationPill: {
+    position: 'absolute',
+    top: 64,
+    left: 18,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: 'rgba(4,7,7,0.55)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+  },
+  heroLocationText: {
+    fontSize: 11,
+    fontWeight: '500',
+    color: FG,
+    letterSpacing: -0.2,
+  },
+  heroTimePill: {
+    position: 'absolute',
+    top: 64,
+    right: 18,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 11,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: 'rgba(4,7,7,0.55)',
+    borderWidth: 1,
+    borderColor: `${GOLD}55`,
+  },
+  heroTimePillText: {
+    fontSize: 10.5,
+    fontWeight: '600',
+    color: GOLD,
+    letterSpacing: 0.3,
+  },
+  heroCategoryTag: {
+    position: 'absolute',
+    bottom: 18,
+    left: 18,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 4,
+    backgroundColor: 'rgba(4,7,7,0.7)',
+    borderWidth: 1,
+  },
+  heroCategoryDot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+  },
+  heroCategoryText: {
+    fontFamily: MONO_FONT,
+    fontSize: 9.5,
+    fontWeight: '600',
+    letterSpacing: 1.4,
+  },
+  // Body
+  body: {
+    paddingHorizontal: 22,
+    paddingTop: 22,
+  },
+  tierLabel: {
+    fontFamily: MONO_FONT,
+    fontSize: 9.5,
+    color: FG_FAINT,
+    letterSpacing: 1.6,
+    textTransform: 'uppercase',
+    marginBottom: 10,
+  },
+  title: {
+    fontFamily: SERIF_FONT,
+    fontSize: 30,
+    fontWeight: '500',
+    lineHeight: 36,
+    color: FG,
+    letterSpacing: -0.5,
+    marginBottom: 16,
+  },
+  proposerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 9,
+    marginBottom: 18,
+  },
+  proposerAvatar: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: BG_RAISED,
+    borderWidth: 1,
+    borderColor: LINE_STRONG,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  proposerDot: {
+    fontSize: 16,
+    color: GOLD,
+    lineHeight: 16,
+    marginTop: -4,
+  },
+  proposerText: {
+    fontSize: 12.5,
+    color: FG_MUTED,
+    letterSpacing: -0.1,
+  },
+  description: {
+    fontSize: 14.5,
+    lineHeight: 22,
+    color: FG_MUTED,
+    letterSpacing: -0.1,
+    marginBottom: 26,
+  },
+  // Sentiment
+  sentimentSection: {
+    paddingTop: 18,
+    paddingBottom: 6,
+    borderTopWidth: 1,
+    borderTopColor: LINE_COLOR,
+    marginBottom: 22,
+  },
+  sentimentBar: {
+    height: 7,
+    borderRadius: 3.5,
+    overflow: 'hidden',
+    flexDirection: 'row',
+    backgroundColor: LINE_COLOR,
+    marginBottom: 12,
+  },
+  sentimentBarEmpty: {
+    height: 7,
+    borderRadius: 3.5,
+    backgroundColor: LINE_COLOR,
+    marginBottom: 12,
+  },
+  sentimentFillSupport: {
+    height: '100%',
+    backgroundColor: GREEN,
+  },
+  sentimentFillOppose: {
+    height: '100%',
+    backgroundColor: RED,
+    opacity: 0.85,
+  },
+  sentimentStats: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  sentimentStat: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 7,
+  },
+  sentimentNum: {
+    fontFamily: SERIF_FONT,
+    fontSize: 22,
+    fontWeight: '500',
+    letterSpacing: -0.5,
+  },
+  sentimentLabel: {
+    fontSize: 10.5,
+    fontWeight: '500',
+    color: FG_FAINT,
+    letterSpacing: 1.4,
+    textTransform: 'uppercase',
+  },
+  sentimentPct: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 4,
+    backgroundColor: BG_RAISED,
+    borderWidth: 1,
+    borderColor: LINE_STRONG,
+  },
+  sentimentPctText: {
+    fontFamily: MONO_FONT,
+    fontSize: 11,
+    fontWeight: '600',
+    color: FG,
+    letterSpacing: 0.3,
+  },
+  noVotesText: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: FG_FAINT,
+    letterSpacing: 0.4,
+    textAlign: 'center',
+    marginTop: 4,
+  },
+  totalVoices: {
+    fontFamily: MONO_FONT,
+    fontSize: 10.5,
+    color: FG_FAINT,
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
+    textAlign: 'center',
+    marginTop: 14,
+  },
+  // Actions
+  actionRow: {
+    marginTop: 4,
+  },
+  voteActions: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  voteBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 16,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    backgroundColor: 'transparent',
+  },
+  voteBtnSupport: {
+    borderColor: GREEN,
+    backgroundColor: `${GREEN}10`,
+  },
+  voteBtnOppose: {
+    borderColor: RED,
+    backgroundColor: `${RED}10`,
+  },
+  voteBtnText: {
+    fontSize: 14,
+    fontWeight: '600',
+    letterSpacing: 0.3,
+  },
+  statusBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: 10,
+    backgroundColor: BG_RAISED,
+    borderWidth: 1,
+    borderColor: LINE_STRONG,
+  },
+  statusBannerText: {
+    fontSize: 13,
+    fontWeight: '600',
+    letterSpacing: 0.3,
+  },
+});
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
