@@ -9,6 +9,7 @@ import {
   Alert,
   ActivityIndicator,
   Dimensions,
+  Image,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Clipboard from 'expo-clipboard';
@@ -205,11 +206,7 @@ function PassportCard({
       {/* Top strip */}
       <View style={premiumStyles.passportTop}>
         <View style={premiumStyles.passportLogo}>
-          <Svg width={22} height={22} viewBox="0 0 22 22">
-            <Circle cx="11" cy="11" r="10" fill="none" stroke={ID.G} strokeWidth={0.5} />
-            <Circle cx="11" cy="11" r="7.5" fill="none" stroke={ID.G} strokeWidth={0.5} />
-            <SvgText x="11" y="14.5" textAnchor="middle" fontFamily={ID.SERIF} fontSize={10} fontStyle="italic" fill={ID.G}>R</SvgText>
-          </Svg>
+          <Image source={require('../../assets/logo.png')} style={{ width: 22, height: 22 }} resizeMode="contain" />
           <Text style={premiumStyles.passportBrand}>REPRESENT</Text>
         </View>
         <Text style={premiumStyles.passportEst}>EST 2026</Text>
@@ -223,7 +220,7 @@ function PassportCard({
           <View style={[premiumStyles.cornerTick, { top: -1, right: -1, borderLeftWidth: 0, borderRightWidth: 1.5 }]} />
           <View style={[premiumStyles.cornerTick, { bottom: -1, left: -1, borderTopWidth: 0, borderBottomWidth: 1.5 }]} />
           <View style={[premiumStyles.cornerTick, { bottom: -1, right: -1, borderTopWidth: 0, borderBottomWidth: 1.5, borderLeftWidth: 0, borderRightWidth: 1.5 }]} />
-          <Text style={premiumStyles.initialsText}>{initials}</Text>
+          <Text style={premiumStyles.initialsText} numberOfLines={1} adjustsFontSizeToFit>{initials}</Text>
           {verified && (
             <View style={premiumStyles.biometricTick}>
               <Ionicons name="checkmark" size={10} color={ID.BG} />
