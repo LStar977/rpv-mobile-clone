@@ -446,7 +446,6 @@ function SnHeader({ isPremium }: { isPremium: boolean }) {
           </Text>
           <Text style={snStyles.headerSubtitle}>
             <Text style={snStyles.headerSubtitleItalic}>Governance under review.</Text>
-            {' '}Briefs read, scored, and entered into the public record.
           </Text>
         </View>
       </View>
@@ -710,15 +709,15 @@ function SnFooterSig() {
 const snStyles = StyleSheet.create({
   // Header
   header: {
-    paddingHorizontal: 24,
-    paddingTop: 8,
-    paddingBottom: 22,
+    paddingHorizontal: 16,
+    paddingTop: 4,
+    paddingBottom: 12,
   },
   headerTopRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 16,
+    alignItems: 'center',
+    marginBottom: 10,
   },
   sessionStatus: {
     flexDirection: 'row',
@@ -764,13 +763,13 @@ const snStyles = StyleSheet.create({
   },
   headerMain: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 14,
+    alignItems: 'center',
+    gap: 12,
   },
   headerIconBox: {
-    width: 52,
-    height: 52,
-    borderRadius: 14,
+    width: 42,
+    height: 42,
+    borderRadius: 12,
     backgroundColor: SN_BG_RAISED,
     borderWidth: 1,
     borderColor: SN_LINE_STRONG,
@@ -779,22 +778,22 @@ const snStyles = StyleSheet.create({
   },
   headerTitle: {
     fontFamily: 'Georgia',
-    fontSize: 38,
+    fontSize: 26,
     fontWeight: '500',
-    letterSpacing: -0.8,
-    lineHeight: 38,
+    letterSpacing: -0.6,
+    lineHeight: 28,
     color: SN_FG,
-    marginBottom: 6,
+    marginBottom: 2,
   },
   headerSubtitle: {
     fontFamily: 'System',
-    fontSize: 13,
+    fontSize: 11.5,
     color: SN_FG_MUTED,
     letterSpacing: -0.1,
   },
   headerSubtitleItalic: {
     fontFamily: 'Georgia',
-    fontSize: 14,
+    fontSize: 12,
     fontStyle: 'italic',
   },
 
@@ -956,12 +955,13 @@ const snStyles = StyleSheet.create({
 
   // Submission Desk
   deskContainer: {
-    marginHorizontal: 24,
-    marginBottom: 22,
-    borderRadius: 18,
+    marginHorizontal: 16,
+    marginTop: 8,
+    marginBottom: 28,
+    borderRadius: 20,
     borderWidth: 1,
     borderColor: SN_LINE_STRONG,
-    padding: 18,
+    padding: 22,
     overflow: 'hidden',
     position: 'relative',
   },
@@ -975,16 +975,16 @@ const snStyles = StyleSheet.create({
     letterSpacing: 1.2,
   },
   deskHeader: {
-    marginBottom: 18,
+    marginBottom: 24,
   },
   deskTitle: {
     fontFamily: 'Georgia',
-    fontSize: 22,
+    fontSize: 30,
     fontWeight: '500',
     color: SN_FG,
-    letterSpacing: -0.2,
-    marginTop: 6,
-    lineHeight: 24,
+    letterSpacing: -0.4,
+    marginTop: 8,
+    lineHeight: 34,
   },
   deskTitleItalic: {
     fontStyle: 'italic',
@@ -992,13 +992,14 @@ const snStyles = StyleSheet.create({
   },
   deskSubtitle: {
     fontFamily: 'System',
-    fontSize: 11.5,
+    fontSize: 13,
     color: SN_FG_MUTED,
     letterSpacing: -0.1,
-    marginTop: 6,
+    marginTop: 8,
+    lineHeight: 18,
   },
   fieldGroup: {
-    marginBottom: 16,
+    marginBottom: 22,
   },
   fieldLabel: {
     fontFamily: 'System',
@@ -1038,8 +1039,8 @@ const snStyles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.4)',
     borderWidth: 1,
     borderColor: SN_LINE,
-    borderRadius: 10,
-    minHeight: 120,
+    borderRadius: 12,
+    minHeight: 320,
     position: 'relative',
     overflow: 'hidden',
   },
@@ -1053,27 +1054,27 @@ const snStyles = StyleSheet.create({
   },
   textArea: {
     fontFamily: 'Georgia',
-    fontSize: 14,
+    fontSize: 15,
     fontStyle: 'italic',
     color: SN_FG,
-    lineHeight: 22,
-    padding: 12,
-    paddingTop: 14,
-    minHeight: 110,
+    lineHeight: 24,
+    padding: 16,
+    paddingTop: 18,
+    minHeight: 310,
   },
   submitButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 10,
-    paddingVertical: 15,
-    borderRadius: 12,
+    paddingVertical: 18,
+    borderRadius: 14,
     overflow: 'hidden',
-    marginTop: 2,
+    marginTop: 4,
   },
   submitText: {
     fontFamily: 'System',
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '600',
     color: '#1A1308',
     letterSpacing: 0.3,
@@ -1748,6 +1749,21 @@ export default function SentinelScreen() {
           <SnHeader isPremium={isPremium} />
         </View>
 
+        {/* Submission Desk Form — Hero */}
+        <View ref={sentinelFormRef} collapsable={false}>
+          <SubmissionDesk
+            title={title}
+            setTitle={setTitle}
+            text={text}
+            setText={setText}
+            issueType={issueType}
+            setIssueType={setIssueType}
+            analyzing={analyzing}
+            onAnalyze={handleAnalyze}
+            isPremium={isPremium}
+          />
+        </View>
+
         {/* Tribunal Tally */}
         <Tribunal analyses={analysisHistory} />
 
@@ -1778,21 +1794,6 @@ export default function SentinelScreen() {
             ))}
           </Animated.View>
         )}
-
-        {/* Submission Desk Form */}
-        <View ref={sentinelFormRef} collapsable={false}>
-          <SubmissionDesk
-            title={title}
-            setTitle={setTitle}
-            text={text}
-            setText={setText}
-            issueType={issueType}
-            setIssueType={setIssueType}
-            analyzing={analyzing}
-            onAnalyze={handleAnalyze}
-            isPremium={isPremium}
-          />
-        </View>
 
         {/* Footer Signature */}
         <SnFooterSig />
