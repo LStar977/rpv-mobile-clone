@@ -563,9 +563,9 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.lg,
   },
   premiumTitle: {
-    ...TYPOGRAPHY.displaySmall,
+    fontFamily: 'Georgia',
     fontSize: responsive(28, 32, 36),
-    fontWeight: '700',
+    fontWeight: '600',
     marginBottom: SPACING.xs,
   },
   premiumSubtitle: {
@@ -578,7 +578,9 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.lg,
   },
   descriptionTitle: {
-    ...TYPOGRAPHY.headlineSmall,
+    fontFamily: 'Georgia',
+    fontSize: 18,
+    fontWeight: '500',
     marginBottom: SPACING.md,
   },
   descriptionText: {
@@ -593,7 +595,9 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   featuresTitle: {
-    ...TYPOGRAPHY.headlineSmall,
+    fontFamily: 'Georgia',
+    fontSize: 18,
+    fontWeight: '500',
     marginBottom: SPACING.lg,
   },
   featureRow: {
@@ -636,10 +640,10 @@ const styles = StyleSheet.create({
     alignItems: 'baseline',
   },
   priceAmount: {
-    ...TYPOGRAPHY.displaySmall,
+    fontFamily: 'Georgia',
     fontSize: responsive(28, 32, 36),
     color: '#000',
-    fontWeight: '700',
+    fontWeight: '600',
   },
   pricePeriod: {
     ...TYPOGRAPHY.bodyMedium,
@@ -676,7 +680,9 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.xl,
   },
   ratioTitle: {
-    ...TYPOGRAPHY.headlineSmall,
+    fontFamily: 'Georgia',
+    fontSize: 18,
+    fontWeight: '500',
     marginBottom: SPACING.lg,
   },
   ratioLegend: {
@@ -699,7 +705,9 @@ const styles = StyleSheet.create({
     ...TYPOGRAPHY.labelSmall,
   },
   sectionTitle: {
-    ...TYPOGRAPHY.headlineSmall,
+    fontFamily: 'Georgia',
+    fontSize: 18,
+    fontWeight: '500',
     marginBottom: SPACING.lg,
   },
   proposalCard: {
@@ -709,8 +717,9 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.md,
   },
   proposalTitle: {
-    ...TYPOGRAPHY.bodyLarge,
-    fontWeight: '600',
+    fontFamily: 'Georgia',
+    fontSize: 16,
+    fontWeight: '500',
     marginBottom: SPACING.md,
   },
   proposalStats: {
@@ -769,7 +778,9 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.lg,
   },
   emptyTitle: {
-    ...TYPOGRAPHY.headlineSmall,
+    fontFamily: 'Georgia',
+    fontSize: 22,
+    fontWeight: '500',
     marginBottom: SPACING.sm,
   },
   emptyText: {
