@@ -1311,7 +1311,7 @@ function ReportCard({
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
         />
-        <Text style={[styles.scoreHeroLabel, { color: colors.gold }]}>GOVERNANCE SCORE</Text>
+        <Text style={[styles.scoreHeroLabel, { color: colors.gold }]}>Governance Score</Text>
         <CircularScoreGauge score={averageScore} size="large" />
         <View style={styles.badgeRow}>
           <View style={[styles.scoreLabelBadge, { backgroundColor: `${scoreColor}15`, borderColor: `${scoreColor}40` }]}>
@@ -2128,10 +2128,12 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   scoreHeroLabel: {
-    ...TYPOGRAPHY.labelMedium,
-    letterSpacing: 2,
+    fontFamily: 'Georgia',
+    fontSize: 14,
+    letterSpacing: 1,
     marginBottom: SPACING.lg,
-    fontWeight: '600',
+    fontWeight: '500',
+    textTransform: 'uppercase',
   },
 
   // Circular Gauge
@@ -2265,8 +2267,9 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.lg,
   },
   sectionTitle: {
-    ...TYPOGRAPHY.labelLarge,
-    fontWeight: '600',
+    fontFamily: 'Georgia',
+    fontSize: 18,
+    fontWeight: '500',
   },
 
   // Score Bars
