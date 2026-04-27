@@ -419,21 +419,17 @@ function QuickStatsRow({ analyses }: { analyses: Analysis[] }) {
 function SnHeader({ isPremium }: { isPremium: boolean }) {
   return (
     <Animated.View entering={FadeInDown.duration(400)} style={snStyles.header}>
-      {/* Top row: status + premium badge */}
-      <View style={snStyles.headerTopRow}>
-        <View style={snStyles.sessionStatus}>
-          <View style={snStyles.statusDot} />
-          <Text style={snStyles.sessionText}>Sentinel session · model active</Text>
-        </View>
-        {isPremium && (
+      {/* Premium badge */}
+      {isPremium && (
+        <View style={snStyles.headerTopRow}>
           <View style={snStyles.premiumHallmark}>
             <Svg width={9} height={9} viewBox="0 0 12 12">
               <Path d="M6 1l1.5 3 3.5.5-2.5 2.5.6 3.5L6 8.8 2.9 10.5l.6-3.5L1 4.5 4.5 4 6 1z" fill={SN_G} />
             </Svg>
             <Text style={snStyles.premiumText}>Premium</Text>
           </View>
-        )}
-      </View>
+        </View>
+      )}
 
       {/* Main header row: icon + title */}
       <View style={snStyles.headerMain}>

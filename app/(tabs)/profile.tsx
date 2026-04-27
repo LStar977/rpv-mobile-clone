@@ -161,8 +161,7 @@ function PrEyebrow({ children, color = PR_FG_FAINT }: { children: React.ReactNod
 function PrHeader({ folio }: { folio: string }) {
   return (
     <Animated.View entering={FadeInDown.duration(400)} style={prStyles.header}>
-      <PrEyebrow>Member's record</PrEyebrow>
-      <Text style={prStyles.folioCode}>FOLIO·{folio}</Text>
+      <PrEyebrow>Profile</PrEyebrow>
     </Animated.View>
   );
 }
@@ -242,7 +241,7 @@ function PortraitCard({
           <Text style={[prStyles.membershipValue, prStyles.tierValue]}>{tier}</Text>
         </TouchableOpacity>
         <View style={prStyles.membershipCell}>
-          <Text style={prStyles.membershipLabel}>SWORN</Text>
+          <Text style={prStyles.membershipLabel}>JOINED</Text>
           <Text style={prStyles.membershipValue}>{memberSince}</Text>
         </View>
         <View style={prStyles.membershipCell}>
@@ -345,7 +344,7 @@ function PrAppearance({
 
   return (
     <Animated.View entering={FadeInUp.delay(400).duration(400)} style={prStyles.section}>
-      <PrSectionHeading roman="IV." title="Appearance" sub="Visual mode for this device" />
+      <PrSectionHeading title="Appearance" />
       <View style={prStyles.appearanceCard}>
         <View style={prStyles.appearanceHeader}>
           <Text style={prStyles.appearanceLabel}>
@@ -382,10 +381,10 @@ function PrSignOut({ onPress }: { onPress: () => void }) {
     <Animated.View entering={FadeInUp.delay(500).duration(400)} style={prStyles.signOutContainer}>
       <TouchableOpacity style={prStyles.signOutButton} onPress={onPress} activeOpacity={0.7}>
         <Ionicons name="log-out-outline" size={14} color={PR_FG_MUTED} />
-        <Text style={prStyles.signOutText}>Sign out of the assembly</Text>
+        <Text style={prStyles.signOutText}>Sign out</Text>
       </TouchableOpacity>
       <Text style={prStyles.footerVersion}>
-        Represent <Text style={prStyles.footerVersionMono}>v1.0.0</Text> · sealed by the assembly
+        Represent <Text style={prStyles.footerVersionMono}>v1.0.0</Text>
       </Text>
     </Animated.View>
   );
@@ -810,7 +809,7 @@ export default function ProfileScreen() {
         />
 
         {/* Section I: Civic Record */}
-        <PrSection roman="I." title="Civic record" sub="Your activity within the assembly" delay={200}>
+        <PrSection title="Activity" delay={200}>
           <PrRow icon="business-outline" label="My organizations" value="3" onPress={() => navigateTo('/modals/organizations')} />
           <PrRow icon="time-outline" label="Voting history" sub="234 ballots cast" onPress={() => navigateTo('/modals/voting-history')} />
           <PrRow icon="analytics-outline" label="Analytics" sub="Patterns & impact" onPress={() => navigateTo('/modals/analytics')} />
@@ -818,7 +817,7 @@ export default function ProfileScreen() {
         </PrSection>
 
         {/* Section II: Membership */}
-        <PrSection roman="II." title="Membership" sub="Standing and benefits" delay={250}>
+        <PrSection title="Membership" delay={250}>
           <PrRow icon="card-outline" label="Subscription" sub={`${tierLabel} tier`} value="Upgrade" valueColor={PR_GL} onPress={() => navigateTo('/modals/subscription')} />
           {Platform.OS === 'ios' && (
             <PrRow
@@ -840,13 +839,13 @@ export default function ProfileScreen() {
         </PrSection>
 
         {/* Section III: Administration */}
-        <PrSection roman="III." title="Administration" sub="Privileged access & controls" delay={300}>
+        <PrSection title="Administration" delay={300}>
           {adminApi.isAdmin() && (
             <PrRow icon="shield-checkmark-outline" label="Admin dashboard" sub="2 organizations" onPress={() => navigateTo('/modals/admin')} />
           )}
           <PrRow icon="notifications-outline" label="Notifications" value="On" valueColor={PR_GREEN} onPress={() => navigateTo('/modals/privacy')} />
           <PrRow icon="settings-outline" label="Settings & privacy" onPress={() => navigateTo('/modals/privacy')} />
-          <PrRow icon="document-text-outline" label="Legal & charters" last onPress={() => navigateTo('/modals/privacy')} />
+          <PrRow icon="document-text-outline" label="Legal" last onPress={() => navigateTo('/modals/privacy')} />
         </PrSection>
 
         {/* Section IV: Appearance */}
