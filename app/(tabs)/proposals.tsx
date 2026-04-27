@@ -847,12 +847,12 @@ function SwipeCard({ proposal, onSwipeLeft, onSwipeRight, onSwipeUp, onTap, isTo
               <Text style={premiumCardStyles.proposerDot}>·</Text>
             </View>
             <Text style={premiumCardStyles.proposerText}>
-              Proposed by <Text style={{ color: FG }}>Community Member</Text>
+              Proposed by <Text style={{ color: FG }}>{proposal.creatorName || 'Community Member'}</Text>
             </Text>
           </View>
 
           {/* Description */}
-          <Text style={premiumCardStyles.description} numberOfLines={2}>{proposal.description}</Text>
+          <Text style={premiumCardStyles.description}>{proposal.description}</Text>
 
           {/* Sentiment ledger */}
           {totalVotes === 0 ? (
@@ -2516,7 +2516,7 @@ export default function ProposalsScreen() {
                       <Text style={detailStyles.proposerDot}>·</Text>
                     </View>
                     <Text style={detailStyles.proposerText}>
-                      Proposed by <Text style={{ color: FG }}>Represent Civic Desk</Text>
+                      Proposed by <Text style={{ color: FG }}>{detail.creatorName || 'Community Member'}</Text>
                     </Text>
                   </View>
 
