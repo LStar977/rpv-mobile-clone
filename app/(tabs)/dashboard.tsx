@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Image } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useRouter } from 'expo-router';
@@ -124,7 +124,17 @@ export default function DashboardScreen() {
       >
         <TopBar name={displayName} city={userCity} state={userState} verified={isVerified} onAvatarPress={() => router.push('/(tabs)/profile')} />
         <Hero pendingCount={pendingCount} breakdown={breakdown} onBeginVoting={navigateToProposals} />
-        <Featured proposal={featured} onPress={navigateToProposals} />
+        <Featured
+          proposal={featured}
+          onPress={() => {
+            if (featured) {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              router.push({ pathname: '/(tabs)/proposals', params: { proposalId: String(featured.id) } });
+            } else {
+              navigateToProposals();
+            }
+          }}
+        />
         <ImpactRing pending={pendingCount} voted={votedCount} passed={passedCount} />
         <Communities
           proposals={proposals}
@@ -249,22 +259,44 @@ function Featured({ proposal, onPress }: { proposal?: Proposal; onPress: () => v
       <TouchableOpacity onPress={onPress} activeOpacity={0.92}>
         <View style={styles.featuredCard}>
           <View style={styles.featuredImage}>
-            <LinearGradient
-              colors={['rgba(234,186,88,0.18)', 'transparent', '#0A0C10']}
-              start={{ x: 0.3, y: 0.3 }} end={{ x: 1, y: 1 }}
-              style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0 }}
-            />
-            <Svg width="100%" height={140} viewBox="0 0 360 140" preserveAspectRatio="xMidYMid slice">
-              <SvgG opacity={0.5}>
-                {[40, 60, 80, 100, 160, 180, 200, 260, 280, 300, 320].map((x, i) => {
-                  const heights = [60, 50, 65, 55, 40, 20, 40, 55, 65, 50, 60];
-                  return <Line key={i} x1={x} y1={120} x2={x} y2={heights[i]} stroke={G_GOLD} strokeWidth={0.7} />;
-                })}
-              </SvgG>
-              <Path d="M150 50 Q180 0 210 50" fill="none" stroke={G_GOLD} strokeWidth={1} opacity={0.7} />
-              <Line x1={0} y1={120} x2={360} y2={120} stroke={G_GOLD} strokeWidth={0.6} opacity={0.5} />
-            </Svg>
-            <View style={styles.featuredImageOverlay} />
+            {proposal.imageUrl ? (
+              <>
+                <Image
+                  source={{ uri: proposal.imageUrl }}
+                  style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, width: '100%', height: '100%' }}
+                  resizeMode="cover"
+                />
+                <LinearGradient
+                  colors={['rgba(4,7,7,0.2)', 'rgba(4,7,7,0.55)', 'rgba(13,15,18,0.95)']}
+                  start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }}
+                  style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0 }}
+                />
+                <View style={{
+                  position: 'absolute', right: -40, top: -40,
+                  width: 140, height: 140, borderRadius: 70,
+                  backgroundColor: 'rgba(234,186,88,0.10)',
+                }} />
+              </>
+            ) : (
+              <>
+                <LinearGradient
+                  colors={['rgba(234,186,88,0.18)', 'transparent', '#0A0C10']}
+                  start={{ x: 0.3, y: 0.3 }} end={{ x: 1, y: 1 }}
+                  style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0 }}
+                />
+                <Svg width="100%" height={140} viewBox="0 0 360 140" preserveAspectRatio="xMidYMid slice">
+                  <SvgG opacity={0.5}>
+                    {[40, 60, 80, 100, 160, 180, 200, 260, 280, 300, 320].map((x, i) => {
+                      const heights = [60, 50, 65, 55, 40, 20, 40, 55, 65, 50, 60];
+                      return <Line key={i} x1={x} y1={120} x2={x} y2={heights[i]} stroke={G_GOLD} strokeWidth={0.7} />;
+                    })}
+                  </SvgG>
+                  <Path d="M150 50 Q180 0 210 50" fill="none" stroke={G_GOLD} strokeWidth={1} opacity={0.7} />
+                  <Line x1={0} y1={120} x2={360} y2={120} stroke={G_GOLD} strokeWidth={0.6} opacity={0.5} />
+                </Svg>
+                <View style={styles.featuredImageOverlay} />
+              </>
+            )}
             <View style={styles.featuredPill}>
               <View style={styles.featuredPillDot} />
               <Text style={styles.featuredPillText}>{closeText}</Text>
