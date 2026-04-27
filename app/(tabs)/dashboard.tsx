@@ -104,9 +104,15 @@ export default function DashboardScreen() {
     votedIds.has(String(p.id)) && p.deadline && new Date(p.deadline).getTime() <= now
   ).length;
 
-  // Recent proposals for digest
-  const recent = [...proposals]
-    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+  // Sentinel digest: most-engaged active proposals (highest vote count, then closing soonest)
+  const digestItems = proposals
+    .filter(p => p.deadline && new Date(p.deadline).getTime() > now)
+    .sort((a, b) => {
+      const aVotes = a.supportVotes + a.opposeVotes;
+      const bVotes = b.supportVotes + b.opposeVotes;
+      if (aVotes !== bVotes) return bVotes - aVotes;
+      return new Date(a.deadline!).getTime() - new Date(b.deadline!).getTime();
+    })
     .slice(0, 3);
 
   return (
@@ -129,7 +135,7 @@ export default function DashboardScreen() {
           onPrimaryPress={navigateToProposals}
           router={router}
         />
-        <SentinelDigest items={recent} />
+        <SentinelDigest items={digestItems} />
         <FooterSig />
         <View style={{ height: 120 }} />
       </ScrollView>
@@ -230,7 +236,8 @@ function Featured({ proposal, onPress }: { proposal?: Proposal; onPress: () => v
   const opposePct = totalVotes > 0 ? 100 - supportPct : 0;
   const scope = (proposal.geoRestrictions || []).length;
   const tierLabel = scope >= 3 ? 'MUNI' : scope === 2 ? 'PROV' : 'FED';
-  const refCode = `${tierLabel} · ${String(proposal.id).slice(-3).padStart(3, '0').toUpperCase()}`;
+  const idDigits = String(proposal.id).match(/\d+/g)?.join('') || '000';
+  const refCode = `${tierLabel} · ${idDigits.slice(-3).padStart(3, '0')}`;
 
   return (
     <Animated.View entering={FadeInUp.duration(500).delay(200)} style={styles.sectionPad}>
@@ -433,37 +440,40 @@ function CommunityRow({ tier, name, meta, primary, flag, last, onPress }: {
 }
 function SentinelDigest({ items }: { items: Proposal[] }) {
   const now = Date.now();
-  const formatRelative = (createdAt: string) => {
-    const diff = now - new Date(createdAt).getTime();
-    const hours = Math.floor(diff / 3600000);
-    if (hours < 1) return 'now';
-    if (hours < 24) return `${hours}h`;
-    return `${Math.floor(hours / 24)}d`;
-  };
-  const formatTime = (createdAt: string) => {
-    const d = new Date(createdAt);
-    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  const formatRemaining = (deadline: string) => {
+    const ms = new Date(deadline).getTime() - now;
+    if (ms <= 0) return 'closed';
+    const days = Math.floor(ms / 86400000);
+    const hours = Math.floor((ms % 86400000) / 3600000);
+    if (days >= 2) return `${days}d left`;
+    if (days === 1) return `${days}d ${hours}h left`;
+    return `${hours}h left`;
   };
   const tagFor = (p: Proposal): string => {
-    const ageHours = (now - new Date(p.createdAt).getTime()) / 3600000;
-    if (ageHours < 24) return 'NEW';
-    if (p.deadline) {
-      const remaining = new Date(p.deadline).getTime() - now;
-      if (remaining <= 0) return 'PASS';
-      if (remaining < 86400000 * 2) return 'VOTE';
-    }
+    if (!p.deadline) return 'NEW';
+    const remaining = new Date(p.deadline).getTime() - now;
+    if (remaining <= 0) return 'PASS';
+    if (remaining < 86400000 * 2) return 'VOTE';
     return 'NEW';
   };
   const tierLabel = (p: Proposal) => {
     const len = (p.geoRestrictions || []).length;
     return len >= 3 ? 'Municipal' : len === 2 ? 'Provincial' : 'Federal';
   };
-  const rows = items.map(p => ({
-    time: formatTime(p.createdAt),
-    tag: tagFor(p),
-    headline: p.title,
-    meta: `${tierLabel(p)} · ${formatRelative(p.createdAt)}`,
-  }));
+  const compact = (n: number) => {
+    if (n >= 10000) return `${Math.round(n / 1000)}K`;
+    if (n >= 1000) return `${(n / 1000).toFixed(1)}K`;
+    return n.toString();
+  };
+  const rows = items.map(p => {
+    const totalVotes = p.supportVotes + p.opposeVotes;
+    return {
+      time: totalVotes > 0 ? compact(totalVotes) : '·',
+      tag: tagFor(p),
+      headline: p.title,
+      meta: `${tierLabel(p)} · ${p.deadline ? formatRemaining(p.deadline) : 'open'}`,
+    };
+  });
   if (rows.length === 0) return null;
   return (
     <Animated.View entering={FadeInUp.duration(500).delay(500)} style={styles.sectionPad}>
