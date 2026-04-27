@@ -163,7 +163,7 @@ const styles = StyleSheet.create({
   card: { borderRadius: 12, padding: 16, marginBottom: 12, borderWidth: 1 },
   row: { flexDirection: 'row', alignItems: 'center' },
   info: { flex: 1, marginLeft: 12 },
-  cardTitle: { fontSize: 15, fontWeight: '600' },
+  cardTitle: { fontFamily: 'Georgia', fontSize: 16, fontWeight: '500' },
   cardSubtitle: { fontSize: 13, marginTop: 2 },
   infoBox: { flexDirection: 'row', alignItems: 'flex-start', borderRadius: 10, padding: 14, marginTop: 8, gap: 10 },
   infoBoxText: { fontSize: 13, flex: 1, lineHeight: 18 },
