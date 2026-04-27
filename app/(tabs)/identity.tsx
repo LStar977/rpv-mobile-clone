@@ -145,15 +145,15 @@ function IdHeader({ folio }: { folio: string }) {
       <View style={premiumStyles.headerTop}>
         <View style={premiumStyles.headerBadge}>
           <View style={premiumStyles.greenDot} />
-          <Text style={premiumStyles.eyebrow}>Civic record · in good standing</Text>
+          <Text style={premiumStyles.eyebrow}>Verified</Text>
         </View>
-        <Text style={premiumStyles.folioCode}>FOLIO {folio}</Text>
+        <Text style={premiumStyles.folioCode}>ID {folio}</Text>
       </View>
       <Text style={premiumStyles.headline}>
-        Citizen <Text style={premiumStyles.headlineItalic}>dossier</Text>
+        Your <Text style={premiumStyles.headlineItalic}>Identity</Text>
       </Text>
       <Text style={premiumStyles.subline}>
-        Verified identity, public record of service, and standing within the assembly.
+        Your verified civic profile and activity.
       </Text>
     </View>
   );
@@ -210,7 +210,7 @@ function PassportCard({
             <Circle cx="11" cy="11" r="7.5" fill="none" stroke={ID.G} strokeWidth={0.5} />
             <SvgText x="11" y="14.5" textAnchor="middle" fontFamily={ID.SERIF} fontSize={10} fontStyle="italic" fill={ID.G}>R</SvgText>
           </Svg>
-          <Text style={premiumStyles.passportBrand}>REPRESENT · CIVIC ASSEMBLY</Text>
+          <Text style={premiumStyles.passportBrand}>REPRESENT</Text>
         </View>
         <Text style={premiumStyles.passportEst}>EST 2026</Text>
       </View>
@@ -248,9 +248,8 @@ function PassportCard({
       {/* Register strip */}
       <View style={premiumStyles.registerStrip}>
         <View style={premiumStyles.registerCell}>
-          <Text style={premiumStyles.registerLabel}>Issued</Text>
-          <Text style={premiumStyles.registerValue}>IV·MMXXVI</Text>
-          <Text style={premiumStyles.registerSub}>{memberSince || 'Apr 2026'}</Text>
+          <Text style={premiumStyles.registerLabel}>Joined</Text>
+          <Text style={premiumStyles.registerValue}>{memberSince || 'Apr 2026'}</Text>
         </View>
         <View style={[premiumStyles.registerCell, premiumStyles.registerCellMid]}>
           <Text style={premiumStyles.registerLabel}>Folio</Text>
@@ -264,16 +263,11 @@ function PassportCard({
         </View>
       </View>
 
-      {/* MRZ zone */}
-      <View style={premiumStyles.mrzZone}>
-        <Text style={premiumStyles.mrzText}>{mrzLine1}</Text>
-        <Text style={premiumStyles.mrzText}>{mrzLine2}</Text>
-      </View>
     </View>
   );
 }
 
-// Standing Register (replaces QuickStats)
+// Activity Stats
 function StandingRegister({ votes, proposals, streak }: { votes: number; proposals: number; streak: number }) {
   const items = [
     { label: 'Votes cast', value: votes.toString().padStart(2, '0'), sub: 'all-time' },
@@ -283,8 +277,7 @@ function StandingRegister({ votes, proposals, streak }: { votes: number; proposa
   return (
     <View style={premiumStyles.standingSection}>
       <View style={premiumStyles.standingHeader}>
-        <Text style={premiumStyles.eyebrow}>Standing register</Text>
-        <Text style={premiumStyles.timestamp}>AS OF 23:06 EST</Text>
+        <Text style={premiumStyles.eyebrow}>Activity</Text>
       </View>
       <View style={premiumStyles.standingGrid}>
         {items.map((it, i) => (
@@ -418,8 +411,7 @@ function ProgressMeter({ earned, total }: { earned: number; total: number }) {
     <View style={premiumStyles.progressCard}>
       <View style={premiumStyles.progressHeader}>
         <View>
-          <Text style={premiumStyles.eyebrow}>Conferred</Text>
-          <Text style={premiumStyles.progressTitle}>Order of merit · progress</Text>
+          <Text style={premiumStyles.progressTitle}>Progress</Text>
         </View>
         <Text style={premiumStyles.progressCount}>
           <Text style={{ color: ID.G }}>{earned}</Text>
@@ -462,18 +454,17 @@ function AccountParticulars({
   onCopyWallet?: () => void;
 }) {
   const rows = [
-    { label: 'Registered name', value: name || '—', verified: true },
-    { label: 'Correspondence', value: email || '—', verified: true },
-    { label: 'Constituency', value: location || '—', verified: true },
-    ...(walletAddress ? [{ label: 'Ledger address', value: `${walletAddress.slice(0, 6)}···${walletAddress.slice(-4)}`, mono: true, action: 'copy' as const }] : []),
+    { label: 'Name', value: name || '—', verified: true },
+    { label: 'Email', value: email || '—', verified: true },
+    { label: 'Location', value: location || '—', verified: true },
+    ...(walletAddress ? [{ label: 'Wallet', value: `${walletAddress.slice(0, 6)}···${walletAddress.slice(-4)}`, mono: true, action: 'copy' as const }] : []),
   ];
 
   return (
     <View style={premiumStyles.particularsCard}>
       <View style={premiumStyles.particularsHeader}>
         <View>
-          <Text style={premiumStyles.eyebrow}>Section II</Text>
-          <Text style={premiumStyles.particularsTitle}>Account particulars</Text>
+          <Text style={premiumStyles.particularsTitle}>Account</Text>
         </View>
         {verified && (
           <View style={premiumStyles.verifiedPill}>
@@ -522,12 +513,9 @@ function VerifiedSeal({ verifiedAt, provider }: { verifiedAt?: string | null | u
 
 // Footer Signature
 function FooterSignature({ folio }: { folio: string }) {
-  const month = toRomanNumeral(new Date().getMonth() + 1);
-  const year = toRomanNumeral(new Date().getFullYear());
   return (
     <View style={premiumStyles.footerSig}>
-      <Text style={premiumStyles.footerItalic}>Sealed by the assembly</Text>
-      <Text style={premiumStyles.footerMono}>FOLIO RW·{folio} · {month}·{year}</Text>
+      <Text style={premiumStyles.footerMono}>Represent · ID {folio}</Text>
     </View>
   );
 }
@@ -866,7 +854,6 @@ export default function IdentityScreen() {
         <Animated.View entering={FadeInUp.delay(400).duration(400)} style={premiumStyles.achievementsSection}>
           <View style={premiumStyles.achievementsHeader}>
             <View>
-              <Text style={premiumStyles.eyebrow}>Order of merit</Text>
               <Text style={premiumStyles.achievementsSectionTitle}>Achievements</Text>
             </View>
             <TouchableOpacity
