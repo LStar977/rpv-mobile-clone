@@ -442,10 +442,10 @@ function SnHeader({ isPremium }: { isPremium: boolean }) {
         </View>
         <View style={{ flex: 1 }}>
           <Text style={snStyles.headerTitle}>
-            The Sentinel<Text style={{ color: SN_GL }}>.</Text>
+            Sentinel AI
           </Text>
           <Text style={snStyles.headerSubtitle}>
-            <Text style={snStyles.headerSubtitleItalic}>Governance under review.</Text>
+            Governance Report Cards
           </Text>
         </View>
       </View>
@@ -464,17 +464,13 @@ function Tribunal({ analyses }: { analyses: Analysis[] }) {
   const sessionCode = `SESSION ${String(now.getMonth() + 1).padStart(2, '0')}·${String(now.getDate()).padStart(2, '0')}`;
 
   const items = [
-    { label: 'Reviewed', count: String(total).padStart(2, '0'), tag: 'this month', color: SN_FG },
-    { label: 'At risk', count: String(atRisk + violating).padStart(2, '0'), tag: 'flagged · open', color: SN_AMBER },
-    { label: 'Aligned', count: String(aligned).padStart(2, '0'), tag: 'sealed · approved', color: SN_GREEN },
+    { label: 'Analyzed', count: String(total).padStart(2, '0'), color: SN_FG },
+    { label: 'At Risk', count: String(atRisk + violating).padStart(2, '0'), color: SN_AMBER },
+    { label: 'Aligned', count: String(aligned).padStart(2, '0'), color: SN_GREEN },
   ];
 
   return (
     <Animated.View entering={FadeInUp.delay(100).duration(400)} style={snStyles.tribunalContainer}>
-      <View style={snStyles.tribunalHeader}>
-        <SnEyebrow>Tribunal · session tally</SnEyebrow>
-        <Text style={snStyles.sessionCode}>{sessionCode}</Text>
-      </View>
       <View style={snStyles.tribunalCard}>
         {items.map((item, i) => (
           <View
@@ -488,7 +484,6 @@ function Tribunal({ analyses }: { analyses: Analysis[] }) {
               {item.count}
             </Text>
             <Text style={snStyles.tribunalLabel}>{item.label}</Text>
-            <Text style={snStyles.tribunalTag}>{item.tag}</Text>
           </View>
         ))}
       </View>
@@ -592,23 +587,19 @@ function SubmissionDesk({
         style={[StyleSheet.absoluteFill, { borderRadius: 18 }]}
       />
 
-      {/* Corner form code */}
-      <Text style={snStyles.formCode}>FORM·SC/04</Text>
-
       {/* Header */}
       <View style={snStyles.deskHeader}>
-        <SnEyebrow>Submit a brief</SnEyebrow>
-        <Text style={snStyles.deskTitle}>
-          Lay before <Text style={snStyles.deskTitleItalic}>the bench</Text>
-        </Text>
-        <Text style={snStyles.deskSubtitle}>
-          Sentinel returns a written verdict in under a minute.
-        </Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+          <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: SN_LINE, justifyContent: 'center', alignItems: 'center' }}>
+            <Text style={{ color: SN_FG, fontSize: 18 }}>+</Text>
+          </View>
+          <Text style={snStyles.deskTitle}>New Analysis</Text>
+        </View>
       </View>
 
       {/* Title field */}
       <View style={snStyles.fieldGroup}>
-        <Text style={snStyles.fieldLabel}>TITLE OF THE BRIEF</Text>
+        <Text style={snStyles.fieldLabel}>Document Title</Text>
         <TextInput
           style={snStyles.titleInput}
           placeholder="e.g. Tax Reform Act, 2026"
@@ -620,7 +611,7 @@ function SubmissionDesk({
 
       {/* Issue type chips */}
       <View style={snStyles.fieldGroup}>
-        <Text style={snStyles.fieldLabel}>ISSUE TYPE</Text>
+        <Text style={snStyles.fieldLabel}>Issue Type</Text>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -640,7 +631,7 @@ function SubmissionDesk({
       {/* Document text area with paper lines */}
       <View style={snStyles.fieldGroup}>
         <View style={snStyles.fieldLabelRow}>
-          <Text style={snStyles.fieldLabel}>BODY OF THE DOCUMENT</Text>
+          <Text style={snStyles.fieldLabel}>Document Text</Text>
           <Text style={snStyles.charCount}>{text.length.toLocaleString()} / 50,000</Text>
         </View>
         <View style={snStyles.textAreaContainer}>
@@ -648,7 +639,7 @@ function SubmissionDesk({
           <View style={snStyles.paperLines} />
           <TextInput
             style={snStyles.textArea}
-            placeholder="Paste or transcribe the governance text here. The Sentinel will read every clause for alignment with constitutional principles, prior precedent, and citizen rights."
+            placeholder="Paste the governance text to analyze..."
             placeholderTextColor={SN_FG_FAINT}
             value={text}
             onChangeText={setText}
@@ -679,17 +670,16 @@ function SubmissionDesk({
           <SentinelMark size={16} color="#1A1308" />
         )}
         <Text style={snStyles.submitText}>
-          {analyzing ? 'Reviewing...' : 'Submit for Sentinel review'}
+          {analyzing ? 'Analyzing...' : 'Analyze with Sentinel'}
         </Text>
       </TouchableOpacity>
 
       {/* Provenance footer */}
       <View style={snStyles.provenanceRow}>
         <Text style={snStyles.provenanceText}>
-          Reviewed by OpenAI under sealed mandate.{' '}
+          Powered by OpenAI.{' '}
           <Text style={snStyles.provenanceLink}>Privacy notice</Text>
         </Text>
-        <Text style={snStyles.versionText}>v4·26·5</Text>
       </View>
     </Animated.View>
   );
@@ -699,8 +689,7 @@ function SubmissionDesk({
 function SnFooterSig() {
   return (
     <Animated.View entering={FadeInUp.delay(400).duration(400)} style={snStyles.footerContainer}>
-      <Text style={snStyles.footerQuote}>The Sentinel reads, the citizen decides.</Text>
-      <Text style={snStyles.footerEstablished}>BENCH ESTABLISHED · IV·MMXXVI</Text>
+      <Text style={snStyles.footerQuote}>Sentinel evaluates documents against 155 principles of proper human governance and generates a report card with grades.</Text>
     </Animated.View>
   );
 }
@@ -1772,8 +1761,7 @@ export default function SentinelScreen() {
           <Animated.View entering={FadeInUp.delay(200).duration(400)} style={snStyles.verdictSection}>
             <View style={snStyles.verdictSectionHeader}>
               <View>
-                <SnEyebrow>Docket</SnEyebrow>
-                <Text style={snStyles.verdictSectionTitle}>Recent verdicts</Text>
+                <Text style={snStyles.verdictSectionTitle}>Recent Analyses</Text>
               </View>
               <TouchableOpacity style={snStyles.archiveLink}>
                 <Text style={snStyles.archiveLinkText}>Archive</Text>
