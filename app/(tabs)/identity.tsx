@@ -732,18 +732,7 @@ export default function IdentityScreen() {
     return earned;
   }, [verification.verified, stats, apiBadges]);
 
-  // Loading state
-  if (loading) {
-    return (
-      <View style={[premiumStyles.container, premiumStyles.loadingContainer]}>
-        <View style={premiumStyles.loadingCard}>
-          <ActivityIndicator size="small" color={ID.G} />
-          <Text style={premiumStyles.loadingText}>Loading identity...</Text>
-        </View>
-      </View>
-    );
-  }
-
+  // Pre-compute display values (needed before early return for hooks consistency)
   const displayName = profile?.name || user?.name || '';
   const displayEmail = profile?.email || user?.email || '';
 
@@ -760,12 +749,24 @@ export default function IdentityScreen() {
   // Member since date
   const memberSince = formatShortDate(verification.verifiedAt) || 'Apr 2026';
 
-  // Generate folio number based on name
+  // Generate folio number based on name (must be before early return)
   const folio = useMemo(() => {
     if (!displayName) return '0000/2033';
     const hash = displayName.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
     return `${(hash % 10000).toString().padStart(4, '0')}/${new Date().getFullYear()}`;
   }, [displayName]);
+
+  // Loading state (after all hooks)
+  if (loading) {
+    return (
+      <View style={[premiumStyles.container, premiumStyles.loadingContainer]}>
+        <View style={premiumStyles.loadingCard}>
+          <ActivityIndicator size="small" color={ID.G} />
+          <Text style={premiumStyles.loadingText}>Loading identity...</Text>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={premiumStyles.container}>
