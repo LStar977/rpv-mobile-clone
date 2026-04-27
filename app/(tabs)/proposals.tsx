@@ -93,8 +93,9 @@ import { showVoteConfirmation } from '../../lib/notifications';
 import { VoteConfirmationOverlay, UpgradeModal, BallotDisplay } from '../../components/ui';
 import { checkForNewBadges } from '../../lib/badgeNotification';
 import * as ImagePicker from 'expo-image-picker';
-import { useTutorialTarget } from '../../components/tutorial';
-import { useTutorialStore } from '../../lib/tutorial';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+const SWIPE_HINT_KEY = '@represent_swipe_hint_shown';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
@@ -311,6 +312,53 @@ function getDossierRef(proposal: Proposal): string {
   const prefix = tier === 'FEDERAL' ? 'FED' : tier === 'PROVINCIAL' ? 'PROV' : 'MUN';
   const idNum = String(proposal.id).match(/\d+/g)?.join('') || '0000';
   return `${prefix}-${idNum.slice(-4).padStart(4, '0')}`;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SWIPE HINT OVERLAY - One-time gesture instructions
+// ═══════════════════════════════════════════════════════════════════════════════
+function SwipeHintOverlay({ visible, onDismiss }: { visible: boolean; onDismiss: () => void }) {
+  const pc = useProposalColors();
+
+  if (!visible) return null;
+
+  return (
+    <TouchableOpacity
+      style={styles.swipeHintOverlay}
+      activeOpacity={1}
+      onPress={onDismiss}
+    >
+      <Animated.View
+        entering={FadeIn.duration(300)}
+        style={[styles.swipeHintCard, { backgroundColor: pc.BG_CARD, borderColor: pc.LINE }]}
+      >
+        <Text style={[styles.swipeHintTitle, { color: pc.GOLD }]}>How to Vote</Text>
+
+        <View style={styles.swipeHintRow}>
+          <View style={[styles.swipeHintIcon, { borderColor: pc.GREEN }]}>
+            <Ionicons name="arrow-forward" size={20} color={pc.GREEN} />
+          </View>
+          <Text style={[styles.swipeHintText, { color: pc.FG }]}>Swipe right to support</Text>
+        </View>
+
+        <View style={styles.swipeHintRow}>
+          <View style={[styles.swipeHintIcon, { borderColor: pc.RED }]}>
+            <Ionicons name="arrow-back" size={20} color={pc.RED} />
+          </View>
+          <Text style={[styles.swipeHintText, { color: pc.FG }]}>Swipe left to oppose</Text>
+        </View>
+
+        <View style={styles.swipeHintRow}>
+          <View style={[styles.swipeHintIcon, { borderColor: pc.FG_MUTED }]}>
+            <Ionicons name="arrow-up" size={20} color={pc.FG_MUTED} />
+          </View>
+          <Text style={[styles.swipeHintText, { color: pc.FG }]}>Swipe up to skip</Text>
+        </View>
+
+        <Text style={[styles.swipeHintDismiss, { color: pc.FG_FAINT }]}>Tap anywhere to start</Text>
+      </Animated.View>
+    </TouchableOpacity>
+  );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1628,11 +1676,9 @@ export default function ProposalsScreen() {
   const [viewMode, setViewMode] = useState<'swipe' | 'list'>('swipe');
   const [swipeIndex, setSwipeIndex] = useState(0);
 
-  // Tutorial target ref
-  const swipeCardRef = useTutorialTarget('swipe-card');
-
-  // Tutorial state for action detection
-  const { isActive: tutorialActive, completeAction: completeTutorialAction } = useTutorialStore();
+  // Swipe hint overlay (shows once for new users)
+  const [showSwipeHint, setShowSwipeHint] = useState(false);
+  const swipeCardRef = useRef<View>(null);
 
   const [newProposal, setNewProposal] = useState({
     title: '',
@@ -1675,6 +1721,22 @@ export default function ProposalsScreen() {
   useEffect(() => {
     setNewProposal((p) => ({ ...p, country: userCountry, state: userState, city: userCity }));
   }, [userCountry, userState, userCity]);
+
+  // Check if swipe hint should be shown (first time in swipe mode)
+  useEffect(() => {
+    if (viewMode === 'swipe') {
+      AsyncStorage.getItem(SWIPE_HINT_KEY).then((value) => {
+        if (!value) {
+          setShowSwipeHint(true);
+        }
+      });
+    }
+  }, [viewMode]);
+
+  const dismissSwipeHint = useCallback(async () => {
+    setShowSwipeHint(false);
+    await AsyncStorage.setItem(SWIPE_HINT_KEY, 'shown');
+  }, []);
 
   const filteredProposals = useMemo(() => {
     // Reverse to show most recent proposals first
@@ -2412,9 +2474,9 @@ export default function ProposalsScreen() {
                   <SwipeCard
                     key={proposal.id}
                     proposal={proposal}
-                    onSwipeLeft={() => handleSwipeVote(proposal, 'oppose')}
-                    onSwipeRight={() => handleSwipeVote(proposal, 'support')}
-                    onSwipeUp={handleSkip}
+                    onSwipeLeft={() => { dismissSwipeHint(); handleSwipeVote(proposal, 'oppose'); }}
+                    onSwipeRight={() => { dismissSwipeHint(); handleSwipeVote(proposal, 'support'); }}
+                    onSwipeUp={() => { dismissSwipeHint(); handleSkip(); }}
                     onTap={() => openProposal(proposal)}
                     isTopCard={idx === 0}
                     cardIndex={idx}
@@ -2422,6 +2484,9 @@ export default function ProposalsScreen() {
                   />
                 )).reverse()}
               </View>
+
+              {/* Swipe hint overlay for first-time users */}
+              <SwipeHintOverlay visible={showSwipeHint} onDismiss={dismissSwipeHint} />
             </View>
           )}
         </GestureHandlerRootView>
@@ -3298,6 +3363,52 @@ const detailStyles = StyleSheet.create({
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+
+  // Swipe Hint Overlay
+  swipeHintOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.85)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+  },
+  swipeHintCard: {
+    borderRadius: BORDER_RADIUS.xl,
+    borderWidth: 1,
+    padding: SPACING.xl,
+    width: '85%',
+    maxWidth: 320,
+  },
+  swipeHintTitle: {
+    fontFamily: SERIF_FONT,
+    fontSize: 24,
+    fontWeight: '600',
+    textAlign: 'center',
+    marginBottom: SPACING.lg,
+  },
+  swipeHintRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: SPACING.md,
+  },
+  swipeHintIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: SPACING.md,
+  },
+  swipeHintText: {
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  swipeHintDismiss: {
+    textAlign: 'center',
+    marginTop: SPACING.lg,
+    fontSize: 14,
+  },
 
   // Header
   header: {

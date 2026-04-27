@@ -6,7 +6,6 @@ import { ThemeProvider, useTheme } from '../lib/theme';
 import { STRIPE_PUBLISHABLE_KEY, MERCHANT_IDENTIFIER } from '../lib/stripe';
 import { initIAP, endIAP } from '../lib/iap';
 import { soundEffects } from '../lib/sounds';
-import { TutorialOverlay } from '../components/tutorial';
 import { Onboarding, hasCompletedOnboarding } from '../components/Onboarding';
 
 // Conditionally import StripeProvider to handle missing native module
@@ -58,7 +57,6 @@ function ThemedStack() {
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="modals" />
       </Stack>
-      <TutorialOverlay />
 
       {/* Onboarding Modal */}
       <Modal
