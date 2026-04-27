@@ -500,9 +500,8 @@ function VerifiedSeal({ verifiedAt, provider }: { verifiedAt?: string | null | u
         </Svg>
       </View>
       <View style={premiumStyles.sealInfo}>
-        <Text style={premiumStyles.sealTitle}>Identity attested</Text>
-        <Text style={premiumStyles.sealSubtitle}>Witnessed by {(provider || 'VERIFF').toUpperCase()} on {date}</Text>
-        <Text style={premiumStyles.timestamp}>WITNESS·#A29F·1804·EST</Text>
+        <Text style={premiumStyles.sealTitle}>Identity verified</Text>
+        <Text style={premiumStyles.sealSubtitle}>Verified by {provider || 'Veriff'} on {date}</Text>
       </View>
     </View>
   );
