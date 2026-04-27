@@ -2567,7 +2567,11 @@ export default function ProposalsScreen() {
                       <View style={detailStyles.voteActions}>
                         <TouchableOpacity
                           style={[detailStyles.voteBtn, detailStyles.voteBtnSupport, detailIsVoting && { opacity: 0.5 }]}
-                          onPress={() => detail && handleVote(detail.id as number, 'support')}
+                          onPress={() => {
+                            if (!detail) return;
+                            closeProposal();
+                            handleVote(detail.id as number, 'support');
+                          }}
                           disabled={detailIsVoting}
                           activeOpacity={0.7}
                         >
@@ -2582,7 +2586,11 @@ export default function ProposalsScreen() {
                         </TouchableOpacity>
                         <TouchableOpacity
                           style={[detailStyles.voteBtn, detailStyles.voteBtnOppose, detailIsVoting && { opacity: 0.5 }]}
-                          onPress={() => detail && handleVote(detail.id as number, 'oppose')}
+                          onPress={() => {
+                            if (!detail) return;
+                            closeProposal();
+                            handleVote(detail.id as number, 'oppose');
+                          }}
                           disabled={detailIsVoting}
                           activeOpacity={0.7}
                         >
