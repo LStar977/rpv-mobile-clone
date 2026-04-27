@@ -30,8 +30,25 @@ import { useAuthStore } from '../../lib/auth';
 import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS, responsive } from '../../lib/theme';
 import { UpgradeModal } from '../../components/ui';
 import { useTutorialTarget } from '../../components/tutorial';
+import Svg, { Circle, Path, Line } from 'react-native-svg';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
+// ── Sentinel Premium Design Tokens ───────────────────────────────────
+const SN_G = '#EABA58';       // Gold primary
+const SN_GD = '#C89A3E';      // Gold dark
+const SN_GL = '#F4D28C';      // Gold light
+const SN_BG = '#040707';      // Background
+const SN_BG_CARD = '#0D0F12'; // Card background
+const SN_BG_RAISED = '#15181C'; // Raised surface
+const SN_LINE = '#1E2228';    // Border/line
+const SN_LINE_STRONG = '#2A2F37'; // Strong border
+const SN_FG = '#F4F5F6';      // Primary text
+const SN_FG_MUTED = '#C7CACD'; // Secondary text
+const SN_FG_FAINT = '#8E9297'; // Tertiary text
+const SN_GREEN = '#34C759';   // Success/aligned
+const SN_RED = '#E5605A';     // Error/violating
+const SN_AMBER = '#F0A542';   // Warning/at risk
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
 const API_URL = 'https://representportal.com';
@@ -165,6 +182,121 @@ function getVerdictIcon(verdict: string): string {
   return 'alert-circle';
 }
 
+// Get verdict color for premium UI
+function getVerdictColorPremium(verdict: string): string {
+  if (verdict === 'Aligned') return SN_GREEN;
+  if (verdict === 'At Risk') return SN_AMBER;
+  return SN_RED;
+}
+
+// ── SentinelMark — sparkle/star icon ─────────────────────────────────
+function SentinelMark({ size = 22, color = SN_G }: { size?: number; color?: string }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M12 2L13.5 9.5L21 11L13.5 12.5L12 20L10.5 12.5L3 11L10.5 9.5L12 2Z"
+        fill={`${color}25`}
+        stroke={color}
+        strokeWidth={1}
+        strokeLinejoin="round"
+      />
+      <Path
+        d="M19 4L19.6 6.4L22 7L19.6 7.6L19 10L18.4 7.6L16 7L18.4 6.4L19 4Z"
+        fill={color}
+        stroke={color}
+        strokeWidth={0.5}
+        strokeLinejoin="round"
+      />
+      <Path
+        d="M5 14L5.4 15.6L7 16L5.4 16.4L5 18L4.6 16.4L3 16L4.6 15.6L5 14Z"
+        fill={color}
+        stroke={color}
+        strokeWidth={0.5}
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
+
+// ── ScoreDial — radial meter for verdict cards ───────────────────────
+function ScoreDial({ score = 50, color = SN_RED, size = 56 }: { score?: number; color?: string; size?: number }) {
+  const r = (size - 8) / 2;
+  const c = 2 * Math.PI * r;
+  const offset = c * (1 - score / 100);
+
+  return (
+    <View style={{ width: size, height: size, position: 'relative' }}>
+      <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+        {/* Background track */}
+        <Circle
+          cx={size / 2}
+          cy={size / 2}
+          r={r}
+          fill="none"
+          stroke={SN_LINE_STRONG}
+          strokeWidth={2}
+        />
+        {/* Score arc */}
+        <Circle
+          cx={size / 2}
+          cy={size / 2}
+          r={r}
+          fill="none"
+          stroke={color}
+          strokeWidth={2}
+          strokeDasharray={`${c}`}
+          strokeDashoffset={offset}
+          strokeLinecap="round"
+          rotation={-90}
+          origin={`${size / 2}, ${size / 2}`}
+        />
+        {/* Inner dashed ring */}
+        <Circle
+          cx={size / 2}
+          cy={size / 2}
+          r={r - 4}
+          fill="none"
+          stroke={color}
+          strokeWidth={0.4}
+          strokeDasharray="1 2"
+          opacity={0.4}
+        />
+      </Svg>
+      <View style={{
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}>
+        <Text style={{
+          fontFamily: 'Georgia',
+          fontSize: size * 0.32,
+          fontWeight: '500',
+          color: color,
+          letterSpacing: -0.5,
+        }}>{score}</Text>
+      </View>
+    </View>
+  );
+}
+
+// ── Premium Eyebrow ──────────────────────────────────────────────────
+function SnEyebrow({ children, color = SN_FG_FAINT }: { children: React.ReactNode; color?: string }) {
+  return (
+    <Text style={{
+      fontFamily: 'System',
+      fontSize: 10,
+      fontWeight: '600',
+      letterSpacing: 2.2,
+      textTransform: 'uppercase',
+      color,
+    }}>{children}</Text>
+  );
+}
+
 // Circular Score Gauge Component (Credit Score Style)
 function CircularScoreGauge({ score, size = 'large' }: { score: number; size?: 'small' | 'large' }) {
   const { colors } = useTheme();
@@ -253,7 +385,7 @@ function LetterGradeBadge({ grade, size = 'large' }: { grade: string; size?: 'sm
   );
 }
 
-// Quick Stats Row Component
+// Quick Stats Row Component (legacy)
 function QuickStatsRow({ analyses }: { analyses: Analysis[] }) {
   const { colors } = useTheme();
   const total = analyses.length;
@@ -278,6 +410,755 @@ function QuickStatsRow({ analyses }: { analyses: Analysis[] }) {
     </View>
   );
 }
+
+// ══════════════════════════════════════════════════════════════════════
+// ══ PREMIUM SENTINEL UI COMPONENTS ════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════════
+
+// ── Premium Header ───────────────────────────────────────────────────
+function SnHeader({ isPremium }: { isPremium: boolean }) {
+  return (
+    <Animated.View entering={FadeInDown.duration(400)} style={snStyles.header}>
+      {/* Top row: status + premium badge */}
+      <View style={snStyles.headerTopRow}>
+        <View style={snStyles.sessionStatus}>
+          <View style={snStyles.statusDot} />
+          <Text style={snStyles.sessionText}>Sentinel session · model active</Text>
+        </View>
+        {isPremium && (
+          <View style={snStyles.premiumHallmark}>
+            <Svg width={9} height={9} viewBox="0 0 12 12">
+              <Path d="M6 1l1.5 3 3.5.5-2.5 2.5.6 3.5L6 8.8 2.9 10.5l.6-3.5L1 4.5 4.5 4 6 1z" fill={SN_G} />
+            </Svg>
+            <Text style={snStyles.premiumText}>Premium</Text>
+          </View>
+        )}
+      </View>
+
+      {/* Main header row: icon + title */}
+      <View style={snStyles.headerMain}>
+        <View style={snStyles.headerIconBox}>
+          <SentinelMark size={28} color={SN_GL} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={snStyles.headerTitle}>
+            The Sentinel<Text style={{ color: SN_GL }}>.</Text>
+          </Text>
+          <Text style={snStyles.headerSubtitle}>
+            <Text style={snStyles.headerSubtitleItalic}>Governance under review.</Text>
+            {' '}Briefs read, scored, and entered into the public record.
+          </Text>
+        </View>
+      </View>
+    </Animated.View>
+  );
+}
+
+// ── Tribunal Tally (replaces QuickStatsRow) ──────────────────────────
+function Tribunal({ analyses }: { analyses: Analysis[] }) {
+  const total = analyses.length;
+  const atRisk = analyses.filter(a => a.analysis.overallVerdict === 'At Risk').length;
+  const violating = analyses.filter(a => a.analysis.overallVerdict === 'Violating').length;
+  const aligned = analyses.filter(a => a.analysis.overallVerdict === 'Aligned').length;
+
+  const now = new Date();
+  const sessionCode = `SESSION ${String(now.getMonth() + 1).padStart(2, '0')}·${String(now.getDate()).padStart(2, '0')}`;
+
+  const items = [
+    { label: 'Reviewed', count: String(total).padStart(2, '0'), tag: 'this month', color: SN_FG },
+    { label: 'At risk', count: String(atRisk + violating).padStart(2, '0'), tag: 'flagged · open', color: SN_AMBER },
+    { label: 'Aligned', count: String(aligned).padStart(2, '0'), tag: 'sealed · approved', color: SN_GREEN },
+  ];
+
+  return (
+    <Animated.View entering={FadeInUp.delay(100).duration(400)} style={snStyles.tribunalContainer}>
+      <View style={snStyles.tribunalHeader}>
+        <SnEyebrow>Tribunal · session tally</SnEyebrow>
+        <Text style={snStyles.sessionCode}>{sessionCode}</Text>
+      </View>
+      <View style={snStyles.tribunalCard}>
+        {items.map((item, i) => (
+          <View
+            key={item.label}
+            style={[
+              snStyles.tribunalCell,
+              i < 2 && snStyles.tribunalCellBorder,
+            ]}
+          >
+            <Text style={[snStyles.tribunalNumber, { color: item.color }]}>
+              {item.count}
+            </Text>
+            <Text style={snStyles.tribunalLabel}>{item.label}</Text>
+            <Text style={snStyles.tribunalTag}>{item.tag}</Text>
+          </View>
+        ))}
+      </View>
+    </Animated.View>
+  );
+}
+
+// ── Premium Verdict Card (dossier style) ─────────────────────────────
+function VerdictDossierCard({
+  analysis,
+  onPress,
+  index,
+}: {
+  analysis: Analysis;
+  onPress: () => void;
+  index: number;
+}) {
+  const averageScore = calculateAverageScore(analysis.analysis.categoryScores);
+  const verdictColor = getVerdictColorPremium(analysis.analysis.overallVerdict);
+  const now = new Date();
+  const caseCode = `SC·${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}/${String(now.getFullYear()).slice(-2)}`;
+
+  return (
+    <Animated.View entering={FadeInUp.delay(index * 80).duration(300)}>
+      <TouchableOpacity
+        style={[snStyles.dossierCard, { borderLeftColor: verdictColor }]}
+        onPress={onPress}
+        activeOpacity={0.7}
+      >
+        <ScoreDial score={averageScore} color={verdictColor} size={56} />
+        <View style={snStyles.dossierContent}>
+          <View style={snStyles.dossierMeta}>
+            <Text style={snStyles.dossierCode}>{caseCode}</Text>
+            <View style={snStyles.dossierDot} />
+            <Text style={snStyles.dossierScope}>{analysis.issueType}</Text>
+          </View>
+          <Text style={snStyles.dossierTitle} numberOfLines={1}>
+            {analysis.title}
+          </Text>
+          <View style={snStyles.dossierFooter}>
+            <View style={[snStyles.verdictChip, { backgroundColor: `${verdictColor}1F`, borderColor: `${verdictColor}59` }]}>
+              <Text style={[snStyles.verdictChipText, { color: verdictColor }]}>
+                {analysis.analysis.overallVerdict}
+              </Text>
+            </View>
+            <Text style={snStyles.dossierDate}>{analysis.timestamp}</Text>
+          </View>
+        </View>
+        <Ionicons name="chevron-forward" size={14} color={SN_FG_FAINT} />
+      </TouchableOpacity>
+    </Animated.View>
+  );
+}
+
+// ── Issue Type Chip ──────────────────────────────────────────────────
+function IssueChip({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      style={[
+        snStyles.issueChip,
+        active && snStyles.issueChipActive,
+      ]}
+      activeOpacity={0.7}
+    >
+      <Text style={[snStyles.issueChipText, active && snStyles.issueChipTextActive]}>
+        {label}
+      </Text>
+    </TouchableOpacity>
+  );
+}
+
+// ── Submission Desk (premium form) ───────────────────────────────────
+function SubmissionDesk({
+  title,
+  setTitle,
+  text,
+  setText,
+  issueType,
+  setIssueType,
+  analyzing,
+  onAnalyze,
+  isPremium,
+}: {
+  title: string;
+  setTitle: (v: string) => void;
+  text: string;
+  setText: (v: string) => void;
+  issueType: string;
+  setIssueType: (v: string) => void;
+  analyzing: boolean;
+  onAnalyze: () => void;
+  isPremium: boolean;
+}) {
+  const issueTypes = ['Policy', 'Statute', 'Charter', 'Treaty', 'Law', 'Other'];
+
+  return (
+    <Animated.View entering={FadeInUp.delay(300).duration(400)} style={snStyles.deskContainer}>
+      <LinearGradient
+        colors={['#0E1014', '#0A0C0F']}
+        style={[StyleSheet.absoluteFill, { borderRadius: 18 }]}
+      />
+
+      {/* Corner form code */}
+      <Text style={snStyles.formCode}>FORM·SC/04</Text>
+
+      {/* Header */}
+      <View style={snStyles.deskHeader}>
+        <SnEyebrow>Submit a brief</SnEyebrow>
+        <Text style={snStyles.deskTitle}>
+          Lay before <Text style={snStyles.deskTitleItalic}>the bench</Text>
+        </Text>
+        <Text style={snStyles.deskSubtitle}>
+          Sentinel returns a written verdict in under a minute.
+        </Text>
+      </View>
+
+      {/* Title field */}
+      <View style={snStyles.fieldGroup}>
+        <Text style={snStyles.fieldLabel}>TITLE OF THE BRIEF</Text>
+        <TextInput
+          style={snStyles.titleInput}
+          placeholder="e.g. Tax Reform Act, 2026"
+          placeholderTextColor={SN_FG_FAINT}
+          value={title}
+          onChangeText={setTitle}
+        />
+      </View>
+
+      {/* Issue type chips */}
+      <View style={snStyles.fieldGroup}>
+        <Text style={snStyles.fieldLabel}>ISSUE TYPE</Text>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={snStyles.chipsRow}
+        >
+          {issueTypes.map((type) => (
+            <IssueChip
+              key={type}
+              label={type}
+              active={issueType === type}
+              onPress={() => setIssueType(type)}
+            />
+          ))}
+        </ScrollView>
+      </View>
+
+      {/* Document text area with paper lines */}
+      <View style={snStyles.fieldGroup}>
+        <View style={snStyles.fieldLabelRow}>
+          <Text style={snStyles.fieldLabel}>BODY OF THE DOCUMENT</Text>
+          <Text style={snStyles.charCount}>{text.length.toLocaleString()} / 50,000</Text>
+        </View>
+        <View style={snStyles.textAreaContainer}>
+          {/* Paper rule lines */}
+          <View style={snStyles.paperLines} />
+          <TextInput
+            style={snStyles.textArea}
+            placeholder="Paste or transcribe the governance text here. The Sentinel will read every clause for alignment with constitutional principles, prior precedent, and citizen rights."
+            placeholderTextColor={SN_FG_FAINT}
+            value={text}
+            onChangeText={setText}
+            multiline
+            numberOfLines={6}
+            textAlignVertical="top"
+            maxLength={50000}
+          />
+        </View>
+      </View>
+
+      {/* Submit button */}
+      <TouchableOpacity
+        style={[snStyles.submitButton, analyzing && { opacity: 0.6 }]}
+        onPress={onAnalyze}
+        disabled={analyzing}
+        activeOpacity={0.8}
+      >
+        <LinearGradient
+          colors={[SN_GL, SN_GD]}
+          style={StyleSheet.absoluteFill}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 0, y: 1 }}
+        />
+        {analyzing ? (
+          <ActivityIndicator size="small" color="#1A1308" />
+        ) : (
+          <SentinelMark size={16} color="#1A1308" />
+        )}
+        <Text style={snStyles.submitText}>
+          {analyzing ? 'Reviewing...' : 'Submit for Sentinel review'}
+        </Text>
+      </TouchableOpacity>
+
+      {/* Provenance footer */}
+      <View style={snStyles.provenanceRow}>
+        <Text style={snStyles.provenanceText}>
+          Reviewed by OpenAI under sealed mandate.{' '}
+          <Text style={snStyles.provenanceLink}>Privacy notice</Text>
+        </Text>
+        <Text style={snStyles.versionText}>v4·26·5</Text>
+      </View>
+    </Animated.View>
+  );
+}
+
+// ── Footer Signature ─────────────────────────────────────────────────
+function SnFooterSig() {
+  return (
+    <Animated.View entering={FadeInUp.delay(400).duration(400)} style={snStyles.footerContainer}>
+      <Text style={snStyles.footerQuote}>The Sentinel reads, the citizen decides.</Text>
+      <Text style={snStyles.footerEstablished}>BENCH ESTABLISHED · IV·MMXXVI</Text>
+    </Animated.View>
+  );
+}
+
+// ── Premium Styles ───────────────────────────────────────────────────
+const snStyles = StyleSheet.create({
+  // Header
+  header: {
+    paddingHorizontal: 24,
+    paddingTop: 8,
+    paddingBottom: 22,
+  },
+  headerTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 16,
+  },
+  sessionStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: SN_GREEN,
+    shadowColor: SN_GREEN,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.4,
+    shadowRadius: 4,
+  },
+  sessionText: {
+    fontFamily: 'System',
+    fontSize: 10,
+    fontWeight: '600',
+    letterSpacing: 2.2,
+    textTransform: 'uppercase',
+    color: SN_FG_FAINT,
+  },
+  premiumHallmark: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: `${SN_G}66`,
+    backgroundColor: `${SN_G}15`,
+  },
+  premiumText: {
+    fontFamily: 'System',
+    fontSize: 9.5,
+    fontWeight: '600',
+    letterSpacing: 1.8,
+    textTransform: 'uppercase',
+    color: SN_G,
+  },
+  headerMain: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 14,
+  },
+  headerIconBox: {
+    width: 52,
+    height: 52,
+    borderRadius: 14,
+    backgroundColor: SN_BG_RAISED,
+    borderWidth: 1,
+    borderColor: SN_LINE_STRONG,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerTitle: {
+    fontFamily: 'Georgia',
+    fontSize: 38,
+    fontWeight: '500',
+    letterSpacing: -0.8,
+    lineHeight: 38,
+    color: SN_FG,
+    marginBottom: 6,
+  },
+  headerSubtitle: {
+    fontFamily: 'System',
+    fontSize: 13,
+    color: SN_FG_MUTED,
+    letterSpacing: -0.1,
+  },
+  headerSubtitleItalic: {
+    fontFamily: 'Georgia',
+    fontSize: 14,
+    fontStyle: 'italic',
+  },
+
+  // Tribunal
+  tribunalContainer: {
+    paddingHorizontal: 24,
+    marginBottom: 22,
+  },
+  tribunalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'baseline',
+    marginBottom: 12,
+  },
+  sessionCode: {
+    fontFamily: 'Courier',
+    fontSize: 9,
+    color: SN_FG_FAINT,
+    letterSpacing: 0.8,
+  },
+  tribunalCard: {
+    backgroundColor: SN_BG_CARD,
+    borderWidth: 1,
+    borderColor: SN_LINE,
+    borderRadius: 14,
+    flexDirection: 'row',
+    overflow: 'hidden',
+  },
+  tribunalCell: {
+    flex: 1,
+    padding: 14,
+  },
+  tribunalCellBorder: {
+    borderRightWidth: 1,
+    borderRightColor: SN_LINE,
+  },
+  tribunalNumber: {
+    fontFamily: 'Georgia',
+    fontSize: 30,
+    fontWeight: '500',
+    letterSpacing: -0.5,
+    marginBottom: 4,
+  },
+  tribunalLabel: {
+    fontFamily: 'System',
+    fontSize: 11,
+    fontWeight: '500',
+    color: SN_FG_MUTED,
+    letterSpacing: -0.1,
+    marginBottom: 2,
+  },
+  tribunalTag: {
+    fontFamily: 'System',
+    fontSize: 9,
+    color: SN_FG_FAINT,
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+  },
+
+  // Dossier Card
+  dossierCard: {
+    backgroundColor: SN_BG_CARD,
+    borderWidth: 1,
+    borderColor: SN_LINE,
+    borderLeftWidth: 2,
+    borderRadius: 14,
+    padding: 14,
+    paddingLeft: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    marginBottom: 10,
+  },
+  dossierContent: {
+    flex: 1,
+    minWidth: 0,
+  },
+  dossierMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 4,
+  },
+  dossierCode: {
+    fontFamily: 'Courier',
+    fontSize: 9,
+    color: SN_FG_FAINT,
+    letterSpacing: 1,
+  },
+  dossierDot: {
+    width: 3,
+    height: 3,
+    borderRadius: 1.5,
+    backgroundColor: SN_LINE_STRONG,
+  },
+  dossierScope: {
+    fontFamily: 'System',
+    fontSize: 10,
+    fontWeight: '500',
+    color: SN_FG_FAINT,
+    letterSpacing: 0.4,
+  },
+  dossierTitle: {
+    fontFamily: 'Georgia',
+    fontSize: 19,
+    fontWeight: '500',
+    color: SN_FG,
+    letterSpacing: -0.1,
+    marginBottom: 6,
+  },
+  dossierFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  verdictChip: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
+    borderWidth: 1,
+  },
+  verdictChipText: {
+    fontFamily: 'System',
+    fontSize: 9,
+    fontWeight: '600',
+    letterSpacing: 1.6,
+    textTransform: 'uppercase',
+  },
+  dossierDate: {
+    fontFamily: 'System',
+    fontSize: 11,
+    color: SN_FG_MUTED,
+  },
+
+  // Issue Chip
+  issueChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: SN_LINE_STRONG,
+    marginRight: 8,
+  },
+  issueChipActive: {
+    borderColor: SN_GD,
+    backgroundColor: `${SN_G}1A`,
+  },
+  issueChipText: {
+    fontFamily: 'System',
+    fontSize: 11,
+    fontWeight: '500',
+    color: SN_FG_MUTED,
+    letterSpacing: -0.1,
+  },
+  issueChipTextActive: {
+    fontWeight: '600',
+    color: SN_G,
+  },
+
+  // Submission Desk
+  deskContainer: {
+    marginHorizontal: 24,
+    marginBottom: 22,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: SN_LINE_STRONG,
+    padding: 18,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  formCode: {
+    position: 'absolute',
+    top: 14,
+    right: 14,
+    fontFamily: 'Courier',
+    fontSize: 8.5,
+    color: SN_FG_FAINT,
+    letterSpacing: 1.2,
+  },
+  deskHeader: {
+    marginBottom: 18,
+  },
+  deskTitle: {
+    fontFamily: 'Georgia',
+    fontSize: 22,
+    fontWeight: '500',
+    color: SN_FG,
+    letterSpacing: -0.2,
+    marginTop: 6,
+    lineHeight: 24,
+  },
+  deskTitleItalic: {
+    fontStyle: 'italic',
+    color: SN_GL,
+  },
+  deskSubtitle: {
+    fontFamily: 'System',
+    fontSize: 11.5,
+    color: SN_FG_MUTED,
+    letterSpacing: -0.1,
+    marginTop: 6,
+  },
+  fieldGroup: {
+    marginBottom: 16,
+  },
+  fieldLabel: {
+    fontFamily: 'System',
+    fontSize: 9.5,
+    fontWeight: '600',
+    color: SN_FG_FAINT,
+    letterSpacing: 2,
+    marginBottom: 8,
+  },
+  fieldLabelRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'baseline',
+    marginBottom: 8,
+  },
+  charCount: {
+    fontFamily: 'Courier',
+    fontSize: 9,
+    color: SN_FG_FAINT,
+    letterSpacing: 0.5,
+  },
+  titleInput: {
+    fontFamily: 'Georgia',
+    fontSize: 18,
+    fontStyle: 'italic',
+    color: SN_FG,
+    borderBottomWidth: 1,
+    borderBottomColor: SN_LINE_STRONG,
+    paddingVertical: 8,
+    paddingHorizontal: 0,
+  },
+  chipsRow: {
+    flexDirection: 'row',
+    paddingVertical: 2,
+  },
+  textAreaContainer: {
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    borderWidth: 1,
+    borderColor: SN_LINE,
+    borderRadius: 10,
+    minHeight: 120,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  paperLines: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    opacity: 0.35,
+  },
+  textArea: {
+    fontFamily: 'Georgia',
+    fontSize: 14,
+    fontStyle: 'italic',
+    color: SN_FG,
+    lineHeight: 22,
+    padding: 12,
+    paddingTop: 14,
+    minHeight: 110,
+  },
+  submitButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    paddingVertical: 15,
+    borderRadius: 12,
+    overflow: 'hidden',
+    marginTop: 2,
+  },
+  submitText: {
+    fontFamily: 'System',
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1A1308',
+    letterSpacing: 0.3,
+  },
+  provenanceRow: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: SN_LINE,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  provenanceText: {
+    fontFamily: 'System',
+    fontSize: 10,
+    color: SN_FG_FAINT,
+    letterSpacing: -0.1,
+    flex: 1,
+  },
+  provenanceLink: {
+    color: SN_GL,
+    textDecorationLine: 'underline',
+  },
+  versionText: {
+    fontFamily: 'Courier',
+    fontSize: 8.5,
+    color: SN_FG_FAINT,
+    letterSpacing: 1,
+  },
+
+  // Footer
+  footerContainer: {
+    paddingHorizontal: 24,
+    paddingTop: 4,
+    paddingBottom: 24,
+    alignItems: 'center',
+  },
+  footerQuote: {
+    fontFamily: 'Georgia',
+    fontSize: 13,
+    fontStyle: 'italic',
+    color: SN_FG_FAINT,
+    letterSpacing: -0.1,
+    marginBottom: 4,
+  },
+  footerEstablished: {
+    fontFamily: 'Courier',
+    fontSize: 8.5,
+    color: SN_FG_FAINT,
+    letterSpacing: 2.2,
+  },
+
+  // Verdict Section
+  verdictSection: {
+    paddingHorizontal: 24,
+    marginBottom: 24,
+  },
+  verdictSectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+    marginBottom: 14,
+  },
+  verdictSectionTitle: {
+    fontFamily: 'Georgia',
+    fontSize: 22,
+    fontWeight: '500',
+    color: SN_FG,
+    letterSpacing: -0.2,
+    lineHeight: 24,
+    marginTop: 4,
+  },
+  archiveLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  archiveLinkText: {
+    fontFamily: 'System',
+    fontSize: 11,
+    fontWeight: '500',
+    color: SN_FG_FAINT,
+  },
+});
 
 // Analysis History Card Component
 function AnalysisHistoryCard({
@@ -856,53 +1737,35 @@ export default function SentinelScreen() {
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={[styles.container, { backgroundColor: SN_BG }]}>
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 16 }]}
         showsVerticalScrollIndicator={false}
       >
-        {/* Header */}
+        {/* Premium Header */}
         <View ref={sentinelHeaderRef} collapsable={false}>
-          <Animated.View entering={FadeInDown.duration(400)} style={styles.header}>
-            <View style={[styles.headerIconBg, { backgroundColor: `${colors.gold}15` }]}>
-              <Ionicons name="sparkles" size={28} color={colors.gold} />
-            </View>
-            <View style={styles.headerText}>
-              <Text style={[styles.headerTitle, { color: colors.gold }]}>Sentinel AI</Text>
-              <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>
-                Governance Report Cards
-              </Text>
-            </View>
-            {!isPremium && (
-              <TouchableOpacity
-                style={[styles.premiumBadge, { backgroundColor: colors.gold }]}
-                onPress={() => router.push('/modals/subscription')}
-              >
-                <Text style={styles.premiumBadgeText}>Premium</Text>
-              </TouchableOpacity>
-            )}
-          </Animated.View>
+          <SnHeader isPremium={isPremium} />
         </View>
 
-        {/* Quick Stats */}
-        <Animated.View entering={FadeInUp.delay(100).duration(400)}>
-          <QuickStatsRow analyses={analysisHistory} />
-        </Animated.View>
+        {/* Tribunal Tally */}
+        <Tribunal analyses={analysisHistory} />
 
-        {/* Recent Analyses */}
+        {/* Recent Verdicts */}
         {analysisHistory.length > 0 && (
-          <Animated.View entering={FadeInUp.delay(200).duration(400)} style={styles.historySection}>
-            <View style={styles.historySectionHeader}>
-              <Text style={[styles.historySectionTitle, { color: colors.text }]}>Recent Analyses</Text>
-              {analysisHistory.length > 3 && (
-                <Text style={[styles.historyCount, { color: colors.textTertiary }]}>
-                  {analysisHistory.length} total
-                </Text>
-              )}
+          <Animated.View entering={FadeInUp.delay(200).duration(400)} style={snStyles.verdictSection}>
+            <View style={snStyles.verdictSectionHeader}>
+              <View>
+                <SnEyebrow>Docket</SnEyebrow>
+                <Text style={snStyles.verdictSectionTitle}>Recent verdicts</Text>
+              </View>
+              <TouchableOpacity style={snStyles.archiveLink}>
+                <Text style={snStyles.archiveLinkText}>Archive</Text>
+                <Ionicons name="chevron-forward" size={10} color={SN_FG_FAINT} />
+              </TouchableOpacity>
             </View>
-            {analysisHistory.slice(0, 5).map((analysis, index) => (
-              <AnalysisHistoryCard
+            {analysisHistory.slice(0, 3).map((analysis, index) => (
+              <VerdictDossierCard
                 key={analysis.id}
                 analysis={analysis}
                 index={index}
@@ -916,120 +1779,23 @@ export default function SentinelScreen() {
           </Animated.View>
         )}
 
-        {/* New Analysis Form */}
+        {/* Submission Desk Form */}
         <View ref={sentinelFormRef} collapsable={false}>
-          <Animated.View
-            entering={FadeInUp.delay(300).duration(400)}
-            style={[styles.formCard, { backgroundColor: colors.surface, borderColor: colors.gold }]}
-          >
-            <LinearGradient
-              colors={[`${colors.gold}08`, 'transparent']}
-              style={StyleSheet.absoluteFill}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-            />
-
-            <View style={styles.formHeader}>
-              <View style={[styles.formIconBg, { backgroundColor: `${colors.gold}15` }]}>
-                <Ionicons name="add-circle-outline" size={20} color={colors.gold} />
-              </View>
-              <Text style={[styles.formTitle, { color: colors.gold }]}>New Analysis</Text>
-            </View>
-
-          {/* Title Input */}
-          <View style={styles.inputGroup}>
-            <Text style={[styles.inputLabel, { color: colors.gold }]}>Document Title</Text>
-            <TextInput
-              style={[styles.input, { backgroundColor: colors.surfaceHighlight, borderColor: colors.border, color: colors.text }]}
-              placeholder="e.g., Tax Reform Act 2026"
-              placeholderTextColor={colors.textTertiary}
-              value={title}
-              onChangeText={setTitle}
-            />
-          </View>
-
-          {/* Issue Type Picker */}
-          <View style={styles.inputGroup}>
-            <Text style={[styles.inputLabel, { color: colors.gold }]}>Issue Type</Text>
-            <TouchableOpacity
-              style={[styles.picker, { backgroundColor: colors.surfaceHighlight, borderColor: colors.border }]}
-              onPress={() => setShowIssueTypePicker(!showIssueTypePicker)}
-            >
-              <Text style={[styles.pickerText, { color: colors.text }]}>{issueType}</Text>
-              <Ionicons name={showIssueTypePicker ? 'chevron-up' : 'chevron-down'} size={20} color={colors.gold} />
-            </TouchableOpacity>
-            {showIssueTypePicker && (
-              <Animated.View
-                entering={FadeIn.duration(200)}
-                style={[styles.pickerDropdown, { backgroundColor: colors.surface, borderColor: colors.border }]}
-              >
-                {ISSUE_TYPES.map((type) => (
-                  <TouchableOpacity
-                    key={type}
-                    style={[styles.pickerOption, issueType === type && { backgroundColor: `${colors.gold}15` }]}
-                    onPress={() => {
-                      setIssueType(type);
-                      setShowIssueTypePicker(false);
-                    }}
-                  >
-                    <Text style={[styles.pickerOptionText, { color: colors.text }]}>{type}</Text>
-                    {issueType === type && <Ionicons name="checkmark" size={18} color={colors.gold} />}
-                  </TouchableOpacity>
-                ))}
-              </Animated.View>
-            )}
-          </View>
-
-          {/* Text Input */}
-          <View style={styles.inputGroup}>
-            <Text style={[styles.inputLabel, { color: colors.gold }]}>Document Text</Text>
-            <TextInput
-              style={[styles.textArea, { backgroundColor: colors.surfaceHighlight, borderColor: colors.border, color: colors.text }]}
-              placeholder="Paste the governance text to analyze..."
-              placeholderTextColor={colors.textTertiary}
-              value={text}
-              onChangeText={setText}
-              multiline
-              numberOfLines={6}
-              textAlignVertical="top"
-            />
-          </View>
-
-          {/* Analyze Button */}
-          <TouchableOpacity
-            style={[styles.analyzeButton, { backgroundColor: colors.gold }, analyzing && styles.buttonDisabled]}
-            onPress={handleAnalyze}
-            disabled={analyzing}
-            activeOpacity={0.8}
-          >
-            {analyzing ? (
-              <>
-                <ActivityIndicator size="small" color="#000" />
-                <Text style={styles.analyzeButtonText}>Analyzing...</Text>
-              </>
-            ) : (
-              <>
-                <Ionicons name="sparkles" size={20} color="#000" />
-                <Text style={styles.analyzeButtonText}>Analyze with Sentinel</Text>
-              </>
-            )}
-          </TouchableOpacity>
-          <Text style={[styles.aiDisclosure, { color: colors.textTertiary }]}>
-            Your text is processed by OpenAI. See our Privacy Policy.
-          </Text>
-          </Animated.View>
+          <SubmissionDesk
+            title={title}
+            setTitle={setTitle}
+            text={text}
+            setText={setText}
+            issueType={issueType}
+            setIssueType={setIssueType}
+            analyzing={analyzing}
+            onAnalyze={handleAnalyze}
+            isPremium={isPremium}
+          />
         </View>
 
-        {/* Info Card */}
-        <Animated.View
-          entering={FadeInUp.delay(400).duration(400)}
-          style={[styles.infoCard, { backgroundColor: `${colors.gold}10`, borderColor: colors.gold }]}
-        >
-          <Ionicons name="information-circle" size={20} color={colors.gold} />
-          <Text style={[styles.infoText, { color: colors.text }]}>
-            Sentinel evaluates documents against 155 principles of proper human governance and generates a report card with grades.
-          </Text>
-        </Animated.View>
+        {/* Footer Signature */}
+        <SnFooterSig />
 
         <View style={styles.bottomPadding} />
       </ScrollView>
