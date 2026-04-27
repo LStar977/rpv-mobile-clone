@@ -940,7 +940,7 @@ export default function ProposalsScreen() {
 
   // Proposals available for swiping (not voted, not ended, user can vote)
   const swipeableProposals = useMemo(() => {
-    return filteredProposals.filter((p) => {
+    const eligible = filteredProposals.filter((p) => {
       // Handle both string and number IDs for seed proposals
       const hasVoted = votedProposals.has(p.id as number) || votedProposals.has(p.id as any);
       const isEnded = isProposalEnded(p);
@@ -948,7 +948,17 @@ export default function ProposalsScreen() {
       const canVote = canUserVoteOnProposal(p, userCountry, userState, userCity, isVerified);
       return !hasVoted && !isEnded && canVote;
     });
-  }, [filteredProposals, votedProposals, userCountry, userState, userCity, isVerified]);
+    // Bring the deep-linked proposal to the front of the swipe stack so when
+    // the user backs out of the detail modal it's the next card to vote on.
+    if (deepLinkProposalId) {
+      const idx = eligible.findIndex((p) => String(p.id) === String(deepLinkProposalId));
+      if (idx > 0) {
+        const [target] = eligible.splice(idx, 1);
+        eligible.unshift(target);
+      }
+    }
+    return eligible;
+  }, [filteredProposals, votedProposals, userCountry, userState, userCity, isVerified, deepLinkProposalId]);
 
   // Reset swipe index when filters change or proposals update
   useEffect(() => {
