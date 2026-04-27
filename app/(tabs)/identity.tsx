@@ -29,6 +29,7 @@ import Animated, {
   Easing,
 } from 'react-native-reanimated';
 import { router } from 'expo-router';
+import Svg, { Circle, Line, Path, Rect, Defs, Pattern, Text as SvgText } from 'react-native-svg';
 
 import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS, responsive } from '../../lib/theme';
 import { useAuthStore } from '../../lib/auth';
@@ -40,9 +41,27 @@ import { useTutorialStore } from '../../lib/tutorial';
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://representportal.com';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CARD_WIDTH = SCREEN_WIDTH - SPACING.lg * 2;
-const CARD_HEIGHT = CARD_WIDTH * 0.63; // Credit card ratio
+const CARD_HEIGHT = CARD_WIDTH * 0.63;
 
 const AnimatedLinearGradient = Animated.createAnimatedComponent(LinearGradient);
+
+// Premium design tokens
+const ID = {
+  G: '#EABA58',
+  GD: '#C89A3E',
+  GL: '#F4D28C',
+  BG: '#040707',
+  BG_CARD: '#0D0F12',
+  BG_RAISED: '#15181C',
+  LINE: '#1E2228',
+  LINE_STRONG: '#2A2F37',
+  FG: '#F4F5F6',
+  FG_MUTED: '#C7CACD',
+  FG_FAINT: '#8E9297',
+  GREEN: '#34C759',
+  SERIF: 'Georgia',
+  MONO: 'JetBrainsMono-Regular',
+};
 
 type VerificationState = {
   verified: boolean;
@@ -106,182 +125,253 @@ function formatShortDate(iso?: string | null) {
   return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short' });
 }
 
-// Digital ID Card Component - Wallet Style
-function DigitalIDCard({
+function toRomanNumeral(num: number): string {
+  const lookup: [number, string][] = [
+    [1000, 'M'], [900, 'CM'], [500, 'D'], [400, 'CD'],
+    [100, 'C'], [90, 'XC'], [50, 'L'], [40, 'XL'],
+    [10, 'X'], [9, 'IX'], [5, 'V'], [4, 'IV'], [1, 'I']
+  ];
+  let result = '';
+  for (const [value, numeral] of lookup) {
+    while (num >= value) { result += numeral; num -= value; }
+  }
+  return result;
+}
+
+// Premium ID Header
+function IdHeader({ folio }: { folio: string }) {
+  return (
+    <View style={premiumStyles.header}>
+      <View style={premiumStyles.headerTop}>
+        <View style={premiumStyles.headerBadge}>
+          <View style={premiumStyles.greenDot} />
+          <Text style={premiumStyles.eyebrow}>Civic record · in good standing</Text>
+        </View>
+        <Text style={premiumStyles.folioCode}>FOLIO {folio}</Text>
+      </View>
+      <Text style={premiumStyles.headline}>
+        Citizen <Text style={premiumStyles.headlineItalic}>dossier</Text>
+      </Text>
+      <Text style={premiumStyles.subline}>
+        Verified identity, public record of service, and standing within the assembly.
+      </Text>
+    </View>
+  );
+}
+
+// Premium Passport Card
+function PassportCard({
   name,
   location,
   verified,
-  verifiedAt,
+  folio,
   memberSince,
-  onPress,
 }: {
   name: string;
   location: string;
   verified: boolean;
-  verifiedAt?: string | null;
+  folio: string;
   memberSince?: string;
-  onPress?: () => void;
 }) {
-  const { colors } = useTheme();
-  const shimmer = useSharedValue(0);
-  const holographicRotation = useSharedValue(0);
-
-  useEffect(() => {
-    // Holographic shimmer effect
-    shimmer.value = withRepeat(
-      withTiming(1, { duration: 3000, easing: Easing.linear }),
-      -1,
-      false
-    );
-
-    if (verified) {
-      holographicRotation.value = withRepeat(
-        withSequence(
-          withTiming(5, { duration: 2000 }),
-          withTiming(-5, { duration: 2000 })
-        ),
-        -1,
-        true
-      );
-    }
-  }, [verified]);
-
-  const shimmerStyle = useAnimatedStyle(() => ({
-    transform: [
-      { translateX: interpolate(shimmer.value, [0, 1], [-CARD_WIDTH, CARD_WIDTH]) },
-    ],
-    opacity: verified ? 0.3 : 0.1,
-  }));
-
-  const cardStyle = useAnimatedStyle(() => ({
-    transform: [
-      { perspective: 1000 },
-      { rotateY: `${holographicRotation.value}deg` },
-    ],
-  }));
-
-  // Generate a pseudo ID number based on name
-  const idNumber = useMemo(() => {
-    if (!name) return 'RW-XXXX-XXXX';
-    const hash = name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-    return `RW-${(hash % 10000).toString().padStart(4, '0')}-${((hash * 7) % 10000).toString().padStart(4, '0')}`;
+  const initials = useMemo(() => {
+    if (!name) return 'RW';
+    const parts = name.split(' ').filter(Boolean);
+    if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+    return name.slice(0, 2).toUpperCase();
   }, [name]);
 
+  const mrzLine1 = useMemo(() => {
+    const nameUpper = (name || 'CITIZEN').toUpperCase().replace(/[^A-Z]/g, '');
+    return `P<CAN<${nameUpper}<<<<<<<<<<<<`;
+  }, [name]);
+
+  const mrzLine2 = `RW${folio.replace(/[^0-9]/g, '')}<CAN8604012M2604264<<<<<<<<`;
+
   return (
-    <TouchableOpacity onPress={onPress} activeOpacity={0.95} disabled={!onPress}>
-      <Animated.View style={[styles.idCard, cardStyle]}>
-        {/* Card Background */}
-        <LinearGradient
-          colors={verified
-            ? ['#1a1a2e', '#16213e', '#1a1a2e']
-            : ['#2d2d2d', '#1f1f1f', '#2d2d2d']
-          }
-          style={StyleSheet.absoluteFill}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-        />
+    <View style={premiumStyles.passportCard}>
+      {/* Guilloché pattern */}
+      <View style={premiumStyles.guilloche}>
+        <Svg width="100%" height="100%" viewBox="0 0 400 260" preserveAspectRatio="none">
+          <Defs>
+            <Pattern id="guilloche" x="0" y="0" width="40" height="40" patternUnits="userSpaceOnUse">
+              <Path d="M 0 20 Q 10 0, 20 20 T 40 20" stroke={ID.G} fill="none" strokeWidth={0.5} opacity={0.07} />
+              <Path d="M 0 20 Q 10 40, 20 20 T 40 20" stroke={ID.G} fill="none" strokeWidth={0.5} opacity={0.07} />
+            </Pattern>
+          </Defs>
+          <Rect width="400" height="260" fill="url(#guilloche)" />
+        </Svg>
+      </View>
 
-        {/* Holographic Overlay for Verified */}
-        {verified && (
-          <LinearGradient
-            colors={['transparent', 'rgba(212,175,55,0.1)', 'rgba(138,109,186,0.1)', 'rgba(52,199,89,0.1)', 'transparent']}
-            style={[StyleSheet.absoluteFill, { opacity: 0.5 }]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-          />
-        )}
+      {/* Top strip */}
+      <View style={premiumStyles.passportTop}>
+        <View style={premiumStyles.passportLogo}>
+          <Svg width={22} height={22} viewBox="0 0 22 22">
+            <Circle cx="11" cy="11" r="10" fill="none" stroke={ID.G} strokeWidth={0.5} />
+            <Circle cx="11" cy="11" r="7.5" fill="none" stroke={ID.G} strokeWidth={0.5} />
+            <SvgText x="11" y="14.5" textAnchor="middle" fontFamily={ID.SERIF} fontSize={10} fontStyle="italic" fill={ID.G}>R</SvgText>
+          </Svg>
+          <Text style={premiumStyles.passportBrand}>REPRESENT · CIVIC ASSEMBLY</Text>
+        </View>
+        <Text style={premiumStyles.passportEst}>EST 2026</Text>
+      </View>
 
-        {/* Shimmer Effect */}
-        <Animated.View style={[styles.shimmerOverlay, shimmerStyle]}>
-          <LinearGradient
-            colors={['transparent', 'rgba(255,255,255,0.3)', 'transparent']}
-            style={styles.shimmerGradient}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-          />
-        </Animated.View>
-
-        {/* Card Content */}
-        <View style={styles.idCardContent}>
-          {/* Header Row */}
-          <View style={styles.idCardHeader}>
-            <View style={styles.idCardLogo}>
-              <Ionicons name="wallet" size={20} color={colors.gold} />
-              <Text style={styles.idCardLogoText}>REPRESENT</Text>
+      {/* Main section */}
+      <View style={premiumStyles.passportMain}>
+        {/* Portrait frame */}
+        <View style={premiumStyles.portraitFrame}>
+          <View style={[premiumStyles.cornerTick, { top: -1, left: -1 }]} />
+          <View style={[premiumStyles.cornerTick, { top: -1, right: -1, borderLeftWidth: 0, borderRightWidth: 1.5 }]} />
+          <View style={[premiumStyles.cornerTick, { bottom: -1, left: -1, borderTopWidth: 0, borderBottomWidth: 1.5 }]} />
+          <View style={[premiumStyles.cornerTick, { bottom: -1, right: -1, borderTopWidth: 0, borderBottomWidth: 1.5, borderLeftWidth: 0, borderRightWidth: 1.5 }]} />
+          <Text style={premiumStyles.initialsText}>{initials}</Text>
+          {verified && (
+            <View style={premiumStyles.biometricTick}>
+              <Ionicons name="checkmark" size={10} color={ID.BG} />
             </View>
-            {verified && (
-              <View style={styles.verifiedChip}>
-                <Ionicons name="shield-checkmark" size={12} color="#34C759" />
-                <Text style={styles.verifiedChipText}>VERIFIED</Text>
-              </View>
-            )}
-          </View>
+          )}
+        </View>
 
-          {/* Avatar & Name Section */}
-          <View style={styles.idCardMain}>
-            <View style={styles.avatarContainer}>
-              <LinearGradient
-                colors={verified ? [colors.gold, '#A68523'] : ['#555', '#333']}
-                style={styles.avatarGradient}
-              >
-                <Ionicons name="person" size={32} color="#fff" />
-              </LinearGradient>
-              {verified && (
-                <View style={styles.avatarBadge}>
-                  <Ionicons name="checkmark" size={10} color="#fff" />
-                </View>
-              )}
-            </View>
-
-            <View style={styles.idCardInfo}>
-              <Text style={styles.idCardName} numberOfLines={1}>
-                {name || 'Your Name'}
-              </Text>
-              <Text style={styles.idCardLocation} numberOfLines={1}>
-                <Ionicons name="location-outline" size={12} color="rgba(255,255,255,0.6)" />
-                {' '}{location || 'Location not set'}
-              </Text>
-            </View>
-          </View>
-
-          {/* Footer Row */}
-          <View style={styles.idCardFooter}>
-            <View style={styles.idCardMeta}>
-              <Text style={styles.idCardMetaLabel}>MEMBER SINCE</Text>
-              <Text style={styles.idCardMetaValue}>{memberSince || '—'}</Text>
-            </View>
-            <View style={styles.idCardMeta}>
-              <Text style={styles.idCardMetaLabel}>ID NUMBER</Text>
-              <Text style={styles.idCardMetaValue}>{idNumber}</Text>
-            </View>
-            <View style={[styles.idCardMeta, { alignItems: 'flex-end' }]}>
-              <Text style={styles.idCardMetaLabel}>STATUS</Text>
-              <Text style={[styles.idCardMetaValue, { color: verified ? '#34C759' : colors.gold }]}>
-                {verified ? 'ACTIVE' : 'PENDING'}
-              </Text>
-            </View>
-          </View>
-
-          {/* Decorative Pattern */}
-          <View style={styles.cardPattern}>
-            {[...Array(5)].map((_, i) => (
-              <View
-                key={i}
-                style={[
-                  styles.patternLine,
-                  { opacity: 0.03 + i * 0.01, top: 10 + i * 25 }
-                ]}
-              />
-            ))}
+        {/* Info */}
+        <View style={premiumStyles.passportInfo}>
+          <Text style={premiumStyles.registeredLabel}>Registered name</Text>
+          <Text style={premiumStyles.passportName}>{name || 'Your Name'}</Text>
+          <View style={premiumStyles.locationRow}>
+            <Svg width={10} height={10} viewBox="0 0 12 12">
+              <Path d="M6 11s4-3.5 4-7a4 4 0 1 0-8 0c0 3.5 4 7 4 7z" stroke={ID.G} strokeWidth={1} fill="none" />
+              <Circle cx="6" cy="4" r="1.2" fill={ID.G} />
+            </Svg>
+            <Text style={premiumStyles.locationText}>{location || 'Location not set'}</Text>
           </View>
         </View>
-      </Animated.View>
-    </TouchableOpacity>
+      </View>
+
+      {/* Register strip */}
+      <View style={premiumStyles.registerStrip}>
+        <View style={premiumStyles.registerCell}>
+          <Text style={premiumStyles.registerLabel}>Issued</Text>
+          <Text style={premiumStyles.registerValue}>IV·MMXXVI</Text>
+          <Text style={premiumStyles.registerSub}>{memberSince || 'Apr 2026'}</Text>
+        </View>
+        <View style={[premiumStyles.registerCell, premiumStyles.registerCellMid]}>
+          <Text style={premiumStyles.registerLabel}>Folio</Text>
+          <Text style={premiumStyles.registerMono}>RW·{folio}</Text>
+        </View>
+        <View style={premiumStyles.registerCell}>
+          <Text style={premiumStyles.registerLabel}>Status</Text>
+          <Text style={[premiumStyles.registerValue, { color: verified ? ID.GREEN : ID.FG_MUTED }]}>
+            {verified ? 'Active' : 'Pending'}
+          </Text>
+        </View>
+      </View>
+
+      {/* MRZ zone */}
+      <View style={premiumStyles.mrzZone}>
+        <Text style={premiumStyles.mrzText}>{mrzLine1}</Text>
+        <Text style={premiumStyles.mrzText}>{mrzLine2}</Text>
+      </View>
+    </View>
   );
 }
 
-// Civic Badge Component
-function CivicBadge({
+// Standing Register (replaces QuickStats)
+function StandingRegister({ votes, proposals, streak }: { votes: number; proposals: number; streak: number }) {
+  const items = [
+    { label: 'Votes cast', value: votes.toString().padStart(2, '0'), sub: 'all-time' },
+    { label: 'Proposals', value: proposals.toString().padStart(2, '0'), sub: 'authored' },
+    { label: 'Day streak', value: streak.toString().padStart(2, '0'), sub: 'consecutive' },
+  ];
+  return (
+    <View style={premiumStyles.standingSection}>
+      <View style={premiumStyles.standingHeader}>
+        <Text style={premiumStyles.eyebrow}>Standing register</Text>
+        <Text style={premiumStyles.timestamp}>AS OF 23:06 EST</Text>
+      </View>
+      <View style={premiumStyles.standingGrid}>
+        {items.map((it, i) => (
+          <View key={i} style={[premiumStyles.standingCell, i < 2 && premiumStyles.standingCellBorder]}>
+            <Text style={premiumStyles.standingValue}>{it.value}</Text>
+            <Text style={premiumStyles.standingLabel}>{it.label}</Text>
+            <Text style={premiumStyles.standingSub}>{it.sub}</Text>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+// Engraved Seal Medallion
+function SealMedallion({ glyph, locked, tier }: { glyph: React.ReactNode; locked: boolean; tier: 'L' | 'E' }) {
+  const ringColor = locked ? ID.LINE_STRONG : ID.GD;
+  const innerColor = locked ? '#16191D' : '#181B20';
+
+  return (
+    <View style={premiumStyles.sealContainer}>
+      <Svg width={56} height={56} viewBox="0 0 56 56">
+        <Circle cx="28" cy="28" r="26" fill={innerColor} stroke={ringColor} strokeWidth={0.8} />
+        <Circle cx="28" cy="28" r="22" fill="none" stroke={ringColor} strokeWidth={0.4} strokeDasharray={tier === 'L' ? '0' : '1 2'} />
+        {[0, 90, 180, 270].map(a => (
+          <Line
+            key={a}
+            x1={28 + 24 * Math.cos((a - 90) * Math.PI / 180)}
+            y1={28 + 24 * Math.sin((a - 90) * Math.PI / 180)}
+            x2={28 + 26 * Math.cos((a - 90) * Math.PI / 180)}
+            y2={28 + 26 * Math.sin((a - 90) * Math.PI / 180)}
+            stroke={ringColor}
+            strokeWidth={1}
+          />
+        ))}
+      </Svg>
+      <View style={[premiumStyles.sealGlyph, { opacity: locked ? 0.45 : 1 }]}>
+        {glyph}
+      </View>
+    </View>
+  );
+}
+
+// Seal glyph SVGs
+const SealGlyphs = {
+  hero: (color: string) => (
+    <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
+      <Path d="M12 3l2.4 4.9 5.4.8-3.9 3.8.9 5.4L12 15.4l-4.8 2.5.9-5.4L4.2 8.7l5.4-.8L12 3z" stroke={color} strokeWidth={1} strokeLinejoin="round" />
+      <Circle cx="12" cy="11" r="2" fill={color} />
+    </Svg>
+  ),
+  rocket: (color: string) => (
+    <Svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={1}>
+      <Path d="M5 19l3-3M3 21l4-1M14 4c4 0 6 2 6 6l-7 7-5-5 6-8z" />
+      <Circle cx="14" cy="10" r="1.2" fill={color} />
+    </Svg>
+  ),
+  globe: (color: string) => (
+    <Svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={0.8}>
+      <Circle cx="12" cy="12" r="9" />
+      <Path d="M12 3a15.3 15.3 0 0 1 4 9 15.3 15.3 0 0 1-4 9 15.3 15.3 0 0 1-4-9 15.3 15.3 0 0 1 4-9z" />
+      <Path d="M3 12h18M5 7h14M5 17h14" />
+    </Svg>
+  ),
+  scroll: (color: string) => (
+    <Svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={1}>
+      <Path d="M6 4h11l3 3v13a2 2 0 0 1-2 2H6V4z" />
+      <Path d="M9 10h7M9 13h7M9 16h4" />
+    </Svg>
+  ),
+  hands: (color: string) => (
+    <Svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={1}>
+      <Circle cx="9" cy="8" r="2.5" />
+      <Circle cx="15" cy="8" r="2.5" />
+      <Path d="M4 19c0-3 2.5-5 5-5s5 2 5 5M11 19c0-3 2.5-5 5-5s5 2 5 5" />
+    </Svg>
+  ),
+  shield: (color: string) => (
+    <Svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={1}>
+      <Path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6l8-3z" />
+      <Path d="M9 12l2 2 4-4" strokeWidth={1.4} />
+    </Svg>
+  ),
+};
+
+// Premium Achievement Badge
+function AchievementBadge({
   badge,
   earned,
   onPress,
@@ -290,100 +380,154 @@ function CivicBadge({
   earned: boolean;
   onPress?: () => void;
 }) {
-  const { colors } = useTheme();
-  const tierColor = TIER_COLORS[badge.tier];
+  const glyphId = badge.id === 'vote_streak_100' ? 'hero' :
+    badge.id === 'early_adopter' ? 'rocket' :
+    badge.id === 'global_citizen' ? 'globe' :
+    badge.id === 'proposal_5' ? 'scroll' :
+    badge.id === 'referral_20' ? 'hands' : 'shield';
+
+  const tier = badge.tier === 'legendary' ? 'L' : 'E';
+  const glyphColor = earned ? ID.GL : ID.FG_FAINT;
+  const glyph = SealGlyphs[glyphId as keyof typeof SealGlyphs]?.(glyphColor) || SealGlyphs.shield(glyphColor);
 
   return (
     <TouchableOpacity
       style={[
-        styles.civicBadge,
-        {
-          backgroundColor: earned ? `${tierColor.bg}15` : colors.surface,
-          borderColor: earned ? `${tierColor.bg}40` : colors.border,
-          shadowColor: earned ? tierColor.bg : 'transparent',
-          shadowOpacity: earned ? 0.4 : 0,
-          shadowRadius: 8,
-          shadowOffset: { width: 0, height: 0 },
-          elevation: earned ? 4 : 0,
-        },
+        premiumStyles.achievementCard,
+        earned && premiumStyles.achievementCardEarned,
       ]}
       onPress={onPress}
       activeOpacity={0.7}
     >
-      <View style={[
-        styles.badgeIconContainer,
-        { backgroundColor: earned ? `${tierColor.bg}20` : `${colors.textTertiary}10` },
-      ]}>
-        <Text style={[styles.badgeEmoji, { opacity: earned ? 1 : 0.4 }]}>
-          {badge.icon}
-        </Text>
-      </View>
-      <Text style={[
-        styles.badgeLabel,
-        { color: earned ? colors.text : colors.textTertiary },
-      ]} numberOfLines={1}>
+      <Text style={premiumStyles.achievementCheck}>{earned ? '✓' : '—'}</Text>
+      <SealMedallion glyph={glyph} locked={!earned} tier={tier} />
+      <Text style={[premiumStyles.achievementName, { color: earned ? ID.FG : ID.FG_MUTED }]}>
         {badge.name}
       </Text>
-      <View style={[styles.tierBadge, { backgroundColor: `${tierColor.bg}${earned ? '30' : '15'}` }]}>
-        <Text style={[styles.tierText, { color: earned ? tierColor.bg : colors.textTertiary }]}>
-          {badge.tier.toUpperCase()}
-        </Text>
-      </View>
-      {!earned && (
-        <View style={styles.badgeLock}>
-          <Ionicons name="lock-closed" size={10} color={colors.textTertiary} />
-        </View>
-      )}
+      <Text style={[premiumStyles.achievementTier, { color: tier === 'L' ? ID.GL : '#B8A4D9', opacity: earned ? 1 : 0.55 }]}>
+        {tier === 'L' ? 'Legendary' : 'Epic'}
+      </Text>
     </TouchableOpacity>
   );
 }
 
-// Count-up number used in stat rows
-function CountUpNumber({ value, delay = 0, style }: { value: number; delay?: number; style?: any }) {
-  const [display, setDisplay] = useState(0);
-  const animated = useSharedValue(0);
-
-  useEffect(() => {
-    animated.value = withDelay(delay, withTiming(value, { duration: 1000, easing: Easing.out(Easing.cubic) }));
-    const id = setInterval(() => {
-      const current = Math.round(animated.value);
-      setDisplay(current);
-      if (current >= value) clearInterval(id);
-    }, 16);
-    return () => clearInterval(id);
-  }, [value, delay]);
-
-  return <Text style={style}>{display}</Text>;
+// Progress Meter with segments
+function ProgressMeter({ earned, total }: { earned: number; total: number }) {
+  const pct = Math.round((earned / total) * 100);
+  return (
+    <View style={premiumStyles.progressCard}>
+      <View style={premiumStyles.progressHeader}>
+        <View>
+          <Text style={premiumStyles.eyebrow}>Conferred</Text>
+          <Text style={premiumStyles.progressTitle}>Order of merit · progress</Text>
+        </View>
+        <Text style={premiumStyles.progressCount}>
+          <Text style={{ color: ID.G }}>{earned}</Text>
+          <Text style={{ color: ID.FG_FAINT }}> / {total}</Text>
+        </Text>
+      </View>
+      <View style={premiumStyles.progressBar}>
+        {Array.from({ length: total }).map((_, i) => (
+          <View
+            key={i}
+            style={[
+              premiumStyles.progressSegment,
+              i < earned && premiumStyles.progressSegmentFilled,
+            ]}
+          />
+        ))}
+      </View>
+      <View style={premiumStyles.progressFooter}>
+        <Text style={premiumStyles.timestamp}>NEXT · ACTIVE LEGISLATOR</Text>
+        <Text style={premiumStyles.timestamp}>{pct}%</Text>
+      </View>
+    </View>
+  );
 }
 
-// Quick Stats Component
-function QuickStats({
-  votesCount,
-  proposalsCount,
-  streakDays,
+// Account Particulars
+function AccountParticulars({
+  name,
+  email,
+  location,
+  walletAddress,
+  verified,
+  onCopyWallet,
 }: {
-  votesCount: number;
-  proposalsCount: number;
-  streakDays: number;
+  name: string;
+  email: string;
+  location: string;
+  walletAddress?: string | null;
+  verified: boolean;
+  onCopyWallet?: () => void;
 }) {
-  const { colors } = useTheme();
+  const rows = [
+    { label: 'Registered name', value: name || '—', verified: true },
+    { label: 'Correspondence', value: email || '—', verified: true },
+    { label: 'Constituency', value: location || '—', verified: true },
+    ...(walletAddress ? [{ label: 'Ledger address', value: `${walletAddress.slice(0, 6)}···${walletAddress.slice(-4)}`, mono: true, action: 'copy' as const }] : []),
+  ];
 
   return (
-    <View style={[styles.quickStats, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-      <View style={styles.statItem}>
-        <CountUpNumber value={votesCount} delay={100} style={[styles.statValue, { color: colors.text }]} />
-        <Text style={[styles.statLabel, { color: colors.textTertiary }]}>Votes</Text>
+    <View style={premiumStyles.particularsCard}>
+      <View style={premiumStyles.particularsHeader}>
+        <View>
+          <Text style={premiumStyles.eyebrow}>Section II</Text>
+          <Text style={premiumStyles.particularsTitle}>Account particulars</Text>
+        </View>
+        {verified && (
+          <View style={premiumStyles.verifiedPill}>
+            <Ionicons name="checkmark" size={9} color={ID.GREEN} />
+            <Text style={premiumStyles.verifiedPillText}>Verified</Text>
+          </View>
+        )}
       </View>
-      <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
-      <View style={styles.statItem}>
-        <CountUpNumber value={proposalsCount} delay={250} style={[styles.statValue, { color: colors.text }]} />
-        <Text style={[styles.statLabel, { color: colors.textTertiary }]}>Proposals</Text>
+      {rows.map((r, i) => (
+        <View key={i} style={[premiumStyles.particularRow, i < rows.length - 1 && premiumStyles.particularRowBorder]}>
+          <Text style={premiumStyles.particularLabel}>{r.label}</Text>
+          <Text style={[premiumStyles.particularValue, r.mono && premiumStyles.monoText]}>{r.value}</Text>
+          {r.action === 'copy' ? (
+            <TouchableOpacity onPress={onCopyWallet} style={premiumStyles.copyButton}>
+              <Ionicons name="copy-outline" size={13} color={ID.FG_MUTED} />
+            </TouchableOpacity>
+          ) : (
+            <View style={premiumStyles.verifiedDot} />
+          )}
+        </View>
+      ))}
+    </View>
+  );
+}
+
+// Verified Seal
+function VerifiedSeal({ verifiedAt, provider }: { verifiedAt?: string | null | undefined; provider?: string }) {
+  const date = formatDate(verifiedAt) || '26 April 2026';
+  return (
+    <View style={premiumStyles.verifiedSeal}>
+      <View style={premiumStyles.sealRing}>
+        <Svg width={44} height={44} viewBox="0 0 44 44">
+          <Circle cx="22" cy="22" r="20" fill="rgba(52,199,89,0.1)" stroke={ID.GREEN} strokeWidth={0.6} />
+          <Circle cx="22" cy="22" r="16" fill="none" stroke={ID.GREEN} strokeWidth={0.3} strokeDasharray="1 2" />
+          <Path d="M14 22l5 5 11-12" stroke={ID.GREEN} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" fill="none" />
+        </Svg>
       </View>
-      <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
-      <View style={styles.statItem}>
-        <CountUpNumber value={streakDays} delay={400} style={[styles.statValue, { color: colors.text }]} />
-        <Text style={[styles.statLabel, { color: colors.textTertiary }]}>Day Streak</Text>
+      <View style={premiumStyles.sealInfo}>
+        <Text style={premiumStyles.sealTitle}>Identity attested</Text>
+        <Text style={premiumStyles.sealSubtitle}>Witnessed by {(provider || 'VERIFF').toUpperCase()} on {date}</Text>
+        <Text style={premiumStyles.timestamp}>WITNESS·#A29F·1804·EST</Text>
       </View>
+    </View>
+  );
+}
+
+// Footer Signature
+function FooterSignature({ folio }: { folio: string }) {
+  const month = toRomanNumeral(new Date().getMonth() + 1);
+  const year = toRomanNumeral(new Date().getFullYear());
+  return (
+    <View style={premiumStyles.footerSig}>
+      <Text style={premiumStyles.footerItalic}>Sealed by the assembly</Text>
+      <Text style={premiumStyles.footerMono}>FOLIO RW·{folio} · {month}·{year}</Text>
     </View>
   );
 }
@@ -431,7 +575,7 @@ export default function IdentityScreen() {
       const profileRes = results[1].status === 'fulfilled' ? results[1].value : { data: null };
       const votedRes = results[2].status === 'fulfilled' ? results[2].value : { data: [] };
 
-      const v = verificationRes?.data || {};
+      const v = (verificationRes?.data || {}) as any;
       const p = profileRes?.data || null;
 
       // Demo account should always appear verified (for App Store review)
@@ -591,10 +735,10 @@ export default function IdentityScreen() {
   // Loading state
   if (loading) {
     return (
-      <View style={[styles.container, styles.loadingContainer, { backgroundColor: colors.background }]}>
-        <View style={[styles.loadingCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <ActivityIndicator size="small" color={colors.gold} />
-          <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading identity...</Text>
+      <View style={[premiumStyles.container, premiumStyles.loadingContainer]}>
+        <View style={premiumStyles.loadingCard}>
+          <ActivityIndicator size="small" color={ID.G} />
+          <Text style={premiumStyles.loadingText}>Loading identity...</Text>
         </View>
       </View>
     );
@@ -613,39 +757,43 @@ export default function IdentityScreen() {
   const locationParts = [displayCity, displayState, displayCountry].filter(Boolean);
   const displayLocation = locationParts.length > 0 ? locationParts.join(', ') : '';
 
-  // Member since date (mock - use user creation date in real app)
-  const memberSince = formatShortDate(verification.verifiedAt) || 'Feb 2026';
+  // Member since date
+  const memberSince = formatShortDate(verification.verifiedAt) || 'Apr 2026';
+
+  // Generate folio number based on name
+  const folio = useMemo(() => {
+    if (!displayName) return '0000/2033';
+    const hash = displayName.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+    return `${(hash % 10000).toString().padStart(4, '0')}/${new Date().getFullYear()}`;
+  }, [displayName]);
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={premiumStyles.container}>
       <ScrollView
-        contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 16 }]}
+        contentContainerStyle={[premiumStyles.scrollContent, { paddingTop: insets.top + 8 }]}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor={colors.gold}
-            progressBackgroundColor={colors.surface}
+            tintColor={ID.G}
+            progressBackgroundColor={ID.BG_CARD}
           />
         }
       >
-        {/* Header */}
-        <Animated.View entering={FadeInDown.duration(400)} style={styles.header}>
-          <Text style={[styles.pageTitle, { color: colors.text }]}>Identity</Text>
-          <Text style={[styles.pageSubtitle, { color: colors.textSecondary }]}>
-            Your civic identity and achievements
-          </Text>
+        {/* Premium Header */}
+        <Animated.View entering={FadeInDown.duration(400)}>
+          <IdHeader folio={folio} />
         </Animated.View>
 
-        {/* Digital ID Card */}
+        {/* Passport Card */}
         <View ref={idCardRef} collapsable={false}>
           <Animated.View entering={FadeInUp.delay(100).duration(500)}>
-            <DigitalIDCard
+            <PassportCard
               name={displayName}
               location={displayLocation}
               verified={verification.verified}
-              verifiedAt={verification.verifiedAt}
+              folio={folio}
               memberSince={memberSince}
             />
           </Animated.View>
@@ -653,25 +801,16 @@ export default function IdentityScreen() {
 
         {/* Verification CTA for unverified users */}
         {!verification.verified && isAuthenticated && (
-          <Animated.View
-            entering={FadeInUp.delay(200).duration(400)}
-            style={[styles.verifyCta, { backgroundColor: colors.surface, borderColor: colors.border }]}
-          >
-            <LinearGradient
-              colors={[`${colors.gold}10`, 'transparent']}
-              style={StyleSheet.absoluteFill}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-            />
-            <View style={styles.verifyCtaContent}>
-              <View style={[styles.verifyCtaIcon, { backgroundColor: `${colors.gold}15` }]}>
-                <Ionicons name="shield-checkmark-outline" size={24} color={colors.gold} />
+          <Animated.View entering={FadeInUp.delay(200).duration(400)} style={premiumStyles.verifyCta}>
+            <View style={premiumStyles.verifyCtaContent}>
+              <View style={premiumStyles.verifyCtaIcon}>
+                <Ionicons name="shield-checkmark-outline" size={24} color={ID.G} />
               </View>
-              <View style={styles.verifyCtaText}>
-                <Text style={[styles.verifyCtaTitle, { color: colors.text }]}>
+              <View style={premiumStyles.verifyCtaText}>
+                <Text style={premiumStyles.verifyCtaTitle}>
                   {verification.status === 'pending' ? 'Verification Pending' : 'Verify Your Identity'}
                 </Text>
-                <Text style={[styles.verifyCtaSubtitle, { color: colors.textSecondary }]}>
+                <Text style={premiumStyles.verifyCtaSubtitle}>
                   {verification.status === 'pending'
                     ? 'Your verification is being processed'
                     : 'Unlock voting and earn the Verified badge'
@@ -694,17 +833,14 @@ export default function IdentityScreen() {
 
         {/* Sign In CTA for unauthenticated users */}
         {!isAuthenticated && (
-          <Animated.View
-            entering={FadeInUp.delay(200).duration(400)}
-            style={[styles.verifyCta, { backgroundColor: colors.surface, borderColor: colors.border }]}
-          >
-            <View style={styles.verifyCtaContent}>
-              <View style={[styles.verifyCtaIcon, { backgroundColor: `${colors.gold}15` }]}>
-                <Ionicons name="log-in-outline" size={24} color={colors.gold} />
+          <Animated.View entering={FadeInUp.delay(200).duration(400)} style={premiumStyles.verifyCta}>
+            <View style={premiumStyles.verifyCtaContent}>
+              <View style={premiumStyles.verifyCtaIcon}>
+                <Ionicons name="log-in-outline" size={24} color={ID.G} />
               </View>
-              <View style={styles.verifyCtaText}>
-                <Text style={[styles.verifyCtaTitle, { color: colors.text }]}>Sign In Required</Text>
-                <Text style={[styles.verifyCtaSubtitle, { color: colors.textSecondary }]}>
+              <View style={premiumStyles.verifyCtaText}>
+                <Text style={premiumStyles.verifyCtaTitle}>Sign In Required</Text>
+                <Text style={premiumStyles.verifyCtaSubtitle}>
                   Sign in to access your civic identity
                 </Text>
               </View>
@@ -718,38 +854,32 @@ export default function IdentityScreen() {
           </Animated.View>
         )}
 
-        {/* Quick Stats */}
+        {/* Standing Register */}
         {isAuthenticated && (
           <Animated.View entering={FadeInUp.delay(300).duration(400)}>
-            <QuickStats
-              votesCount={stats.votes}
-              proposalsCount={stats.proposals}
-              streakDays={stats.streak}
-            />
+            <StandingRegister votes={stats.votes} proposals={stats.proposals} streak={stats.streak} />
           </Animated.View>
         )}
 
-        {/* Civic Badges Section */}
-        <Animated.View
-          entering={FadeInUp.delay(400).duration(400)}
-          style={styles.badgesSection}
-        >
-          <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>Achievements</Text>
+        {/* Achievements Section */}
+        <Animated.View entering={FadeInUp.delay(400).duration(400)} style={premiumStyles.achievementsSection}>
+          <View style={premiumStyles.achievementsHeader}>
+            <View>
+              <Text style={premiumStyles.eyebrow}>Order of merit</Text>
+              <Text style={premiumStyles.achievementsSectionTitle}>Achievements</Text>
+            </View>
             <TouchableOpacity
               onPress={() => router.push('/modals/badges')}
-              style={styles.viewAllButton}
+              style={premiumStyles.viewAllButton}
             >
-              <Text style={[styles.viewAllText, { color: colors.gold }]}>
-                View All {ALL_BADGES.length}
-              </Text>
-              <Ionicons name="chevron-forward" size={14} color={colors.gold} />
+              <Text style={premiumStyles.viewAllText}>View all {ALL_BADGES.length}</Text>
+              <Ionicons name="chevron-forward" size={10} color={ID.G} />
             </TouchableOpacity>
           </View>
 
-          <View style={styles.badgesGrid}>
+          <View style={premiumStyles.achievementsGrid}>
             {PREVIEW_BADGES.map((badge) => (
-              <CivicBadge
+              <AchievementBadge
                 key={badge.id}
                 badge={badge}
                 earned={earnedBadges.has(badge.id)}
@@ -765,542 +895,299 @@ export default function IdentityScreen() {
               />
             ))}
           </View>
-
-          {/* Progress summary */}
-          <View style={[styles.badgeProgress, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <View style={styles.badgeProgressInfo}>
-              <Text style={[styles.badgeProgressLabel, { color: colors.textSecondary }]}>Progress</Text>
-              <Text style={[styles.badgeProgressValue, { color: colors.text }]}>
-                {earnedBadges.size}/{ALL_BADGES.length} badges earned
-              </Text>
-            </View>
-            <View style={[styles.badgeProgressBar, { backgroundColor: colors.border }]}>
-              <View
-                style={[
-                  styles.badgeProgressFill,
-                  {
-                    backgroundColor: colors.gold,
-                    width: `${(earnedBadges.size / ALL_BADGES.length) * 100}%`
-                  }
-                ]}
-              />
-            </View>
-          </View>
         </Animated.View>
 
-        {/* Account Details */}
+        {/* Progress Meter */}
+        <Animated.View entering={FadeInUp.delay(450).duration(400)}>
+          <ProgressMeter earned={earnedBadges.size} total={ALL_BADGES.length} />
+        </Animated.View>
+
+        {/* Account Particulars */}
         {isAuthenticated && (
-          <Animated.View
-            entering={FadeInUp.delay(500).duration(400)}
-            style={[styles.detailsCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
-          >
-            <View style={styles.detailsHeader}>
-              <Text style={[styles.detailsTitle, { color: colors.text }]}>Account Details</Text>
-              {verification.verified && (
-                <View style={[styles.verifiedTag, { backgroundColor: `${colors.success}15` }]}>
-                  <Ionicons name="checkmark-circle" size={14} color={colors.success} />
-                  <Text style={[styles.verifiedTagText, { color: colors.success }]}>Verified</Text>
-                </View>
-              )}
-            </View>
-
-            <View style={styles.detailsContent}>
-              <View style={[styles.detailRow, { borderBottomColor: colors.border }]}>
-                <View style={[styles.detailIcon, { backgroundColor: `${colors.gold}12` }]}>
-                  <Ionicons name="person-outline" size={16} color={colors.gold} />
-                </View>
-                <View style={styles.detailText}>
-                  <Text style={[styles.detailLabel, { color: colors.textTertiary }]}>Name</Text>
-                  <Text style={[styles.detailValue, { color: displayName ? colors.text : colors.textTertiary }]}>
-                    {displayName || '—'}
-                  </Text>
-                </View>
-              </View>
-
-              <View style={[styles.detailRow, { borderBottomColor: colors.border }]}>
-                <View style={[styles.detailIcon, { backgroundColor: `${colors.gold}12` }]}>
-                  <Ionicons name="mail-outline" size={16} color={colors.gold} />
-                </View>
-                <View style={styles.detailText}>
-                  <Text style={[styles.detailLabel, { color: colors.textTertiary }]}>Email</Text>
-                  <Text style={[styles.detailValue, { color: displayEmail ? colors.text : colors.textTertiary }]}>
-                    {displayEmail || '—'}
-                  </Text>
-                </View>
-              </View>
-
-              <View style={[styles.detailRow, { borderBottomColor: colors.border, borderBottomWidth: user?.walletAddress ? 1 : 0 }]}>
-                <View style={[styles.detailIcon, { backgroundColor: `${colors.gold}12` }]}>
-                  <Ionicons name="location-outline" size={16} color={colors.gold} />
-                </View>
-                <View style={styles.detailText}>
-                  <Text style={[styles.detailLabel, { color: colors.textTertiary }]}>Location</Text>
-                  <Text style={[styles.detailValue, { color: displayLocation ? colors.text : colors.textTertiary }]}>
-                    {displayLocation || '—'}
-                  </Text>
-                </View>
-              </View>
-
-              {user?.walletAddress && (
-                <View style={[styles.detailRow, { borderBottomWidth: 0 }]}>
-                  <View style={[styles.detailIcon, { backgroundColor: `${colors.gold}12` }]}>
-                    <Ionicons name="wallet-outline" size={16} color={colors.gold} />
-                  </View>
-                  <View style={styles.detailText}>
-                    <Text style={[styles.detailLabel, { color: colors.textTertiary }]}>Blockchain Address</Text>
-                    <Text style={[styles.detailValue, { color: colors.text }]}>
-                      {`${user.walletAddress.slice(0, 6)}...${user.walletAddress.slice(-4)}`}
-                    </Text>
-                  </View>
-                  <TouchableOpacity onPress={() => copyWalletAddress(user.walletAddress!)}>
-                    <Ionicons name="copy-outline" size={18} color={colors.textSecondary} />
-                  </TouchableOpacity>
-                </View>
-              )}
-            </View>
+          <Animated.View entering={FadeInUp.delay(500).duration(400)}>
+            <AccountParticulars
+              name={displayName}
+              email={displayEmail}
+              location={displayLocation}
+              walletAddress={user?.walletAddress}
+              verified={verification.verified}
+              onCopyWallet={() => user?.walletAddress && copyWalletAddress(user.walletAddress)}
+            />
           </Animated.View>
         )}
 
-        {/* Verification Info */}
+        {/* Verified Seal */}
         {verification.verified && (
-          <Animated.View
-            entering={FadeInUp.delay(600).duration(400)}
-            style={[styles.verificationInfo, { backgroundColor: `${colors.success}08`, borderColor: `${colors.success}20` }]}
-          >
-            <Ionicons name="shield-checkmark" size={20} color={colors.success} />
-            <View style={styles.verificationInfoText}>
-              <Text style={[styles.verificationInfoTitle, { color: colors.success }]}>
-                Identity Verified
-              </Text>
-              <Text style={[styles.verificationInfoSubtitle, { color: colors.textSecondary }]}>
-                Verified via {verification.provider?.toUpperCase()} on {formatDate(verification.verifiedAt)}
-              </Text>
-            </View>
+          <Animated.View entering={FadeInUp.delay(600).duration(400)}>
+            <VerifiedSeal verifiedAt={verification.verifiedAt} provider={verification.provider} />
           </Animated.View>
         )}
 
-        <View style={styles.bottomSpacer} />
+        {/* Footer Signature */}
+        <Animated.View entering={FadeInUp.delay(700).duration(400)}>
+          <FooterSignature folio={folio} />
+        </Animated.View>
+
+        <View style={premiumStyles.bottomSpacer} />
       </ScrollView>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1 },
-  loadingContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+const styles = StyleSheet.create({});
+
+// Premium Identity Styles
+const premiumStyles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: ID.BG },
+  loadingContainer: { alignItems: 'center', justifyContent: 'center' },
   loadingCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: SPACING.md,
-    paddingHorizontal: SPACING.xl,
-    paddingVertical: SPACING.lg,
-    borderRadius: BORDER_RADIUS.xl,
+    gap: 12,
+    paddingHorizontal: 24,
+    paddingVertical: 16,
+    borderRadius: 16,
+    backgroundColor: ID.BG_CARD,
     borderWidth: 1,
+    borderColor: ID.LINE,
   },
-  loadingText: {
-    ...TYPOGRAPHY.bodyMedium,
-  },
-
-  scrollContent: {
-    // paddingTop is set dynamically via insets
-    paddingHorizontal: SPACING.lg,
-    paddingBottom: SPACING.xxl,
-  },
+  loadingText: { color: ID.FG_MUTED, fontSize: 14 },
+  scrollContent: { paddingHorizontal: 16, paddingBottom: 32 },
 
   // Header
-  header: {
-    marginBottom: SPACING.xl,
-  },
-  pageTitle: {
-    ...TYPOGRAPHY.displaySmall,
-    fontSize: responsive(28, 32, 36),
-  },
-  pageSubtitle: {
-    ...TYPOGRAPHY.bodyMedium,
-    marginTop: SPACING.xs,
-  },
+  header: { paddingHorizontal: 8, paddingBottom: 18 },
+  headerTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 },
+  headerBadge: { flexDirection: 'row', alignItems: 'center' },
+  greenDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: ID.GREEN, marginRight: 8 },
+  eyebrow: { fontWeight: '600', fontSize: 10, letterSpacing: 2.2, textTransform: 'uppercase', color: ID.FG_FAINT },
+  folioCode: { fontFamily: ID.MONO, fontSize: 9.5, color: ID.FG_FAINT, letterSpacing: 0.8 },
+  headline: { fontFamily: ID.SERIF, fontSize: 44, fontWeight: '500', letterSpacing: -0.8, lineHeight: 42, color: ID.FG, marginBottom: 10 },
+  headlineItalic: { fontStyle: 'italic', color: ID.GL, fontWeight: '400' },
+  subline: { fontSize: 13, color: ID.FG_MUTED, letterSpacing: -0.05, maxWidth: 280 },
 
-  // Digital ID Card
-  idCard: {
-    width: CARD_WIDTH,
-    height: CARD_HEIGHT,
-    borderRadius: BORDER_RADIUS.xxl,
+  // Passport Card
+  passportCard: {
+    position: 'relative',
+    borderRadius: 20,
+    backgroundColor: ID.BG_CARD,
+    borderWidth: 1,
+    borderColor: ID.LINE_STRONG,
     overflow: 'hidden',
-    ...SHADOWS.lg,
-    marginBottom: SPACING.lg,
+    marginBottom: 22,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 18 },
+    shadowOpacity: 0.4,
+    shadowRadius: 36,
+    elevation: 20,
   },
-  idCardContent: {
-    flex: 1,
-    padding: SPACING.lg,
-    justifyContent: 'space-between',
-  },
-  idCardHeader: {
+  guilloche: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, opacity: 0.07 },
+  passportTop: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    padding: 14,
+    paddingHorizontal: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: ID.LINE,
   },
-  idCardLogo: {
-    flexDirection: 'row',
+  passportLogo: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  passportBrand: { fontWeight: '600', fontSize: 10, letterSpacing: 2.8, color: ID.G },
+  passportEst: { fontFamily: ID.MONO, fontSize: 9, color: ID.FG_FAINT, letterSpacing: 1 },
+  passportMain: { flexDirection: 'row', alignItems: 'flex-start', padding: 20, gap: 16 },
+  portraitFrame: {
+    width: 88,
+    height: 110,
+    borderWidth: 1,
+    borderColor: ID.GD,
+    backgroundColor: '#0A0C0F',
+    justifyContent: 'center',
     alignItems: 'center',
-    gap: SPACING.sm,
-  },
-  idCardLogoText: {
-    color: '#D4AF37',
-    fontSize: 14,
-    fontWeight: '700',
-    letterSpacing: 2,
-  },
-  verifiedChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: 'rgba(52,199,89,0.15)',
-    paddingHorizontal: SPACING.sm,
-    paddingVertical: 4,
-    borderRadius: BORDER_RADIUS.full,
-  },
-  verifiedChipText: {
-    color: '#34C759',
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-  },
-  idCardMain: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.lg,
-  },
-  avatarContainer: {
     position: 'relative',
   },
-  avatarGradient: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarBadge: {
+  cornerTick: { position: 'absolute', width: 8, height: 8, borderTopWidth: 1.5, borderLeftWidth: 1.5, borderColor: ID.G },
+  initialsText: { fontFamily: ID.SERIF, fontSize: 42, fontWeight: '500', fontStyle: 'italic', color: ID.GL, letterSpacing: -0.8 },
+  biometricTick: {
     position: 'absolute',
-    bottom: 0,
-    right: 0,
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: '#34C759',
-    alignItems: 'center',
-    justifyContent: 'center',
+    bottom: -8,
+    right: -8,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: ID.GREEN,
     borderWidth: 2,
-    borderColor: '#1a1a2e',
+    borderColor: '#0B0D10',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  idCardInfo: {
-    flex: 1,
+  passportInfo: { flex: 1, paddingTop: 4 },
+  registeredLabel: { fontWeight: '600', fontSize: 9, letterSpacing: 2.2, textTransform: 'uppercase', color: ID.FG_FAINT, marginBottom: 4 },
+  passportName: { fontFamily: ID.SERIF, fontSize: 24, fontWeight: '500', letterSpacing: -0.4, color: ID.FG, lineHeight: 26, marginBottom: 8 },
+  locationRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  locationText: { fontSize: 11.5, color: ID.FG_MUTED, letterSpacing: -0.05 },
+  registerStrip: { flexDirection: 'row', borderTopWidth: 1, borderTopColor: ID.LINE },
+  registerCell: { flex: 1, padding: 12, paddingHorizontal: 14 },
+  registerCellMid: { borderLeftWidth: 1, borderRightWidth: 1, borderColor: ID.LINE },
+  registerLabel: { fontWeight: '600', fontSize: 9, letterSpacing: 2, textTransform: 'uppercase', color: ID.FG_FAINT, marginBottom: 4 },
+  registerValue: { fontFamily: ID.SERIF, fontSize: 14, fontWeight: '500', fontStyle: 'italic', color: ID.FG },
+  registerSub: { fontSize: 9, color: ID.FG_FAINT, letterSpacing: 0.5, marginTop: 2 },
+  registerMono: { fontFamily: ID.MONO, fontSize: 11, fontWeight: '500', color: ID.FG, letterSpacing: 0.4 },
+  mrzZone: {
+    padding: 10,
+    paddingHorizontal: 16,
+    borderTopWidth: 1,
+    borderTopColor: ID.LINE,
+    backgroundColor: 'rgba(0,0,0,0.3)',
   },
-  idCardName: {
-    color: '#fff',
-    fontSize: responsive(18, 20, 20),
-    fontWeight: '700',
-    marginBottom: 4,
-  },
-  idCardLocation: {
-    color: 'rgba(255,255,255,0.6)',
-    fontSize: 13,
-  },
-  idCardFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  idCardMeta: {
-    flex: 1,
-    minWidth: 0,
-  },
-  idCardMetaLabel: {
-    color: 'rgba(255,255,255,0.4)',
-    fontSize: 9,
-    fontWeight: '600',
-    letterSpacing: 1,
-    marginBottom: 2,
-  },
-  idCardMetaValue: {
-    color: 'rgba(255,255,255,0.9)',
-    fontSize: 11,
-    fontWeight: '600',
-    letterSpacing: 0.5,
-  },
-  shimmerOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    width: CARD_WIDTH * 0.5,
-  },
-  shimmerGradient: {
-    flex: 1,
-    width: '100%',
-  },
-  cardPattern: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    overflow: 'hidden',
-  },
-  patternLine: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    height: 1,
-    backgroundColor: '#fff',
-  },
+  mrzText: { fontFamily: ID.MONO, fontSize: 9.5, color: ID.FG_MUTED, letterSpacing: 0.8, lineHeight: 14 },
 
   // Verify CTA
   verifyCta: {
-    borderRadius: BORDER_RADIUS.xxl,
-    borderWidth: 1,
-    padding: SPACING.lg,
-    marginBottom: SPACING.lg,
-    overflow: 'hidden',
-    ...SHADOWS.sm,
-  },
-  verifyCtaContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.md,
-    marginBottom: SPACING.lg,
-  },
-  verifyCtaIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  verifyCtaText: {
-    flex: 1,
-  },
-  verifyCtaTitle: {
-    ...TYPOGRAPHY.labelLarge,
-    marginBottom: 2,
-  },
-  verifyCtaSubtitle: {
-    ...TYPOGRAPHY.bodySmall,
-  },
-
-  // Quick Stats
-  quickStats: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: BORDER_RADIUS.xl,
-    borderWidth: 1,
-    padding: SPACING.lg,
-    marginBottom: SPACING.lg,
-    ...SHADOWS.sm,
-  },
-  statItem: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  statValue: {
-    fontSize: 24,
-    fontWeight: '700',
-    marginBottom: 2,
-  },
-  statLabel: {
-    ...TYPOGRAPHY.labelSmall,
-  },
-  statDivider: {
-    width: 1,
-    height: 32,
-    marginHorizontal: SPACING.md,
-  },
-
-  // Badges Section
-  badgesSection: {
-    marginBottom: SPACING.lg,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: SPACING.md,
-  },
-  sectionTitle: {
-    ...TYPOGRAPHY.headlineSmall,
-  },
-  sectionSubtitle: {
-    ...TYPOGRAPHY.labelSmall,
-  },
-  badgesGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: SPACING.sm,
-  },
-  civicBadge: {
-    width: (CARD_WIDTH - SPACING.sm * 2) / 3,
-    aspectRatio: 1,
-    borderRadius: BORDER_RADIUS.xl,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: SPACING.sm,
-  },
-  badgeIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: SPACING.xs,
-  },
-  badgeLabel: {
-    ...TYPOGRAPHY.labelSmall,
-    textAlign: 'center',
-    marginTop: SPACING.xs,
-  },
-  badgeEmoji: {
-    fontSize: 28,
-  },
-  tierBadge: {
-    paddingHorizontal: SPACING.sm,
-    paddingVertical: 2,
-    borderRadius: BORDER_RADIUS.full,
-    marginTop: SPACING.xs,
-  },
-  tierText: {
-    fontSize: 8,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-  },
-  badgeLock: {
-    position: 'absolute',
-    top: SPACING.sm,
-    right: SPACING.sm,
-  },
-  viewAllButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 2,
-  },
-  viewAllText: {
-    ...TYPOGRAPHY.labelSmall,
-    fontWeight: '600',
-  },
-  badgeProgress: {
-    marginTop: SPACING.md,
-    padding: SPACING.md,
-    borderRadius: BORDER_RADIUS.lg,
-    borderWidth: 1,
-  },
-  badgeProgressInfo: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: SPACING.sm,
-  },
-  badgeProgressLabel: {
-    ...TYPOGRAPHY.labelSmall,
-  },
-  badgeProgressValue: {
-    ...TYPOGRAPHY.labelSmall,
-    fontWeight: '600',
-  },
-  badgeProgressBar: {
-    height: 6,
-    borderRadius: 3,
-    overflow: 'hidden',
-  },
-  badgeProgressFill: {
-    height: '100%',
-    borderRadius: 3,
-  },
-
-  // Details Card
-  detailsCard: {
-    borderRadius: BORDER_RADIUS.xxl,
-    borderWidth: 1,
-    overflow: 'hidden',
-    marginBottom: SPACING.lg,
-    ...SHADOWS.sm,
-  },
-  detailsHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: SPACING.lg,
-    paddingBottom: SPACING.md,
-  },
-  detailsTitle: {
-    ...TYPOGRAPHY.labelLarge,
-  },
-  verifiedTag: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: SPACING.sm,
-    paddingVertical: 4,
-    borderRadius: BORDER_RADIUS.full,
-  },
-  verifiedTagText: {
-    ...TYPOGRAPHY.labelSmall,
-    fontWeight: '600',
-  },
-  detailsContent: {
-    paddingHorizontal: SPACING.lg,
-    paddingBottom: SPACING.lg,
-  },
-  detailRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.md,
-    paddingVertical: SPACING.md,
-    borderBottomWidth: 1,
-  },
-  detailIcon: {
-    width: 36,
-    height: 36,
     borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: ID.LINE,
+    padding: 16,
+    marginBottom: 16,
+    backgroundColor: ID.BG_CARD,
   },
-  detailText: {
-    flex: 1,
-  },
-  detailLabel: {
-    ...TYPOGRAPHY.labelSmall,
-    marginBottom: 2,
-  },
-  detailValue: {
-    ...TYPOGRAPHY.bodyMedium,
-    fontWeight: '500',
-  },
+  verifyCtaContent: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16 },
+  verifyCtaIcon: { width: 48, height: 48, borderRadius: 24, backgroundColor: `${ID.G}15`, justifyContent: 'center', alignItems: 'center' },
+  verifyCtaText: { flex: 1 },
+  verifyCtaTitle: { fontSize: 15, fontWeight: '600', color: ID.FG, marginBottom: 2 },
+  verifyCtaSubtitle: { fontSize: 13, color: ID.FG_MUTED },
 
-  // Verification Info
-  verificationInfo: {
+  // Standing Register
+  standingSection: { paddingHorizontal: 8, marginBottom: 22 },
+  standingHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  timestamp: { fontFamily: ID.MONO, fontSize: 9, color: ID.FG_FAINT, letterSpacing: 0.8 },
+  standingGrid: {
+    flexDirection: 'row',
+    backgroundColor: ID.BG_CARD,
+    borderWidth: 1,
+    borderColor: ID.LINE,
+    borderRadius: 14,
+    overflow: 'hidden',
+  },
+  standingCell: { flex: 1, padding: 16, paddingHorizontal: 14 },
+  standingCellBorder: { borderRightWidth: 1, borderRightColor: ID.LINE },
+  standingValue: { fontFamily: ID.SERIF, fontSize: 36, fontWeight: '500', color: ID.FG, letterSpacing: -0.8, lineHeight: 36, marginBottom: 6 },
+  standingLabel: { fontSize: 11, fontWeight: '500', color: ID.FG_MUTED, letterSpacing: -0.05 },
+  standingSub: { fontWeight: '600', fontSize: 9, letterSpacing: 0.8, textTransform: 'uppercase', color: ID.FG_FAINT, marginTop: 2 },
+
+  // Achievements
+  achievementsSection: { paddingHorizontal: 8, marginBottom: 18 },
+  achievementsHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 14 },
+  achievementsSectionTitle: { fontFamily: ID.SERIF, fontSize: 22, fontWeight: '500', color: ID.FG, letterSpacing: -0.4, lineHeight: 22 },
+  viewAllButton: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  viewAllText: { fontSize: 11, fontWeight: '500', color: ID.G, letterSpacing: -0.05 },
+  achievementsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  achievementCard: {
+    width: (CARD_WIDTH - 24 - 20) / 3,
+    backgroundColor: ID.BG_CARD,
+    borderWidth: 1,
+    borderColor: ID.LINE,
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 8,
+    alignItems: 'center',
+    position: 'relative',
+  },
+  achievementCardEarned: {
+    backgroundColor: 'rgba(234,186,88,0.06)',
+    borderColor: ID.GD,
+    shadowColor: ID.G,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.08,
+    shadowRadius: 14,
+    elevation: 4,
+  },
+  achievementCheck: { position: 'absolute', top: 8, right: 8, fontFamily: ID.MONO, fontSize: 8, color: ID.FG_FAINT, letterSpacing: 1 },
+  sealContainer: { width: 56, height: 56, marginBottom: 0, position: 'relative' },
+  sealGlyph: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, justifyContent: 'center', alignItems: 'center' },
+  achievementName: { fontSize: 10.5, fontWeight: '600', color: ID.FG_MUTED, letterSpacing: -0.05, marginTop: 8, marginBottom: 4, textAlign: 'center', lineHeight: 12 },
+  achievementTier: { fontFamily: ID.SERIF, fontSize: 10, fontStyle: 'italic', letterSpacing: 0.5 },
+
+  // Progress Meter
+  progressCard: {
+    backgroundColor: ID.BG_CARD,
+    borderWidth: 1,
+    borderColor: ID.LINE,
+    borderRadius: 14,
+    padding: 14,
+    paddingHorizontal: 16,
+    marginHorizontal: 8,
+    marginBottom: 22,
+  },
+  progressHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 },
+  progressTitle: { fontSize: 13, fontWeight: '600', color: ID.FG, letterSpacing: -0.05 },
+  progressCount: { fontFamily: ID.SERIF, fontSize: 18, letterSpacing: -0.4 },
+  progressBar: { flexDirection: 'row', gap: 3, marginBottom: 8 },
+  progressSegment: { flex: 1, height: 5, borderRadius: 1, backgroundColor: ID.LINE_STRONG },
+  progressSegmentFilled: { backgroundColor: ID.G, shadowColor: ID.G, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.4, shadowRadius: 6 },
+  progressFooter: { flexDirection: 'row', justifyContent: 'space-between' },
+
+  // Account Particulars
+  particularsCard: {
+    backgroundColor: ID.BG_CARD,
+    borderWidth: 1,
+    borderColor: ID.LINE,
+    borderRadius: 16,
+    overflow: 'hidden',
+    marginHorizontal: 8,
+    marginBottom: 18,
+  },
+  particularsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 14,
+    paddingHorizontal: 18,
+    borderBottomWidth: 1,
+    borderBottomColor: ID.LINE,
+  },
+  particularsTitle: { fontFamily: ID.SERIF, fontSize: 18, fontWeight: '500', color: ID.FG, letterSpacing: -0.05, lineHeight: 18 },
+  verifiedPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: SPACING.md,
-    padding: SPACING.lg,
-    borderRadius: BORDER_RADIUS.xl,
+    gap: 5,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: 'rgba(52,199,89,0.1)',
     borderWidth: 1,
+    borderColor: 'rgba(52,199,89,0.3)',
   },
-  verificationInfoText: {
-    flex: 1,
-  },
-  verificationInfoTitle: {
-    ...TYPOGRAPHY.labelMedium,
-    fontWeight: '600',
-  },
-  verificationInfoSubtitle: {
-    ...TYPOGRAPHY.bodySmall,
-    marginTop: 2,
-  },
+  verifiedPillText: { fontWeight: '600', fontSize: 9.5, letterSpacing: 1.2, textTransform: 'uppercase', color: ID.GREEN },
+  particularRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 18, gap: 12 },
+  particularRowBorder: { borderBottomWidth: 1, borderBottomColor: ID.LINE },
+  particularLabel: { width: 108, fontWeight: '600', fontSize: 9.5, letterSpacing: 1.6, textTransform: 'uppercase', color: ID.FG_FAINT },
+  particularValue: { flex: 1, fontSize: 13.5, fontWeight: '500', color: ID.FG, letterSpacing: -0.05 },
+  monoText: { fontFamily: ID.MONO, fontSize: 12, letterSpacing: 0.4 },
+  copyButton: { width: 28, height: 28, borderRadius: 8, backgroundColor: ID.BG_RAISED, borderWidth: 1, borderColor: ID.LINE_STRONG, justifyContent: 'center', alignItems: 'center' },
+  verifiedDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: ID.GREEN, opacity: 0.7 },
 
-  bottomSpacer: {
-    height: 100,
+  // Verified Seal
+  verifiedSeal: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    marginHorizontal: 8,
+    padding: 14,
+    paddingHorizontal: 16,
+    borderRadius: 14,
+    backgroundColor: 'rgba(52,199,89,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(52,199,89,0.25)',
+    marginBottom: 18,
   },
+  sealRing: { width: 44, height: 44 },
+  sealInfo: { flex: 1 },
+  sealTitle: { fontWeight: '600', fontSize: 9.5, letterSpacing: 1.8, textTransform: 'uppercase', color: ID.GREEN, marginBottom: 3 },
+  sealSubtitle: { fontFamily: ID.SERIF, fontSize: 15, fontWeight: '500', color: ID.FG, letterSpacing: -0.05, lineHeight: 18, marginBottom: 6 },
+
+  // Footer
+  footerSig: { paddingVertical: 8, paddingHorizontal: 24, alignItems: 'center' },
+  footerItalic: { fontFamily: ID.SERIF, fontSize: 13, fontStyle: 'italic', color: ID.FG_FAINT, letterSpacing: -0.05, marginBottom: 4 },
+  footerMono: { fontFamily: ID.MONO, fontSize: 8.5, color: ID.FG_FAINT, letterSpacing: 2.2, textTransform: 'uppercase' },
+
+  bottomSpacer: { height: 100 },
 });
