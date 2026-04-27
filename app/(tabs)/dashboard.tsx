@@ -276,7 +276,7 @@ function Featured({ proposal, onPress }: { proposal?: Proposal; onPress: () => v
   return (
     <Animated.View entering={FadeInUp.duration(500).delay(200)} style={styles.sectionPad}>
       <View style={styles.sectionHeader}>
-        <Text style={[styles.eyebrow, { color: dc.FG_FAINT }]}>Featured This Week</Text>
+        <Text style={[styles.eyebrow, { color: dc.GOLD }]}>Featured This Week</Text>
         <Text style={[styles.sectionMetaMono, { color: dc.GOLD }]}>{refCode}</Text>
       </View>
 
@@ -360,7 +360,7 @@ function ImpactRing({ pending, voted, passed }: { pending: number; voted: number
   return (
     <Animated.View entering={FadeInUp.duration(500).delay(300)} style={styles.sectionPad}>
       <View style={styles.sectionHeader}>
-        <Text style={[styles.eyebrow, { color: dc.FG_FAINT }]}>Your Civic Record</Text>
+        <Text style={[styles.eyebrow, { color: dc.GOLD }]}>Your Civic Record</Text>
         <Text style={[styles.sectionMeta, { color: dc.FG_FAINT }]}>Since Mar 2026</Text>
       </View>
 
@@ -451,8 +451,7 @@ function Communities({ proposals, votedIds, country, state, city, onPrimaryPress
   return (
     <Animated.View entering={FadeInUp.duration(500).delay(400)} style={styles.sectionPad}>
       <View style={styles.sectionHeader}>
-        <Text style={[styles.eyebrow, { color: dc.FG_FAINT }]}>Your Communities</Text>
-        <Text style={[styles.sectionMetaGold, { color: dc.GOLD }]}>Manage</Text>
+        <Text style={[styles.eyebrow, { color: dc.GOLD }]}>Your Communities</Text>
       </View>
 
       <View style={[styles.communityCard, { backgroundColor: dc.BG_CARD, borderColor: dc.LINE }]}>
@@ -539,7 +538,7 @@ function SentinelDigest({ items }: { items: Proposal[] }) {
   return (
     <Animated.View entering={FadeInUp.duration(500).delay(500)} style={styles.sectionPad}>
       <View style={styles.sectionHeader}>
-        <Text style={[styles.eyebrow, { color: dc.FG_FAINT }]}>Sentinel Digest</Text>
+        <Text style={[styles.eyebrow, { color: dc.GOLD }]}>Trending</Text>
         <Text style={[styles.sectionMetaMono, { color: dc.FG_FAINT }]}>Updated 2h ago</Text>
       </View>
       <View style={[styles.communityCard, { backgroundColor: dc.BG_CARD, borderColor: dc.LINE }]}>
@@ -587,7 +586,7 @@ const styles = StyleSheet.create({
   scrollContent: { paddingHorizontal: 0 },
 
   eyebrow: {
-    fontFamily: SANS, fontSize: 10, fontWeight: '600',
+    fontFamily: SANS, fontSize: 11, fontWeight: '600',
     letterSpacing: 2.2, textTransform: 'uppercase',
   },
   hairline: { height: 1, backgroundColor: LINE },
