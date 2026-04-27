@@ -875,8 +875,8 @@ function SwipeCard({ proposal, onSwipeLeft, onSwipeRight, onSwipeUp, onTap, isTo
                   <Text style={premiumCardStyles.sentimentPctText}>{supportPercent}%</Text>
                 </View>
                 <View style={premiumCardStyles.sentimentStatRight}>
-                  <Text style={premiumCardStyles.sentimentLabel}>OPPOSE</Text>
                   <Text style={[premiumCardStyles.sentimentNum, { color: RED }]}>{(proposal.opposeVotes || 0).toLocaleString()}</Text>
+                  <Text style={premiumCardStyles.sentimentLabel}>OPPOSE</Text>
                 </View>
               </View>
             </View>
@@ -1128,7 +1128,7 @@ const premiumCardStyles = StyleSheet.create({
     gap: 6,
   },
   sentimentStatRight: {
-    flexDirection: 'row',
+    flexDirection: 'row-reverse',
     alignItems: 'baseline',
     gap: 6,
   },
@@ -2542,9 +2542,9 @@ export default function ProposalsScreen() {
                         <View style={detailStyles.sentimentPct}>
                           <Text style={detailStyles.sentimentPctText}>{pct}%</Text>
                         </View>
-                        <View style={detailStyles.sentimentStat}>
-                          <Text style={detailStyles.sentimentLabel}>OPPOSE</Text>
+                        <View style={detailStyles.sentimentStatRight}>
                           <Text style={[detailStyles.sentimentNum, { color: RED }]}>{(detail.opposeVotes || 0).toLocaleString()}</Text>
+                          <Text style={detailStyles.sentimentLabel}>OPPOSE</Text>
                         </View>
                       </View>
                       <Text style={detailStyles.totalVoices}>{total.toLocaleString()} total voices</Text>
@@ -3171,6 +3171,11 @@ const detailStyles = StyleSheet.create({
   },
   sentimentStat: {
     flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 7,
+  },
+  sentimentStatRight: {
+    flexDirection: 'row-reverse',
     alignItems: 'baseline',
     gap: 7,
   },
