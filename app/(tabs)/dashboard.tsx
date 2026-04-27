@@ -72,10 +72,11 @@ export default function DashboardScreen() {
   const [proposals, setProposals] = useState<Proposal[]>([]);
   const [votedIds, setVotedIds] = useState<Set<string>>(new Set());
 
-  const displayName = user?.name?.split(' ')[0] || 'Lance';
-  const userCity = user?.city || 'Calgary';
-  const userState = user?.state || 'AB';
-  const isVerified = user?.verified ?? true;
+  const displayName = user?.name?.split(' ')[0] || 'User';
+  const userCity = user?.city || '';
+  const userState = user?.state || '';
+  const userCountry = user?.country || '';
+  const isVerified = user?.verified ?? false;
 
   const loadData = useCallback(async () => {
     const [propRes, votedRes] = await Promise.all([
@@ -157,15 +158,17 @@ export default function DashboardScreen() {
           }}
         />
         <ImpactRing pending={pendingCount} voted={votedCount} passed={passedCount} />
-        <Communities
-          proposals={proposals}
-          votedIds={votedIds}
-          country={user?.country || 'Canada'}
-          state={userState}
-          city={userCity}
-          onPrimaryPress={navigateToProposals}
-          router={router}
-        />
+        {isVerified && userCountry && (
+          <Communities
+            proposals={proposals}
+            votedIds={votedIds}
+            country={userCountry}
+            state={userState}
+            city={userCity}
+            onPrimaryPress={navigateToProposals}
+            router={router}
+          />
+        )}
         <SentinelDigest items={digestItems} />
         <FooterSig />
         <View style={{ height: 120 }} />
@@ -180,7 +183,8 @@ export default function DashboardScreen() {
 function TopBar({ name, city, state, verified, onAvatarPress }: { name: string; city: string; state: string; verified: boolean; onAvatarPress: () => void }) {
   const dc = useDashboardColors();
   const dateStr = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
-  const statusText = verified ? `Verified · ${city}, ${state}` : `Unverified · ${city}, ${state}`;
+  const locationText = city && state ? ` · ${city}, ${state}` : '';
+  const statusText = verified ? `Verified${locationText}` : 'Unverified';
   const dotColor = verified ? dc.GREEN : dc.FG_FAINT;
   return (
     <Animated.View entering={FadeInDown.duration(500)} style={styles.topBar}>
@@ -201,7 +205,7 @@ function TopBar({ name, city, state, verified, onAvatarPress }: { name: string; 
             <Text style={[styles.avatarLetter, { color: dc.GOLD }]}>{name.charAt(0).toUpperCase()}</Text>
           </View>
         </LinearGradient>
-        <View style={[styles.avatarVerifiedDot, { backgroundColor: dc.GREEN }]} />
+        {verified && <View style={[styles.avatarVerifiedDot, { backgroundColor: dc.GREEN }]} />}
       </TouchableOpacity>
     </Animated.View>
   );
