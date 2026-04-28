@@ -2066,27 +2066,6 @@ export default function ProposalsScreen() {
 
   // Swipe vote handler
   const handleSwipeVote = useCallback(async (proposal: Proposal, vote: 'support' | 'oppose') => {
-    // Get fresh tutorial state directly from store (not from stale closure)
-    const { isActive, completeAction, currentStepIndex, steps } = useTutorialStore.getState();
-
-    // Check if this is a tutorial action
-    if (isActive) {
-      // During tutorial, show vote confirmation overlay
-      setLastVoteType(vote);
-      setShowVoteOverlay(true);
-
-      // Advance the card
-      setSwipeIndex((prev) => prev + 1);
-
-      // Complete the tutorial action after overlay animation (1.7s delay)
-      // This gives user time to see the confirmation before moving to next step
-      const action = vote === 'support' ? 'swipe-right' : 'swipe-left';
-      setTimeout(() => {
-        completeAction(action);
-      }, 1700);
-      return;
-    }
-
     // Move to next card
     setSwipeIndex((prev) => prev + 1);
 
