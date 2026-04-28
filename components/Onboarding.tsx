@@ -197,9 +197,19 @@ function SwipeIcon() {
           opacity={0.9}
         />
       </G>
-      {/* Arrow */}
+      {/* Left arrow */}
       <Path
-        d="M55 70 L95 70 M82 57 L95 70 L82 83"
+        d="M70 70 L45 70 M58 57 L45 70 L58 83"
+        stroke={GOLD}
+        strokeWidth={3}
+        fill="none"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        opacity={0.6}
+      />
+      {/* Right arrow */}
+      <Path
+        d="M70 70 L95 70 M82 57 L95 70 L82 83"
         stroke={GOLD}
         strokeWidth={3}
         fill="none"
