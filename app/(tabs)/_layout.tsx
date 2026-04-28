@@ -11,7 +11,8 @@ import Animated, {
   interpolate,
 } from 'react-native-reanimated';
 import { useTheme, SHADOWS, ANIMATION } from '../../lib/theme';
-import { Onboarding, hasCompletedOnboarding } from '../../components/Onboarding';
+import { useAuthStore } from '../../lib/auth';
+import { Onboarding, hasCompletedOnboarding, resetOnboarding } from '../../components/Onboarding';
 
 // Custom Tab Bar Icon with animation
 function TabIcon({
@@ -72,18 +73,27 @@ function TabIcon({
   );
 }
 
+const DEMO_EMAIL = 'demo@represent.app';
+
 export default function TabLayout() {
   const { colors, isDark } = useTheme();
   const insets = useSafeAreaInsets();
+  const { user } = useAuthStore();
   const [showOnboarding, setShowOnboarding] = useState(false);
 
   useEffect(() => {
-    hasCompletedOnboarding().then((completed) => {
+    const checkOnboarding = async () => {
+      // Always reset onboarding for demo account (App Store review preview)
+      if (user?.email === DEMO_EMAIL) {
+        await resetOnboarding();
+      }
+      const completed = await hasCompletedOnboarding();
       if (!completed) {
         setShowOnboarding(true);
       }
-    });
-  }, []);
+    };
+    checkOnboarding();
+  }, [user?.email]);
 
   const handleOnboardingComplete = () => {
     setShowOnboarding(false);
