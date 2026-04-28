@@ -325,7 +325,7 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
   const viewabilityConfig = useRef({ viewAreaCoveragePercentThreshold: 50 }).current;
 
   const renderSlide = ({ item }: { item: Slide }) => (
-    <View style={[styles.slide, { width: SCREEN_WIDTH }]}>
+    <View style={styles.slide}>
       <Animated.View entering={FadeInUp.duration(500).delay(50)} style={styles.eyebrowContainer}>
         <Text style={styles.eyebrow}>{item.eyebrow}</Text>
       </Animated.View>
@@ -393,7 +393,11 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
         viewabilityConfig={viewabilityConfig}
         bounces={false}
         style={styles.flatList}
-        contentContainerStyle={styles.flatListContent}
+        getItemLayout={(_, index) => ({
+          length: SCREEN_WIDTH,
+          offset: SCREEN_WIDTH * index,
+          index,
+        })}
       />
 
       {/* Pagination dots */}
@@ -522,15 +526,11 @@ const styles = StyleSheet.create({
   flatList: {
     flex: 1,
   },
-  flatListContent: {
-    alignItems: 'center',
-  },
   slide: {
-    flex: 1,
+    width: SCREEN_WIDTH,
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 36,
-    paddingTop: 80,
   },
   eyebrowContainer: {
     marginBottom: 24,
