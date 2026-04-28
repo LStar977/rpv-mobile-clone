@@ -1,5 +1,6 @@
+import { useState, useEffect } from 'react';
 import { Tabs } from 'expo-router';
-import { View, StyleSheet, Platform } from 'react-native';
+import { View, StyleSheet, Platform, Modal } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -10,6 +11,7 @@ import Animated, {
   interpolate,
 } from 'react-native-reanimated';
 import { useTheme, SHADOWS, ANIMATION } from '../../lib/theme';
+import { Onboarding, hasCompletedOnboarding } from '../../components/Onboarding';
 
 // Custom Tab Bar Icon with animation
 function TabIcon({
@@ -73,8 +75,22 @@ function TabIcon({
 export default function TabLayout() {
   const { colors, isDark } = useTheme();
   const insets = useSafeAreaInsets();
+  const [showOnboarding, setShowOnboarding] = useState(false);
+
+  useEffect(() => {
+    hasCompletedOnboarding().then((completed) => {
+      if (!completed) {
+        setShowOnboarding(true);
+      }
+    });
+  }, []);
+
+  const handleOnboardingComplete = () => {
+    setShowOnboarding(false);
+  };
 
   return (
+    <>
     <Tabs
       key={isDark ? 'dark' : 'light'}
       screenListeners={{
@@ -156,6 +172,17 @@ export default function TabLayout() {
         }}
       />
     </Tabs>
+
+    {/* Onboarding Modal - shows after sign-in for first-time users */}
+    <Modal
+      visible={showOnboarding}
+      animationType="fade"
+      statusBarTranslucent
+      presentationStyle="fullScreen"
+    >
+      <Onboarding onComplete={handleOnboardingComplete} />
+    </Modal>
+    </>
   );
 }
 

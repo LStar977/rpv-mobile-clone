@@ -1,12 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { View, Modal } from 'react-native';
+import { View } from 'react-native';
 import { ThemeProvider, useTheme } from '../lib/theme';
 import { STRIPE_PUBLISHABLE_KEY, MERCHANT_IDENTIFIER } from '../lib/stripe';
 import { initIAP, endIAP } from '../lib/iap';
 import { soundEffects } from '../lib/sounds';
-import { Onboarding, hasCompletedOnboarding } from '../components/Onboarding';
 
 // Conditionally import StripeProvider to handle missing native module
 let StripeProvider: any = null;
@@ -18,31 +17,15 @@ try {
 
 function ThemedStack() {
   const { colors, isDark } = useTheme();
-  const [showOnboarding, setShowOnboarding] = useState<boolean | null>(null);
 
   useEffect(() => {
     initIAP();
     soundEffects.init();
-
-    // Check onboarding status
-    hasCompletedOnboarding().then((completed) => {
-      setShowOnboarding(!completed);
-    });
-
     return () => {
       endIAP();
       soundEffects.unload();
     };
   }, []);
-
-  const handleOnboardingComplete = () => {
-    setShowOnboarding(false);
-  };
-
-  // Don't render until we know onboarding status
-  if (showOnboarding === null) {
-    return <View style={{ flex: 1, backgroundColor: colors.background }} />;
-  }
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -57,16 +40,6 @@ function ThemedStack() {
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="modals" />
       </Stack>
-
-      {/* Onboarding Modal */}
-      <Modal
-        visible={showOnboarding}
-        animationType="fade"
-        statusBarTranslucent
-        presentationStyle="fullScreen"
-      >
-        <Onboarding onComplete={handleOnboardingComplete} />
-      </Modal>
     </View>
   );
 }
