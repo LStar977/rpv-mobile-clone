@@ -1,5 +1,5 @@
 import { db } from './db';
-import { pushTokens, users, proposals } from '../shared/schema';
+import { pushTokens, users, proposals } from '@shared/schema';
 import { eq, and, or, isNull } from 'drizzle-orm';
 
 const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send';

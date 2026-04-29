@@ -5,12 +5,13 @@ import { baseNetwork } from "./base-network";
 import { log } from "./app";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { setupBadgeRoutes } from "./badge-routes";
-import { passportNFTs, activatedRidings, electoralRidingQRCodes, proposals, votes, voteTokenClaims, organizations } from "@shared/schema";
+import { passportNFTs, activatedRidings, electoralRidingQRCodes, proposals, votes, voteTokenClaims, organizations, transactions } from "@shared/schema";
 import { eq, count, and } from "drizzle-orm";
 import { db } from "./db";
 import { savePushToken, notifyNewProposal, notifyTokenClaimed, notifyProposalVote } from "./notifications";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import jwt from "jsonwebtoken";
+import { randomUUID } from "crypto";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Setup OAuth authentication (Google, Apple, GitHub)
@@ -349,7 +350,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let newBadges = [];
       try {
         const { db } = await import('./db');
-        const { badges, userBadges, votes } = await import('../shared/schema');
+        const { badges, userBadges, votes } = await import('@shared/schema');
         const { eq, and } = await import('drizzle-orm');
 
         // Get user votes to check for badges
@@ -589,7 +590,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const { db } = await import('./db');
       const { eq } = await import('drizzle-orm');
-      const { badges, userBadges } = await import('../shared/schema');
+      const { badges, userBadges } = await import('@shared/schema');
 
       const earnedBadges = await db
         .select({
@@ -684,7 +685,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "Unauthorized" });
       }
 
-      const { votes } = await import("../shared/schema");
+      const { votes } = await import("@shared/schema");
       const { eq } = await import("drizzle-orm");
 
       // Get total vote count
@@ -802,7 +803,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "User not found" });
       }
 
-      const { proposals, votes } = await import("../shared/schema");
+      const { proposals, votes } = await import("@shared/schema");
       const { eq, isNull, and } = await import("drizzle-orm");
 
       // Get all proposals where user hasn't voted
@@ -3602,6 +3603,143 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ─── End organization sub-resource endpoints ────────────────────────────────
+
+  // ─── Apple In-App Purchase (IAP) receipt validation ─────────────────────────
+  // Mobile (lib/iap.ts) POSTs { receipt, productId, organizationId? } here
+  // after a successful App Store purchase. We verify the receipt with Apple,
+  // map the productId to a feature, and update the user/org subscription
+  // state. Idempotent on Apple's transaction_id.
+  //
+  // Requires APPLE_SHARED_SECRET env var (generated in App Store Connect).
+  app.post("/api/iap/validate-receipt", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims?.sub;
+      if (!userId) return res.status(401).json({ error: "Unauthorized" });
+
+      const { receipt, productId, organizationId } = req.body;
+      if (!receipt || !productId) {
+        return res.status(400).json({ error: "Missing receipt or productId" });
+      }
+
+      const sharedSecret = process.env.APPLE_SHARED_SECRET;
+      if (!sharedSecret) {
+        log("APPLE_SHARED_SECRET not configured — set it in env after generating in App Store Connect");
+        return res.status(500).json({ error: "IAP validation not configured" });
+      }
+
+      const verifyWithApple = async (url: string) => {
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            'receipt-data': receipt,
+            'password': sharedSecret,
+            'exclude-old-transactions': true,
+          }),
+        });
+        return response.json();
+      };
+
+      // Try production first; on status 21007 ("sandbox receipt sent to prod"),
+      // retry against sandbox. This is Apple's recommended pattern so the same
+      // code works in TestFlight + App Store.
+      let appleResponse: any = await verifyWithApple('https://buy.itunes.apple.com/verifyReceipt');
+      if (appleResponse.status === 21007) {
+        log(`IAP: sandbox receipt detected, retrying for user=${userId}`);
+        appleResponse = await verifyWithApple('https://sandbox.itunes.apple.com/verifyReceipt');
+      }
+
+      if (appleResponse.status !== 0) {
+        log(`IAP validation failed: status=${appleResponse.status}, user=${userId}, product=${productId}`);
+        return res.status(400).json({ error: `Apple receipt invalid (status ${appleResponse.status})` });
+      }
+
+      // Find the matching transaction in the receipt. Apple returns transactions
+      // in receipt.in_app (one-time purchases) and latest_receipt_info (subs).
+      const inApp: any[] = appleResponse.receipt?.in_app || [];
+      const latestReceiptInfo: any[] = appleResponse.latest_receipt_info || [];
+      const allTransactions = [...inApp, ...latestReceiptInfo];
+      const matchingTx = allTransactions.find((tx: any) => tx.product_id === productId);
+
+      if (!matchingTx) {
+        log(`IAP: no matching transaction for productId=${productId}, user=${userId}`);
+        return res.status(400).json({ error: "Product not found in receipt" });
+      }
+
+      const appleTxId: string = matchingTx.transaction_id;
+      const originalTxId: string = matchingTx.original_transaction_id || appleTxId;
+
+      // Idempotency: skip if we've already processed this Apple transaction
+      const existingTx = await db.select().from(transactions)
+        .where(and(eq(transactions.userId, userId), eq(transactions.txHash, appleTxId)))
+        .limit(1);
+      if (existingTx.length > 0) {
+        log(`IAP: transaction ${appleTxId} already processed for user=${userId}`);
+        return res.json({ valid: true, message: "Already processed" });
+      }
+
+      // Map productId → feature and update DB
+      let productType = 'unknown';
+      let expiresAt: Date | undefined;
+      const expiresMs = matchingTx.expires_date_ms ? parseInt(matchingTx.expires_date_ms, 10) : null;
+      if (expiresMs) expiresAt = new Date(expiresMs);
+
+      if (productId === 'com.representwallet.app.verification') {
+        productType = 'verification';
+        await storage.updateUser(userId, { verificationPaid: true } as any);
+      } else if (productId === 'com.representwallet.app.premium') {
+        productType = 'premium';
+        await storage.updateUser(userId, {
+          subscriptionStatus: 'active',
+          subscriptionEndDate: expiresAt,
+          stripeSubscriptionId: `iap:${originalTxId}`,
+        } as any);
+      } else if (productId.startsWith('com.representwallet.app.org.')) {
+        productType = 'organization';
+        if (!organizationId) {
+          return res.status(400).json({ error: "organizationId required for org subscriptions" });
+        }
+        // Caller must be a member of the org before we activate its subscription
+        const isMember = await storage.isOrganizationMember(organizationId, userId);
+        if (!isMember) {
+          return res.status(403).json({ error: "Not a member of this organization" });
+        }
+        await db.update(organizations).set({
+          subscriptionStatus: 'active',
+          stripeSubscriptionId: `iap:${originalTxId}`,
+        }).where(eq(organizations.id, organizationId));
+      } else if (productId.startsWith('com.representwallet.app.ballots.')) {
+        productType = 'ballot_pack';
+        // Ballot allocation logic deferred — for now just record the transaction
+      } else {
+        log(`IAP: unknown productId=${productId}, user=${userId}`);
+        return res.status(400).json({ error: "Unknown product" });
+      }
+
+      // Record transaction for audit + idempotency
+      await db.insert(transactions).values({
+        id: randomUUID(),
+        userId,
+        txHash: appleTxId,
+        type: `iap_${productType}`,
+        amount: matchingTx.price ? String(matchingTx.price) : null,
+        status: 'completed',
+        data: { productId, originalTxId, organizationId, environment: appleResponse.environment } as any,
+        createdAt: new Date(),
+      });
+
+      log(`✅ IAP validated: user=${userId}, product=${productId}, tx=${appleTxId}`);
+
+      res.json({
+        valid: true,
+        productType,
+        expiresAt: expiresAt?.toISOString(),
+      });
+    } catch (error: any) {
+      log(`IAP validation error: ${error.message}`);
+      res.status(500).json({ error: "Failed to validate receipt" });
+    }
+  });
 
   // Health check
   app.get("/api/health", (req, res) => {
