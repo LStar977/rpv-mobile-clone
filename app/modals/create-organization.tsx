@@ -329,31 +329,37 @@ export default function CreateOrganizationScreen() {
         type: selectedTier,
       });
 
-      if (createResult.error || !createResult.data?.id) {
-        Alert.alert('Error', createResult.error || 'Failed to create organization');
+      const organizationId = createResult.data?.id;
+
+      // Demo account: check for ID first, ignore errors if we have an org
+      if (isDemoAccount) {
+        if (organizationId) {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          Alert.alert(
+            'Organization Created!',
+            `${name} has been created successfully. You are now the admin.`,
+            [
+              {
+                text: 'View Organization',
+                onPress: () => {
+                  router.replace({
+                    pathname: '/modals/organization-detail',
+                    params: { orgId: organizationId, orgName: name, orgRole: 'admin' },
+                  });
+                },
+              },
+            ]
+          );
+          return;
+        }
+        // Only show error if we truly have no org ID
+        Alert.alert('Error', 'Failed to create organization');
         return;
       }
 
-      const organizationId = createResult.data.id;
-
-      // Demo account: skip payment and show success immediately
-      if (isDemoAccount) {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        Alert.alert(
-          'Organization Created!',
-          `${name} has been created successfully. You are now the admin.`,
-          [
-            {
-              text: 'View Organization',
-              onPress: () => {
-                router.replace({
-                  pathname: '/modals/organization-detail',
-                  params: { orgId: organizationId, orgName: name, orgRole: 'admin' },
-                });
-              },
-            },
-          ]
-        );
+      // Non-demo accounts: check for errors
+      if (createResult.error || !organizationId) {
+        Alert.alert('Error', createResult.error || 'Failed to create organization');
         return;
       }
 

@@ -235,6 +235,20 @@ export default function OrganizationDetailScreen() {
       if (limitsResult.data) setProposalLimits(limitsResult.data);
     } catch (error) {
       console.error('Failed to fetch organization data:', error);
+      // Set fallback org from params even on exception
+      if (params.orgId && params.orgName) {
+        const isDemoUser = user?.email === 'demo@represent.app';
+        setOrganization({
+          id: params.orgId as string,
+          name: params.orgName as string,
+          description: '',
+          memberCount: 1,
+          tier: 'starter',
+          verified: false,
+          createdAt: new Date().toISOString(),
+          role: isDemoUser ? 'admin' : ((params.orgRole as 'admin' | 'member') || 'member'),
+        });
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);

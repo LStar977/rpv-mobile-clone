@@ -856,6 +856,13 @@ export const organizationsApi = {
       try {
         const stored = await AsyncStorage.getItem(DEMO_ORGS_STORAGE_KEY);
         const existingOrgs: Organization[] = stored ? JSON.parse(stored) : [];
+
+        // Prevent duplicates - if org with same name exists, return it
+        const duplicate = existingOrgs.find(o => o.name.toLowerCase() === data.name.toLowerCase());
+        if (duplicate) {
+          return { data: { ...duplicate, role: 'admin' }, error: null };
+        }
+
         existingOrgs.push(enhancedOrg);
         await AsyncStorage.setItem(DEMO_ORGS_STORAGE_KEY, JSON.stringify(existingOrgs));
         return { data: enhancedOrg, error: null };
@@ -882,6 +889,13 @@ export const organizationsApi = {
       try {
         const stored = await AsyncStorage.getItem(DEMO_ORGS_STORAGE_KEY);
         const existingOrgs: Organization[] = stored ? JSON.parse(stored) : [];
+
+        // Prevent duplicates - if org with same name exists, return it
+        const duplicate = existingOrgs.find(o => o.name.toLowerCase() === data.name.toLowerCase());
+        if (duplicate) {
+          return { data: { ...duplicate, role: 'admin' }, error: null };
+        }
+
         existingOrgs.push(localOrg);
         await AsyncStorage.setItem(DEMO_ORGS_STORAGE_KEY, JSON.stringify(existingOrgs));
         return { data: localOrg, error: null };
