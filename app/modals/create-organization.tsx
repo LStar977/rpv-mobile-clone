@@ -10,6 +10,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Image,
+  Linking,
 } from 'react-native';
 import { useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
@@ -26,7 +27,7 @@ import { processOrganizationPayment } from '../../lib/payment';
 
 type Step = 'details' | 'tier' | 'payment';
 
-type OrgTier = 'community' | 'professional' | 'enterprise';
+type OrgTier = 'starter' | 'professional' | 'enterprise';
 
 const ORG_TIERS: Record<OrgTier, {
   name: string;
@@ -36,15 +37,16 @@ const ORG_TIERS: Record<OrgTier, {
   features: string[];
   icon: keyof typeof Ionicons.glyphMap;
   popular?: boolean;
+  contactOnly?: boolean;
 }> = {
-  community: {
-    name: 'Community',
+  starter: {
+    name: 'Starter',
     price: '$29',
     priceValue: 29,
     description: 'Perfect for small groups and local organizations',
     icon: 'people-outline',
     features: [
-      'Up to 50 members',
+      'Up to 100 members',
       'Internal proposals & voting',
       'Basic announcements',
       'Invite code management',
@@ -53,14 +55,14 @@ const ORG_TIERS: Record<OrgTier, {
   },
   professional: {
     name: 'Professional',
-    price: '$49',
-    priceValue: 49,
+    price: '$79',
+    priceValue: 79,
     description: 'For growing organizations with advanced needs',
     icon: 'business-outline',
     popular: true,
     features: [
-      'Up to 500 members',
-      'Everything in Community',
+      'Up to 1,000 members',
+      'Everything in Starter',
       'Advanced analytics',
       'Custom branding',
       'Priority support',
@@ -69,10 +71,11 @@ const ORG_TIERS: Record<OrgTier, {
   },
   enterprise: {
     name: 'Enterprise',
-    price: '$99',
-    priceValue: 99,
+    price: 'Contact Us',
+    priceValue: 0,
     description: 'For large organizations and institutions',
     icon: 'globe-outline',
+    contactOnly: true,
     features: [
       'Unlimited members',
       'Everything in Professional',
@@ -150,12 +153,13 @@ function TierCard({
   selected,
   onSelect,
 }: {
-  tier: typeof ORG_TIERS.community;
+  tier: typeof ORG_TIERS.starter;
   tierKey: OrgTier;
   selected: boolean;
   onSelect: () => void;
 }) {
   const { colors } = useTheme();
+  const isContactOnly = tier.contactOnly;
 
   return (
     <TouchableOpacity
@@ -184,7 +188,9 @@ function TierCard({
           <Text style={[styles.tierName, { color: colors.text }]}>{tier.name}</Text>
           <View style={styles.tierPriceRow}>
             <Text style={[styles.tierPrice, { color: colors.gold }]}>{tier.price}</Text>
-            <Text style={[styles.tierPeriod, { color: colors.textSecondary }]}>/month</Text>
+            {!isContactOnly && (
+              <Text style={[styles.tierPeriod, { color: colors.textSecondary }]}>/month</Text>
+            )}
           </View>
         </View>
         <View
@@ -286,6 +292,13 @@ export default function CreateOrganizationScreen() {
       }
       setCurrentStep('tier');
     } else if (currentStep === 'tier') {
+      // Enterprise tier opens email instead of payment
+      if (selectedTier === 'enterprise') {
+        const subject = encodeURIComponent(`Enterprise Inquiry: ${name.trim()}`);
+        const body = encodeURIComponent(`Hi,\n\nI'm interested in the Enterprise plan for my organization "${name.trim()}".\n\nPlease contact me to discuss pricing and features.\n\nThank you`);
+        Linking.openURL(`mailto:lance@representvote.com?subject=${subject}&body=${body}`);
+        return;
+      }
       setCurrentStep('payment');
     }
   };
@@ -316,31 +329,37 @@ export default function CreateOrganizationScreen() {
         type: selectedTier,
       });
 
-      if (createResult.error || !createResult.data?.id) {
-        Alert.alert('Error', createResult.error || 'Failed to create organization');
+      const organizationId = createResult.data?.id;
+
+      // Demo account: check for ID first, ignore errors if we have an org
+      if (isDemoAccount) {
+        if (organizationId) {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          Alert.alert(
+            'Organization Created!',
+            `${name} has been created successfully. You are now the admin.`,
+            [
+              {
+                text: 'View Organization',
+                onPress: () => {
+                  router.replace({
+                    pathname: '/modals/organization-detail',
+                    params: { orgId: organizationId, orgName: name, orgRole: 'admin' },
+                  });
+                },
+              },
+            ]
+          );
+          return;
+        }
+        // Only show error if we truly have no org ID
+        Alert.alert('Error', 'Failed to create organization');
         return;
       }
 
-      const organizationId = createResult.data.id;
-
-      // Demo account: skip payment and show success immediately
-      if (isDemoAccount) {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        Alert.alert(
-          'Organization Created!',
-          `${name} has been created successfully. You are now the admin.`,
-          [
-            {
-              text: 'View Organization',
-              onPress: () => {
-                router.replace({
-                  pathname: '/modals/organization-detail',
-                  params: { orgId: organizationId, orgName: name, orgRole: 'admin' },
-                });
-              },
-            },
-          ]
-        );
+      // Non-demo accounts: check for errors
+      if (createResult.error || !organizationId) {
+        Alert.alert('Error', createResult.error || 'Failed to create organization');
         return;
       }
 
@@ -446,7 +465,7 @@ export default function CreateOrganizationScreen() {
         Select the plan that fits your organization's needs
       </Text>
 
-      {(Object.entries(ORG_TIERS) as [OrgTier, typeof ORG_TIERS.community][]).map(([key, tier]) => (
+      {(Object.entries(ORG_TIERS) as [OrgTier, typeof ORG_TIERS.starter][]).map(([key, tier]) => (
         <TierCard
           key={key}
           tierKey={key}
@@ -603,8 +622,17 @@ export default function CreateOrganizationScreen() {
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
               >
-                <Text style={styles.actionButtonText}>Continue</Text>
-                <Ionicons name="chevron-forward" size={20} color="#000" />
+                {currentStep === 'tier' && selectedTier === 'enterprise' ? (
+                  <>
+                    <Ionicons name="mail-outline" size={20} color="#000" />
+                    <Text style={styles.actionButtonText}>Contact Us</Text>
+                  </>
+                ) : (
+                  <>
+                    <Text style={styles.actionButtonText}>Continue</Text>
+                    <Ionicons name="chevron-forward" size={20} color="#000" />
+                  </>
+                )}
               </LinearGradient>
             </TouchableOpacity>
           )}
@@ -634,7 +662,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   headerTitle: {
-    ...TYPOGRAPHY.headlineSmall,
+    fontFamily: 'Georgia',
+    fontSize: 20,
+    fontWeight: '500',
   },
   stepIndicator: {
     flexDirection: 'row',
@@ -682,7 +712,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   stepTitle: {
-    ...TYPOGRAPHY.headlineMedium,
+    fontFamily: 'Georgia',
+    fontSize: 22,
+    fontWeight: '500',
     marginBottom: SPACING.xs,
   },
   stepSubtitle: {
@@ -798,16 +830,18 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   tierName: {
-    ...TYPOGRAPHY.labelLarge,
-    fontWeight: '600',
+    fontFamily: 'Georgia',
+    fontSize: 16,
+    fontWeight: '500',
   },
   tierPriceRow: {
     flexDirection: 'row',
     alignItems: 'baseline',
   },
   tierPrice: {
-    ...TYPOGRAPHY.headlineSmall,
-    fontWeight: '700',
+    fontFamily: 'Georgia',
+    fontSize: 20,
+    fontWeight: '500',
   },
   tierPeriod: {
     ...TYPOGRAPHY.labelSmall,
@@ -872,8 +906,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   summaryName: {
-    ...TYPOGRAPHY.labelLarge,
-    fontWeight: '600',
+    fontFamily: 'Georgia',
+    fontSize: 16,
+    fontWeight: '500',
     marginBottom: SPACING.xxs,
   },
   summaryDescription: {
@@ -907,8 +942,9 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   summaryTotalValue: {
-    ...TYPOGRAPHY.headlineSmall,
-    fontWeight: '700',
+    fontFamily: 'Georgia',
+    fontSize: 20,
+    fontWeight: '500',
   },
 
   // Info Note

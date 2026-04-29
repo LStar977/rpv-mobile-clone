@@ -1,0 +1,754 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>How Represent Makes Money</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Onest:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      --bg: #040707;
+      --gold: #EABA58;
+      --text: #F4F5F6;
+      --text-muted: rgba(244, 245, 246, 0.6);
+      --card-bg: rgba(255, 255, 255, 0.04);
+      --card-border: rgba(255, 255, 255, 0.08);
+    }
+
+    body {
+      font-family: 'Onest', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+
+    section {
+      padding: 100px 0;
+      opacity: 0;
+      transform: translateY(30px);
+      transition: opacity 0.8s ease, transform 0.8s ease;
+    }
+
+    section.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .eyebrow {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      font-weight: 500;
+      letter-spacing: 2px;
+      color: var(--gold);
+      text-transform: uppercase;
+      margin-bottom: 16px;
+    }
+
+    h1 {
+      font-size: clamp(36px, 6vw, 56px);
+      font-weight: 600;
+      line-height: 1.1;
+      margin-bottom: 20px;
+    }
+
+    h2 {
+      font-size: clamp(28px, 4vw, 40px);
+      font-weight: 600;
+      margin-bottom: 40px;
+    }
+
+    h3 {
+      font-size: 20px;
+      font-weight: 600;
+      margin-bottom: 12px;
+    }
+
+    .subtitle {
+      font-size: clamp(18px, 2.5vw, 22px);
+      color: var(--text-muted);
+      max-width: 600px;
+    }
+
+    .divider {
+      width: 80px;
+      height: 2px;
+      background: var(--gold);
+      margin-top: 48px;
+    }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 32px;
+      backdrop-filter: blur(20px);
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 24px;
+    }
+
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 24px;
+    }
+
+    @media (max-width: 768px) {
+      .grid-2, .grid-3 {
+        grid-template-columns: 1fr;
+      }
+      section {
+        padding: 60px 0;
+      }
+    }
+
+    .mono {
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .gold {
+      color: var(--gold);
+    }
+
+    .muted {
+      color: var(--text-muted);
+    }
+
+    .text-center {
+      text-align: center;
+    }
+
+    /* Hero */
+    .hero {
+      min-height: 70vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding-top: 120px;
+    }
+
+    /* Flywheel */
+    .flywheel-container {
+      display: flex;
+      justify-content: center;
+      margin-bottom: 48px;
+    }
+
+    .flywheel-svg {
+      width: 100%;
+      max-width: 500px;
+      height: auto;
+    }
+
+    .flywheel-caption {
+      text-align: center;
+      font-size: 18px;
+      color: var(--text-muted);
+      font-style: italic;
+    }
+
+    /* Customer cards */
+    .customer-card .icon {
+      width: 48px;
+      height: 48px;
+      margin-bottom: 20px;
+      color: var(--gold);
+    }
+
+    .customer-card .need {
+      font-size: 15px;
+      color: var(--text-muted);
+      margin-bottom: 16px;
+    }
+
+    .customer-card .buy {
+      font-size: 15px;
+      margin-bottom: 16px;
+    }
+
+    .customer-card .example {
+      font-size: 14px;
+      color: var(--text-muted);
+      padding: 16px;
+      background: rgba(234, 186, 88, 0.06);
+      border-left: 2px solid var(--gold);
+      border-radius: 0 8px 8px 0;
+      font-style: italic;
+    }
+
+    /* Revenue tiers */
+    .revenue-section {
+      margin-bottom: 48px;
+    }
+
+    .revenue-title {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .revenue-title::before {
+      content: '';
+      width: 8px;
+      height: 8px;
+      background: var(--gold);
+      border-radius: 50%;
+    }
+
+    .tier {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      padding: 16px 0;
+      border-bottom: 1px solid var(--card-border);
+    }
+
+    .tier:last-child {
+      border-bottom: none;
+    }
+
+    .tier-name {
+      font-weight: 500;
+    }
+
+    .tier-price {
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--gold);
+      font-size: 14px;
+      text-align: right;
+    }
+
+    .tier-desc {
+      font-size: 14px;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    /* Math section */
+    .math-block {
+      text-align: center;
+      padding: 48px;
+      margin-bottom: 32px;
+    }
+
+    .math-label {
+      font-size: 16px;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+    }
+
+    .math-number {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: clamp(24px, 4vw, 32px);
+      font-weight: 600;
+    }
+
+    .math-plus {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 32px;
+      color: var(--gold);
+      margin: 16px 0;
+    }
+
+    .math-result {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: clamp(36px, 6vw, 56px);
+      font-weight: 600;
+      color: var(--gold);
+      margin-top: 24px;
+    }
+
+    .math-comparison {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 24px;
+    }
+
+    @media (max-width: 768px) {
+      .math-comparison {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Moat */
+    .moat-card {
+      text-align: center;
+      padding: 40px 24px;
+    }
+
+    .moat-icon {
+      width: 56px;
+      height: 56px;
+      margin: 0 auto 20px;
+      color: var(--gold);
+    }
+
+    .moat-card p {
+      font-size: 15px;
+      color: var(--text-muted);
+      margin-top: 12px;
+    }
+
+    /* Footer */
+    .closing {
+      border-top: 1px solid var(--card-border);
+      padding: 80px 0;
+    }
+
+    .closing-statement {
+      font-size: clamp(20px, 3vw, 28px);
+      max-width: 800px;
+      margin: 0 auto 24px;
+      text-align: center;
+      line-height: 1.5;
+    }
+
+    .closing-sub {
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 16px;
+      margin-bottom: 60px;
+    }
+
+    footer {
+      text-align: center;
+      padding: 40px 0;
+      border-top: 1px solid var(--card-border);
+      font-size: 14px;
+      color: var(--text-muted);
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+
+    function useInView(threshold = 0.1) {
+      const ref = useRef(null);
+      const [isVisible, setIsVisible] = useState(false);
+
+      useEffect(() => {
+        const observer = new IntersectionObserver(
+          ([entry]) => {
+            if (entry.isIntersecting) {
+              setIsVisible(true);
+              observer.disconnect();
+            }
+          },
+          { threshold }
+        );
+
+        if (ref.current) {
+          observer.observe(ref.current);
+        }
+
+        return () => observer.disconnect();
+      }, [threshold]);
+
+      return [ref, isVisible];
+    }
+
+    function Section({ children, className = '' }) {
+      const [ref, isVisible] = useInView(0.15);
+      return (
+        <section ref={ref} className={`${className} ${isVisible ? 'visible' : ''}`}>
+          <div className="container">
+            {children}
+          </div>
+        </section>
+      );
+    }
+
+    function NewspaperIcon() {
+      return (
+        <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+          <path d="M19 3H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V5a2 2 0 00-2-2z"/>
+          <path d="M7 7h5v5H7z"/>
+          <path d="M14 7h3M14 10h3M7 14h10M7 17h10"/>
+        </svg>
+      );
+    }
+
+    function BuildingIcon() {
+      return (
+        <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+          <path d="M3 21h18M5 21V7l8-4v18M19 21V11l-6-3M9 9v.01M9 12v.01M9 15v.01M9 18v.01"/>
+        </svg>
+      );
+    }
+
+    function PeopleIcon() {
+      return (
+        <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+          <circle cx="9" cy="7" r="3"/>
+          <circle cx="17" cy="7" r="3"/>
+          <path d="M3 21v-2a4 4 0 014-4h4a4 4 0 014 4v2"/>
+          <path d="M17 14a4 4 0 014 4v3"/>
+        </svg>
+      );
+    }
+
+    function MegaphoneIcon() {
+      return (
+        <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+          <path d="M3 11l18-5v12L3 13v-2z"/>
+          <path d="M11.6 16.8a3 3 0 11-5.8-1.6"/>
+        </svg>
+      );
+    }
+
+    function ShieldIcon() {
+      return (
+        <svg className="moat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+          <path d="M9 12l2 2 4-4"/>
+        </svg>
+      );
+    }
+
+    function MapIcon() {
+      return (
+        <svg className="moat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+          <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/>
+          <circle cx="12" cy="9" r="2.5"/>
+        </svg>
+      );
+    }
+
+    function ChainIcon() {
+      return (
+        <svg className="moat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+          <rect x="3" y="3" width="7" height="7" rx="1"/>
+          <rect x="14" y="3" width="7" height="7" rx="1"/>
+          <rect x="14" y="14" width="7" height="7" rx="1"/>
+          <rect x="3" y="14" width="7" height="7" rx="1"/>
+          <path d="M10 6.5h4M10 17.5h4M6.5 10v4M17.5 10v4"/>
+        </svg>
+      );
+    }
+
+    function Flywheel() {
+      return (
+        <svg className="flywheel-svg" viewBox="0 0 400 400" fill="none">
+          <defs>
+            <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+              <path d="M0,0 L0,6 L9,3 z" fill="#EABA58"/>
+            </marker>
+          </defs>
+
+          {/* Circular arrows */}
+          <path
+            d="M 280 100 A 120 120 0 0 1 320 200"
+            stroke="#EABA58"
+            strokeWidth="1.5"
+            fill="none"
+            markerEnd="url(#arrow)"
+          />
+          <path
+            d="M 300 280 A 120 120 0 0 1 200 320"
+            stroke="#EABA58"
+            strokeWidth="1.5"
+            fill="none"
+            markerEnd="url(#arrow)"
+          />
+          <path
+            d="M 100 300 A 120 120 0 0 1 80 200"
+            stroke="#EABA58"
+            strokeWidth="1.5"
+            fill="none"
+            markerEnd="url(#arrow)"
+          />
+          <path
+            d="M 100 120 A 120 120 0 0 1 200 80"
+            stroke="#EABA58"
+            strokeWidth="1.5"
+            fill="none"
+            markerEnd="url(#arrow)"
+          />
+
+          {/* Nodes */}
+          {/* Top - Citizens */}
+          <circle cx="200" cy="60" r="45" stroke="#EABA58" strokeWidth="1.5" fill="rgba(234,186,88,0.08)"/>
+          <text x="200" y="55" textAnchor="middle" fill="#F4F5F6" fontSize="11" fontFamily="Onest">Citizens</text>
+          <text x="200" y="70" textAnchor="middle" fill="#F4F5F6" fontSize="11" fontFamily="Onest">verify & vote</text>
+
+          {/* Right - Data grows */}
+          <circle cx="340" cy="200" r="45" stroke="#EABA58" strokeWidth="1.5" fill="rgba(234,186,88,0.08)"/>
+          <text x="340" y="190" textAnchor="middle" fill="#F4F5F6" fontSize="11" fontFamily="Onest">Verified data</text>
+          <text x="340" y="205" textAnchor="middle" fill="#F4F5F6" fontSize="11" fontFamily="Onest">grows</text>
+
+          {/* Bottom - Institutions pay */}
+          <circle cx="200" cy="340" r="45" stroke="#EABA58" strokeWidth="1.5" fill="rgba(234,186,88,0.08)"/>
+          <text x="200" y="335" textAnchor="middle" fill="#F4F5F6" fontSize="11" fontFamily="Onest">Institutions</text>
+          <text x="200" y="350" textAnchor="middle" fill="#F4F5F6" fontSize="11" fontFamily="Onest">pay for insights</text>
+
+          {/* Left - Revenue funds */}
+          <circle cx="60" cy="200" r="45" stroke="#EABA58" strokeWidth="1.5" fill="rgba(234,186,88,0.08)"/>
+          <text x="60" y="195" textAnchor="middle" fill="#F4F5F6" fontSize="11" fontFamily="Onest">Revenue</text>
+          <text x="60" y="210" textAnchor="middle" fill="#F4F5F6" fontSize="11" fontFamily="Onest">funds growth</text>
+        </svg>
+      );
+    }
+
+    function App() {
+      return (
+        <>
+          {/* Hero */}
+          <Section className="hero">
+            <div className="eyebrow">The Business Model</div>
+            <h1>The Data Layer for Democracy</h1>
+            <p className="subtitle">
+              Citizens use Represent for free. Institutions pay for what the data reveals.
+            </p>
+            <div className="divider"></div>
+          </Section>
+
+          {/* Flywheel */}
+          <Section>
+            <h2 className="text-center">How It Compounds</h2>
+            <div className="flywheel-container">
+              <Flywheel />
+            </div>
+            <p className="flywheel-caption">
+              Every new verified user makes the product more valuable to every customer.
+            </p>
+          </Section>
+
+          {/* Who Pays */}
+          <Section>
+            <h2>Who Pays Represent</h2>
+            <div className="grid-2">
+              <div className="card customer-card">
+                <NewspaperIcon />
+                <h3>News & Polling Organizations</h3>
+                <p className="need">
+                  <strong className="gold">What they need:</strong> Real-time verified public sentiment to replace $50,000 polls that take weeks and survey only 1,000 unverified people.
+                </p>
+                <p className="buy">
+                  <strong className="gold">What they buy:</strong> Sentiment API access — geographic breakdowns, demographic splits, time-series data.
+                </p>
+                <div className="example">
+                  "A national newsroom queries: 'How does Calgary feel about the arena district plan vs. Edmonton?' — answered in seconds, from verified residents, not a 1,200-person phone sample."
+                </div>
+              </div>
+
+              <div className="card customer-card">
+                <BuildingIcon />
+                <h3>Governments & Municipalities</h3>
+                <p className="need">
+                  <strong className="gold">What they need:</strong> To understand constituent sentiment without spending $80,000 on consultants or holding town halls where 40 people show up.
+                </p>
+                <p className="buy">
+                  <strong className="gold">What they buy:</strong> Analytics dashboard — real-time sentiment with ward-level breakdowns, alerts, and exportable reports.
+                </p>
+                <div className="example">
+                  "A city councillor sees that 73% of verified Ward 7 residents oppose a zoning change — broken down by postal code, updated live."
+                </div>
+              </div>
+
+              <div className="card customer-card">
+                <PeopleIcon />
+                <h3>Organizations</h3>
+                <p className="need">
+                  <strong className="gold">What they need:</strong> Secure, verified elections for their members without paper ballots or unverified tools like Election Buddy.
+                </p>
+                <p className="buy">
+                  <strong className="gold">What they buy:</strong> Hosted elections — identity-verified voting scoped to their membership, with ranked choice, audit trails, and results dashboards.
+                </p>
+                <div className="example">
+                  "A 15,000-member teachers' union runs their executive election through Represent. Every vote identity-verified, every result on-chain and auditable."
+                </div>
+              </div>
+
+              <div className="card customer-card">
+                <MegaphoneIcon />
+                <h3>Advocacy & Campaigns</h3>
+                <p className="need">
+                  <strong className="gold">What they need:</strong> To reach verified, opted-in voters in specific jurisdictions with targeted messages.
+                </p>
+                <p className="buy">
+                  <strong className="gold">What they buy:</strong> Constituent communication — permission-based messaging scoped by geography and interest, with consent controls.
+                </p>
+                <div className="example">
+                  "An environmental nonprofit sends a message to 8,000 verified Calgary residents who voted on climate-related proposals — all opted in, zero spam."
+                </div>
+              </div>
+            </div>
+          </Section>
+
+          {/* Revenue Model */}
+          <Section>
+            <h2>Four Revenue Lines</h2>
+
+            <div className="card revenue-section">
+              <div className="revenue-title">Sentiment API</div>
+              <div className="tier">
+                <div>
+                  <div className="tier-name">Free</div>
+                  <div className="tier-desc">10 requests/day, aggregate data only</div>
+                </div>
+                <div className="tier-price">$0</div>
+              </div>
+              <div className="tier">
+                <div>
+                  <div className="tier-name">Professional</div>
+                  <div className="tier-desc">Geographic breakdowns, 10K requests/day</div>
+                </div>
+                <div className="tier-price">$2,000/mo</div>
+              </div>
+              <div className="tier">
+                <div>
+                  <div className="tier-name">Enterprise</div>
+                  <div className="tier-desc">Full access, demographic splits, time-series, SLA</div>
+                </div>
+                <div className="tier-price">$20,000+/mo</div>
+              </div>
+            </div>
+
+            <div className="card revenue-section">
+              <div className="revenue-title">Analytics Dashboard</div>
+              <div className="tier">
+                <div>
+                  <div className="tier-name">Per Jurisdiction Seat</div>
+                  <div className="tier-desc">Real-time sentiment, ward-level breakdowns, scheduled reports, CSV export, alerts</div>
+                </div>
+                <div className="tier-price">$3,000–$10,000/mo</div>
+              </div>
+            </div>
+
+            <div className="card revenue-section">
+              <div className="revenue-title">Hosted Elections</div>
+              <div className="tier">
+                <div>
+                  <div className="tier-name">Per Election</div>
+                  <div className="tier-desc">Scales with voter roll size</div>
+                </div>
+                <div className="tier-price">$500–$5,000</div>
+              </div>
+              <div className="tier">
+                <div>
+                  <div className="tier-name">Annual Plans</div>
+                  <div className="tier-desc">For recurring elections</div>
+                </div>
+                <div className="tier-price">$10,000–$50,000/yr</div>
+              </div>
+            </div>
+
+            <div className="card revenue-section">
+              <div className="revenue-title">Constituent Communication</div>
+              <div className="tier">
+                <div>
+                  <div className="tier-name">Per Message Delivery</div>
+                  <div className="tier-desc">Targeting, consent management, delivery receipts</div>
+                </div>
+                <div className="tier-price">$0.05–$0.25</div>
+              </div>
+            </div>
+          </Section>
+
+          {/* The Math */}
+          <Section>
+            <h2 className="text-center">The Math</h2>
+            <div className="math-comparison">
+              <div className="card math-block">
+                <div className="muted" style={{marginBottom: '8px', fontSize: '14px'}}>YEAR 1</div>
+                <div className="math-label">100,000 verified users in Alberta</div>
+                <div className="muted" style={{fontSize: '14px'}}>(3% of adult population)</div>
+                <div className="math-plus">+</div>
+                <div className="math-label">10 institutional customers</div>
+                <div className="muted" style={{fontSize: '14px'}}>avg $5,000/mo</div>
+                <div className="math-result">$600K ARR</div>
+              </div>
+
+              <div className="card math-block">
+                <div className="muted" style={{marginBottom: '8px', fontSize: '14px'}}>YEAR 3</div>
+                <div className="math-label">500,000 verified users</div>
+                <div className="muted" style={{fontSize: '14px'}}>3 provinces + 2 US states</div>
+                <div className="math-plus">+</div>
+                <div className="math-label">30 institutional customers</div>
+                <div className="muted" style={{fontSize: '14px'}}>across all tiers</div>
+                <div className="math-result">$3M+ ARR</div>
+              </div>
+            </div>
+            <p className="text-center muted" style={{marginTop: '32px', fontSize: '16px'}}>
+              And citizens never pay a cent.
+            </p>
+          </Section>
+
+          {/* Moat */}
+          <Section>
+            <h2 className="text-center">Why This Is Hard to Copy</h2>
+            <div className="grid-3">
+              <div className="card moat-card">
+                <ShieldIcon />
+                <h3>Verified Identity Network</h3>
+                <p>Every user is government ID verified. No competitor can replicate this dataset without building the same trust and infrastructure.</p>
+              </div>
+
+              <div className="card moat-card">
+                <MapIcon />
+                <h3>Geographic Precision</h3>
+                <p>Sentiment data gated to postal code level. Traditional polls can't touch this granularity.</p>
+              </div>
+
+              <div className="card moat-card">
+                <ChainIcon />
+                <h3>Immutable Record</h3>
+                <p>Every response recorded on Base (Ethereum L2). Auditable by anyone, tampered by no one.</p>
+              </div>
+            </div>
+          </Section>
+
+          {/* Closing */}
+          <div className="closing">
+            <div className="container">
+              <p className="closing-statement">
+                Represent doesn't sell user data. We sell what the data reveals — in aggregate, anonymized, and with full transparency.
+              </p>
+              <p className="closing-sub">
+                Citizens own their voice. Institutions pay to listen.
+              </p>
+            </div>
+          </div>
+
+          <footer>
+            <div className="container">
+              Represent Labs Inc. &bull; Calgary, Alberta &bull; represent.vote
+            </div>
+          </footer>
+        </>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>

@@ -191,6 +191,7 @@ interface CreateProposalData {
   voteType?: string;
   options?: string[];
   imageUrl?: string;
+  isOfficial?: boolean;
 }
 
 interface UploadResponse {
@@ -457,7 +458,10 @@ export const organizationsApi = {
   },
 
   async leaveOrganization(orgId: string): Promise<ApiResponse<{ success: boolean }>> {
-    return apiRequest(`/api/organizations/${orgId}/leave`, { method: 'POST' });
+    const authState = useAuthStore.getState();
+    const userId = authState.user?.id;
+    if (!userId) return { data: null, error: 'Not authenticated' };
+    return apiRequest(`/api/organizations/${orgId}/members/${userId}/remove`, { method: 'POST' });
   },
 
   async deleteOrganization(orgId: string): Promise<ApiResponse<{ success: boolean }>> {
@@ -596,7 +600,7 @@ export const organizationsApi = {
         creatorId: 'demo-user',
         organizationId: orgId,
         organizationName: orgName,
-        isOfficial: true,
+        isOfficial: data.isOfficial ?? false,
       };
 
       try {
@@ -613,7 +617,7 @@ export const organizationsApi = {
 
     return apiRequest<OrganizationProposal>(`/api/organizations/${orgId}/proposals`, {
       method: 'POST',
-      body: JSON.stringify({ ...data, isOfficial: true }),
+      body: JSON.stringify({ ...data, isOfficial: data.isOfficial ?? false }),
     });
   },
 
@@ -782,7 +786,7 @@ export const organizationsApi = {
   },
 
   async removeMember(orgId: string, userId: string): Promise<ApiResponse<{ success: boolean }>> {
-    return apiRequest(`/api/organizations/${orgId}/members/${userId}`, { method: 'DELETE' });
+    return apiRequest(`/api/organizations/${orgId}/members/${userId}/remove`, { method: 'POST' });
   },
 
   async updateMemberRole(orgId: string, userId: string, role: 'admin' | 'member'): Promise<ApiResponse<{ success: boolean }>> {
@@ -829,11 +833,15 @@ export const organizationsApi = {
     name: string;
     description: string;
     logoUrl?: string;
-    type: 'community' | 'professional' | 'enterprise';
+    type: 'starter' | 'professional' | 'enterprise';
   }): Promise<ApiResponse<Organization>> {
     const result = await apiRequest<Organization>('/api/organizations', {
       method: 'POST',
-      body: JSON.stringify(data),
+      body: JSON.stringify({
+        ...data,
+        // Map 'starter' to 'community' for backend compatibility
+        type: data.type === 'starter' ? 'community' : data.type,
+      }),
     });
 
     // For demo account, save with enhanced data to ensure input fields and admin role
@@ -851,11 +859,19 @@ export const organizationsApi = {
       try {
         const stored = await AsyncStorage.getItem(DEMO_ORGS_STORAGE_KEY);
         const existingOrgs: Organization[] = stored ? JSON.parse(stored) : [];
+
+        // Prevent duplicates - if org with same name exists, return it
+        const duplicate = existingOrgs.find(o => o.name.toLowerCase() === data.name.toLowerCase());
+        if (duplicate) {
+          return { data: { ...duplicate, role: 'admin' }, error: null };
+        }
+
         existingOrgs.push(enhancedOrg);
         await AsyncStorage.setItem(DEMO_ORGS_STORAGE_KEY, JSON.stringify(existingOrgs));
         return { data: enhancedOrg, error: null };
       } catch (e) {
         console.error('Failed to save demo organization locally:', e);
+        return { data: enhancedOrg, error: null };
       }
     }
 
@@ -876,11 +892,19 @@ export const organizationsApi = {
       try {
         const stored = await AsyncStorage.getItem(DEMO_ORGS_STORAGE_KEY);
         const existingOrgs: Organization[] = stored ? JSON.parse(stored) : [];
+
+        // Prevent duplicates - if org with same name exists, return it
+        const duplicate = existingOrgs.find(o => o.name.toLowerCase() === data.name.toLowerCase());
+        if (duplicate) {
+          return { data: { ...duplicate, role: 'admin' }, error: null };
+        }
+
         existingOrgs.push(localOrg);
         await AsyncStorage.setItem(DEMO_ORGS_STORAGE_KEY, JSON.stringify(existingOrgs));
         return { data: localOrg, error: null };
       } catch (e) {
         console.error('Failed to save demo organization locally:', e);
+        return { data: localOrg, error: null };
       }
     }
 

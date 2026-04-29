@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -16,6 +17,8 @@ import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { organizationsApi } from '../../lib/api';
 import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS } from '../../lib/theme';
+
+const SERIF_FONT = Platform.OS === 'ios' ? 'Georgia' : 'serif';
 
 function getTimeRemaining(deadline: string | null): { text: string; urgent: boolean } {
   if (!deadline) return { text: 'Open indefinitely', urgent: false };
@@ -397,6 +400,7 @@ const styles = StyleSheet.create({
   },
   title: {
     ...TYPOGRAPHY.headlineMedium,
+    fontFamily: SERIF_FONT,
     marginBottom: SPACING.md,
   },
   timeCard: {

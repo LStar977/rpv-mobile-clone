@@ -160,7 +160,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   headerTitle: {
-    ...TYPOGRAPHY.headlineSmall,
+    fontFamily: 'Georgia',
+    fontSize: 20,
+    fontWeight: '500',
   },
   content: {
     flex: 1,
@@ -177,8 +179,9 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.lg,
   },
   priceAmount: {
-    ...TYPOGRAPHY.displayMedium,
-    fontWeight: '700',
+    fontFamily: 'Georgia',
+    fontSize: 36,
+    fontWeight: '500',
     textAlign: 'center',
   },
   priceLabel: {
@@ -187,7 +190,9 @@ const styles = StyleSheet.create({
     marginTop: SPACING.xxs,
   },
   heroTitle: {
-    ...TYPOGRAPHY.headlineLarge,
+    fontFamily: 'Georgia',
+    fontSize: 24,
+    fontWeight: '500',
     textAlign: 'center',
     marginBottom: SPACING.sm,
   },
@@ -204,7 +209,9 @@ const styles = StyleSheet.create({
     ...SHADOWS.md,
   },
   benefitsTitle: {
-    ...TYPOGRAPHY.headlineSmall,
+    fontFamily: 'Georgia',
+    fontSize: 18,
+    fontWeight: '500',
     marginBottom: SPACING.lg,
   },
   benefitRow: {
@@ -251,8 +258,9 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.sm,
   },
   upsellTitle: {
-    ...TYPOGRAPHY.labelLarge,
-    fontWeight: '600',
+    fontFamily: 'Georgia',
+    fontSize: 16,
+    fontWeight: '500',
   },
   upsellBadge: {
     paddingHorizontal: SPACING.sm,

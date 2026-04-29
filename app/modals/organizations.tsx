@@ -1,7 +1,8 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, ActivityIndicator, RefreshControl } from 'react-native';
-import { useState, useEffect, useCallback } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, ActivityIndicator, RefreshControl, Platform } from 'react-native';
+import { useState, useCallback } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
@@ -9,6 +10,7 @@ import { useAuthStore } from '../../lib/auth';
 import { organizationsApi, Organization } from '../../lib/api';
 import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS } from '../../lib/theme';
 
+const SERIF_FONT = Platform.OS === 'ios' ? 'Georgia' : 'serif';
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
 // Organization Card Component
@@ -253,9 +255,11 @@ export default function OrganizationsScreen() {
     }
   }, [token]);
 
-  useEffect(() => {
-    fetchOrganizations();
-  }, [fetchOrganizations]);
+  useFocusEffect(
+    useCallback(() => {
+      fetchOrganizations();
+    }, [fetchOrganizations])
+  );
 
   const onRefresh = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -364,7 +368,7 @@ export default function OrganizationsScreen() {
                     <Ionicons name="business" size={24} color="#000" />
                   </View>
                   <View style={styles.upsellText}>
-                    <Text style={[styles.upsellTitle, { color: colors.text }]}>Create Your Organization</Text>
+                    <Text style={[styles.upsellTitle, { color: colors.text, fontFamily: 'Georgia' }]}>Create Your Organization</Text>
                     <Text style={[styles.upsellDescription, { color: colors.textSecondary }]}>
                       Start at $29/month for unions, nonprofits, and community groups.
                     </Text>
@@ -427,7 +431,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   headerTitle: {
-    ...TYPOGRAPHY.headlineSmall,
+    fontFamily: 'Georgia',
+    fontSize: 20,
+    fontWeight: '500',
   },
   addButton: {
     width: 40,
@@ -466,8 +472,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   statValue: {
-    ...TYPOGRAPHY.headlineLarge,
-    fontWeight: '700',
+    fontFamily: 'Georgia',
+    fontSize: 28,
+    fontWeight: '500',
   },
   statLabel: {
     ...TYPOGRAPHY.labelSmall,
@@ -509,8 +516,9 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.xxs,
   },
   orgName: {
-    ...TYPOGRAPHY.labelLarge,
-    fontWeight: '600',
+    fontFamily: 'Georgia',
+    fontSize: 16,
+    fontWeight: '500',
   },
   orgDescription: {
     ...TYPOGRAPHY.bodySmall,
@@ -558,7 +566,9 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.xl,
   },
   emptyTitle: {
-    ...TYPOGRAPHY.headlineSmall,
+    fontFamily: 'Georgia',
+    fontSize: 22,
+    fontWeight: '500',
     marginBottom: SPACING.sm,
   },
   emptyDescription: {

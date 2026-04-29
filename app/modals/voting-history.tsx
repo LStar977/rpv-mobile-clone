@@ -440,8 +440,9 @@ const styles = StyleSheet.create({
     marginLeft: SPACING.md,
   },
   limitsTitle: {
-    ...TYPOGRAPHY.labelLarge,
-    fontWeight: '600',
+    fontFamily: 'Georgia',
+    fontSize: 16,
+    fontWeight: '500',
   },
   limitsSubtitle: {
     ...TYPOGRAPHY.bodySmall,
@@ -451,8 +452,9 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
   },
   limitsCountValue: {
-    ...TYPOGRAPHY.headlineMedium,
-    fontWeight: '700',
+    fontFamily: 'Georgia',
+    fontSize: 24,
+    fontWeight: '500',
   },
   limitsCountLabel: {
     ...TYPOGRAPHY.labelSmall,
@@ -488,8 +490,9 @@ const styles = StyleSheet.create({
     height: 40,
   },
   statsNumber: {
-    ...TYPOGRAPHY.headlineLarge,
-    fontWeight: '700',
+    fontFamily: 'Georgia',
+    fontSize: 28,
+    fontWeight: '500',
   },
   statsLabel: {
     ...TYPOGRAPHY.labelSmall,
@@ -543,8 +546,9 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.md,
   },
   proposalTitle: {
-    ...TYPOGRAPHY.labelLarge,
-    fontWeight: '600',
+    fontFamily: 'Georgia',
+    fontSize: 16,
+    fontWeight: '500',
     flex: 1,
     marginRight: SPACING.md,
   },

@@ -506,8 +506,9 @@ const styles = StyleSheet.create({
     gap: SPACING.xs,
   },
   headerTitle: {
-    fontSize: TYPOGRAPHY.h4.fontSize,
-    fontWeight: '700',
+    fontFamily: 'Georgia',
+    fontSize: 20,
+    fontWeight: '500',
   },
   headerSpacer: {
     width: 40,
@@ -560,8 +561,9 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.lg,
   },
   unauthorizedTitle: {
-    fontSize: TYPOGRAPHY.h3.fontSize,
-    fontWeight: '700',
+    fontFamily: 'Georgia',
+    fontSize: 22,
+    fontWeight: '500',
     marginBottom: SPACING.sm,
   },
   unauthorizedText: {
@@ -595,8 +597,9 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   sectionTitle: {
-    fontSize: TYPOGRAPHY.h5.fontSize,
-    fontWeight: '700',
+    fontFamily: 'Georgia',
+    fontSize: 18,
+    fontWeight: '500',
     marginBottom: SPACING.md,
   },
   activityCard: {
@@ -605,8 +608,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   activityTitle: {
-    fontSize: TYPOGRAPHY.bodyLarge.fontSize,
-    fontWeight: '600',
+    fontFamily: 'Georgia',
+    fontSize: 18,
+    fontWeight: '500',
     marginBottom: SPACING.lg,
   },
   activityRow: {
@@ -619,8 +623,9 @@ const styles = StyleSheet.create({
     gap: SPACING.xs,
   },
   activityValue: {
-    fontSize: TYPOGRAPHY.h4.fontSize,
-    fontWeight: '700',
+    fontFamily: 'Georgia',
+    fontSize: 24,
+    fontWeight: '500',
   },
   activityLabel: {
     fontSize: TYPOGRAPHY.caption.fontSize,
@@ -642,8 +647,9 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.xs,
   },
   proposalsHeaderText: {
-    fontSize: TYPOGRAPHY.bodyLarge.fontSize,
-    fontWeight: '600',
+    fontFamily: 'Georgia',
+    fontSize: 18,
+    fontWeight: '500',
   },
   proposalsHeaderNote: {
     fontSize: TYPOGRAPHY.caption.fontSize,
@@ -678,8 +684,9 @@ const styles = StyleSheet.create({
   },
   proposalTitle: {
     flex: 1,
-    fontSize: TYPOGRAPHY.body.fontSize,
-    fontWeight: '600',
+    fontFamily: 'Georgia',
+    fontSize: 15,
+    fontWeight: '500',
     lineHeight: 20,
   },
   deleteButton: {

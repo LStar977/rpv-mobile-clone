@@ -46,12 +46,56 @@ import { useAuthStore } from '../../lib/auth';
 import { useBallotStore } from '../../lib/ballots';
 import { shareProposal } from '../../lib/share';
 import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS, ANIMATION, responsive } from '../../lib/theme';
+import Svg, { Rect, Line, Ellipse, Path, Circle, G, Defs, LinearGradient as SvgLinearGradient, Stop } from 'react-native-svg';
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PREMIUM DESIGN CONSTANTS - Institutional gold-on-black (static fallbacks)
+// ═══════════════════════════════════════════════════════════════════════════════
+const GOLD = '#EABA58';
+const GOLD_DARK = '#C89A3E';
+const GOLD_LIGHT = '#F4D28C';
+const BG = '#040707';
+const BG_CARD = '#0D0F12';
+const BG_RAISED = '#15181C';
+const LINE_COLOR = '#1E2228';
+const LINE_STRONG = '#2A2F37';
+const FG = '#F4F5F6';
+const FG_MUTED = '#C7CACD';
+const FG_FAINT = '#8E9297';
+const GREEN = '#34C759';
+const RED = '#FF6B6B';
+const BLUE = '#5B8FF9';
+const SERIF_FONT = Platform.OS === 'ios' ? 'Georgia' : 'serif';
+const MONO_FONT = Platform.OS === 'ios' ? 'Menlo' : 'monospace';
+
+// Dynamic hook for components to get theme-aware colors
+function useProposalColors() {
+  const { colors, isDark } = useTheme();
+  return {
+    GOLD: colors.gold,
+    GOLD_DARK: colors.goldDark,
+    GOLD_LIGHT: colors.goldLight,
+    BG: colors.background,
+    BG_CARD: colors.surface,
+    BG_RAISED: colors.surfaceElevated,
+    LINE: colors.border,
+    LINE_STRONG: colors.borderStrong,
+    FG: colors.text,
+    FG_MUTED: colors.textSecondary,
+    FG_FAINT: colors.textTertiary,
+    GREEN: colors.success,
+    RED: colors.error,
+    BLUE: '#5B8FF9',
+    isDark,
+  };
+}
 import { showVoteConfirmation } from '../../lib/notifications';
 import { VoteConfirmationOverlay, UpgradeModal, BallotDisplay } from '../../components/ui';
 import { checkForNewBadges } from '../../lib/badgeNotification';
 import * as ImagePicker from 'expo-image-picker';
-import { useTutorialTarget } from '../../components/tutorial';
-import { useTutorialStore } from '../../lib/tutorial';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+const SWIPE_HINT_KEY = '@represent_swipe_hint_shown';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
@@ -89,6 +133,466 @@ const categoryThemes: Record<string, { primary: string; secondary: string; icon:
 };
 
 const SWIPE_THRESHOLD = 120;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SVG SCENE ILLUSTRATIONS - Abstract gold line art for proposals
+// ═══════════════════════════════════════════════════════════════════════════════
+function HousingScene() {
+  return (
+    <Svg width="100%" height="100%" viewBox="0 0 360 180" preserveAspectRatio="xMidYMid slice" style={StyleSheet.absoluteFill}>
+      <Defs>
+        <SvgLinearGradient id="sky1" x1="0" y1="0" x2="0" y2="1">
+          <Stop offset="0%" stopColor="#1A2030" />
+          <Stop offset="100%" stopColor="#0A0D14" />
+        </SvgLinearGradient>
+      </Defs>
+      <Rect width="360" height="180" fill="url(#sky1)" />
+      <Ellipse cx="280" cy="40" rx="100" ry="50" fill={GOLD} opacity={0.08} />
+      <G fill="#0E1218" stroke={GOLD} strokeWidth={0.5} strokeOpacity={0.35}>
+        <Rect x={20} y={80} width={38} height={100} />
+        <Rect x={62} y={60} width={44} height={120} />
+        <Rect x={110} y={50} width={32} height={130} />
+        <Rect x={146} y={70} width={52} height={110} />
+        <Rect x={202} y={45} width={40} height={135} />
+        <Rect x={246} y={65} width={36} height={115} />
+        <Rect x={286} y={75} width={50} height={105} />
+      </G>
+      <G fill={GOLD} opacity={0.7}>
+        {[[28,100],[44,100],[28,120],[44,140],[70,80],[86,100],[70,120],[118,70],[130,90],[156,90],[176,110],[212,65],[228,85],[254,85],[294,95]].map(([x,y], i) => (
+          <Rect key={i} x={x} y={y} width={6} height={6} />
+        ))}
+      </G>
+      <Line x1={0} y1={180} x2={360} y2={180} stroke={GOLD} strokeWidth={0.5} opacity={0.4} />
+    </Svg>
+  );
+}
+
+function TransitScene() {
+  return (
+    <Svg width="100%" height="100%" viewBox="0 0 360 180" preserveAspectRatio="xMidYMid slice" style={StyleSheet.absoluteFill}>
+      <Defs>
+        <SvgLinearGradient id="sky2" x1="0" y1="0" x2="0" y2="1">
+          <Stop offset="0%" stopColor="#101522" />
+          <Stop offset="100%" stopColor="#08090F" />
+        </SvgLinearGradient>
+      </Defs>
+      <Rect width="360" height="180" fill="url(#sky2)" />
+      <Path d="M-20 150 Q 90 100 180 120 Q 270 140 380 80" stroke={GOLD} strokeWidth={2} fill="none" opacity={0.7} />
+      <Path d="M-20 165 Q 90 115 180 135 Q 270 155 380 95" stroke={GOLD} strokeWidth={0.8} fill="none" opacity={0.4} />
+      <G stroke={GOLD} strokeWidth={1} opacity={0.55}>
+        <Line x1={40} y1={130} x2={40} y2={180} />
+        <Line x1={100} y1={108} x2={100} y2={180} />
+        <Line x1={160} y1={120} x2={160} y2={180} />
+        <Line x1={220} y1={128} x2={220} y2={180} />
+        <Line x1={280} y1={118} x2={280} y2={180} />
+        <Line x1={320} y1={100} x2={320} y2={180} />
+      </G>
+      <Path d="M-20 150 Q 90 100 180 120 Q 270 140 380 80" stroke={GOLD_LIGHT} strokeWidth={1} strokeDasharray="3 6" fill="none" opacity={0.9} />
+      <G transform="translate(310, 30)" stroke={GOLD} strokeWidth={0.6} fill="none" opacity={0.6}>
+        <Circle r={14} />
+        <Line x1={0} y1={-14} x2={0} y2={14} />
+        <Line x1={-14} y1={0} x2={14} y2={0} />
+      </G>
+    </Svg>
+  );
+}
+
+function EconomyScene() {
+  return (
+    <Svg width="100%" height="100%" viewBox="0 0 360 180" preserveAspectRatio="xMidYMid slice" style={StyleSheet.absoluteFill}>
+      <Defs>
+        <SvgLinearGradient id="sky3" x1="0" y1="0" x2="0" y2="1">
+          <Stop offset="0%" stopColor="#1B1F2A" />
+          <Stop offset="100%" stopColor="#0A0D14" />
+        </SvgLinearGradient>
+      </Defs>
+      <Rect width="360" height="180" fill="url(#sky3)" />
+      {[0, 1, 2, 3, 4].map((i) => (
+        <G key={i} transform={`translate(${20 + i * 68}, 50)`}>
+          <Rect width={58} height={130} fill="#0E1218" stroke={GOLD} strokeWidth={0.6} strokeOpacity={0.5} />
+          <Rect x={6} y={14} width={46} height={60} fill="#070A10" stroke={GOLD} strokeOpacity={i === 1 || i === 3 ? 0.9 : 0.3} strokeWidth={0.6} />
+          <Line x1={0} y1={80} x2={58} y2={80} stroke={GOLD} strokeWidth={0.4} opacity={0.4} />
+          {(i === 1 || i === 3) && (
+            <G>
+              <Rect x={14} y={32} width={30} height={20} fill={BG} stroke={GOLD} strokeWidth={0.6} />
+            </G>
+          )}
+        </G>
+      ))}
+      <Line x1={0} y1={180} x2={360} y2={180} stroke={GOLD} strokeWidth={0.5} opacity={0.4} />
+    </Svg>
+  );
+}
+
+function EnvironmentScene() {
+  return (
+    <Svg width="100%" height="100%" viewBox="0 0 360 180" preserveAspectRatio="xMidYMid slice" style={StyleSheet.absoluteFill}>
+      <Defs>
+        <SvgLinearGradient id="sky4" x1="0" y1="0" x2="0" y2="1">
+          <Stop offset="0%" stopColor="#0F1A14" />
+          <Stop offset="100%" stopColor="#060A08" />
+        </SvgLinearGradient>
+      </Defs>
+      <Rect width="360" height="180" fill="url(#sky4)" />
+      <Ellipse cx="180" cy="200" rx="200" ry="60" fill={GOLD} opacity={0.05} />
+      {[40, 100, 160, 220, 280, 320].map((x, i) => (
+        <G key={i} transform={`translate(${x}, ${140 - (i % 3) * 20})`}>
+          <Line x1={0} y1={0} x2={0} y2={40 + (i % 2) * 20} stroke={GOLD} strokeWidth={1} opacity={0.6} />
+          <Path d={`M-12,-${10 + i * 3} Q0,-${25 + i * 3} 12,-${10 + i * 3}`} stroke={GOLD} strokeWidth={0.8} fill="none" opacity={0.5} />
+          <Path d={`M-8,-${18 + i * 3} Q0,-${30 + i * 3} 8,-${18 + i * 3}`} stroke={GOLD} strokeWidth={0.6} fill="none" opacity={0.4} />
+        </G>
+      ))}
+    </Svg>
+  );
+}
+
+function HealthcareScene() {
+  return (
+    <Svg width="100%" height="100%" viewBox="0 0 360 180" preserveAspectRatio="xMidYMid slice" style={StyleSheet.absoluteFill}>
+      <Defs>
+        <SvgLinearGradient id="sky5" x1="0" y1="0" x2="0" y2="1">
+          <Stop offset="0%" stopColor="#1A1520" />
+          <Stop offset="100%" stopColor="#0A080D" />
+        </SvgLinearGradient>
+      </Defs>
+      <Rect width="360" height="180" fill="url(#sky5)" />
+      <G transform="translate(180, 90)">
+        <Circle r={50} fill="none" stroke={GOLD} strokeWidth={1} opacity={0.3} />
+        <Circle r={35} fill="none" stroke={GOLD} strokeWidth={0.6} opacity={0.2} />
+        <Rect x={-5} y={-25} width={10} height={50} fill={GOLD} opacity={0.6} />
+        <Rect x={-25} y={-5} width={50} height={10} fill={GOLD} opacity={0.6} />
+      </G>
+      <Path d="M40 160 Q100 100 160 120 Q220 140 280 100 Q340 60 380 80" stroke={GOLD} strokeWidth={1} fill="none" opacity={0.3} />
+    </Svg>
+  );
+}
+
+function DefaultScene() {
+  return (
+    <Svg width="100%" height="100%" viewBox="0 0 360 180" preserveAspectRatio="xMidYMid slice" style={StyleSheet.absoluteFill}>
+      <Defs>
+        <SvgLinearGradient id="sky6" x1="0" y1="0" x2="0" y2="1">
+          <Stop offset="0%" stopColor="#1A1814" />
+          <Stop offset="100%" stopColor="#0A0908" />
+        </SvgLinearGradient>
+      </Defs>
+      <Rect width="360" height="180" fill="url(#sky6)" />
+      <G transform="translate(180, 90)" opacity={0.3}>
+        <Circle r={60} fill="none" stroke={GOLD} strokeWidth={1} strokeDasharray="4 4" />
+        <Circle r={40} fill="none" stroke={GOLD} strokeWidth={0.6} />
+        <Circle r={20} fill={GOLD} opacity={0.2} />
+      </G>
+      <Line x1={0} y1={180} x2={360} y2={180} stroke={GOLD} strokeWidth={0.5} opacity={0.3} />
+    </Svg>
+  );
+}
+
+function getSceneForCategory(category: string) {
+  switch (category?.toLowerCase()) {
+    case 'housing': return <HousingScene />;
+    case 'transportation': case 'infrastructure': return <TransitScene />;
+    case 'economy': return <EconomyScene />;
+    case 'environment': return <EnvironmentScene />;
+    case 'healthcare': return <HealthcareScene />;
+    default: return <DefaultScene />;
+  }
+}
+
+// Get tier label from geo restrictions
+function getTierLabel(geoRestrictions?: string[]): string {
+  if (!geoRestrictions || geoRestrictions.length === 0) return 'FEDERAL';
+  if (geoRestrictions.length === 1) return 'FEDERAL';
+  if (geoRestrictions.length === 2) return 'PROVINCIAL';
+  return 'MUNICIPAL';
+}
+
+// Generate dossier ref code from proposal
+function getDossierRef(proposal: Proposal): string {
+  const tier = getTierLabel(proposal.geoRestrictions);
+  const prefix = tier === 'FEDERAL' ? 'FED' : tier === 'PROVINCIAL' ? 'PROV' : 'MUN';
+  const idNum = String(proposal.id).match(/\d+/g)?.join('') || '0000';
+  return `${prefix}-${idNum.slice(-4).padStart(4, '0')}`;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SWIPE HINT OVERLAY - One-time gesture instructions
+// ═══════════════════════════════════════════════════════════════════════════════
+function SwipeHintOverlay({ visible, onDismiss }: { visible: boolean; onDismiss: () => void }) {
+  const pc = useProposalColors();
+
+  if (!visible) return null;
+
+  return (
+    <TouchableOpacity
+      style={styles.swipeHintOverlay}
+      activeOpacity={1}
+      onPress={onDismiss}
+    >
+      <Animated.View
+        entering={FadeIn.duration(300)}
+        style={[styles.swipeHintCard, { backgroundColor: pc.BG_CARD, borderColor: pc.LINE }]}
+      >
+        <Text style={[styles.swipeHintTitle, { color: pc.GOLD }]}>How to Vote</Text>
+
+        <View style={styles.swipeHintRow}>
+          <View style={[styles.swipeHintIcon, { borderColor: pc.GREEN }]}>
+            <Ionicons name="arrow-forward" size={20} color={pc.GREEN} />
+          </View>
+          <Text style={[styles.swipeHintText, { color: pc.FG }]}>Swipe right to support</Text>
+        </View>
+
+        <View style={styles.swipeHintRow}>
+          <View style={[styles.swipeHintIcon, { borderColor: pc.RED }]}>
+            <Ionicons name="arrow-back" size={20} color={pc.RED} />
+          </View>
+          <Text style={[styles.swipeHintText, { color: pc.FG }]}>Swipe left to oppose</Text>
+        </View>
+
+        <View style={styles.swipeHintRow}>
+          <View style={[styles.swipeHintIcon, { borderColor: pc.FG_MUTED }]}>
+            <Ionicons name="arrow-up" size={20} color={pc.FG_MUTED} />
+          </View>
+          <Text style={[styles.swipeHintText, { color: pc.FG }]}>Swipe up to skip</Text>
+        </View>
+
+        <Text style={[styles.swipeHintDismiss, { color: pc.FG_FAINT }]}>Tap anywhere to start</Text>
+      </Animated.View>
+    </TouchableOpacity>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PREMIUM VOTE HEADER - Institutional serif styling
+// ═══════════════════════════════════════════════════════════════════════════════
+function VoteHeader({
+  index,
+  total,
+  activeCount,
+  closingSoon,
+  selectedFilter,
+  onFilterChange,
+  insetTop,
+}: {
+  index: number;
+  total: number;
+  activeCount: number;
+  closingSoon: number;
+  selectedFilter: string;
+  onFilterChange: (filter: string) => void;
+  insetTop: number;
+}) {
+  const pc = useProposalColors();
+  const filters = ['All', 'Federal', 'Provincial', 'Municipal', 'Closing'];
+
+  return (
+    <View style={{ paddingTop: insetTop + 8, backgroundColor: pc.BG }}>
+      {/* Title block */}
+      <View style={voteHeaderStyles.titleBlock}>
+        <View>
+          <Text style={[voteHeaderStyles.serifTitle, { color: pc.FG }]}>Proposals</Text>
+          <View style={voteHeaderStyles.subtitleRow}>
+            <Text style={[voteHeaderStyles.subtitleText, { color: pc.FG_MUTED }]}>{activeCount} active</Text>
+            <View style={[voteHeaderStyles.dotSeparator, { backgroundColor: pc.LINE_STRONG }]} />
+            <Text style={[voteHeaderStyles.subtitleText, { color: pc.FG_MUTED }]}>{closingSoon} closing soon</Text>
+          </View>
+        </View>
+      </View>
+
+      {/* Filter rail */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={voteHeaderStyles.filterRail}
+      >
+        {filters.map((label) => {
+          const isActive = selectedFilter === label;
+          return (
+            <TouchableOpacity
+              key={label}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                onFilterChange(label);
+              }}
+              style={[
+                voteHeaderStyles.filterChip,
+                {
+                  backgroundColor: isActive ? pc.GOLD : 'transparent',
+                  borderColor: isActive ? pc.GOLD : pc.LINE_STRONG,
+                },
+              ]}
+            >
+              <Text style={[
+                voteHeaderStyles.filterChipText,
+                { color: isActive ? '#1A1206' : pc.FG_MUTED },
+              ]}>{label}</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
+
+      {/* Progress counter */}
+      <View style={voteHeaderStyles.progressSection}>
+        <View style={voteHeaderStyles.progressRow}>
+          <View style={voteHeaderStyles.counterRow}>
+            <Text style={[voteHeaderStyles.counterNum, { color: pc.FG }]}>
+              {String(index + 1).padStart(2, '0')} / {String(total).padStart(2, '0')}
+            </Text>
+            <Text style={[voteHeaderStyles.counterLabel, { color: pc.FG_FAINT }]}>in queue</Text>
+          </View>
+          <Text style={[voteHeaderStyles.percentText, { color: pc.FG_FAINT }]}>
+            {total > 0 ? Math.round(((index + 1) / total) * 100) : 0}% reviewed
+          </Text>
+        </View>
+        <View style={[voteHeaderStyles.progressBar, { backgroundColor: pc.LINE }]}>
+          <LinearGradient
+            colors={[pc.GOLD_DARK, pc.GOLD, pc.GOLD_LIGHT]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={[voteHeaderStyles.progressFill, { width: `${total > 0 ? ((index + 1) / total) * 100 : 0}%` }]}
+          />
+          {[25, 50, 75].map(p => (
+            <View key={p} style={[voteHeaderStyles.progressTick, { left: `${p}%`, backgroundColor: pc.LINE_STRONG }]} />
+          ))}
+        </View>
+      </View>
+    </View>
+  );
+}
+
+const voteHeaderStyles = StyleSheet.create({
+  identityStrip: {
+    paddingHorizontal: 24,
+    paddingTop: 8,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  statusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  statusText: {
+    fontFamily: Platform.OS === 'ios' ? 'System' : 'sans-serif',
+    fontSize: 11,
+    fontWeight: '500',
+    letterSpacing: 1.5,
+    textTransform: 'uppercase',
+    color: FG_FAINT,
+  },
+  dateText: {
+    fontFamily: MONO_FONT,
+    fontSize: 9.5,
+    color: FG_FAINT,
+    letterSpacing: 1,
+  },
+  titleBlock: {
+    paddingHorizontal: 24,
+    paddingTop: 14,
+    paddingBottom: 18,
+  },
+  serifTitle: {
+    fontFamily: SERIF_FONT,
+    fontSize: 38,
+    fontWeight: '500',
+    color: FG,
+    letterSpacing: -1,
+  },
+  subtitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 8,
+  },
+  subtitleText: {
+    fontSize: 12,
+    color: FG_FAINT,
+    letterSpacing: -0.2,
+  },
+  dotSeparator: {
+    width: 2,
+    height: 2,
+    borderRadius: 1,
+    backgroundColor: FG_FAINT,
+  },
+  filterRail: {
+    paddingHorizontal: 24,
+    paddingBottom: 18,
+    gap: 6,
+  },
+  filterChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  filterChipText: {
+    fontSize: 11,
+    fontWeight: '500',
+    letterSpacing: 0.3,
+  },
+  progressSection: {
+    paddingHorizontal: 24,
+    paddingBottom: 16,
+  },
+  progressRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'baseline',
+    marginBottom: 10,
+  },
+  counterRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 8,
+  },
+  counterNum: {
+    fontFamily: MONO_FONT,
+    fontSize: 10.5,
+    fontWeight: '500',
+    color: FG,
+    letterSpacing: 0.5,
+  },
+  counterLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    letterSpacing: 1.5,
+    textTransform: 'uppercase',
+    color: GOLD,
+  },
+  percentText: {
+    fontFamily: MONO_FONT,
+    fontSize: 9,
+    color: FG_FAINT,
+    letterSpacing: 0.8,
+  },
+  progressBar: {
+    height: 2,
+    backgroundColor: LINE_COLOR,
+    borderRadius: 2,
+    overflow: 'visible',
+    position: 'relative',
+  },
+  progressFill: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    borderRadius: 2,
+  },
+  progressTick: {
+    position: 'absolute',
+    top: -2,
+    bottom: -2,
+    width: 1,
+    backgroundColor: BG,
+  },
+});
 
 // Helper to check if a proposal is a seed proposal (for local-only voting)
 const isSeedProposal = (id: number | string): boolean =>
@@ -201,10 +705,10 @@ interface SwipeCardProps {
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 // Base card height - will be adjusted with safe area insets in component
-const BASE_CARD_HEIGHT_OFFSET = 340; // Space for header, tab bar, and margins
+const BASE_CARD_HEIGHT_OFFSET = 280; // Space for header, tab bar, and margins
 
 function SwipeCard({ proposal, onSwipeLeft, onSwipeRight, onSwipeUp, onTap, isTopCard, cardIndex, cardHeight }: SwipeCardProps) {
-  const { colors } = useTheme();
+  const pc = useProposalColors();
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
   const rotation = useSharedValue(0);
@@ -314,132 +818,145 @@ function SwipeCard({ proposal, onSwipeLeft, onSwipeRight, onSwipeUp, onTap, isTo
     opacity: interpolate(translateY.value, [-SWIPE_THRESHOLD, 0], [1, 0], Extrapolation.CLAMP),
   }));
 
+  // Get category color for tag
+  const getCategoryColor = () => {
+    switch (category?.toLowerCase()) {
+      case 'economy': return pc.GREEN;
+      case 'housing': return pc.GOLD;
+      case 'transportation': case 'infrastructure': return pc.BLUE;
+      case 'environment': return '#22C55E';
+      case 'healthcare': return '#EF4444';
+      default: return pc.GOLD;
+    }
+  };
+
+  const tierLabel = getTierLabel(proposal.geoRestrictions);
+  const categoryColor = getCategoryColor();
+  const location = proposal.geoRestrictions && proposal.geoRestrictions.length > 0
+    ? proposal.geoRestrictions[proposal.geoRestrictions.length - 1]
+    : 'Canada';
+
   return (
     <GestureDetector gesture={composedGesture}>
-      <Animated.View style={[styles.swipeCard, { backgroundColor: colors.surface, borderColor: colors.border, height: cardHeight }, cardStyle]}>
-        {/* Hero Image */}
-        {proposal.imageUrl ? (
-          <View style={styles.swipeCardImageContainer}>
-            <Image source={{ uri: proposal.imageUrl }} style={styles.swipeCardImage} resizeMode="cover" />
-            {/* Category-themed gradient overlay on image */}
-            <LinearGradient
-              colors={[`${theme.primary}40`, 'transparent']}
-              style={styles.swipeCardImageOverlayTop}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 0, y: 1 }}
-            />
-            <LinearGradient
-              colors={['transparent', 'rgba(0,0,0,0.5)', 'rgba(0,0,0,0.9)']}
-              locations={[0, 0.5, 1]}
-              style={styles.swipeCardImageOverlay}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 0, y: 1 }}
-            />
-          </View>
-        ) : (
-          <View style={[styles.swipeCardImageContainer, { backgroundColor: theme.primary + '20' }]}>
-            <LinearGradient
-              colors={[`${theme.primary}30`, `${theme.secondary}20`]}
-              style={StyleSheet.absoluteFill}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-            />
-            <Ionicons name={theme.icon as any} size={80} color={`${theme.primary}50`} />
-          </View>
-        )}
+      <Animated.View style={[premiumCardStyles.card, { height: cardHeight, backgroundColor: pc.BG_CARD, borderColor: pc.LINE }, cardStyle]}>
+        {/* Hero with SVG scene */}
+        <View style={premiumCardStyles.heroContainer}>
+          {proposal.imageUrl ? (
+            <>
+              <Image source={{ uri: proposal.imageUrl }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+              <LinearGradient
+                colors={pc.isDark ? ['rgba(4,7,7,0.2)', 'rgba(4,7,7,0.55)', 'rgba(13,15,18,0.95)'] : ['rgba(255,255,255,0.2)', 'rgba(255,255,255,0.55)', 'rgba(250,248,245,0.95)']}
+                locations={[0, 0.5, 1]}
+                style={StyleSheet.absoluteFill}
+              />
+            </>
+          ) : (
+            <>
+              {getSceneForCategory(category)}
+              <LinearGradient
+                colors={pc.isDark ? ['rgba(4,7,7,0.15)', 'transparent', 'transparent', 'rgba(13,15,18,0.95)'] : ['rgba(255,255,255,0.15)', 'transparent', 'transparent', 'rgba(250,248,245,0.95)']}
+                locations={[0, 0.3, 0.75, 1]}
+                style={StyleSheet.absoluteFill}
+              />
+            </>
+          )}
 
-        {/* Geo scope badge - top left */}
-        <View style={[styles.swipeGeoBadgeTopLeft, { backgroundColor: 'rgba(0,0,0,0.6)' }]}>
-          <Ionicons
-            name={proposal.geoRestrictions && proposal.geoRestrictions.length > 0 ? 'location' : 'globe-outline'}
-            size={14}
-            color="#fff"
-          />
-          <Text style={styles.swipeGeoText}>
-            {proposal.geoRestrictions && proposal.geoRestrictions.length > 0
-              ? proposal.geoRestrictions[proposal.geoRestrictions.length - 1]
-              : 'Global'}
-          </Text>
+          {/* Location pill - top left */}
+          <View style={[premiumCardStyles.locationPill, { backgroundColor: pc.isDark ? 'rgba(4,7,7,0.55)' : 'rgba(255,255,255,0.75)' }]}>
+            <Ionicons name="location" size={11} color={pc.FG} />
+            <Text style={[premiumCardStyles.locationText, { color: pc.FG }]}>{location}</Text>
+          </View>
+
+          {/* Time remaining pill - top right */}
+          {!isEnded && timeRemaining ? (
+            <View style={[premiumCardStyles.timePill, { borderColor: `${pc.GOLD}55`, backgroundColor: pc.isDark ? 'rgba(4,7,7,0.55)' : 'rgba(255,255,255,0.75)' }]}>
+              <Ionicons name="time-outline" size={11} color={pc.GOLD} />
+              <Text style={[premiumCardStyles.timePillText, { color: pc.GOLD }]}>{timeRemaining}</Text>
+            </View>
+          ) : null}
+
+          {/* Category tag - bottom left */}
+          <View style={[premiumCardStyles.categoryTag, { borderColor: `${categoryColor}66` }]}>
+            <View style={[premiumCardStyles.categoryDot, { backgroundColor: categoryColor }]} />
+            <Text style={[premiumCardStyles.categoryText, { color: categoryColor }]}>{category.toUpperCase()}</Text>
+          </View>
         </View>
 
         {/* Swipe Indicators */}
         {isTopCard && !isEnded && (
           <>
-            <Animated.View style={[styles.swipeIndicatorFullScreen, styles.swipeIndicatorRight, supportIndicatorStyle]}>
-              <View style={[styles.swipeIndicatorCircle, { backgroundColor: colors.success }]}>
-                <Ionicons name="checkmark" size={48} color="#fff" />
+            <Animated.View style={[premiumCardStyles.swipeVeil, { backgroundColor: `${pc.GREEN}20` }, supportIndicatorStyle]}>
+              <View style={[premiumCardStyles.swipeStamp, { borderColor: pc.GREEN }]}>
+                <Text style={[premiumCardStyles.swipeStampText, { color: pc.GREEN }]}>SUPPORT</Text>
               </View>
-              <Text style={[styles.swipeIndicatorTextLarge, { color: colors.success }]}>SUPPORT</Text>
             </Animated.View>
-            <Animated.View style={[styles.swipeIndicatorFullScreen, styles.swipeIndicatorLeft, opposeIndicatorStyle]}>
-              <View style={[styles.swipeIndicatorCircle, { backgroundColor: colors.error }]}>
-                <Ionicons name="close" size={48} color="#fff" />
+            <Animated.View style={[premiumCardStyles.swipeVeil, { backgroundColor: `${pc.RED}20` }, opposeIndicatorStyle]}>
+              <View style={[premiumCardStyles.swipeStamp, { borderColor: pc.RED, right: 24, left: undefined }]}>
+                <Text style={[premiumCardStyles.swipeStampText, { color: pc.RED }]}>OPPOSE</Text>
               </View>
-              <Text style={[styles.swipeIndicatorTextLarge, { color: colors.error }]}>OPPOSE</Text>
             </Animated.View>
-            <Animated.View style={[styles.swipeIndicatorFullScreen, styles.swipeIndicatorTop, skipIndicatorStyle]}>
-              <View style={[styles.swipeIndicatorCircle, { backgroundColor: colors.gold }]}>
-                <Ionicons name="arrow-up" size={48} color="#fff" />
+            <Animated.View style={[premiumCardStyles.swipeVeilTop, skipIndicatorStyle]}>
+              <View style={[premiumCardStyles.swipeStamp, { borderColor: pc.GOLD, transform: [{ rotate: '0deg' }] }]}>
+                <Text style={[premiumCardStyles.swipeStampText, { color: pc.GOLD }]}>SKIP</Text>
               </View>
-              <Text style={[styles.swipeIndicatorTextLarge, { color: colors.gold }]}>SKIP</Text>
             </Animated.View>
           </>
         )}
 
-        {/* Content Overlay at Bottom */}
-        <View style={styles.swipeCardContentOverlay}>
-          {/* Category & Time badges */}
-          <View style={styles.swipeCardBadgeRow}>
-            <View style={[styles.swipeCategoryBadgeLarge, { backgroundColor: theme.primary }]}>
-              <Ionicons name={theme.icon as any} size={14} color="#fff" />
-              <Text style={styles.swipeCategoryTextLight}>{category}</Text>
+        {/* Card body */}
+        <View style={premiumCardStyles.cardBody}>
+          {/* Tier label */}
+          <Text style={[premiumCardStyles.refText, { color: pc.GOLD }]}>{tierLabel}</Text>
+
+          {/* Serif title */}
+          <Text style={[premiumCardStyles.serifTitle, { color: pc.FG }]} numberOfLines={2}>{proposal.title}</Text>
+
+          {/* Proposer */}
+          <View style={premiumCardStyles.proposerRow}>
+            <View style={[premiumCardStyles.proposerAvatar, { backgroundColor: pc.LINE_STRONG }]}>
+              <Text style={[premiumCardStyles.proposerDot, { color: pc.GOLD }]}>·</Text>
             </View>
-            {timeRemaining && (
-              <View style={[styles.swipeTimeBadgeLarge, { backgroundColor: isEnded ? colors.error : 'rgba(255,255,255,0.2)' }]}>
-                <Ionicons name="time-outline" size={14} color="#fff" />
-                <Text style={styles.swipeTimeTextLight}>{timeRemaining}</Text>
-              </View>
-            )}
-          </View>
-
-          {/* Title */}
-          <Text style={styles.swipeCardTitleLarge} numberOfLines={2}>{proposal.title}</Text>
-
-          {/* Creator info */}
-          <View style={styles.swipeCreatorRow}>
-            <Ionicons name="person-circle-outline" size={14} color="rgba(255,255,255,0.6)" />
-            <Text style={styles.swipeCreatorText}>
-              Proposed by Community Member
+            <Text style={[premiumCardStyles.proposerText, { color: pc.FG_MUTED }]}>
+              Proposed by <Text style={{ color: pc.FG }}>{proposal.creatorName || 'Community Member'}</Text>
             </Text>
           </View>
 
           {/* Description */}
-          <Text style={styles.swipeCardDescLarge} numberOfLines={2}>{proposal.description}</Text>
+          <Text style={[premiumCardStyles.description, { color: pc.FG_MUTED }]}>{proposal.description}</Text>
 
-          {/* Vote Progress */}
-          <View style={styles.swipeVoteSectionLarge}>
-            <View style={styles.swipeVoteBarBgLarge}>
-              <View style={[styles.swipeVoteBarFillLarge, { width: `${supportPercent}%`, backgroundColor: colors.success }]} />
-              <View style={[styles.swipeVoteBarOpposeSection, { width: `${100 - supportPercent}%`, backgroundColor: colors.error }]} />
+          {/* Sentiment ledger */}
+          {totalVotes === 0 ? (
+            <View style={premiumCardStyles.sentimentSection}>
+              <View style={[premiumCardStyles.sentimentBarEmpty, { backgroundColor: pc.LINE }]} />
+              <Text style={[premiumCardStyles.noVotesText, { color: pc.FG_FAINT }]}>No votes yet</Text>
             </View>
-            <View style={styles.swipeVoteStatsLarge}>
-              <View style={styles.swipeVoteStatLarge}>
-                <Ionicons name="thumbs-up" size={18} color={colors.success} />
-                <Text style={[styles.swipeVoteCountLarge, { color: colors.success }]}>{(proposal.supportVotes || 0).toLocaleString()}</Text>
+          ) : (
+            <View style={premiumCardStyles.sentimentSection}>
+              <View style={[premiumCardStyles.sentimentBar, { backgroundColor: pc.LINE }]}>
+                <View style={[premiumCardStyles.sentimentFillSupport, { width: `${supportPercent}%`, backgroundColor: pc.GREEN }]} />
+                <View style={[premiumCardStyles.sentimentFillOppose, { width: `${100 - supportPercent}%`, backgroundColor: pc.RED }]} />
               </View>
-              <Text style={styles.swipeVotePercentLarge}>{supportPercent}% support</Text>
-              <View style={styles.swipeVoteStatLarge}>
-                <Ionicons name="thumbs-down" size={18} color={colors.error} />
-                <Text style={[styles.swipeVoteCountLarge, { color: colors.error }]}>{(proposal.opposeVotes || 0).toLocaleString()}</Text>
+              <View style={premiumCardStyles.sentimentStats}>
+                <View style={premiumCardStyles.sentimentStat}>
+                  <Text style={[premiumCardStyles.sentimentNum, { color: pc.GREEN }]}>{(proposal.supportVotes || 0).toLocaleString()}</Text>
+                  <Text style={[premiumCardStyles.sentimentLabel, { color: pc.FG_FAINT }]}>SUPPORT</Text>
+                </View>
+                <View style={premiumCardStyles.sentimentPct}>
+                  <Text style={[premiumCardStyles.sentimentPctText, { color: pc.FG_FAINT }]}>{supportPercent}%</Text>
+                </View>
+                <View style={premiumCardStyles.sentimentStatRight}>
+                  <Text style={[premiumCardStyles.sentimentNum, { color: pc.RED }]}>{(proposal.opposeVotes || 0).toLocaleString()}</Text>
+                  <Text style={[premiumCardStyles.sentimentLabel, { color: pc.FG_FAINT }]}>OPPOSE</Text>
+                </View>
               </View>
             </View>
-          </View>
+          )}
 
-          {/* Ended Banner (shown inside card) */}
+          {/* Ended Banner */}
           {isEnded && (
-            <View style={styles.swipeEndedBannerLarge}>
-              <Ionicons name="flag-outline" size={18} color="#fff" />
-              <Text style={styles.swipeEndedTextLarge}>Voting has ended</Text>
+            <View style={premiumCardStyles.endedBanner}>
+              <Ionicons name="flag-outline" size={14} color="#fff" />
+              <Text style={premiumCardStyles.endedText}>Voting has ended</Text>
             </View>
           )}
         </View>
@@ -447,6 +964,328 @@ function SwipeCard({ proposal, onSwipeLeft, onSwipeRight, onSwipeUp, onTap, isTo
     </GestureDetector>
   );
 }
+
+// Premium card styles
+const premiumCardStyles = StyleSheet.create({
+  card: {
+    position: 'absolute',
+    left: 16,
+    right: 16,
+    top: 0,
+    backgroundColor: BG_CARD,
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: LINE_COLOR,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 24 },
+    shadowOpacity: 0.5,
+    shadowRadius: 48,
+    elevation: 20,
+  },
+  heroContainer: {
+    height: 260,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  locationPill: {
+    position: 'absolute',
+    top: 16,
+    left: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: 'rgba(4,7,7,0.55)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+  },
+  locationText: {
+    fontSize: 11,
+    fontWeight: '500',
+    color: FG,
+    letterSpacing: -0.2,
+  },
+  timePill: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 11,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: 'rgba(4,7,7,0.55)',
+    borderWidth: 1,
+    borderColor: `${GOLD}55`,
+  },
+  timePillText: {
+    fontSize: 10.5,
+    fontWeight: '600',
+    color: GOLD,
+    letterSpacing: 0.3,
+  },
+  categoryTag: {
+    position: 'absolute',
+    bottom: 14,
+    left: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 4,
+    backgroundColor: 'rgba(4,7,7,0.7)',
+    borderWidth: 1,
+  },
+  categoryDot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+  },
+  categoryText: {
+    fontFamily: MONO_FONT,
+    fontSize: 9,
+    fontWeight: '600',
+    letterSpacing: 1.3,
+  },
+  swipeVeil: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 5,
+  },
+  swipeVeilTop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 100,
+    backgroundColor: `${GOLD}20`,
+    zIndex: 5,
+  },
+  swipeStamp: {
+    position: 'absolute',
+    top: 32,
+    left: 24,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 6,
+    borderWidth: 2,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    transform: [{ rotate: '-8deg' }],
+  },
+  swipeStampText: {
+    fontSize: 14,
+    fontWeight: '700',
+    letterSpacing: 3,
+  },
+  cardBody: {
+    padding: 16,
+    paddingTop: 14,
+  },
+  refRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'baseline',
+    marginBottom: 10,
+  },
+  refText: {
+    fontFamily: MONO_FONT,
+    fontSize: 9,
+    color: FG_FAINT,
+    letterSpacing: 1.4,
+    textTransform: 'uppercase',
+    marginBottom: 8,
+  },
+  timeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  timeText: {
+    fontSize: 9.5,
+    fontWeight: '500',
+    letterSpacing: 1.3,
+    textTransform: 'uppercase',
+    color: GOLD,
+  },
+  serifTitle: {
+    fontFamily: SERIF_FONT,
+    fontSize: 24,
+    fontWeight: '500',
+    color: FG,
+    lineHeight: 28,
+    letterSpacing: -0.5,
+    marginBottom: 10,
+  },
+  proposerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 10,
+  },
+  proposerAvatar: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: 'rgba(234,186,88,0.10)',
+    borderWidth: 1,
+    borderColor: 'rgba(234,186,88,0.35)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  proposerDot: {
+    fontFamily: SERIF_FONT,
+    fontSize: 9,
+    fontWeight: '600',
+    color: GOLD,
+  },
+  proposerText: {
+    fontSize: 11.5,
+    color: FG_MUTED,
+    letterSpacing: -0.2,
+  },
+  description: {
+    fontSize: 12.5,
+    color: FG_MUTED,
+    lineHeight: 18,
+    letterSpacing: -0.2,
+    marginBottom: 12,
+  },
+  sentimentSection: {
+    marginBottom: 10,
+  },
+  sentimentBar: {
+    height: 6,
+    borderRadius: 3,
+    overflow: 'hidden',
+    flexDirection: 'row',
+    backgroundColor: LINE_COLOR,
+    marginBottom: 10,
+  },
+  sentimentBarEmpty: {
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: LINE_COLOR,
+    marginBottom: 10,
+  },
+  noVotesText: {
+    fontSize: 11,
+    fontWeight: '500',
+    color: FG_FAINT,
+    letterSpacing: 0.4,
+    textAlign: 'center',
+  },
+  sentimentFillSupport: {
+    height: '100%',
+    backgroundColor: GREEN,
+  },
+  sentimentFillOppose: {
+    height: '100%',
+    backgroundColor: RED,
+    opacity: 0.8,
+  },
+  sentimentStats: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  sentimentStat: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 6,
+  },
+  sentimentStatRight: {
+    flexDirection: 'row-reverse',
+    alignItems: 'baseline',
+    gap: 6,
+  },
+  sentimentNum: {
+    fontFamily: SERIF_FONT,
+    fontSize: 18,
+    fontWeight: '500',
+    letterSpacing: -0.5,
+  },
+  sentimentLabel: {
+    fontSize: 10,
+    fontWeight: '500',
+    color: FG_FAINT,
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
+  },
+  sentimentPct: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 4,
+    backgroundColor: BG_RAISED,
+    borderWidth: 1,
+    borderColor: LINE_STRONG,
+  },
+  sentimentPctText: {
+    fontFamily: MONO_FONT,
+    fontSize: 11,
+    fontWeight: '500',
+    color: FG,
+    letterSpacing: 0.3,
+  },
+  cardFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: LINE_COLOR,
+  },
+  footerChips: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  metaChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: 7,
+    backgroundColor: BG_RAISED,
+    borderWidth: 1,
+    borderColor: LINE_COLOR,
+  },
+  metaChipText: {
+    fontSize: 10.5,
+    fontWeight: '500',
+    color: FG_MUTED,
+    letterSpacing: -0.2,
+  },
+  dossierLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  dossierLinkText: {
+    fontSize: 10,
+    fontWeight: '600',
+    letterSpacing: 0.3,
+    color: GOLD,
+  },
+  endedBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 12,
+    paddingVertical: 10,
+    borderRadius: 8,
+    backgroundColor: 'rgba(239,68,68,0.15)',
+  },
+  endedText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#fff',
+  },
+});
 
 // --- View Mode Toggle ---
 function ViewModeToggle({ mode, onToggle }: { mode: 'swipe' | 'list'; onToggle: () => void }) {
@@ -837,11 +1676,9 @@ export default function ProposalsScreen() {
   const [viewMode, setViewMode] = useState<'swipe' | 'list'>('swipe');
   const [swipeIndex, setSwipeIndex] = useState(0);
 
-  // Tutorial target ref
-  const swipeCardRef = useTutorialTarget('swipe-card');
-
-  // Tutorial state for action detection
-  const { isActive: tutorialActive, completeAction: completeTutorialAction } = useTutorialStore();
+  // Swipe hint overlay (shows once for new users)
+  const [showSwipeHint, setShowSwipeHint] = useState(false);
+  const swipeCardRef = useRef<View>(null);
 
   const [newProposal, setNewProposal] = useState({
     title: '',
@@ -884,6 +1721,22 @@ export default function ProposalsScreen() {
   useEffect(() => {
     setNewProposal((p) => ({ ...p, country: userCountry, state: userState, city: userCity }));
   }, [userCountry, userState, userCity]);
+
+  // Check if swipe hint should be shown (first time in swipe mode)
+  useEffect(() => {
+    if (viewMode === 'swipe') {
+      AsyncStorage.getItem(SWIPE_HINT_KEY).then((value) => {
+        if (!value) {
+          setShowSwipeHint(true);
+        }
+      });
+    }
+  }, [viewMode]);
+
+  const dismissSwipeHint = useCallback(async () => {
+    setShowSwipeHint(false);
+    await AsyncStorage.setItem(SWIPE_HINT_KEY, 'shown');
+  }, []);
 
   const filteredProposals = useMemo(() => {
     // Reverse to show most recent proposals first
@@ -940,7 +1793,7 @@ export default function ProposalsScreen() {
 
   // Proposals available for swiping (not voted, not ended, user can vote)
   const swipeableProposals = useMemo(() => {
-    return filteredProposals.filter((p) => {
+    const eligible = filteredProposals.filter((p) => {
       // Handle both string and number IDs for seed proposals
       const hasVoted = votedProposals.has(p.id as number) || votedProposals.has(p.id as any);
       const isEnded = isProposalEnded(p);
@@ -948,7 +1801,17 @@ export default function ProposalsScreen() {
       const canVote = canUserVoteOnProposal(p, userCountry, userState, userCity, isVerified);
       return !hasVoted && !isEnded && canVote;
     });
-  }, [filteredProposals, votedProposals, userCountry, userState, userCity, isVerified]);
+    // Bring the deep-linked proposal to the front of the swipe stack so when
+    // the user backs out of the detail modal it's the next card to vote on.
+    if (deepLinkProposalId) {
+      const idx = eligible.findIndex((p) => String(p.id) === String(deepLinkProposalId));
+      if (idx > 0) {
+        const [target] = eligible.splice(idx, 1);
+        eligible.unshift(target);
+      }
+    }
+    return eligible;
+  }, [filteredProposals, votedProposals, userCountry, userState, userCity, isVerified, deepLinkProposalId]);
 
   // Reset swipe index when filters change or proposals update
   useEffect(() => {
@@ -1203,27 +2066,6 @@ export default function ProposalsScreen() {
 
   // Swipe vote handler
   const handleSwipeVote = useCallback(async (proposal: Proposal, vote: 'support' | 'oppose') => {
-    // Get fresh tutorial state directly from store (not from stale closure)
-    const { isActive, completeAction, currentStepIndex, steps } = useTutorialStore.getState();
-
-    // Check if this is a tutorial action
-    if (isActive) {
-      // During tutorial, show vote confirmation overlay
-      setLastVoteType(vote);
-      setShowVoteOverlay(true);
-
-      // Advance the card
-      setSwipeIndex((prev) => prev + 1);
-
-      // Complete the tutorial action after overlay animation (1.7s delay)
-      // This gives user time to see the confirmation before moving to next step
-      const action = vote === 'support' ? 'swipe-right' : 'swipe-left';
-      setTimeout(() => {
-        completeAction(action);
-      }, 1700);
-      return;
-    }
-
     // Move to next card
     setSwipeIndex((prev) => prev + 1);
 
@@ -1399,73 +2241,75 @@ export default function ProposalsScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Header */}
-      <Animated.View entering={FadeInDown.duration(400)} style={[styles.header, { borderBottomColor: colors.border, paddingTop: insets.top + 16 }]}>
-        <View style={styles.headerRow}>
-          <View>
-            <Text style={[styles.headerTitle, { color: colors.text }]}>Proposals</Text>
-            <Text style={[styles.headerSubtitle, { color: colors.textTertiary }]}>
-              {activeCount} active proposal{activeCount !== 1 ? 's' : ''}
-            </Text>
-          </View>
+      {/* Header - only show in list mode */}
+      {viewMode !== 'swipe' && (
+        <Animated.View entering={FadeInDown.duration(400)} style={[styles.header, { borderBottomColor: colors.border, paddingTop: insets.top + 16 }]}>
+          <View style={styles.headerRow}>
+            <View>
+              <Text style={[styles.headerTitle, { color: colors.text }]}>Proposals</Text>
+              <Text style={[styles.headerSubtitle, { color: colors.textTertiary }]}>
+                {activeCount} active proposal{activeCount !== 1 ? 's' : ''}
+              </Text>
+            </View>
 
-          <View style={styles.headerActions}>
-            <BallotDisplay size="sm" />
+            <View style={styles.headerActions}>
+              <BallotDisplay size="sm" />
 
-            <TouchableOpacity
-              style={[
-                styles.filterBtn,
-                {
-                  backgroundColor: hasActiveFilters ? colors.gold : colors.surface,
-                  borderColor: hasActiveFilters ? colors.gold : colors.border,
-                },
-              ]}
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                setShowFilters(!showFilters);
-              }}
-            >
-              <Ionicons name="options-outline" size={18} color={hasActiveFilters ? '#000' : colors.text} />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                setShowCreateModal(true);
-              }}
-            >
-              <LinearGradient
-                colors={[colors.gold, colors.goldDark || '#A68523']}
-                style={styles.createBtn}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
+              <TouchableOpacity
+                style={[
+                  styles.filterBtn,
+                  {
+                    backgroundColor: hasActiveFilters ? colors.gold : colors.surface,
+                    borderColor: hasActiveFilters ? colors.gold : colors.border,
+                  },
+                ]}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  setShowFilters(!showFilters);
+                }}
               >
-                <Ionicons name="add" size={22} color="#000" />
-              </LinearGradient>
-            </TouchableOpacity>
-          </View>
-        </View>
+                <Ionicons name="options-outline" size={18} color={hasActiveFilters ? '#000' : colors.text} />
+              </TouchableOpacity>
 
-        {/* Search */}
-        <View style={[styles.searchBar, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <Ionicons name="search-outline" size={18} color={colors.textTertiary} />
-          <TextInput
-            style={[styles.searchInput, { color: colors.text }]}
-            placeholder="Search proposals..."
-            placeholderTextColor={colors.textTertiary}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-          />
-          {searchQuery ? (
-            <TouchableOpacity onPress={() => setSearchQuery('')}>
-              <Ionicons name="close-circle" size={18} color={colors.textTertiary} />
-            </TouchableOpacity>
-          ) : null}
-        </View>
-      </Animated.View>
+              <TouchableOpacity
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                  setShowCreateModal(true);
+                }}
+              >
+                <LinearGradient
+                  colors={[colors.gold, colors.goldDark || '#A68523']}
+                  style={styles.createBtn}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                >
+                  <Ionicons name="add" size={22} color="#000" />
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Search */}
+          <View style={[styles.searchBar, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <Ionicons name="search-outline" size={18} color={colors.textTertiary} />
+            <TextInput
+              style={[styles.searchInput, { color: colors.text }]}
+              placeholder="Search proposals..."
+              placeholderTextColor={colors.textTertiary}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+            />
+            {searchQuery ? (
+              <TouchableOpacity onPress={() => setSearchQuery('')}>
+                <Ionicons name="close-circle" size={18} color={colors.textTertiary} />
+              </TouchableOpacity>
+            ) : null}
+          </View>
+        </Animated.View>
+      )}
 
       {/* Filter Panel */}
-      {showFilters && (
+      {showFilters && viewMode !== 'swipe' && (
         <Animated.View
           entering={FadeInDown.duration(250)}
           style={[styles.filterPanel, { backgroundColor: colors.surface, borderColor: colors.border }]}
@@ -1551,8 +2395,8 @@ export default function ProposalsScreen() {
           )}
         </Animated.View>
       ) : viewMode === 'swipe' ? (
-        /* Swipe Mode */
-        <GestureHandlerRootView style={styles.swipeContainer}>
+        /* Swipe Mode - Premium Redesign */
+        <GestureHandlerRootView style={[styles.swipeContainer, { backgroundColor: BG }]}>
           {visibleSwipeCards.length === 0 ? (
             <Animated.View entering={FadeIn.duration(400)} style={styles.swipeEmptyState}>
               <View style={[styles.swipeEmptyIcon, { backgroundColor: `${colors.success}15` }]}>
@@ -1575,31 +2419,43 @@ export default function ProposalsScreen() {
               </TouchableOpacity>
             </Animated.View>
           ) : (
-            <>
-              {/* Progress indicator */}
-              <View style={styles.swipeProgress}>
-                <Text style={[styles.swipeProgressText, { color: colors.textTertiary }]}>
-                  {swipeIndex + 1} of {swipeableProposals.length} proposals
-                </Text>
-                <View style={[styles.swipeProgressBar, { backgroundColor: colors.border }]}>
-                  <View
-                    style={[
-                      styles.swipeProgressFill,
-                      { backgroundColor: colors.gold, width: `${((swipeIndex + 1) / swipeableProposals.length) * 100}%` },
-                    ]}
-                  />
-                </View>
-              </View>
+            <View style={{ flex: 1 }}>
+              {/* Premium Vote Header */}
+              <VoteHeader
+                index={swipeIndex}
+                total={swipeableProposals.length}
+                activeCount={activeCount}
+                closingSoon={filteredProposals.filter(p => {
+                  const tr = getTimeRemaining(p.deadline);
+                  return tr && tr.includes('d') && parseInt(tr) <= 3;
+                }).length}
+                selectedFilter={selectedGeoLevel === 'All' ? 'All' :
+                  selectedGeoLevel === 'National' ? 'Federal' :
+                  selectedGeoLevel === 'State/Province' ? 'Provincial' :
+                  selectedGeoLevel === 'City/Local' ? 'Municipal' : 'All'}
+                onFilterChange={(filter) => {
+                  const geoMap: Record<string, string> = {
+                    'All': 'All',
+                    'Federal': 'National',
+                    'Provincial': 'State/Province',
+                    'Municipal': 'City/Local',
+                    'Closing': 'All',
+                  };
+                  setSelectedGeoLevel(geoMap[filter] || 'All');
+                  if (filter === 'Closing') setSelectedStatus('Active');
+                }}
+                insetTop={insets.top}
+              />
 
               {/* Card stack */}
-              <View ref={swipeCardRef} style={styles.cardStack} collapsable={false}>
+              <View ref={swipeCardRef} style={[styles.cardStack, { marginTop: 8 }]} collapsable={false}>
                 {visibleSwipeCards.map((proposal, idx) => (
                   <SwipeCard
                     key={proposal.id}
                     proposal={proposal}
-                    onSwipeLeft={() => handleSwipeVote(proposal, 'oppose')}
-                    onSwipeRight={() => handleSwipeVote(proposal, 'support')}
-                    onSwipeUp={handleSkip}
+                    onSwipeLeft={() => { dismissSwipeHint(); handleSwipeVote(proposal, 'oppose'); }}
+                    onSwipeRight={() => { dismissSwipeHint(); handleSwipeVote(proposal, 'support'); }}
+                    onSwipeUp={() => { dismissSwipeHint(); handleSkip(); }}
                     onTap={() => openProposal(proposal)}
                     isTopCard={idx === 0}
                     cardIndex={idx}
@@ -1608,7 +2464,9 @@ export default function ProposalsScreen() {
                 )).reverse()}
               </View>
 
-            </>
+              {/* Swipe hint overlay for first-time users */}
+              <SwipeHintOverlay visible={showSwipeHint} onDismiss={dismissSwipeHint} />
+            </View>
           )}
         </GestureHandlerRootView>
       ) : (
@@ -1645,170 +2503,181 @@ export default function ProposalsScreen() {
         </ScrollView>
       )}
 
-      {/* Detail Modal */}
+      {/* Detail Modal — premium institutional redesign */}
       <Modal visible={showDetailModal} animationType="slide" presentationStyle="pageSheet" onRequestClose={closeProposal}>
-        <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
-          <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
-            <TouchableOpacity onPress={closeProposal} style={styles.modalClose}>
-              <Ionicons name="chevron-down" size={24} color={colors.textSecondary} />
+        <View style={[detailStyles.container, { backgroundColor: BG }]}>
+          {/* Minimal floating header */}
+          <View style={detailStyles.header}>
+            <TouchableOpacity onPress={closeProposal} style={detailStyles.headerBtn} activeOpacity={0.7}>
+              <Ionicons name="chevron-down" size={20} color={FG} />
             </TouchableOpacity>
-
-            <Text style={[styles.modalTitle, { color: colors.text }]}>Proposal</Text>
-
             <TouchableOpacity
               onPress={() => {
                 if (!detail) return;
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                 shareProposal({ id: detail.id as number, title: detail.title, description: detail.description });
               }}
-              style={[styles.modalShare, { backgroundColor: colors.surface, borderColor: colors.border }]}
+              style={detailStyles.headerBtn}
+              activeOpacity={0.7}
             >
-              <Ionicons name="share-outline" size={18} color={colors.text} />
+              <Ionicons name="share-outline" size={16} color={FG} />
             </TouchableOpacity>
           </View>
 
-          {detail && (
-            <ScrollView contentContainerStyle={styles.modalContent} showsVerticalScrollIndicator={false}>
-              <View style={[styles.detailCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                <LinearGradient
-                  colors={[`${colors.gold}08`, 'transparent']}
-                  style={StyleSheet.absoluteFill}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                />
+          {detail && (() => {
+            const total = (detail.supportVotes || 0) + (detail.opposeVotes || 0);
+            const pct = total > 0 ? Math.round(((detail.supportVotes || 0) / total) * 100) : 0;
+            const tierLabel = getTierLabel(detail.geoRestrictions);
+            const category = detail.category || 'General';
+            const location = detail.geoRestrictions && detail.geoRestrictions.length > 0
+              ? detail.geoRestrictions[detail.geoRestrictions.length - 1]
+              : 'Canada';
+            const timeRemaining = getTimeRemaining(detail.deadline);
+            const ended = isProposalEnded(detail);
+            const cat = category.toLowerCase();
+            const categoryColor =
+              cat === 'economy' ? GREEN :
+              cat === 'housing' ? GOLD :
+              cat === 'transportation' || cat === 'infrastructure' ? BLUE :
+              cat === 'environment' ? '#22C55E' :
+              cat === 'healthcare' ? '#EF4444' : GOLD;
 
-                <View style={styles.detailHeaderRow}>
-                  <View style={[styles.categoryBadge, { backgroundColor: `${colors.gold}15` }]}>
-                    <Text style={[styles.categoryText, { color: colors.gold }]}>{detail.category || 'General'}</Text>
-                  </View>
-
-                  {detail.deadline && (
-                    <View
-                      style={[
-                        styles.timeBadge,
-                        { backgroundColor: isProposalEnded(detail) ? `${colors.error}15` : `${colors.gold}15` },
-                      ]}
-                    >
-                      <Ionicons
-                        name="time-outline"
-                        size={12}
-                        color={isProposalEnded(detail) ? colors.error : colors.gold}
-                      />
-                      <Text
-                        style={[styles.timeText, { color: isProposalEnded(detail) ? colors.error : colors.gold }]}
-                      >
-                        {getTimeRemaining(detail.deadline)}
-                      </Text>
-                    </View>
+            return (
+              <ScrollView contentContainerStyle={detailStyles.scrollContent} showsVerticalScrollIndicator={false}>
+                {/* Hero image with overlays */}
+                <View style={detailStyles.hero}>
+                  {detail.imageUrl ? (
+                    <Image source={{ uri: detail.imageUrl }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+                  ) : (
+                    <View style={[StyleSheet.absoluteFill, { backgroundColor: BG_RAISED }]} />
                   )}
-                </View>
-
-                {(detail.geoRestrictions || []).length > 0 && (
-                  <View style={[styles.geoTags, { marginTop: SPACING.sm }]}>
-                    {(detail.geoRestrictions || []).slice(0, 6).map((tag, i) => (
-                      <View key={i} style={[styles.geoTag, { backgroundColor: `${colors.info}12` }]}>
-                        <Ionicons name="location-outline" size={10} color={colors.info} />
-                        <Text style={[styles.geoTagText, { color: colors.info }]}>{tag}</Text>
-                      </View>
-                    ))}
+                  <LinearGradient
+                    colors={['rgba(4,7,7,0.25)', 'rgba(4,7,7,0.6)', 'rgba(4,7,7,1)']}
+                    locations={[0, 0.55, 1]}
+                    style={StyleSheet.absoluteFill}
+                  />
+                  <View style={detailStyles.heroLocationPill}>
+                    <Ionicons name="location" size={11} color={FG} />
+                    <Text style={detailStyles.heroLocationText}>{location}</Text>
                   </View>
-                )}
-
-                <Text style={[styles.detailTitle, { color: colors.text }]}>{detail.title}</Text>
-                <Text style={[styles.detailDesc, { color: colors.textSecondary }]}>{detail.description}</Text>
-
-                {detail.imageUrl && (
-                  <View style={[styles.imageWrapper, { marginTop: SPACING.lg }]}>
-                    <Image source={{ uri: detail.imageUrl }} style={styles.proposalImage} resizeMode="cover" />
-                  </View>
-                )}
-
-                {/* Vote Progress */}
-                <View style={[styles.voteSection, { marginTop: SPACING.xl }]}>
-                  {(() => {
-                    const total = (detail.supportVotes || 0) + (detail.opposeVotes || 0);
-                    const pct = total > 0 ? Math.round(((detail.supportVotes || 0) / total) * 100) : 50;
-                    return (
-                      <>
-                        <View style={[styles.voteBarBg, { backgroundColor: colors.error }]}>
-                          <Animated.View style={[styles.voteBarFill, { width: `${pct}%`, backgroundColor: colors.success }]} />
-                        </View>
-                        <View style={styles.voteStats}>
-                          <View style={styles.voteStat}>
-                            <View style={[styles.voteIconBg, { backgroundColor: `${colors.success}15` }]}>
-                              <Ionicons name="thumbs-up" size={12} color={colors.success} />
-                            </View>
-                            <Text style={[styles.voteCount, { color: colors.textSecondary }]}>
-                              {(detail.supportVotes || 0).toLocaleString()}
-                            </Text>
-                          </View>
-                          <View style={styles.voteStat}>
-                            <View style={[styles.voteIconBg, { backgroundColor: `${colors.error}15` }]}>
-                              <Ionicons name="thumbs-down" size={12} color={colors.error} />
-                            </View>
-                            <Text style={[styles.voteCount, { color: colors.textSecondary }]}>
-                              {(detail.opposeVotes || 0).toLocaleString()}
-                            </Text>
-                          </View>
-                        </View>
-                      </>
-                    );
-                  })()}
-                </View>
-
-                {/* Actions */}
-                <View style={{ marginTop: SPACING.xl }}>
-                  {isProposalEnded(detail) ? (
-                    <View style={[styles.statusBanner, { backgroundColor: `${colors.error}10` }]}>
-                      <Ionicons name="flag-outline" size={16} color={colors.error} />
-                      <Text style={[styles.statusText, { color: colors.error }]}>Voting has ended</Text>
+                  {!ended && timeRemaining ? (
+                    <View style={detailStyles.heroTimePill}>
+                      <Ionicons name="time-outline" size={11} color={GOLD} />
+                      <Text style={detailStyles.heroTimePillText}>{timeRemaining}</Text>
                     </View>
-                  ) : detailHasVoted ? (
-                    <View style={[styles.statusBanner, { backgroundColor: `${colors.success}10` }]}>
-                      <Ionicons name="checkmark-circle" size={16} color={colors.success} />
-                      <Text style={[styles.statusText, { color: colors.success }]}>You have voted</Text>
+                  ) : null}
+                  <View style={[detailStyles.heroCategoryTag, { borderColor: `${categoryColor}66` }]}>
+                    <View style={[detailStyles.heroCategoryDot, { backgroundColor: categoryColor }]} />
+                    <Text style={[detailStyles.heroCategoryText, { color: categoryColor }]}>{category.toUpperCase()}</Text>
+                  </View>
+                </View>
+
+                {/* Body */}
+                <View style={detailStyles.body}>
+                  <Text style={detailStyles.tierLabel}>{tierLabel}</Text>
+                  <Text style={detailStyles.title}>{detail.title}</Text>
+
+                  <View style={detailStyles.proposerRow}>
+                    <View style={detailStyles.proposerAvatar}>
+                      <Text style={detailStyles.proposerDot}>·</Text>
+                    </View>
+                    <Text style={detailStyles.proposerText}>
+                      Proposed by <Text style={{ color: FG }}>{detail.creatorName || 'Community Member'}</Text>
+                    </Text>
+                  </View>
+
+                  <Text style={detailStyles.description}>{detail.description}</Text>
+
+                  {/* Sentiment ledger */}
+                  {total === 0 ? (
+                    <View style={detailStyles.sentimentSection}>
+                      <View style={detailStyles.sentimentBarEmpty} />
+                      <Text style={detailStyles.noVotesText}>No votes yet</Text>
                     </View>
                   ) : (
-                    <View style={styles.voteActions}>
-                      <TouchableOpacity
-                        style={[styles.voteBtn, { backgroundColor: colors.success }, detailIsVoting && styles.btnDisabled]}
-                        onPress={() => detail && handleVote(detail.id as number, 'support')}
-                        disabled={detailIsVoting}
-                        activeOpacity={0.85}
-                      >
-                        {detailIsVoting ? (
-                          <ActivityIndicator size="small" color="#fff" />
-                        ) : (
-                          <>
-                            <Ionicons name="checkmark-circle" size={16} color="#fff" />
-                            <Text style={styles.voteBtnText}>Support</Text>
-                          </>
-                        )}
-                      </TouchableOpacity>
-
-                      <TouchableOpacity
-                        style={[styles.voteBtn, { backgroundColor: colors.error }, detailIsVoting && styles.btnDisabled]}
-                        onPress={() => detail && handleVote(detail.id as number, 'oppose')}
-                        disabled={detailIsVoting}
-                        activeOpacity={0.85}
-                      >
-                        {detailIsVoting ? (
-                          <ActivityIndicator size="small" color="#fff" />
-                        ) : (
-                          <>
-                            <Ionicons name="close-circle" size={16} color="#fff" />
-                            <Text style={styles.voteBtnText}>Oppose</Text>
-                          </>
-                        )}
-                      </TouchableOpacity>
+                    <View style={detailStyles.sentimentSection}>
+                      <View style={detailStyles.sentimentBar}>
+                        <View style={[detailStyles.sentimentFillSupport, { width: `${pct}%` }]} />
+                        <View style={[detailStyles.sentimentFillOppose, { width: `${100 - pct}%` }]} />
+                      </View>
+                      <View style={detailStyles.sentimentStats}>
+                        <View style={detailStyles.sentimentStat}>
+                          <Text style={[detailStyles.sentimentNum, { color: GREEN }]}>{(detail.supportVotes || 0).toLocaleString()}</Text>
+                          <Text style={detailStyles.sentimentLabel}>SUPPORT</Text>
+                        </View>
+                        <View style={detailStyles.sentimentPct}>
+                          <Text style={detailStyles.sentimentPctText}>{pct}%</Text>
+                        </View>
+                        <View style={detailStyles.sentimentStatRight}>
+                          <Text style={[detailStyles.sentimentNum, { color: RED }]}>{(detail.opposeVotes || 0).toLocaleString()}</Text>
+                          <Text style={detailStyles.sentimentLabel}>OPPOSE</Text>
+                        </View>
+                      </View>
+                      <Text style={detailStyles.totalVoices}>{total.toLocaleString()} total voices</Text>
                     </View>
                   )}
-                </View>
-              </View>
 
-              <View style={{ height: 120 }} />
-            </ScrollView>
-          )}
+                  {/* Vote actions */}
+                  <View style={detailStyles.actionRow}>
+                    {ended ? (
+                      <View style={detailStyles.statusBanner}>
+                        <Ionicons name="flag-outline" size={14} color={RED} />
+                        <Text style={[detailStyles.statusBannerText, { color: RED }]}>Voting has ended</Text>
+                      </View>
+                    ) : detailHasVoted ? (
+                      <View style={detailStyles.statusBanner}>
+                        <Ionicons name="checkmark-circle" size={14} color={GREEN} />
+                        <Text style={[detailStyles.statusBannerText, { color: GREEN }]}>You have voted</Text>
+                      </View>
+                    ) : (
+                      <View style={detailStyles.voteActions}>
+                        <TouchableOpacity
+                          style={[detailStyles.voteBtn, detailStyles.voteBtnSupport, detailIsVoting && { opacity: 0.5 }]}
+                          onPress={() => {
+                            if (!detail) return;
+                            closeProposal();
+                            handleVote(detail.id as number, 'support');
+                          }}
+                          disabled={detailIsVoting}
+                          activeOpacity={0.7}
+                        >
+                          {detailIsVoting ? (
+                            <ActivityIndicator size="small" color={GREEN} />
+                          ) : (
+                            <>
+                              <Ionicons name="checkmark" size={16} color={GREEN} />
+                              <Text style={[detailStyles.voteBtnText, { color: GREEN }]}>Support</Text>
+                            </>
+                          )}
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[detailStyles.voteBtn, detailStyles.voteBtnOppose, detailIsVoting && { opacity: 0.5 }]}
+                          onPress={() => {
+                            if (!detail) return;
+                            closeProposal();
+                            handleVote(detail.id as number, 'oppose');
+                          }}
+                          disabled={detailIsVoting}
+                          activeOpacity={0.7}
+                        >
+                          {detailIsVoting ? (
+                            <ActivityIndicator size="small" color={RED} />
+                          ) : (
+                            <>
+                              <Ionicons name="close" size={16} color={RED} />
+                              <Text style={[detailStyles.voteBtnText, { color: RED }]}>Oppose</Text>
+                            </>
+                          )}
+                        </TouchableOpacity>
+                      </View>
+                    )}
+                  </View>
+                </View>
+
+                <View style={{ height: 80 }} />
+              </ScrollView>
+            );
+          })()}
         </View>
       </Modal>
 
@@ -2171,8 +3040,354 @@ export default function ProposalsScreen() {
   );
 }
 
+// Premium proposal detail modal styles
+const detailStyles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 18,
+    paddingTop: 14,
+    paddingBottom: 8,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 10,
+  },
+  headerBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(4,7,7,0.55)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  scrollContent: {
+    paddingBottom: 20,
+  },
+  // Hero
+  hero: {
+    width: '100%',
+    height: 320,
+    position: 'relative',
+    overflow: 'hidden',
+    backgroundColor: BG_RAISED,
+  },
+  heroLocationPill: {
+    position: 'absolute',
+    top: 64,
+    left: 18,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: 'rgba(4,7,7,0.55)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+  },
+  heroLocationText: {
+    fontSize: 11,
+    fontWeight: '500',
+    color: FG,
+    letterSpacing: -0.2,
+  },
+  heroTimePill: {
+    position: 'absolute',
+    top: 64,
+    right: 18,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 11,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: 'rgba(4,7,7,0.55)',
+    borderWidth: 1,
+    borderColor: `${GOLD}55`,
+  },
+  heroTimePillText: {
+    fontSize: 10.5,
+    fontWeight: '600',
+    color: GOLD,
+    letterSpacing: 0.3,
+  },
+  heroCategoryTag: {
+    position: 'absolute',
+    bottom: 18,
+    left: 18,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 4,
+    backgroundColor: 'rgba(4,7,7,0.7)',
+    borderWidth: 1,
+  },
+  heroCategoryDot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+  },
+  heroCategoryText: {
+    fontFamily: MONO_FONT,
+    fontSize: 9.5,
+    fontWeight: '600',
+    letterSpacing: 1.4,
+  },
+  // Body
+  body: {
+    paddingHorizontal: 22,
+    paddingTop: 22,
+  },
+  tierLabel: {
+    fontFamily: MONO_FONT,
+    fontSize: 9.5,
+    color: FG_FAINT,
+    letterSpacing: 1.6,
+    textTransform: 'uppercase',
+    marginBottom: 10,
+  },
+  title: {
+    fontFamily: SERIF_FONT,
+    fontSize: 30,
+    fontWeight: '500',
+    lineHeight: 36,
+    color: FG,
+    letterSpacing: -0.5,
+    marginBottom: 16,
+  },
+  proposerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 9,
+    marginBottom: 18,
+  },
+  proposerAvatar: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: BG_RAISED,
+    borderWidth: 1,
+    borderColor: LINE_STRONG,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  proposerDot: {
+    fontSize: 16,
+    color: GOLD,
+    lineHeight: 16,
+    marginTop: -4,
+  },
+  proposerText: {
+    fontSize: 12.5,
+    color: FG_MUTED,
+    letterSpacing: -0.1,
+  },
+  description: {
+    fontSize: 14.5,
+    lineHeight: 22,
+    color: FG_MUTED,
+    letterSpacing: -0.1,
+    marginBottom: 26,
+  },
+  // Sentiment
+  sentimentSection: {
+    paddingTop: 18,
+    paddingBottom: 6,
+    borderTopWidth: 1,
+    borderTopColor: LINE_COLOR,
+    marginBottom: 22,
+  },
+  sentimentBar: {
+    height: 7,
+    borderRadius: 3.5,
+    overflow: 'hidden',
+    flexDirection: 'row',
+    backgroundColor: LINE_COLOR,
+    marginBottom: 12,
+  },
+  sentimentBarEmpty: {
+    height: 7,
+    borderRadius: 3.5,
+    backgroundColor: LINE_COLOR,
+    marginBottom: 12,
+  },
+  sentimentFillSupport: {
+    height: '100%',
+    backgroundColor: GREEN,
+  },
+  sentimentFillOppose: {
+    height: '100%',
+    backgroundColor: RED,
+    opacity: 0.85,
+  },
+  sentimentStats: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  sentimentStat: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 7,
+  },
+  sentimentStatRight: {
+    flexDirection: 'row-reverse',
+    alignItems: 'baseline',
+    gap: 7,
+  },
+  sentimentNum: {
+    fontFamily: SERIF_FONT,
+    fontSize: 22,
+    fontWeight: '500',
+    letterSpacing: -0.5,
+  },
+  sentimentLabel: {
+    fontSize: 10.5,
+    fontWeight: '500',
+    color: FG_FAINT,
+    letterSpacing: 1.4,
+    textTransform: 'uppercase',
+  },
+  sentimentPct: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 4,
+    backgroundColor: BG_RAISED,
+    borderWidth: 1,
+    borderColor: LINE_STRONG,
+  },
+  sentimentPctText: {
+    fontFamily: MONO_FONT,
+    fontSize: 11,
+    fontWeight: '600',
+    color: FG,
+    letterSpacing: 0.3,
+  },
+  noVotesText: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: FG_FAINT,
+    letterSpacing: 0.4,
+    textAlign: 'center',
+    marginTop: 4,
+  },
+  totalVoices: {
+    fontFamily: MONO_FONT,
+    fontSize: 10.5,
+    color: FG_FAINT,
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
+    textAlign: 'center',
+    marginTop: 14,
+  },
+  // Actions
+  actionRow: {
+    marginTop: 4,
+  },
+  voteActions: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  voteBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 16,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    backgroundColor: 'transparent',
+  },
+  voteBtnSupport: {
+    borderColor: GREEN,
+    backgroundColor: `${GREEN}10`,
+  },
+  voteBtnOppose: {
+    borderColor: RED,
+    backgroundColor: `${RED}10`,
+  },
+  voteBtnText: {
+    fontSize: 14,
+    fontWeight: '600',
+    letterSpacing: 0.3,
+  },
+  statusBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: 10,
+    backgroundColor: BG_RAISED,
+    borderWidth: 1,
+    borderColor: LINE_STRONG,
+  },
+  statusBannerText: {
+    fontSize: 13,
+    fontWeight: '600',
+    letterSpacing: 0.3,
+  },
+});
+
 const styles = StyleSheet.create({
   container: { flex: 1 },
+
+  // Swipe Hint Overlay
+  swipeHintOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.85)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+  },
+  swipeHintCard: {
+    borderRadius: BORDER_RADIUS.xl,
+    borderWidth: 1,
+    padding: SPACING.xl,
+    width: '85%',
+    maxWidth: 320,
+  },
+  swipeHintTitle: {
+    fontFamily: SERIF_FONT,
+    fontSize: 24,
+    fontWeight: '600',
+    textAlign: 'center',
+    marginBottom: SPACING.lg,
+  },
+  swipeHintRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: SPACING.md,
+  },
+  swipeHintIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: SPACING.md,
+  },
+  swipeHintText: {
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  swipeHintDismiss: {
+    textAlign: 'center',
+    marginTop: SPACING.lg,
+    fontSize: 14,
+  },
 
   // Header
   header: {

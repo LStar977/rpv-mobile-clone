@@ -1,6 +1,6 @@
-import { useEffect, useRef } from 'react';
-import { Tabs, usePathname } from 'expo-router';
-import { View, StyleSheet, Platform } from 'react-native';
+import { useState, useEffect } from 'react';
+import { Tabs } from 'expo-router';
+import { View, StyleSheet, Platform, Modal } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -10,9 +10,9 @@ import Animated, {
   withSpring,
   interpolate,
 } from 'react-native-reanimated';
-import { useTheme, SHADOWS, BORDER_RADIUS, SPACING, ANIMATION } from '../../lib/theme';
-import { useTutorialStore } from '../../lib/tutorial';
-import { useTutorialTarget } from '../../components/tutorial';
+import { useTheme, SHADOWS, ANIMATION } from '../../lib/theme';
+import { useAuthStore } from '../../lib/auth';
+import { Onboarding, hasCompletedOnboarding, resetOnboarding } from '../../components/Onboarding';
 
 // Custom Tab Bar Icon with animation
 function TabIcon({
@@ -73,57 +73,34 @@ function TabIcon({
   );
 }
 
+const DEMO_EMAIL = 'demo@represent.app';
+
 export default function TabLayout() {
   const { colors, isDark } = useTheme();
-  const pathname = usePathname();
   const insets = useSafeAreaInsets();
-  const {
-    checkTutorialStatus,
-    startTutorial,
-    resetTutorial,
-    isActive: tutorialActive,
-    currentStepIndex,
-    steps,
-    completeAction
-  } = useTutorialStore();
+  const { user } = useAuthStore();
+  const [showOnboarding, setShowOnboarding] = useState(false);
 
-  // Tutorial target refs for tab icons
-  const identityTabRef = useTutorialTarget('tab-identity');
-  const sentinelTabRef = useTutorialTarget('tab-sentinel');
-
-  // Check and start tutorial on first launch (only if not completed)
   useEffect(() => {
-    const initTutorial = async () => {
-      const hasCompleted = await checkTutorialStatus();
-      if (!hasCompleted) {
-        // First time user - start tutorial after brief delay
-        setTimeout(() => {
-          startTutorial();
-        }, 800);
+    const checkOnboarding = async () => {
+      // Always reset onboarding for demo account (App Store review preview)
+      if (user?.email === DEMO_EMAIL) {
+        await resetOnboarding();
+      }
+      const completed = await hasCompletedOnboarding();
+      if (!completed) {
+        setShowOnboarding(true);
       }
     };
-    initTutorial();
-  }, []);
+    checkOnboarding();
+  }, [user?.email]);
 
-  // Detect tab navigation for tutorial
-  useEffect(() => {
-    if (!tutorialActive) return;
-
-    const currentStep = steps[currentStepIndex];
-    if (currentStep?.requiredAction !== 'tap-tab') return;
-
-    // Extract current tab name from pathname
-    const currentTab = pathname.split('/').pop();
-
-    // Check if user navigated to the correct tab
-    if (currentStep.id === 'tap-identity' && currentTab === 'identity') {
-      completeAction('tap-tab');
-    } else if (currentStep.id === 'tap-sentinel' && currentTab === 'sentinel') {
-      completeAction('tap-tab');
-    }
-  }, [pathname, tutorialActive, currentStepIndex, steps]);
+  const handleOnboardingComplete = () => {
+    setShowOnboarding(false);
+  };
 
   return (
+    <>
     <Tabs
       key={isDark ? 'dark' : 'light'}
       screenListeners={{
@@ -182,9 +159,7 @@ export default function TabLayout() {
         options={{
           title: 'Identity',
           tabBarIcon: ({ color, focused }) => (
-            <View ref={identityTabRef} collapsable={false}>
-              <TabIcon name="shield-checkmark-outline" color={color} focused={focused} />
-            </View>
+            <TabIcon name="shield-checkmark-outline" color={color} focused={focused} />
           ),
         }}
       />
@@ -193,9 +168,7 @@ export default function TabLayout() {
         options={{
           title: 'Sentinel',
           tabBarIcon: ({ color, focused }) => (
-            <View ref={sentinelTabRef} collapsable={false}>
-              <TabIcon name="sparkles-outline" color={color} focused={focused} />
-            </View>
+            <TabIcon name="sparkles-outline" color={color} focused={focused} />
           ),
         }}
       />
@@ -209,6 +182,17 @@ export default function TabLayout() {
         }}
       />
     </Tabs>
+
+    {/* Onboarding Modal - shows after sign-in for first-time users */}
+    <Modal
+      visible={showOnboarding}
+      animationType="fade"
+      statusBarTranslucent
+      presentationStyle="fullScreen"
+    >
+      <Onboarding onComplete={handleOnboardingComplete} />
+    </Modal>
+    </>
   );
 }
 

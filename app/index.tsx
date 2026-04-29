@@ -1638,16 +1638,17 @@ const styles = StyleSheet.create({
     marginBottom: SPACING['2xl'],
   },
   authLogo: {
-    width: 64,
-    height: 64,
-    borderRadius: RADIUS.xl,
+    width: 72,
+    height: 72,
+    borderRadius: 36,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: SPACING.lg,
   },
   authLogoImage: {
-    width: 44,
-    height: 44,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
   },
   authTitle: {
     ...TYPOGRAPHY.h2,
