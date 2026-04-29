@@ -9,6 +9,7 @@ import { useAuthStore } from '../../lib/auth';
 import { organizationsApi, Organization, OrganizationProposal } from '../../lib/api';
 import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS } from '../../lib/theme';
 
+const SERIF_FONT = Platform.OS === 'ios' ? 'Georgia' : 'serif';
 const CATEGORIES = ['Transportation', 'Environment', 'Housing', 'Education', 'Healthcare', 'Economy', 'Public Safety', 'Infrastructure', 'Other'];
 
 type TabType = 'proposals' | 'announcements' | 'about' | 'admin';
@@ -181,6 +182,7 @@ export default function OrganizationDetailScreen() {
     title: '',
     description: '',
     category: 'Other',
+    isOfficial: false,
   });
 
   // Admin panel state
@@ -361,6 +363,7 @@ export default function OrganizationDetailScreen() {
         title: newProposal.title.trim(),
         description: newProposal.description.trim(),
         category: newProposal.category,
+        isOfficial: newProposal.isOfficial,
       });
 
       if (result.error) {
@@ -370,7 +373,7 @@ export default function OrganizationDetailScreen() {
 
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setShowCreateModal(false);
-      setNewProposal({ title: '', description: '', category: 'Other' });
+      setNewProposal({ title: '', description: '', category: 'Other', isOfficial: false });
 
       // Refresh data
       fetchData();
@@ -1164,13 +1167,28 @@ export default function OrganizationDetailScreen() {
               </ScrollView>
             </View>
 
-            {/* Official Notice */}
-            <View style={[styles.officialNotice, { backgroundColor: `${colors.gold}10`, borderColor: `${colors.gold}30` }]}>
-              <Ionicons name="ribbon" size={18} color={colors.gold} />
-              <Text style={[styles.officialNoticeText, { color: colors.gold }]}>
-                This proposal will be marked as an official proposal from {organization?.name}
-              </Text>
-            </View>
+            {/* Official Toggle (Admin only) */}
+            {organization?.role === 'admin' && (
+              <View style={[styles.officialToggleRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                <View style={styles.officialToggleInfo}>
+                  <View style={[styles.officialToggleIcon, { backgroundColor: `${colors.gold}15` }]}>
+                    <Ionicons name="ribbon" size={18} color={colors.gold} />
+                  </View>
+                  <View style={styles.officialToggleText}>
+                    <Text style={[styles.officialToggleTitle, { color: colors.text }]}>Official Proposal</Text>
+                    <Text style={[styles.officialToggleSubtitle, { color: colors.textSecondary }]}>
+                      Mark as an official proposal from {organization?.name}
+                    </Text>
+                  </View>
+                </View>
+                <Switch
+                  value={newProposal.isOfficial}
+                  onValueChange={(value) => setNewProposal((prev) => ({ ...prev, isOfficial: value }))}
+                  trackColor={{ false: colors.border, true: colors.gold }}
+                  thumbColor="#FFF"
+                />
+              </View>
+            )}
 
             <View style={{ height: 100 }} />
           </ScrollView>
@@ -1351,6 +1369,8 @@ const styles = StyleSheet.create({
   },
   heroName: {
     ...TYPOGRAPHY.headlineSmall,
+    fontFamily: SERIF_FONT,
+    fontStyle: 'italic',
   },
   tierBadge: {
     alignSelf: 'flex-start',
@@ -1734,19 +1754,38 @@ const styles = StyleSheet.create({
     ...TYPOGRAPHY.labelSmall,
     fontWeight: '600',
   },
-  officialNotice: {
+  officialToggleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: SPACING.lg,
+    justifyContent: 'space-between',
+    padding: SPACING.md,
     borderRadius: BORDER_RADIUS.lg,
     borderWidth: 1,
-    gap: SPACING.md,
-    marginTop: SPACING.md,
+    marginTop: SPACING.lg,
   },
-  officialNoticeText: {
-    ...TYPOGRAPHY.bodySmall,
+  officialToggleInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
     flex: 1,
-    lineHeight: 20,
+    gap: SPACING.md,
+  },
+  officialToggleIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  officialToggleText: {
+    flex: 1,
+  },
+  officialToggleTitle: {
+    ...TYPOGRAPHY.bodyMedium,
+    fontWeight: '600',
+  },
+  officialToggleSubtitle: {
+    ...TYPOGRAPHY.caption,
+    marginTop: 2,
   },
 
   // Admin Panel Styles

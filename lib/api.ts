@@ -191,6 +191,7 @@ interface CreateProposalData {
   voteType?: string;
   options?: string[];
   imageUrl?: string;
+  isOfficial?: boolean;
 }
 
 interface UploadResponse {
@@ -596,7 +597,7 @@ export const organizationsApi = {
         creatorId: 'demo-user',
         organizationId: orgId,
         organizationName: orgName,
-        isOfficial: true,
+        isOfficial: data.isOfficial ?? false,
       };
 
       try {
@@ -613,7 +614,7 @@ export const organizationsApi = {
 
     return apiRequest<OrganizationProposal>(`/api/organizations/${orgId}/proposals`, {
       method: 'POST',
-      body: JSON.stringify({ ...data, isOfficial: true }),
+      body: JSON.stringify({ ...data, isOfficial: data.isOfficial ?? false }),
     });
   },
 
