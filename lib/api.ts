@@ -830,11 +830,15 @@ export const organizationsApi = {
     name: string;
     description: string;
     logoUrl?: string;
-    type: 'community' | 'professional' | 'enterprise';
+    type: 'starter' | 'professional' | 'enterprise';
   }): Promise<ApiResponse<Organization>> {
     const result = await apiRequest<Organization>('/api/organizations', {
       method: 'POST',
-      body: JSON.stringify(data),
+      body: JSON.stringify({
+        ...data,
+        // Map 'starter' to 'community' for backend compatibility
+        type: data.type === 'starter' ? 'community' : data.type,
+      }),
     });
 
     // For demo account, save with enhanced data to ensure input fields and admin role
