@@ -861,6 +861,7 @@ export const organizationsApi = {
         return { data: enhancedOrg, error: null };
       } catch (e) {
         console.error('Failed to save demo organization locally:', e);
+        return { data: enhancedOrg, error: null };
       }
     }
 
@@ -886,6 +887,7 @@ export const organizationsApi = {
         return { data: localOrg, error: null };
       } catch (e) {
         console.error('Failed to save demo organization locally:', e);
+        return { data: localOrg, error: null };
       }
     }
 

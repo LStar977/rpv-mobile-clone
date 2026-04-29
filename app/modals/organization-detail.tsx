@@ -216,6 +216,19 @@ export default function OrganizationDetailScreen() {
         const isDemoUser = user?.email === 'demo@represent.app';
         const role = isDemoUser ? 'admin' : (orgResult.data.role || (params.orgRole as 'admin' | 'member' | undefined));
         setOrganization({ ...orgResult.data, role });
+      } else if (params.orgId && params.orgName) {
+        // Fallback: construct org from params when API fails
+        const isDemoUser = user?.email === 'demo@represent.app';
+        setOrganization({
+          id: params.orgId as string,
+          name: params.orgName as string,
+          description: '',
+          memberCount: 1,
+          tier: 'starter',
+          verified: false,
+          createdAt: new Date().toISOString(),
+          role: isDemoUser ? 'admin' : ((params.orgRole as 'admin' | 'member') || 'member'),
+        });
       }
       if (proposalsResult.data) setProposals(proposalsResult.data);
       if (announcementsResult.data) setAnnouncements(announcementsResult.data);
