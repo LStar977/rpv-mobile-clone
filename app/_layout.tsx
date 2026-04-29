@@ -6,6 +6,7 @@ import { ThemeProvider, useTheme } from '../lib/theme';
 import { STRIPE_PUBLISHABLE_KEY, MERCHANT_IDENTIFIER } from '../lib/stripe';
 import { initIAP, endIAP } from '../lib/iap';
 import { soundEffects } from '../lib/sounds';
+import { useSyncBallotTier } from '../lib/ballots';
 
 // Conditionally import StripeProvider to handle missing native module
 let StripeProvider: any = null;
@@ -17,6 +18,11 @@ try {
 
 function ThemedStack() {
   const { colors, isDark } = useTheme();
+
+  // Keeps the ballot store's tier ('free' | 'verified' | 'premium') in sync
+  // with the user's auth + subscription state. Without this, premium subscribers
+  // would still see the free-tier daily-cap UI.
+  useSyncBallotTier();
 
   useEffect(() => {
     initIAP();

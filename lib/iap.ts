@@ -9,17 +9,6 @@ export const IAP_PRODUCTS = {
   orgCommunity: 'com.representwallet.app.org.community',
   orgProfessional: 'com.representwallet.app.org.professional',
   orgEnterprise: 'com.representwallet.app.org.enterprise',
-  // Ballot packs (consumables)
-  ballots5: 'com.representwallet.app.ballots.5',
-  ballots10: 'com.representwallet.app.ballots.10',
-  ballots25: 'com.representwallet.app.ballots.25',
-} as const;
-
-// Ballot pack configurations
-export const BALLOT_PACKS = {
-  [IAP_PRODUCTS.ballots5]: { ballots: 5, price: '$3.99' },
-  [IAP_PRODUCTS.ballots10]: { ballots: 10, price: '$6.99' },
-  [IAP_PRODUCTS.ballots25]: { ballots: 25, price: '$14.99' },
 } as const;
 
 // Conditionally import react-native-iap to handle missing native module (e.g., in Expo Go)
@@ -70,10 +59,10 @@ export async function initIAP(): Promise<boolean> {
       async (purchase: any) => {
         const receipt = purchase.transactionReceipt;
         if (receipt) {
-          // Finish the transaction (mark as consumable for ballot packs)
-          const consumable = isConsumable(purchase.productId);
+          // No more consumables — verification is one-time, premium/org are
+          // subscriptions. Always finish as non-consumable.
           try {
-            await RNIap.finishTransaction({ purchase, isConsumable: consumable });
+            await RNIap.finishTransaction({ purchase, isConsumable: false });
           } catch (e) {
             console.error('Error finishing transaction:', e);
           }
@@ -160,14 +149,11 @@ export async function getProducts(skus?: string[]): Promise<IAPProduct[]> {
   }
 }
 
-// Check if a product is a consumable (ballot packs)
-function isConsumable(sku: string): boolean {
-  return sku.includes('.ballots.');
-}
-
-// Check if a product is a subscription
+// Check if a product is a subscription. Ballot packs were consumables but
+// have been retired in favor of the daily-allowance system; the only one-time
+// product left is verification.
 function isSubscription(sku: string): boolean {
-  return sku !== IAP_PRODUCTS.verification && !isConsumable(sku);
+  return sku !== IAP_PRODUCTS.verification;
 }
 
 /**
@@ -208,13 +194,6 @@ export async function purchaseProduct(sku: string): Promise<IAPPurchaseResult> {
       });
     }
   });
-}
-
-/**
- * Purchase ballot pack (consumable)
- */
-export async function purchaseBallots(packId: keyof typeof BALLOT_PACKS): Promise<IAPPurchaseResult> {
-  return purchaseProduct(packId);
 }
 
 /**

@@ -1922,13 +1922,15 @@ export default function ProposalsScreen() {
       return;
     }
 
-    // Check ballot balance (premium users have unlimited)
-    const { spendBallot, tier: ballotTier, syncFromChain } = useBallotStore.getState();
+    // Daily ballot cap check (premium users have unlimited).
+    // Server enforces the same cap; the local check is a fast UX path so
+    // we don't even attempt the network call when the user is out.
+    const { spendBallot, tier: ballotTier } = useBallotStore.getState();
     if (ballotTier !== 'premium') {
       const canSpend = spendBallot();
       if (!canSpend) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-        router.push('/modals/out-of-ballots');
+        router.push('/modals/subscription');
         return;
       }
     }
@@ -2034,10 +2036,9 @@ export default function ProposalsScreen() {
       // Check for newly earned badges (async, non-blocking)
       setTimeout(() => checkForNewBadges(), 1500);
 
-      // Re-sync ballot balance from chain after vote (token was transferred)
-      if (user?.walletAddress) {
-        syncFromChain(user.walletAddress);
-      }
+      // Daily counter was already incremented by spendBallot() before the vote.
+      // No on-chain balance sync needed — the daily counter is the source of
+      // truth for the UI; the user's on-chain RPV balance is just "ammo".
     } catch {
       if (currentTier !== 'premium') restoreBallot();
       Alert.alert('Error', 'Failed to submit vote. Please try again.');

@@ -25,8 +25,6 @@ export default function ModalsLayout() {
       <Stack.Screen name="verification-payment" />
       <Stack.Screen name="create-organization" />
       <Stack.Screen name="admin" />
-      <Stack.Screen name="out-of-ballots" />
-      <Stack.Screen name="purchase-ballots" />
       <Stack.Screen name="my-proposals" />
       <Stack.Screen name="community-proposals" />
     </Stack>

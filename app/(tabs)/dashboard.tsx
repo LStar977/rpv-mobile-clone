@@ -8,7 +8,6 @@ import Svg, { Circle, Line, Path, Defs, LinearGradient as SvgLinearGradient, Sto
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { SPACING, useTheme } from '../../lib/theme';
 import { useAuthStore } from '../../lib/auth';
-import { useBallotStore } from '../../lib/ballots';
 import { proposalsApi, userApi, type Proposal } from '../../lib/api';
 import { useFocusEffect } from 'expo-router';
 
@@ -67,7 +66,6 @@ export default function DashboardScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user } = useAuthStore();
-  const { syncFromChain } = useBallotStore();
   const [refreshing, setRefreshing] = useState(false);
   const [proposals, setProposals] = useState<Proposal[]>([]);
   const [votedIds, setVotedIds] = useState<Set<string>>(new Set());
@@ -89,10 +87,6 @@ export default function DashboardScreen() {
 
   useEffect(() => { loadData(); }, [loadData]);
   useFocusEffect(useCallback(() => { loadData(); }, [loadData]));
-
-  useEffect(() => {
-    if (user?.walletAddress) syncFromChain(user.walletAddress);
-  }, [user?.walletAddress, syncFromChain]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
