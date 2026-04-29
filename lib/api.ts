@@ -458,7 +458,10 @@ export const organizationsApi = {
   },
 
   async leaveOrganization(orgId: string): Promise<ApiResponse<{ success: boolean }>> {
-    return apiRequest(`/api/organizations/${orgId}/leave`, { method: 'POST' });
+    const authState = useAuthStore.getState();
+    const userId = authState.user?.id;
+    if (!userId) return { data: null, error: 'Not authenticated' };
+    return apiRequest(`/api/organizations/${orgId}/members/${userId}/remove`, { method: 'POST' });
   },
 
   async deleteOrganization(orgId: string): Promise<ApiResponse<{ success: boolean }>> {
@@ -783,7 +786,7 @@ export const organizationsApi = {
   },
 
   async removeMember(orgId: string, userId: string): Promise<ApiResponse<{ success: boolean }>> {
-    return apiRequest(`/api/organizations/${orgId}/members/${userId}`, { method: 'DELETE' });
+    return apiRequest(`/api/organizations/${orgId}/members/${userId}/remove`, { method: 'POST' });
   },
 
   async updateMemberRole(orgId: string, userId: string, role: 'admin' | 'member'): Promise<ApiResponse<{ success: boolean }>> {
