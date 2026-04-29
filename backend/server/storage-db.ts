@@ -488,6 +488,48 @@ export class DatabaseStorage implements IStorage {
     await db.update(users).set(stripeInfo).where(eq(users.id, userId));
   }
 
+  // ─── Ballot system: daily-cap enforcement and one-time grant tracking ──────
+
+  async markInitialBallotsGranted(userId: string): Promise<void> {
+    await db.update(users).set({ initialBallotsGranted: true } as any).where(eq(users.id, userId));
+  }
+
+  async incrementBallotsUsedToday(userId: string): Promise<void> {
+    await db.update(users)
+      .set({ ballotsUsedToday: sql`coalesce(${users.ballotsUsedToday}, 0) + 1` } as any)
+      .where(eq(users.id, userId));
+  }
+
+  // Lazy daily reset: if ballotsResetAt is on a previous calendar day (UTC),
+  // reset counter to 0 and stamp a new resetAt. Returns the (possibly reset)
+  // current count so the caller can enforce the cap in one read.
+  async resetBallotsIfStale(userId: string): Promise<number> {
+    const result = await db.select({
+      usedToday: users.ballotsUsedToday,
+      resetAt: users.ballotsResetAt,
+    }).from(users).where(eq(users.id, userId)).limit(1);
+    const row = result[0];
+    if (!row) return 0;
+    const now = new Date();
+    const lastReset = row.resetAt ? new Date(row.resetAt) : new Date(0);
+    const sameDay = lastReset.getUTCFullYear() === now.getUTCFullYear()
+      && lastReset.getUTCMonth() === now.getUTCMonth()
+      && lastReset.getUTCDate() === now.getUTCDate();
+    if (!sameDay) {
+      await db.update(users)
+        .set({ ballotsUsedToday: 0, ballotsResetAt: now } as any)
+        .where(eq(users.id, userId));
+      return 0;
+    }
+    return row.usedToday ?? 0;
+  }
+
+  async getUsersNeedingInitialGrant(): Promise<any[]> {
+    return await db.select().from(users).where(
+      and(eq(users.verified, true), eq(users.initialBallotsGranted, false))
+    );
+  }
+
   async createOrganization(name: string, creatorId: string, type: string, membershipType: string, emailDomain?: string): Promise<any> {
     const inviteCode = 'ORG-' + Math.random().toString(36).substring(2, 10).toUpperCase();
     const result = await db.insert(organizations).values({

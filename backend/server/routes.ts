@@ -13,6 +13,43 @@ import { registerObjectStorageRoutes } from "./replit_integrations/object_storag
 import jwt from "jsonwebtoken";
 import { randomUUID } from "crypto";
 
+// One-time bulk RPV transfer per user, fired when verification is approved.
+// Idempotent — safe to call from every verification-approved branch; only the
+// first call actually transfers tokens. Failures are swallowed so a transient
+// blockchain hiccup never blocks the verification itself.
+const INITIAL_BALLOT_GRANT = 1000;
+
+async function grantInitialBallotsIfNeeded(userId: string): Promise<void> {
+  try {
+    const user = await storage.getUser(userId);
+    if (!user || (user as any).initialBallotsGranted) return;
+
+    const wallet = await storage.getUserWallet(userId);
+    if (!wallet) {
+      log(`grantInitialBallots: user ${userId} has no wallet yet, skipping`);
+      return;
+    }
+
+    const rpvTokenAddress = process.env.RPV_TOKEN_ADDRESS;
+    if (!rpvTokenAddress) {
+      log(`grantInitialBallots: RPV_TOKEN_ADDRESS not configured`);
+      return;
+    }
+
+    const result = await baseNetwork.transferRPVToken(rpvTokenAddress, wallet.address, INITIAL_BALLOT_GRANT);
+    if (result.success) {
+      await (storage as any).markInitialBallotsGranted(userId);
+      log(`✅ Granted ${INITIAL_BALLOT_GRANT} RPV to user ${userId} (tx=${result.txHash})`);
+    } else {
+      log(`grantInitialBallots: transfer failed for user ${userId}: ${result.error}`);
+    }
+  } catch (e) {
+    log(`grantInitialBallots error for user ${userId}: ${e}`);
+  }
+}
+
+const DAILY_BALLOT_CAP = 20;
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // Setup OAuth authentication (Google, Apple, GitHub)
   await setupAuth(app);
@@ -296,6 +333,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      // Daily ballot cap enforcement (DB-only, off-chain).
+      // Premium subscribers ($7.99/mo) bypass the cap entirely.
+      // resetBallotsIfStale lazy-resets the counter at the start of a new
+      // calendar day (UTC) so we don't need a cron job.
+      const isPremium = user?.subscriptionStatus === 'active';
+      if (!isPremium) {
+        const usedToday = await (storage as any).resetBallotsIfStale(userId);
+        if (usedToday >= DAILY_BALLOT_CAP) {
+          return res.status(403).json({
+            error: `Daily voting limit reached (${DAILY_BALLOT_CAP}/day). Upgrade to Premium for unlimited voting.`,
+            dailyCapReached: true,
+          });
+        }
+      }
+
       const rpvTokenAddress = process.env.RPV_TOKEN_ADDRESS;
       if (!rpvTokenAddress) {
         return res.status(500).json({ error: "RPV token not configured" });
@@ -307,19 +359,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "Voting on this proposal has ended" });
       }
 
-      // Check user's RPV balance
+      // Check user's RPV balance and top up if they've fully drained their grant.
+      // Most users will never hit this — they got 1000 tokens at verification.
       const balance = await baseNetwork.getRPVBalance(rpvTokenAddress, wallet.address);
       const userBalance = parseFloat(balance);
 
       log(`User ${userId} RPV balance: ${balance}`);
 
-      // If user has no tokens, transfer 1 RPV to them first
       if (userBalance < 1) {
-        log(`Transferring 1 RPV token to user ${userId} before voting`);
-        const transferResult = await baseNetwork.transferRPVToken(rpvTokenAddress, wallet.address, 1);
+        log(`Top-up: transferring ${INITIAL_BALLOT_GRANT} RPV to user ${userId}`);
+        const transferResult = await baseNetwork.transferRPVToken(rpvTokenAddress, wallet.address, INITIAL_BALLOT_GRANT);
         if (!transferResult.success) {
-          log(`Warning: Failed to transfer RPV token to user: ${transferResult.error}`);
-          // Continue anyway - vote will fail if transfer didn't work
+          log(`Warning: top-up transfer failed for user ${userId}: ${transferResult.error}`);
+          // Continue anyway — vote will fail if transfer didn't work
         }
       }
 
@@ -344,6 +396,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // For multiple-choice, only update position counts (option counts handled separately if needed)
       if (!selectedOption) {
         await storage.updateProposalVotes(proposalId, position);
+      }
+
+      // Increment the daily ballot counter (premium users have no cap, skip)
+      if (!isPremium) {
+        await (storage as any).incrementBallotsUsedToday(userId);
       }
 
       // Check and award badges
@@ -1148,6 +1205,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           verifiedAt: new Date(),
         });
 
+        await grantInitialBallotsIfNeeded(userId);
+
         log(`User manually verified: user=${userId}`);
 
         res.json({
@@ -1383,6 +1442,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             verifiedAt: new Date(),
           });
 
+          await grantInitialBallotsIfNeeded(userId);
+
           return res.json({
             verified: true,
             message: "Identity verified! You can now mint your passport."
@@ -1433,6 +1494,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 verificationMethod: 'veriff',
                 verifiedAt: new Date(),
               });
+
+              await grantInitialBallotsIfNeeded(userId);
 
               return res.json({
                 verified: true,
@@ -1522,6 +1585,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         await storage.updateUserVerification(userId, updateData);
 
+        await grantInitialBallotsIfNeeded(userId);
+
         log(`User verified via Veriff webhook: user=${userId}, verificationId=${verificationId}, document=${document.type}, country=${address.country}`);
       }
 
@@ -1578,6 +1643,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         log(`Veriff webhook data: document.country=${document.country}, address.country=${address.country}`);
         await storage.updateUserVerification(userId, updateData);
+        await grantInitialBallotsIfNeeded(userId);
         log(`User verified via /api/veriff/webhook: user=${userId}, verificationId=${verificationId}, country=${country}`);
       }
 
@@ -1887,6 +1953,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         city: city || null,
       });
 
+      await grantInitialBallotsIfNeeded(user.id);
+
       log(`✅ Admin verified user: ${user.id}, email=${email}`);
 
       res.json({ success: true, userId: user.id, verified: true });
@@ -1964,6 +2032,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         log(`Veriff check-decision: Updating user ${userId} with: ${JSON.stringify(updateData)}`);
         await storage.updateUserVerification(userId, updateData);
+        await grantInitialBallotsIfNeeded(userId);
         log(`✅ User ${userId} verified via Veriff check-decision. Country: ${updateData.country}, State: ${updateData.state}, City: ${updateData.city}`);
       }
 
@@ -3709,8 +3778,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           stripeSubscriptionId: `iap:${originalTxId}`,
         }).where(eq(organizations.id, organizationId));
       } else if (productId.startsWith('com.representwallet.app.ballots.')) {
-        productType = 'ballot_pack';
-        // Ballot allocation logic deferred — for now just record the transaction
+        // Ballot packs were retired in favor of the daily-allowance model.
+        // We return 410 Gone so any in-flight purchases from older app builds
+        // get a clear error instead of silently succeeding.
+        log(`IAP: ballot pack purchase rejected (deprecated product) productId=${productId}, user=${userId}`);
+        return res.status(410).json({ error: "Ballot packs are no longer sold. Upgrade to Premium for unlimited voting." });
       } else {
         log(`IAP: unknown productId=${productId}, user=${userId}`);
         return res.status(400).json({ error: "Unknown product" });
@@ -3738,6 +3810,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       log(`IAP validation error: ${error.message}`);
       res.status(500).json({ error: "Failed to validate receipt" });
+    }
+  });
+
+  // Admin: one-shot backfill of the initial 1000-RPV grant for users who
+  // verified before the daily-allowance system shipped. Idempotent — only
+  // touches users where initialBallotsGranted=false. Safe to run multiple
+  // times. Gated by VERIFF_MASTER_SIGNATURE_KEY (existing admin secret).
+  app.post("/api/admin/backfill-initial-ballots", async (req: any, res) => {
+    try {
+      const adminKey = req.headers['x-admin-key'];
+      if (!adminKey || adminKey !== process.env.VERIFF_MASTER_SIGNATURE_KEY) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+
+      const pending = await (storage as any).getUsersNeedingInitialGrant();
+      log(`Backfill: ${pending.length} verified users need initial ballot grant`);
+
+      let granted = 0;
+      let skipped = 0;
+      for (const user of pending) {
+        await grantInitialBallotsIfNeeded(user.id);
+        // Re-check to count successes (helper swallows errors)
+        const refreshed = await storage.getUser(user.id);
+        if ((refreshed as any)?.initialBallotsGranted) {
+          granted++;
+        } else {
+          skipped++;
+        }
+      }
+
+      log(`Backfill complete: granted=${granted}, skipped=${skipped}`);
+      res.json({ success: true, total: pending.length, granted, skipped });
+    } catch (error: any) {
+      log(`Backfill error: ${error.message}`);
+      res.status(500).json({ error: "Backfill failed" });
     }
   });
 
