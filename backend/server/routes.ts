@@ -241,29 +241,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const user = await storage.getUser(userId);
-
-      // Verified-citizen gate replaces the old passport-NFT gate. Identity
-      // verification (Veriff) is the actual one-person-one-vote enforcement;
-      // the on-chain NFT was a redundant artifact of a removed mint flow.
-      if (!user?.verified) {
-        return res.status(403).json({ error: "You must complete identity verification before voting." });
-      }
       const proposal = await storage.getProposal(proposalId);
       const wallet = await storage.getUserWallet(userId);
-
-      // Check organization membership if proposal is org-restricted
-      if (proposal?.organizationId) {
-        const isMember = await storage.isOrganizationMember(proposal.organizationId, userId);
-        if (!isMember) {
-          return res.status(403).json({ error: "You must be a member of this organization to vote on this proposal" });
-        }
-      }
 
       if (!proposal) {
         return res.status(404).json({ error: "Proposal not found" });
       }
 
-      if (!wallet) {
+      // Identity gate. Two paths:
+      // - Org-scoped proposals: org membership replaces Veriff. The org admin's
+      //   invite code is the gate, so schools, unions, neighborhood groups,
+      //   etc. can run polls for their unverified members. These votes are
+      //   recorded off-chain (DB only) — see the on-chain branch further down.
+      // - Public / geo-gated proposals: Veriff verification still required.
+      //   This is the credibility moat for civic-scale referenda.
+      const isOrgScoped = !!proposal.organizationId;
+      if (isOrgScoped) {
+        const isMember = await storage.isOrganizationMember(proposal.organizationId, userId);
+        if (!isMember) {
+          return res.status(403).json({ error: "You must be a member of this organization to vote on this proposal" });
+        }
+      } else if (!user?.verified) {
+        return res.status(403).json({ error: "You must complete identity verification before voting." });
+      }
+
+      // On-chain voting requires a smart wallet (created at signup). For
+      // off-chain org votes the wallet isn't used, but we don't need to
+      // special-case its absence here — every account has one.
+      if (!wallet && !isOrgScoped) {
         return res.status(400).json({ error: "User wallet not found" });
       }
 
@@ -412,51 +417,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      const rpvTokenAddress = process.env.RPV_TOKEN_ADDRESS;
-      if (!rpvTokenAddress) {
-        return res.status(500).json({ error: "RPV token not configured" });
-      }
-
-      // Check if proposal is closed
+      // Check if proposal is closed (applies to all proposals).
       const isClosed = await (storage as any).isProposalClosed(proposalId);
       if (isClosed) {
         return res.status(403).json({ error: "Voting on this proposal has ended" });
       }
 
-      // Check user's RPV balance and top up if they've fully drained their grant.
-      // Most users will never hit this — they got 1000 tokens at verification.
-      const balance = await baseNetwork.getRPVBalance(rpvTokenAddress, wallet.address);
-      const userBalance = parseFloat(balance);
-
-      log(`User ${userId} RPV balance: ${balance}`);
-
-      if (userBalance < 1) {
-        log(`Top-up: transferring ${INITIAL_BALLOT_GRANT} RPV to user ${userId}`);
-        const transferResult = await baseNetwork.transferRPVToken(rpvTokenAddress, wallet.address, INITIAL_BALLOT_GRANT);
-        if (!transferResult.success) {
-          log(`Warning: top-up transfer failed for user ${userId}: ${transferResult.error}`);
-          // Continue anyway — vote will fail if transfer didn't work
+      // On-chain vote (only for non-org proposals). Org-scoped proposals are
+      // recorded off-chain because (1) unverified org members have no RPV
+      // grant to transfer, and (2) classroom polls / internal org votes
+      // don't need Base mainnet immutability — the engagement value comes
+      // from the tally itself, not from a verifiable on-chain trail.
+      let txHash: string | undefined = undefined;
+      if (!isOrgScoped) {
+        const rpvTokenAddress = process.env.RPV_TOKEN_ADDRESS;
+        if (!rpvTokenAddress) {
+          return res.status(500).json({ error: "RPV token not configured" });
         }
-      }
 
-      // For multiple-choice, find the option address; for yes/no use the position directly
-      let optionAddress: string | undefined;
-      if (position === 'multiple-choice' && selectedOption && proposal.optionAddresses && Array.isArray(proposal.optionAddresses)) {
-        const optionIndex = proposal.options?.indexOf(selectedOption) ?? -1;
-        if (optionIndex >= 0 && optionIndex < proposal.optionAddresses.length) {
-          optionAddress = proposal.optionAddresses[optionIndex];
+        // Check user's RPV balance and top up if they've fully drained their grant.
+        // Most users will never hit this — they got 1000 tokens at verification.
+        const balance = await baseNetwork.getRPVBalance(rpvTokenAddress, wallet!.address);
+        const userBalance = parseFloat(balance);
+
+        log(`User ${rid(userId)} RPV balance: ${balance}`);
+
+        if (userBalance < 1) {
+          log(`Top-up: transferring ${INITIAL_BALLOT_GRANT} RPV to user ${rid(userId)}`);
+          const transferResult = await baseNetwork.transferRPVToken(rpvTokenAddress, wallet!.address, INITIAL_BALLOT_GRANT);
+          if (!transferResult.success) {
+            log(`Warning: top-up transfer failed for user ${rid(userId)}: ${transferResult.error}`);
+            // Continue anyway — vote will fail if transfer didn't work
+          }
         }
+
+        // For multiple-choice, find the option address; for yes/no use the position directly
+        let optionAddress: string | undefined;
+        if (position === 'multiple-choice' && selectedOption && proposal.optionAddresses && Array.isArray(proposal.optionAddresses)) {
+          const optionIndex = proposal.options?.indexOf(selectedOption) ?? -1;
+          if (optionIndex >= 0 && optionIndex < proposal.optionAddresses.length) {
+            optionAddress = proposal.optionAddresses[optionIndex];
+          }
+        }
+
+        // User votes by transferring their token to vote address (signed with their key, relayed by server)
+        const voteResult = await baseNetwork.voteWithRelayPattern(rpvTokenAddress, wallet!.privateKey, wallet!.address, position as 'support' | 'oppose' | 'multiple-choice', proposalId, optionAddress);
+
+        if (!voteResult.success) {
+          return res.status(400).json({ error: voteResult.error || "Failed to transfer vote token" });
+        }
+        txHash = voteResult.txHash;
       }
 
-      // User votes by transferring their token to vote address (signed with their key, relayed by server)
-      const voteResult = await baseNetwork.voteWithRelayPattern(rpvTokenAddress, wallet.privateKey, wallet.address, position as 'support' | 'oppose' | 'multiple-choice', proposalId, optionAddress);
-
-      if (!voteResult.success) {
-        return res.status(400).json({ error: voteResult.error || "Failed to transfer vote token" });
-      }
-
-      // Record vote in database (with selected option if multiple-choice)
-      await storage.recordVote(userId, proposalId, position, undefined, voteResult.txHash, selectedOption);
+      // Record vote in database (txHash is null for off-chain org votes).
+      await storage.recordVote(userId, proposalId, position, undefined, txHash, selectedOption);
 
       // Demo account is sandboxed: vote is recorded in the user's history,
       // but real proposal counters don't move so App Store reviewers can't
@@ -515,7 +529,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         log(`Badge check error (non-critical): ${badgeError}`);
       }
 
-      log(`Vote recorded on-chain: user=${rid(userId)}, proposal=${proposalId}, position=${position}, tx=${voteResult.txHash}`);
+      log(`Vote recorded ${isOrgScoped ? 'off-chain (org)' : 'on-chain'}: user=${rid(userId)}, proposal=${proposalId}, position=${position}${txHash ? `, tx=${txHash}` : ''}`);
 
       // Notify proposal owner that someone voted on their proposal
       if (proposal.userId !== userId) {
@@ -525,8 +539,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json({
         success: true,
-        message: "Vote recorded on-chain via token transfer",
-        txHash: voteResult.txHash,
+        message: isOrgScoped ? "Vote recorded" : "Vote recorded on-chain via token transfer",
+        txHash,
         newBadges,
       });
     } catch (error) {
