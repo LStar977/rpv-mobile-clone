@@ -221,7 +221,14 @@ async function apiRequest<T>(
       const errorData = await response.json().catch(() => ({}));
       console.error(`API Error: ${response.status}`, errorData);
 
-      // Handle auth expiration - trigger re-auth flow
+      // Handle auth expiration - trigger re-auth flow.
+      // TODO: implement transparent refresh+retry. Requires backend changes:
+      // (1) issue a refreshToken alongside the JWT at /api/auth/{google,apple}/mobile,
+      // (2) add POST /api/auth/refresh that consumes a refresh token and returns
+      //     a new short-lived JWT, (3) mobile SecureStore-persist the refresh token,
+      // (4) on 401 here, call /api/auth/refresh, update auth store, retry once.
+      // Currently the user is bounced to sign-in on token expiry — acceptable
+      // for now since JWT_EXPIRES_IN is long enough for typical sessions.
       if (response.status === 401) {
         console.log('[API] Token expired or invalid, triggering re-auth');
         useAuthStore.getState().checkAuth();

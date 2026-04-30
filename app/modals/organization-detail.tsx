@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Image as ExpoImage } from 'expo-image';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { useAuthStore } from '../../lib/auth';
@@ -638,7 +639,7 @@ export default function OrganizationDetailScreen() {
             <View style={styles.heroContent}>
               <View style={[styles.heroLogo, { backgroundColor: `${colors.gold}15` }]}>
                 {organization.logoUrl ? (
-                  <Animated.Image source={{ uri: organization.logoUrl }} style={styles.heroLogoImage} />
+                  <ExpoImage source={{ uri: organization.logoUrl }} style={styles.heroLogoImage} contentFit="cover" cachePolicy="memory-disk" transition={150} />
                 ) : (
                   <Ionicons name="business" size={32} color={colors.gold} />
                 )}

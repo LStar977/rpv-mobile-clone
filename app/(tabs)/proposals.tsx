@@ -4,6 +4,7 @@ import {
   Text,
   StyleSheet,
   ScrollView,
+  FlatList,
   TouchableOpacity,
   ActivityIndicator,
   RefreshControl,
@@ -16,6 +17,7 @@ import {
   Dimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Image as ExpoImage } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
@@ -843,7 +845,7 @@ function SwipeCard({ proposal, onSwipeLeft, onSwipeRight, onSwipeUp, onTap, isTo
         <View style={premiumCardStyles.heroContainer}>
           {proposal.imageUrl ? (
             <>
-              <Image source={{ uri: proposal.imageUrl }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+              <ExpoImage source={{ uri: proposal.imageUrl }} style={StyleSheet.absoluteFill} contentFit="cover" cachePolicy="memory-disk" transition={150} />
               <LinearGradient
                 colors={pc.isDark ? ['rgba(4,7,7,0.2)', 'rgba(4,7,7,0.55)', 'rgba(13,15,18,0.95)'] : ['rgba(255,255,255,0.2)', 'rgba(255,255,255,0.55)', 'rgba(250,248,245,0.95)']}
                 locations={[0, 0.5, 1]}
@@ -1500,7 +1502,7 @@ function ProposalCard({
       {/* Image */}
       {proposal.imageUrl && (
         <View style={styles.imageWrapper}>
-          <Image source={{ uri: proposal.imageUrl }} style={styles.proposalImage} resizeMode="cover" />
+          <ExpoImage source={{ uri: proposal.imageUrl }} style={styles.proposalImage} contentFit="cover" cachePolicy="memory-disk" transition={150} />
           <LinearGradient
             colors={['transparent', 'rgba(0,0,0,0.3)']}
             style={styles.imageOverlay}
@@ -2473,11 +2475,28 @@ export default function ProposalsScreen() {
           )}
         </GestureHandlerRootView>
       ) : (
-        /* List Mode */
-        <ScrollView
+        /* List Mode — virtualized so memory + first-paint scale to thousands of proposals */
+        <FlatList
           style={styles.list}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
+          data={filteredProposals}
+          keyExtractor={(p) => String(p.id)}
+          renderItem={({ item, index }) => (
+            <ProposalCard
+              proposal={item}
+              hasVoted={votedProposals.has(item.id as number)}
+              onVote={handleVote}
+              isVoting={votingProposalId === item.id}
+              onPress={() => openProposal(item)}
+              index={index}
+              isUserVerified={isVerified}
+              userCountry={userCountry}
+              userState={userState}
+              userCity={userCity}
+            />
+          )}
+          ListFooterComponent={<View style={styles.listSpacer} />}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -2486,24 +2505,11 @@ export default function ProposalsScreen() {
               progressBackgroundColor={colors.surface}
             />
           }
-        >
-          {filteredProposals.map((proposal, index) => (
-            <ProposalCard
-              key={proposal.id}
-              proposal={proposal}
-              hasVoted={votedProposals.has(proposal.id as number)}
-              onVote={handleVote}
-              isVoting={votingProposalId === proposal.id}
-              onPress={() => openProposal(proposal)}
-              index={index}
-              isUserVerified={isVerified}
-              userCountry={userCountry}
-              userState={userState}
-              userCity={userCity}
-            />
-          ))}
-          <View style={styles.listSpacer} />
-        </ScrollView>
+          removeClippedSubviews
+          initialNumToRender={6}
+          maxToRenderPerBatch={6}
+          windowSize={10}
+        />
       )}
 
       {/* Detail Modal — premium institutional redesign */}
@@ -2550,7 +2556,7 @@ export default function ProposalsScreen() {
                 {/* Hero image with overlays */}
                 <View style={detailStyles.hero}>
                   {detail.imageUrl ? (
-                    <Image source={{ uri: detail.imageUrl }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+                    <ExpoImage source={{ uri: detail.imageUrl }} style={StyleSheet.absoluteFill} contentFit="cover" cachePolicy="memory-disk" transition={150} />
                   ) : (
                     <View style={[StyleSheet.absoluteFill, { backgroundColor: BG_RAISED }]} />
                   )}

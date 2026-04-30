@@ -727,6 +727,8 @@ export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const [userTier, setUserTier] = useState<UserTier>('free');
   const [refreshing, setRefreshing] = useState(false);
+  const [badgesEarned, setBadgesEarned] = useState<number | null>(null);
+  const BADGES_TOTAL = 15;
 
   // Fetch user's subscription tier
   const fetchTier = useCallback(async () => {
@@ -764,6 +766,25 @@ export default function ProfileScreen() {
   useEffect(() => {
     fetchTier();
   }, [fetchTier]);
+
+  // Live badge count for the profile menu row. Falls back to null on
+  // failure so the row label degrades gracefully ("Badges & achievements").
+  useEffect(() => {
+    if (!token || !user?.id) return;
+    (async () => {
+      try {
+        const response = await fetch(`${API_URL}/api/badges/user/${user.id}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (response.ok) {
+          const earned = await response.json();
+          setBadgesEarned(Array.isArray(earned) ? earned.length : 0);
+        }
+      } catch {
+        // Keep null; row will hide the count.
+      }
+    })();
+  }, [token, user?.id]);
 
   useFocusEffect(
     useCallback(() => {
@@ -849,7 +870,7 @@ export default function ProfileScreen() {
           <PrRow icon="business-outline" label="My organizations" value="3" onPress={() => navigateTo('/modals/organizations')} />
           <PrRow icon="time-outline" label="Voting history" sub="234 ballots cast" onPress={() => navigateTo('/modals/voting-history')} />
           <PrRow icon="analytics-outline" label="Analytics" sub="Patterns & impact" onPress={() => navigateTo('/modals/analytics')} />
-          <PrRow icon="trophy-outline" label="Badges & achievements" value="1 / 15" valueColor={colors.goldLight} last onPress={() => navigateTo('/modals/badges')} />
+          <PrRow icon="trophy-outline" label="Badges & achievements" value={badgesEarned !== null ? `${badgesEarned} / ${BADGES_TOTAL}` : undefined} valueColor={colors.goldLight} last onPress={() => navigateTo('/modals/badges')} />
         </PrSection>
 
         {/* Section II: Membership */}

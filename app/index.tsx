@@ -1004,6 +1004,13 @@ export default function AuthScreen() {
     }
   }, [isAuthenticated]);
 
+  // While authenticated, render nothing — the effect above is replacing
+  // the route. Without this guard the sign-in UI flashes for one frame
+  // on cold start when SecureStore-cached credentials are valid.
+  if (isAuthenticated) {
+    return null;
+  }
+
   const handleBiometricLogin = async () => {
     const result = await authenticateWithBiometrics(`Use ${biometricType} to sign in`);
     if (result.success) {

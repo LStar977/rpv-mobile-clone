@@ -8,6 +8,7 @@ import { STRIPE_PUBLISHABLE_KEY, MERCHANT_IDENTIFIER } from '../lib/stripe';
 import { initIAP, endIAP } from '../lib/iap';
 import { soundEffects } from '../lib/sounds';
 import { useSyncBallotTier } from '../lib/ballots';
+import { useAuthStore } from '../lib/auth';
 
 // Sentry init at module load. No-op when EXPO_PUBLIC_SENTRY_DSN isn't set,
 // so it's safe to leave wired up before you've created a Sentry project.
@@ -54,6 +55,8 @@ try {
 
 function ThemedStack() {
   const { colors, isDark } = useTheme();
+  const hydrated = useAuthStore((s) => s.hydrated);
+  const hydrate = useAuthStore((s) => s.hydrate);
 
   // Keeps the ballot store's tier ('free' | 'verified' | 'premium') in sync
   // with the user's auth + subscription state. Without this, premium subscribers
@@ -61,6 +64,9 @@ function ThemedStack() {
   useSyncBallotTier();
 
   useEffect(() => {
+    // Rehydrate auth from SecureStore before the entry route renders, so
+    // returning users don't see the sign-in screen flash on cold start.
+    hydrate();
     initIAP();
     soundEffects.init();
     return () => {
@@ -68,6 +74,12 @@ function ThemedStack() {
       soundEffects.unload();
     };
   }, []);
+
+  // Until SecureStore reads complete, show a blank background that matches
+  // the splash so the transition into the authed UI is seamless.
+  if (!hydrated) {
+    return <View style={{ flex: 1, backgroundColor: colors.background }} />;
+  }
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
