@@ -881,7 +881,7 @@ export const organizationsApi = {
     logoUrl?: string;
     type: 'starter' | 'professional' | 'enterprise';
   }): Promise<ApiResponse<Organization>> {
-    const result = await apiRequest<Organization>('/api/organizations', {
+    const rawResult = await apiRequest<any>('/api/organizations', {
       method: 'POST',
       body: JSON.stringify({
         ...data,
@@ -889,6 +889,12 @@ export const organizationsApi = {
         type: data.type === 'starter' ? 'community' : data.type,
       }),
     });
+
+    // Backend returns { organization: {...} }; unwrap to a flat Organization
+    // so callers can read .id directly. Matches getMembers/getInviteCodes pattern.
+    const result: ApiResponse<Organization> = rawResult.data?.organization
+      ? { data: rawResult.data.organization, error: null }
+      : { data: rawResult.data, error: rawResult.error };
 
     // For demo account, save with enhanced data to ensure input fields and admin role
     if (isDemoAccount() && result.data) {

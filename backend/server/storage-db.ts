@@ -683,7 +683,14 @@ export class DatabaseStorage implements IStorage {
     const orgs = await Promise.all(
       memberships.map(async (m) => {
         const org = await this.getOrganization(m.organizationId);
-        return org ? { ...org, role: m.role } : null;
+        if (!org) return null;
+        const countRes: any = await db.execute(sql`
+          SELECT COUNT(*)::int AS count FROM organization_members
+          WHERE organization_id = ${m.organizationId}
+        `);
+        const rows = Array.isArray(countRes) ? countRes : (countRes?.rows ?? []);
+        const memberCount = Number(rows[0]?.count) || 0;
+        return { ...org, role: m.role, memberCount };
       })
     );
     return orgs.filter(Boolean);
