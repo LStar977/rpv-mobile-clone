@@ -196,6 +196,34 @@ export async function setupAuth(app: Express) {
     }
   });
 
+  // Account deletion (Apple App Store guideline 5.1.1(v) requires this for any
+  // app that supports sign-up). Soft-delete: anonymize PII but keep the row so
+  // votes and proposals stay attributable to "a deleted user" and don't break
+  // proposal counts. The session is cleared; user cannot log back in because
+  // their original email is now overwritten with a sentinel value.
+  app.delete("/api/auth/account", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub || req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      await (storage as any).deleteUser(userId);
+      log(`Account deleted (anonymized) for user: ${userId}`);
+      // Best-effort session cleanup for OAuth sessions; mobile bearer-token
+      // auth has nothing server-side to invalidate beyond the row update.
+      if (typeof req.logout === "function") {
+        req.logout(() => {
+          res.json({ success: true });
+        });
+        return;
+      }
+      res.json({ success: true });
+    } catch (error) {
+      log(`Delete account error: ${error}`);
+      res.status(500).json({ error: "Failed to delete account" });
+    }
+  });
+
   app.get("/api/auth/user-legacy", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user?.id;

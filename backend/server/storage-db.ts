@@ -819,6 +819,90 @@ export class DatabaseStorage implements IStorage {
       resetDate: startOfNextMonth,
     };
   }
+
+  // Atomic ballot consumption: combines lazy reset + cap check + increment in
+  // a single SQL UPDATE. Eliminates the TOCTOU race where two concurrent
+  // requests could both pass the read-time cap check.
+  // Returns true if a ballot was consumed; false if the daily cap was reached.
+  async consumeBallot(userId: string, dailyCap: number): Promise<boolean> {
+    const result = await db.execute(sql`
+      UPDATE users
+      SET
+        ballots_used_today = CASE
+          WHEN ballots_reset_at::date < (NOW() AT TIME ZONE 'UTC')::date THEN 1
+          ELSE COALESCE(ballots_used_today, 0) + 1
+        END,
+        ballots_reset_at = CASE
+          WHEN ballots_reset_at::date < (NOW() AT TIME ZONE 'UTC')::date THEN NOW()
+          ELSE ballots_reset_at
+        END
+      WHERE id = ${userId}
+        AND (
+          ballots_reset_at::date < (NOW() AT TIME ZONE 'UTC')::date
+          OR COALESCE(ballots_used_today, 0) < ${dailyCap}
+        )
+      RETURNING ballots_used_today
+    `);
+    // neon-http returns an array of rows directly; pg returns { rows, rowCount }
+    const r: any = result;
+    if (Array.isArray(r)) return r.length > 0;
+    if (typeof r?.rowCount === "number") return r.rowCount > 0;
+    if (Array.isArray(r?.rows)) return r.rows.length > 0;
+    return false;
+  }
+
+  // Same atomic-update pattern for Sentinel AI daily quota.
+  async consumeSentinelUse(userId: string, dailyCap: number): Promise<boolean> {
+    const result = await db.execute(sql`
+      UPDATE users
+      SET
+        sentinel_uses_today = CASE
+          WHEN sentinel_reset_at::date < (NOW() AT TIME ZONE 'UTC')::date THEN 1
+          ELSE COALESCE(sentinel_uses_today, 0) + 1
+        END,
+        sentinel_reset_at = CASE
+          WHEN sentinel_reset_at::date < (NOW() AT TIME ZONE 'UTC')::date THEN NOW()
+          ELSE sentinel_reset_at
+        END
+      WHERE id = ${userId}
+        AND (
+          sentinel_reset_at::date < (NOW() AT TIME ZONE 'UTC')::date
+          OR COALESCE(sentinel_uses_today, 0) < ${dailyCap}
+        )
+      RETURNING sentinel_uses_today
+    `);
+    // neon-http returns an array of rows directly; pg returns { rows, rowCount }
+    const r: any = result;
+    if (Array.isArray(r)) return r.length > 0;
+    if (typeof r?.rowCount === "number") return r.rowCount > 0;
+    if (Array.isArray(r?.rows)) return r.rows.length > 0;
+    return false;
+  }
+
+  // Soft-delete: anonymize PII but keep the user row so vote counts and
+  // proposal authorship stay intact. Email is rewritten to a sentinel value
+  // so the unique index is satisfied and the original address is freed.
+  async deleteUser(userId: string): Promise<void> {
+    const sentinelEmail = `deleted_${userId}@represent.invalid`;
+    await db.update(users)
+      .set({
+        email: sentinelEmail,
+        name: null,
+        firstName: null,
+        lastName: null,
+        profileImageUrl: null,
+        walletAddress: null,
+        verificationId: null,
+        country: null,
+        state: null,
+        city: null,
+        gender: null,
+        dateOfBirth: null,
+        deleted: true,
+        updatedAt: new Date(),
+      } as any)
+      .where(eq(users.id, userId));
+  }
 }
 
 export const storage = new DatabaseStorage();
