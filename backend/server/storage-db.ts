@@ -562,12 +562,9 @@ export class DatabaseStorage implements IStorage {
     }).onConflictDoNothing();
   }
 
-  async isOrganizationMember(organizationId: string, userId: string): Promise<boolean> {
-    const result = await db.select().from(organizationMembers).where(
-      and(eq(organizationMembers.organizationId, organizationId), eq(organizationMembers.userId, userId))
-    ).limit(1);
-    return result.length > 0;
-  }
+  // (isOrganizationMember moved further down — recursive variant that includes
+  // sub-org descendants. The strict direct-membership check is exposed as
+  // isDirectOrganizationMember for places that need it.)
 
   async getUserOrganizations(userId: string): Promise<any[]> {
     const result = await db.select().from(organizationMembers).where(
@@ -902,6 +899,207 @@ export class DatabaseStorage implements IStorage {
         updatedAt: new Date(),
       } as any)
       .where(eq(users.id, userId));
+  }
+
+  // ─── Sub-organizations: hierarchical orgs (parent → child) ─────────────────
+
+  // Create a sub-org under an existing parent. The parent must exist; the
+  // creator becomes the admin of the sub-org via addOrganizationMember.
+  async createSubOrganization(
+    parentOrgId: string,
+    name: string,
+    creatorId: string,
+    type: string,
+    membershipType: string = 'invite',
+    description?: string,
+  ): Promise<any> {
+    const inviteCode = 'ORG-' + Math.random().toString(36).substring(2, 10).toUpperCase();
+    const result = await db.insert(organizations).values({
+      id: randomUUID(),
+      name,
+      description,
+      creatorId,
+      type,
+      membershipType,
+      inviteCode,
+      isActive: true,
+      parentOrgId,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    } as any).returning();
+    return result[0];
+  }
+
+  // Direct children only (one level down).
+  async getSubOrganizations(parentOrgId: string): Promise<any[]> {
+    const result = await db.select().from(organizations).where(
+      and(eq(organizations.parentOrgId as any, parentOrgId), eq(organizations.isActive, true))
+    );
+    return result;
+  }
+
+  // Recursive: every descendant (children, grandchildren, …) including the
+  // root itself. Used for visibility queries — "all orgs under X."
+  async getOrganizationDescendantIds(rootOrgId: string): Promise<string[]> {
+    const result: any = await db.execute(sql`
+      WITH RECURSIVE descendants AS (
+        SELECT id FROM organizations WHERE id = ${rootOrgId}
+        UNION
+        SELECT o.id FROM organizations o
+        JOIN descendants d ON o.parent_org_id = d.id
+        WHERE o.is_active = true
+      )
+      SELECT id FROM descendants
+    `);
+    const rows = Array.isArray(result) ? result : (result?.rows ?? []);
+    return rows.map((r: any) => r.id);
+  }
+
+  // Effective membership: user is considered a member of orgId if they are
+  // a direct member of orgId OR a direct member of any descendant of orgId.
+  // This is the check used by the voting endpoint and proposal visibility.
+  async isOrganizationMember(organizationId: string, userId: string): Promise<boolean> {
+    const result: any = await db.execute(sql`
+      WITH RECURSIVE descendants AS (
+        SELECT id FROM organizations WHERE id = ${organizationId}
+        UNION
+        SELECT o.id FROM organizations o
+        JOIN descendants d ON o.parent_org_id = d.id
+        WHERE o.is_active = true
+      )
+      SELECT 1 FROM organization_members om
+      WHERE om.user_id = ${userId}
+        AND om.organization_id IN (SELECT id FROM descendants)
+      LIMIT 1
+    `);
+    const rows = Array.isArray(result) ? result : (result?.rows ?? []);
+    return rows.length > 0;
+  }
+
+  // Strict variant: only direct membership in this exact org. Used when the
+  // hierarchy traversal would be wrong — e.g., admin operations on the org
+  // itself shouldn't grant from a parent admin without explicit ancestor
+  // permission checks.
+  async isDirectOrganizationMember(organizationId: string, userId: string): Promise<boolean> {
+    const result = await db.select().from(organizationMembers).where(
+      and(eq(organizationMembers.organizationId, organizationId), eq(organizationMembers.userId, userId))
+    ).limit(1);
+    return result.length > 0;
+  }
+
+  // ─── Org insights: aggregate analytics across an org and its descendants ──
+
+  // Returns counts + per-sub-org breakdown + 30-day vote time series, all
+  // scoped to the given org and its descendants.
+  async getOrganizationInsights(rootOrgId: string, periodDays: number = 30): Promise<any> {
+    const descendantIds = await this.getOrganizationDescendantIds(rootOrgId);
+    if (descendantIds.length === 0) {
+      return { totalMembers: 0, subOrgCount: 0, totalProposals: 0, totalVotes: 0, participationRate: 0, subOrgs: [], voteTimeSeries: [] };
+    }
+
+    // Total unique members across this org and all descendants.
+    const memberCountResult: any = await db.execute(sql`
+      SELECT COUNT(DISTINCT user_id)::int AS count FROM organization_members
+      WHERE organization_id = ANY(${descendantIds})
+    `);
+    const memberRows = Array.isArray(memberCountResult) ? memberCountResult : (memberCountResult?.rows ?? []);
+    const totalMembers = memberRows[0]?.count || 0;
+
+    // Direct sub-orgs only (children, not grandchildren) for the breakdown.
+    const directSubs = await this.getSubOrganizations(rootOrgId);
+
+    // Total proposals in this org tree.
+    const propCountResult: any = await db.execute(sql`
+      SELECT COUNT(*)::int AS count FROM proposals
+      WHERE organization_id = ANY(${descendantIds})
+    `);
+    const propRows = Array.isArray(propCountResult) ? propCountResult : (propCountResult?.rows ?? []);
+    const totalProposals = propRows[0]?.count || 0;
+
+    // Total votes on proposals in this org tree, within the period.
+    const voteCountResult: any = await db.execute(sql`
+      SELECT COUNT(*)::int AS count FROM votes v
+      JOIN proposals p ON v.proposal_id = p.id
+      WHERE p.organization_id = ANY(${descendantIds})
+        AND v.timestamp >= NOW() - (${periodDays}::int * INTERVAL '1 day')
+    `);
+    const voteRows = Array.isArray(voteCountResult) ? voteCountResult : (voteCountResult?.rows ?? []);
+    const totalVotes = voteRows[0]?.count || 0;
+
+    // Participation rate: distinct voters / total members. Coarse but useful.
+    const participantsResult: any = await db.execute(sql`
+      SELECT COUNT(DISTINCT v.user_id)::int AS count FROM votes v
+      JOIN proposals p ON v.proposal_id = p.id
+      WHERE p.organization_id = ANY(${descendantIds})
+        AND v.timestamp >= NOW() - (${periodDays}::int * INTERVAL '1 day')
+    `);
+    const partRows = Array.isArray(participantsResult) ? participantsResult : (participantsResult?.rows ?? []);
+    const participants = partRows[0]?.count || 0;
+    const participationRate = totalMembers > 0 ? participants / totalMembers : 0;
+
+    // Per-sub-org breakdown (one level down only — keep payload bounded).
+    const subOrgBreakdown = await Promise.all(directSubs.map(async (sub: any) => {
+      const subDescendants = await this.getOrganizationDescendantIds(sub.id);
+      const memberRes: any = await db.execute(sql`
+        SELECT COUNT(DISTINCT user_id)::int AS count FROM organization_members
+        WHERE organization_id = ANY(${subDescendants})
+      `);
+      const memCount = (Array.isArray(memberRes) ? memberRes : memberRes?.rows ?? [])[0]?.count || 0;
+      const propRes: any = await db.execute(sql`
+        SELECT COUNT(*)::int AS count FROM proposals
+        WHERE organization_id = ANY(${subDescendants})
+      `);
+      const propCount = (Array.isArray(propRes) ? propRes : propRes?.rows ?? [])[0]?.count || 0;
+      const voteRes: any = await db.execute(sql`
+        SELECT COUNT(*)::int AS count FROM votes v
+        JOIN proposals p ON v.proposal_id = p.id
+        WHERE p.organization_id = ANY(${subDescendants})
+          AND v.timestamp >= NOW() - (${periodDays}::int * INTERVAL '1 day')
+      `);
+      const vCount = (Array.isArray(voteRes) ? voteRes : voteRes?.rows ?? [])[0]?.count || 0;
+      const partRes: any = await db.execute(sql`
+        SELECT COUNT(DISTINCT v.user_id)::int AS count FROM votes v
+        JOIN proposals p ON v.proposal_id = p.id
+        WHERE p.organization_id = ANY(${subDescendants})
+          AND v.timestamp >= NOW() - (${periodDays}::int * INTERVAL '1 day')
+      `);
+      const subParticipants = (Array.isArray(partRes) ? partRes : partRes?.rows ?? [])[0]?.count || 0;
+      return {
+        id: sub.id,
+        name: sub.name,
+        memberCount: memCount,
+        proposalCount: propCount,
+        voteCount: vCount,
+        participationRate: memCount > 0 ? subParticipants / memCount : 0,
+      };
+    }));
+
+    // 30-day vote time series for the sparkline.
+    const seriesResult: any = await db.execute(sql`
+      SELECT DATE(v.timestamp) AS day, COUNT(*)::int AS count
+      FROM votes v
+      JOIN proposals p ON v.proposal_id = p.id
+      WHERE p.organization_id = ANY(${descendantIds})
+        AND v.timestamp >= NOW() - (${periodDays}::int * INTERVAL '1 day')
+      GROUP BY day
+      ORDER BY day
+    `);
+    const seriesRows = Array.isArray(seriesResult) ? seriesResult : (seriesResult?.rows ?? []);
+    const voteTimeSeries = seriesRows.map((r: any) => ({
+      date: r.day instanceof Date ? r.day.toISOString().slice(0, 10) : String(r.day).slice(0, 10),
+      count: r.count,
+    }));
+
+    return {
+      totalMembers,
+      subOrgCount: directSubs.length,
+      totalProposals,
+      totalVotes,
+      participationRate,
+      subOrgs: subOrgBreakdown,
+      voteTimeSeries,
+      periodDays,
+    };
   }
 }
 

@@ -83,6 +83,11 @@ export const organizations = pgTable("organizations", {
   inviteCode: varchar("invite_code").unique(), // For invite-based membership
   isActive: boolean("is_active").default(true),
 
+  // Hierarchical orgs: when set, this row is a sub-organization of parentOrgId.
+  // Recursive — sub-orgs can have their own sub-orgs (district > school > class).
+  // Membership of a sub-org confers effective membership in all ancestors.
+  parentOrgId: varchar("parent_org_id"),
+
   // NEW: Branding fields
   logoUrl: varchar("logo_url"), // URL to org logo
   primaryColor: varchar("primary_color").default("#EABA58"), // Primary brand color
