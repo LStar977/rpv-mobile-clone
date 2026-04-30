@@ -5,6 +5,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Image as ExpoImage } from 'expo-image';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
+import Svg, { Rect } from 'react-native-svg';
 import * as Haptics from 'expo-haptics';
 import { useAuthStore } from '../../lib/auth';
 import { organizationsApi, Organization, OrganizationProposal } from '../../lib/api';
@@ -12,8 +13,65 @@ import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS } from '../../lib
 
 const SERIF_FONT = Platform.OS === 'ios' ? 'Georgia' : 'serif';
 const CATEGORIES = ['Transportation', 'Environment', 'Housing', 'Education', 'Healthcare', 'Economy', 'Public Safety', 'Infrastructure', 'Other'];
+const ORG_TYPES: Array<{ value: string; label: string }> = [
+  { value: 'school', label: 'School / Class' },
+  { value: 'corporation', label: 'Company / Department' },
+  { value: 'union', label: 'Union / Local' },
+  { value: 'nonprofit', label: 'Nonprofit / Chapter' },
+  { value: 'other', label: 'Other' },
+];
 
-type TabType = 'proposals' | 'announcements' | 'about' | 'admin';
+type TabType = 'proposals' | 'announcements' | 'insights' | 'about' | 'admin';
+
+interface OrgInsights {
+  totalMembers: number;
+  subOrgCount: number;
+  totalProposals: number;
+  totalVotes: number;
+  participationRate: number;
+  subOrgs?: Array<{ id: string; name: string; memberCount: number; proposalCount: number; voteCount: number; participationRate: number }>;
+  voteTimeSeries?: Array<{ date: string; count: number }>;
+  periodDays: number;
+}
+
+// Insights: small metric tile (label + big number + icon).
+function MetricCard({ label, value, icon, colors }: { label: string; value: string; icon: string; colors: any }) {
+  return (
+    <View style={[styles.metricCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+      <View style={[styles.metricIconWrap, { backgroundColor: `${colors.gold}15` }]}>
+        <Ionicons name={icon as any} size={16} color={colors.gold} />
+      </View>
+      <Text style={[styles.metricNumber, { color: colors.text }]} numberOfLines={1}>{value}</Text>
+      <Text style={[styles.metricLabel, { color: colors.textSecondary }]} numberOfLines={1}>{label}</Text>
+    </View>
+  );
+}
+
+// Insights: minimal SVG bar chart for the vote time series. Each bar height
+// is normalized to the period max; days with no votes render flat. No deps —
+// react-native-svg is already used elsewhere in the app.
+function VoteTimeSeriesChart({ data, colors }: { data: Array<{ date: string; count: number }>; colors: any }) {
+  const width = 280;
+  const height = 80;
+  const barGap = 2;
+  const max = data.reduce((m, d) => Math.max(m, d.count), 1);
+  const barWidth = Math.max(2, (width - (data.length - 1) * barGap) / Math.max(1, data.length));
+  return (
+    <View style={{ alignItems: 'center', paddingVertical: 8 }}>
+      <Svg width={width} height={height}>
+        {data.map((d, i) => {
+          const h = (d.count / max) * (height - 4);
+          const x = i * (barWidth + barGap);
+          const y = height - h;
+          return <Rect key={d.date} x={x} y={y} width={barWidth} height={h} rx={1} fill={colors.gold} />;
+        })}
+      </Svg>
+      <Text style={{ fontSize: 11, color: colors.textTertiary, marginTop: 6 }}>
+        {data.length} day{data.length === 1 ? '' : 's'} · max {max} votes/day
+      </Text>
+    </View>
+  );
+}
 
 // Tab Button Component
 function TabButton({
@@ -195,6 +253,17 @@ export default function OrganizationDetailScreen() {
   const [creatingAnnouncement, setCreatingAnnouncement] = useState(false);
   const [newAnnouncement, setNewAnnouncement] = useState({ title: '', content: '', pinned: false });
 
+  // Sub-orgs state
+  const [subOrgs, setSubOrgs] = useState<any[]>([]);
+  const [subOrgsLoading, setSubOrgsLoading] = useState(false);
+  const [showCreateSubOrgModal, setShowCreateSubOrgModal] = useState(false);
+  const [creatingSubOrg, setCreatingSubOrg] = useState(false);
+  const [newSubOrg, setNewSubOrg] = useState({ name: '', type: 'school', description: '' });
+
+  // Insights state
+  const [insights, setInsights] = useState<OrgInsights | null>(null);
+  const [insightsLoading, setInsightsLoading] = useState(false);
+
   const fetchData = useCallback(async () => {
     // Wait for auth to fully initialize before fetching
     if (authLoading) return;
@@ -291,6 +360,113 @@ export default function OrganizationDetailScreen() {
       fetchAdminData();
     }
   }, [activeTab, fetchAdminData, organization?.role]);
+
+  // Sub-orgs: lazy-load when admin tab is active (admin lists/manages them)
+  // and also when insights tab is active (insights pulls per-sub-org breakdown
+  // server-side, but we want the list cached for navigation drill-down).
+  const fetchSubOrgs = useCallback(async () => {
+    if (!params.orgId) return;
+    setSubOrgsLoading(true);
+    try {
+      const result = await organizationsApi.getSubOrganizations(params.orgId);
+      if (result.data) setSubOrgs(result.data);
+    } catch (error) {
+      console.error('Failed to fetch sub-orgs:', error);
+    } finally {
+      setSubOrgsLoading(false);
+    }
+  }, [params.orgId]);
+
+  const fetchInsights = useCallback(async () => {
+    if (!params.orgId) return;
+    setInsightsLoading(true);
+    try {
+      const result = await organizationsApi.getOrganizationInsights(params.orgId, 30);
+      if (result.data) setInsights(result.data as OrgInsights);
+    } catch (error) {
+      console.error('Failed to fetch insights:', error);
+    } finally {
+      setInsightsLoading(false);
+    }
+  }, [params.orgId]);
+
+  useEffect(() => {
+    if (activeTab === 'admin' && organization?.role === 'admin') {
+      fetchSubOrgs();
+    }
+    if (activeTab === 'insights') {
+      fetchInsights();
+      fetchSubOrgs();
+    }
+  }, [activeTab, fetchSubOrgs, fetchInsights, organization?.role]);
+
+  const handleCreateSubOrg = async () => {
+    if (!params.orgId || !newSubOrg.name.trim()) {
+      Alert.alert('Required', 'Please enter a name for the sub-organization.');
+      return;
+    }
+    setCreatingSubOrg(true);
+    try {
+      const result = await organizationsApi.createSubOrganization(
+        params.orgId,
+        newSubOrg.name.trim(),
+        newSubOrg.type,
+        { description: newSubOrg.description.trim() || undefined },
+      );
+      if (result.error) {
+        Alert.alert('Error', result.error);
+        return;
+      }
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setNewSubOrg({ name: '', type: 'school', description: '' });
+      setShowCreateSubOrgModal(false);
+      await fetchSubOrgs();
+    } catch (error: any) {
+      Alert.alert('Error', error?.message || 'Failed to create sub-organization');
+    } finally {
+      setCreatingSubOrg(false);
+    }
+  };
+
+  const handleDeleteSubOrg = (subOrg: any) => {
+    Alert.alert(
+      'Delete Sub-organization',
+      `Permanently delete "${subOrg.name}"? Its members, proposals, and voting history will be removed. This cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            if (!params.orgId) return;
+            try {
+              const result = await organizationsApi.deleteSubOrganization(params.orgId, subOrg.id);
+              if (result.error) {
+                Alert.alert('Error', result.error);
+                return;
+              }
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              await fetchSubOrgs();
+            } catch (error: any) {
+              Alert.alert('Error', error?.message || 'Failed to delete');
+            }
+          },
+        },
+      ],
+    );
+  };
+
+  const handleOpenSubOrg = (subOrg: any) => {
+    Haptics.selectionAsync();
+    router.push({
+      pathname: '/modals/organization-detail',
+      params: {
+        orgId: subOrg.id,
+        orgName: subOrg.name,
+        orgRole: 'admin', // creator of the sub-org is its admin
+      },
+    });
+  };
 
   const handleLeaveOrganization = () => {
     if (!organization) return;
@@ -697,6 +873,12 @@ export default function OrganizationDetailScreen() {
             onPress={() => setActiveTab('announcements')}
           />
           <TabButton
+            label="Insights"
+            icon="analytics-outline"
+            active={activeTab === 'insights'}
+            onPress={() => setActiveTab('insights')}
+          />
+          <TabButton
             label="About"
             icon="information-circle-outline"
             active={activeTab === 'about'}
@@ -800,6 +982,98 @@ export default function OrganizationDetailScreen() {
           </>
         )}
 
+        {activeTab === 'insights' && (
+          <View style={styles.insightsContainer}>
+            {insightsLoading ? (
+              <View style={styles.adminLoadingContainer}>
+                <ActivityIndicator size="large" color={colors.gold} />
+              </View>
+            ) : !insights ? (
+              <Animated.View entering={FadeInUp.duration(400)} style={[styles.aboutCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                <Text style={[styles.aboutDescription, { color: colors.textSecondary, textAlign: 'center' }]}>
+                  No insights available yet.
+                </Text>
+              </Animated.View>
+            ) : (
+              <>
+                {/* Topline metric grid */}
+                <Animated.View entering={FadeInUp.duration(400)} style={styles.metricGrid}>
+                  <MetricCard label="Members" value={insights.totalMembers.toLocaleString()} icon="people-outline" colors={colors} />
+                  <MetricCard label="Sub-orgs" value={String(insights.subOrgCount)} icon="git-branch-outline" colors={colors} />
+                  <MetricCard label="Proposals" value={String(insights.totalProposals)} icon="document-text-outline" colors={colors} />
+                  <MetricCard label="Votes (30d)" value={insights.totalVotes.toLocaleString()} icon="checkmark-done-outline" colors={colors} />
+                </Animated.View>
+
+                {/* Participation rate */}
+                <Animated.View
+                  entering={FadeInUp.delay(100).duration(400)}
+                  style={[styles.adminSection, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                >
+                  <View style={styles.adminSectionHeader}>
+                    <View style={styles.adminSectionTitleRow}>
+                      <Ionicons name="pulse-outline" size={20} color={colors.gold} />
+                      <Text style={[styles.adminSectionTitle, { color: colors.text }]}>Participation</Text>
+                    </View>
+                    <Text style={[styles.metricValue, { color: colors.gold }]}>
+                      {Math.round(insights.participationRate * 100)}%
+                    </Text>
+                  </View>
+                  <Text style={[styles.adminEmptyText, { color: colors.textSecondary }]}>
+                    of members voted on at least one proposal in the last {insights.periodDays} days.
+                  </Text>
+                </Animated.View>
+
+                {/* Vote time series — simple SVG bar chart */}
+                {insights.voteTimeSeries && insights.voteTimeSeries.length > 0 && (
+                  <Animated.View
+                    entering={FadeInUp.delay(200).duration(400)}
+                    style={[styles.adminSection, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                  >
+                    <View style={styles.adminSectionHeader}>
+                      <View style={styles.adminSectionTitleRow}>
+                        <Ionicons name="bar-chart-outline" size={20} color={colors.gold} />
+                        <Text style={[styles.adminSectionTitle, { color: colors.text }]}>Daily votes</Text>
+                      </View>
+                    </View>
+                    <VoteTimeSeriesChart data={insights.voteTimeSeries} colors={colors} />
+                  </Animated.View>
+                )}
+
+                {/* Per-sub-org breakdown (admin-only payload) */}
+                {insights.subOrgs && insights.subOrgs.length > 0 && (
+                  <Animated.View
+                    entering={FadeInUp.delay(300).duration(400)}
+                    style={[styles.adminSection, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                  >
+                    <View style={styles.adminSectionHeader}>
+                      <View style={styles.adminSectionTitleRow}>
+                        <Ionicons name="git-branch-outline" size={20} color={colors.gold} />
+                        <Text style={[styles.adminSectionTitle, { color: colors.text }]}>Sub-organizations</Text>
+                      </View>
+                    </View>
+                    {insights.subOrgs.map((sub) => (
+                      <TouchableOpacity
+                        key={sub.id}
+                        style={[styles.subOrgRow, { borderTopColor: colors.border }]}
+                        onPress={() => handleOpenSubOrg(sub)}
+                        activeOpacity={0.7}
+                      >
+                        <View style={styles.subOrgInfo}>
+                          <Text style={[styles.subOrgName, { color: colors.text }]}>{sub.name}</Text>
+                          <Text style={[styles.subOrgMeta, { color: colors.textTertiary }]}>
+                            {sub.memberCount} members · {sub.voteCount} votes · {Math.round(sub.participationRate * 100)}% participation
+                          </Text>
+                        </View>
+                        <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
+                      </TouchableOpacity>
+                    ))}
+                  </Animated.View>
+                )}
+              </>
+            )}
+          </View>
+        )}
+
         {activeTab === 'about' && organization && (
           <Animated.View
             entering={FadeInUp.duration(400)}
@@ -893,9 +1167,60 @@ export default function OrganizationDetailScreen() {
               </View>
             ) : (
               <>
-                {/* Invite Codes Section */}
+                {/* Sub-organizations Section */}
                 <Animated.View
                   entering={FadeInUp.duration(400)}
+                  style={[styles.adminSection, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                >
+                  <View style={styles.adminSectionHeader}>
+                    <View style={styles.adminSectionTitleRow}>
+                      <Ionicons name="git-branch-outline" size={20} color={colors.gold} />
+                      <Text style={[styles.adminSectionTitle, { color: colors.text }]}>
+                        Sub-organizations ({subOrgs.length})
+                      </Text>
+                    </View>
+                    <TouchableOpacity
+                      style={[styles.adminActionBtn, { backgroundColor: colors.gold }]}
+                      onPress={() => setShowCreateSubOrgModal(true)}
+                    >
+                      <Ionicons name="add" size={16} color="#000" />
+                      <Text style={styles.adminActionBtnText}>Create</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {subOrgsLoading ? (
+                    <ActivityIndicator size="small" color={colors.gold} style={{ marginVertical: 12 }} />
+                  ) : subOrgs.length === 0 ? (
+                    <Text style={[styles.adminEmptyText, { color: colors.textSecondary }]}>
+                      No sub-organizations yet. Create one to scope polls to specific groups (classrooms, departments, locals, chapters).
+                    </Text>
+                  ) : (
+                    subOrgs.map((sub) => (
+                      <View key={sub.id} style={[styles.subOrgRow, { borderTopColor: colors.border }]}>
+                        <TouchableOpacity
+                          style={styles.subOrgInfo}
+                          onPress={() => handleOpenSubOrg(sub)}
+                          activeOpacity={0.7}
+                        >
+                          <Text style={[styles.subOrgName, { color: colors.text }]}>{sub.name}</Text>
+                          <Text style={[styles.subOrgMeta, { color: colors.textTertiary }]}>
+                            {sub.type} · {new Date(sub.createdAt).toLocaleDateString()}
+                          </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[styles.inviteCodeActionBtn, { backgroundColor: `${colors.error}15` }]}
+                          onPress={() => handleDeleteSubOrg(sub)}
+                        >
+                          <Ionicons name="trash-outline" size={16} color={colors.error} />
+                        </TouchableOpacity>
+                      </View>
+                    ))
+                  )}
+                </Animated.View>
+
+                {/* Invite Codes Section */}
+                <Animated.View
+                  entering={FadeInUp.delay(50).duration(400)}
                   style={[styles.adminSection, { backgroundColor: colors.surface, borderColor: colors.border }]}
                 >
                   <View style={styles.adminSectionHeader}>
@@ -1309,6 +1634,82 @@ export default function OrganizationDetailScreen() {
             </View>
 
             <View style={{ height: 100 }} />
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Create Sub-organization Modal */}
+      <Modal
+        visible={showCreateSubOrgModal}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setShowCreateSubOrgModal(false)}
+      >
+        <KeyboardAvoidingView
+          style={[styles.modalContainer, { backgroundColor: colors.background }]}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
+          <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
+            <TouchableOpacity onPress={() => setShowCreateSubOrgModal(false)} disabled={creatingSubOrg}>
+              <Text style={[styles.modalCancel, { color: colors.textSecondary }]}>Cancel</Text>
+            </TouchableOpacity>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>New sub-organization</Text>
+            <TouchableOpacity onPress={handleCreateSubOrg} disabled={creatingSubOrg || !newSubOrg.name.trim()}>
+              {creatingSubOrg ? (
+                <ActivityIndicator size="small" color={colors.gold} />
+              ) : (
+                <Text style={[styles.modalSubmit, { color: newSubOrg.name.trim() ? colors.gold : colors.textTertiary }]}>Create</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView contentContainerStyle={{ padding: 20 }} keyboardShouldPersistTaps="handled">
+            <Text style={[styles.modalLabel, { color: colors.text }]}>Name</Text>
+            <TextInput
+              value={newSubOrg.name}
+              onChangeText={(t) => setNewSubOrg({ ...newSubOrg, name: t })}
+              placeholder='e.g. "Mr. Smith\'s Class" or "Engineering Team"'
+              placeholderTextColor={colors.textTertiary}
+              style={[styles.modalInput, { backgroundColor: colors.surface, borderColor: colors.border, color: colors.text }]}
+              maxLength={80}
+              autoCapitalize="words"
+            />
+
+            <Text style={[styles.modalLabel, { color: colors.text, marginTop: 16 }]}>Type</Text>
+            <View style={styles.typeRow}>
+              {ORG_TYPES.map((t) => (
+                <TouchableOpacity
+                  key={t.value}
+                  onPress={() => setNewSubOrg({ ...newSubOrg, type: t.value })}
+                  style={[
+                    styles.typeChip,
+                    {
+                      backgroundColor: newSubOrg.type === t.value ? `${colors.gold}20` : colors.surface,
+                      borderColor: newSubOrg.type === t.value ? colors.gold : colors.border,
+                    },
+                  ]}
+                >
+                  <Text style={{ color: newSubOrg.type === t.value ? colors.gold : colors.textSecondary, fontSize: 13 }}>
+                    {t.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <Text style={[styles.modalLabel, { color: colors.text, marginTop: 16 }]}>Description (optional)</Text>
+            <TextInput
+              value={newSubOrg.description}
+              onChangeText={(t) => setNewSubOrg({ ...newSubOrg, description: t })}
+              placeholder="What's this sub-org for?"
+              placeholderTextColor={colors.textTertiary}
+              style={[styles.modalInput, styles.modalInputMultiline, { backgroundColor: colors.surface, borderColor: colors.border, color: colors.text }]}
+              multiline
+              maxLength={300}
+            />
+
+            <Text style={[styles.adminEmptyText, { color: colors.textTertiary, marginTop: 16 }]}>
+              Sub-organizations get their own invite code, member roster, and proposal feed. Members of the sub-org are also effective members of {organization?.name || 'this organization'}.
+            </Text>
           </ScrollView>
         </KeyboardAvoidingView>
       </Modal>
@@ -2007,5 +2408,103 @@ const styles = StyleSheet.create({
   pinToggleHint: {
     ...TYPOGRAPHY.labelSmall,
     marginTop: 2,
+  },
+
+  // Insights tab
+  insightsContainer: {
+    paddingHorizontal: SPACING.lg,
+    paddingTop: SPACING.md,
+  },
+  metricGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: SPACING.sm,
+    marginBottom: SPACING.md,
+  },
+  metricCard: {
+    flexBasis: '47%',
+    flexGrow: 1,
+    borderWidth: 1,
+    borderRadius: BORDER_RADIUS.md,
+    padding: SPACING.md,
+  },
+  metricIconWrap: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  metricNumber: {
+    fontFamily: SERIF_FONT,
+    fontSize: 24,
+    fontWeight: '600',
+    letterSpacing: -0.5,
+  },
+  metricLabel: {
+    ...TYPOGRAPHY.labelSmall,
+    marginTop: 2,
+  },
+  metricValue: {
+    fontFamily: SERIF_FONT,
+    fontSize: 22,
+    fontWeight: '600',
+  },
+
+  // Sub-org list rows (admin tab + insights breakdown)
+  subOrgRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: SPACING.md,
+    borderTopWidth: 1,
+    gap: SPACING.sm,
+  },
+  subOrgInfo: {
+    flex: 1,
+  },
+  subOrgName: {
+    ...TYPOGRAPHY.bodyMedium,
+    fontWeight: '600',
+  },
+  subOrgMeta: {
+    ...TYPOGRAPHY.labelSmall,
+    marginTop: 2,
+  },
+
+  // Sub-org create modal
+  modalCancel: {
+    ...TYPOGRAPHY.bodyMedium,
+  },
+  modalSubmit: {
+    ...TYPOGRAPHY.bodyMedium,
+    fontWeight: '600',
+  },
+  modalLabel: {
+    ...TYPOGRAPHY.labelMedium,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  modalInput: {
+    borderWidth: 1,
+    borderRadius: BORDER_RADIUS.md,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    ...TYPOGRAPHY.bodyMedium,
+  },
+  modalInputMultiline: {
+    minHeight: 80,
+    textAlignVertical: 'top',
+  },
+  typeRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  typeChip: {
+    paddingHorizontal: SPACING.md,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
   },
 });

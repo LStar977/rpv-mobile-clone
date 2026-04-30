@@ -505,6 +505,45 @@ export const organizationsApi = {
     return apiRequest(`/api/organizations/${orgId}`, { method: 'DELETE' });
   },
 
+  // ─── Sub-organizations ───────────────────────────────────────────────────
+  // Hierarchical orgs: a school is a parent org; classrooms are sub-orgs.
+  // Sub-orgs are just organizations with parent_org_id set, so all the existing
+  // org endpoints (members, invite codes, proposals, announcements, voting)
+  // work on them unchanged.
+
+  async getSubOrganizations(orgId: string): Promise<ApiResponse<any[]>> {
+    const result = await apiRequest<any>(`/api/organizations/${orgId}/sub-orgs`);
+    if (Array.isArray(result.data)) return { data: result.data, error: null };
+    if (result.data?.subOrgs) return { data: result.data.subOrgs, error: null };
+    return { data: [], error: result.error };
+  },
+
+  async createSubOrganization(parentOrgId: string, name: string, type: string, options?: { membershipType?: string; description?: string }): Promise<ApiResponse<any>> {
+    return apiRequest(`/api/organizations/${parentOrgId}/sub-orgs`, {
+      method: 'POST',
+      body: JSON.stringify({ name, type, ...options }),
+    });
+  },
+
+  async deleteSubOrganization(parentOrgId: string, subOrgId: string): Promise<ApiResponse<{ success: boolean }>> {
+    return apiRequest(`/api/organizations/${parentOrgId}/sub-orgs/${subOrgId}`, { method: 'DELETE' });
+  },
+
+  // ─── Insights ────────────────────────────────────────────────────────────
+
+  async getOrganizationInsights(orgId: string, periodDays: number = 30): Promise<ApiResponse<{
+    totalMembers: number;
+    subOrgCount: number;
+    totalProposals: number;
+    totalVotes: number;
+    participationRate: number;
+    subOrgs?: Array<{ id: string; name: string; memberCount: number; proposalCount: number; voteCount: number; participationRate: number }>;
+    voteTimeSeries?: Array<{ date: string; count: number }>;
+    periodDays: number;
+  }>> {
+    return apiRequest(`/api/organizations/${orgId}/insights?period=${periodDays}`);
+  },
+
   async getOrganizationProposals(orgId: string): Promise<ApiResponse<OrganizationProposal[]>> {
     // Helper to merge user votes into proposals
     const mergeUserVotes = async (proposals: OrganizationProposal[]): Promise<OrganizationProposal[]> => {
