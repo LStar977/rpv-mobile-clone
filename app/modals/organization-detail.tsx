@@ -1668,7 +1668,7 @@ export default function OrganizationDetailScreen() {
             <TextInput
               value={newSubOrg.name}
               onChangeText={(t) => setNewSubOrg({ ...newSubOrg, name: t })}
-              placeholder='e.g. "Mr. Smith\'s Class" or "Engineering Team"'
+              placeholder={`e.g. "Mr. Smith's Class" or "Engineering Team"`}
               placeholderTextColor={colors.textTertiary}
               style={[styles.modalInput, { backgroundColor: colors.surface, borderColor: colors.border, color: colors.text }]}
               maxLength={80}
