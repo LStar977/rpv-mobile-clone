@@ -55,7 +55,8 @@
           "enableGooglePay": true
         }
       ],
-      "react-native-iap"
+      "react-native-iap",
+      "@sentry/react-native/expo"
     ],
     "extra": {
       "router": {

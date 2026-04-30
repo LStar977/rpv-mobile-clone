@@ -6,12 +6,21 @@ import { log } from "./app";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { setupBadgeRoutes } from "./badge-routes";
 import { passportNFTs, activatedRidings, electoralRidingQRCodes, proposals, votes, voteTokenClaims, organizations, transactions } from "@shared/schema";
-import { eq, count, and } from "drizzle-orm";
+import { eq, count, and, sql } from "drizzle-orm";
 import { db } from "./db";
 import { savePushToken, notifyNewProposal, notifyTokenClaimed, notifyProposalVote } from "./notifications";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import jwt from "jsonwebtoken";
 import { randomUUID, createHmac, timingSafeEqual } from "crypto";
+
+// Redact PII before logging. Returns first 8 chars + ellipsis so logs stay
+// useful for tracing a single request through the system without spilling
+// full identifiers to disk / Sentry / log aggregators.
+function rid(value: string | null | undefined): string {
+  if (!value) return "—";
+  if (value.length <= 8) return value;
+  return value.slice(0, 8) + "…";
+}
 
 // Tiny in-memory IP rate limiter — windowMs / max bucket per ip+key.
 // Single-instance only; resets on restart, which is fine for our threat model.
@@ -506,7 +515,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         log(`Badge check error (non-critical): ${badgeError}`);
       }
 
-      log(`Vote recorded on-chain: user=${userId}, proposal=${proposalId}, position=${position}, tx=${voteResult.txHash}`);
+      log(`Vote recorded on-chain: user=${rid(userId)}, proposal=${proposalId}, position=${position}, tx=${voteResult.txHash}`);
 
       // Notify proposal owner that someone voted on their proposal
       if (proposal.userId !== userId) {
@@ -1119,7 +1128,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       await storage.recordVote(userId, proposalId, position);
 
-      log(`Geo-gated vote recorded: user=${userId}, proposal=${proposalId}, location=${country}/${state}`);
+      log(`Geo-gated vote recorded: user=${rid(userId)}, proposal=${proposalId}, location=${country}/${state}`);
 
       res.json({
         success: true,
@@ -1161,7 +1170,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(400).json({ error: "userId required" });
     }
 
-    log(`Identity verify request: userId=${userId}, method=${verificationMethod}, firstName="${firstName}", lastName="${lastName}"`);
+    log(`Identity verify request: userId=${rid(userId)}, method=${verificationMethod}`);
 
     try {
       if (verificationMethod === 'veriff') {
@@ -1297,7 +1306,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         dateOfBirth: dateOfBirth || null,
       });
 
-      log(`Profile updated: userId=${userId}, name="${name}", country="${country}", state="${state}", city="${city}", documentType="${documentType}", gender="${gender}", dateOfBirth="${dateOfBirth}"`);
+      log(`Profile updated: userId=${rid(userId)}, country="${country}", state="${state}", city="${city}", documentType="${documentType}"`);
 
       res.json({
         success: true,
@@ -1606,7 +1615,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const verificationId = verification.id;
       const status = verification.status;
 
-      log(`Veriff webhook received: userId=${userId}, status=${status}`);
+      log(`Veriff webhook received: userId=${rid(userId)}, status=${status}`);
 
       if (status === 'approved') {
         // Extract location and document data from Veriff response
@@ -1646,7 +1655,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         await grantInitialBallotsIfNeeded(userId);
 
-        log(`User verified via Veriff webhook: user=${userId}, verificationId=${verificationId}, document=${document.type}, country=${address.country}`);
+        log(`User verified via Veriff webhook: user=${rid(userId)}, verificationId=${rid(verificationId)}, document=${document.type}, country=${address.country}`);
       }
 
       // Always respond 200 to Veriff webhook
@@ -1675,7 +1684,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const verificationId = verification.id;
       const status = verification.status;
 
-      log(`Veriff webhook: userId=${userId}, status=${status}, verificationId=${verificationId}`);
+      log(`Veriff webhook: userId=${rid(userId)}, status=${status}, verificationId=${rid(verificationId)}`);
 
       if (status === 'approved') {
         const person = verification.person || {};
@@ -1707,7 +1716,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         log(`Veriff webhook data: document.country=${document.country}, address.country=${address.country}`);
         await storage.updateUserVerification(userId, updateData);
         await grantInitialBallotsIfNeeded(userId);
-        log(`User verified via /api/veriff/webhook: user=${userId}, verificationId=${verificationId}, country=${country}`);
+        log(`User verified via /api/veriff/webhook: user=${rid(userId)}, verificationId=${rid(verificationId)}, country=${country}`);
       }
 
       res.status(200).json({ received: true });
@@ -2038,7 +2047,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       await grantInitialBallotsIfNeeded(user.id);
 
-      log(`✅ Admin verified user: ${user.id}, email=${email}`);
+      log(`✅ Admin verified user: ${rid(user.id)}`);
 
       res.json({ success: true, userId: user.id, verified: true });
     } catch (error) {
@@ -2176,7 +2185,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Generate unique tokenId based on userId and timestamp
       const tokenId = Math.floor(Math.random() * 1000000).toString();
 
-      log(`🎫 Passport mint request: userId=${effectiveUserId}, wallet=${wallet.address}, contractAddress=${passportContractAddress}`);
+      log(`🎫 Passport mint request: userId=${rid(effectiveUserId)}, contractAddress=${passportContractAddress}`);
 
       // Call the actual minting function
       const mintResult = await baseNetwork.mintPassportNFT(
@@ -2222,7 +2231,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         mintResult.txHash || ''
       );
 
-      log(`✅ Passport minted successfully: userId=${effectiveUserId}, tokenId=${tokenId}, txHash=${mintResult.txHash}`);
+      log(`✅ Passport minted successfully: userId=${rid(effectiveUserId)}, tokenId=${tokenId}, txHash=${mintResult.txHash}`);
 
       res.json({
         success: true,
@@ -3932,8 +3941,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Health check
-  app.get("/api/health", (req, res) => {
-    res.json({ status: "ok", network: "Base Sepolia" });
+  // Real health check: probes the DB and verifies critical env vars are set.
+  // Replit's autoscaler + external uptime monitors call this; a static "ok"
+  // would mask outages. Returns 503 if anything fails so monitors fire.
+  app.get("/api/health", async (req, res) => {
+    const checks: Record<string, "ok" | string> = {};
+    const required = [
+      "DATABASE_URL",
+      "VERIFF_MASTER_SIGNATURE_KEY",
+      "RPV_TOKEN_ADDRESS",
+      "JWT_SECRET",
+    ];
+    for (const k of required) {
+      checks[k] = process.env[k] ? "ok" : "missing";
+    }
+    try {
+      await db.execute(sql`SELECT 1`);
+      checks.db = "ok";
+    } catch (e: any) {
+      checks.db = `error: ${e?.message || "unknown"}`;
+    }
+    const failed = Object.entries(checks).filter(([, v]) => v !== "ok");
+    if (failed.length > 0) {
+      return res.status(503).json({ status: "degraded", checks, network: "Base Sepolia" });
+    }
+    res.json({ status: "ok", checks, network: "Base Sepolia" });
   });
 
   const httpServer = createServer(app);

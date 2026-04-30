@@ -2,11 +2,47 @@ import { useEffect } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { View } from 'react-native';
+import * as Sentry from '@sentry/react-native';
 import { ThemeProvider, useTheme } from '../lib/theme';
 import { STRIPE_PUBLISHABLE_KEY, MERCHANT_IDENTIFIER } from '../lib/stripe';
 import { initIAP, endIAP } from '../lib/iap';
 import { soundEffects } from '../lib/sounds';
 import { useSyncBallotTier } from '../lib/ballots';
+
+// Sentry init at module load. No-op when EXPO_PUBLIC_SENTRY_DSN isn't set,
+// so it's safe to leave wired up before you've created a Sentry project.
+const SENTRY_PII_FIELDS = new Set([
+  'email', 'phone', 'dateOfBirth', 'verificationId',
+  'walletAddress', 'privateKey', 'token', 'refreshToken',
+  'firstName', 'lastName', 'name',
+]);
+function scrubPii(obj: any): any {
+  if (obj === null || obj === undefined) return obj;
+  if (typeof obj !== 'object') return obj;
+  if (Array.isArray(obj)) return obj.map(scrubPii);
+  const out: any = {};
+  for (const [k, v] of Object.entries(obj)) {
+    if (SENTRY_PII_FIELDS.has(k)) {
+      out[k] = '[redacted]';
+    } else if (typeof v === 'object') {
+      out[k] = scrubPii(v);
+    } else {
+      out[k] = v;
+    }
+  }
+  return out;
+}
+Sentry.init({
+  dsn: process.env.EXPO_PUBLIC_SENTRY_DSN,
+  enableAutoSessionTracking: true,
+  tracesSampleRate: 0.1,
+  beforeSend(event) {
+    if (event.request?.data) event.request.data = scrubPii(event.request.data);
+    if (event.extra) event.extra = scrubPii(event.extra);
+    if (event.user) event.user = { id: event.user.id };
+    return event;
+  },
+});
 
 // Conditionally import StripeProvider to handle missing native module
 let StripeProvider: any = null;
@@ -50,7 +86,7 @@ function ThemedStack() {
   );
 }
 
-export default function RootLayout() {
+function RootLayout() {
   const content = (
     <ThemeProvider>
       <ThemedStack />
@@ -72,3 +108,6 @@ export default function RootLayout() {
 
   return content;
 }
+
+// Sentry.wrap enables automatic error boundary + performance monitoring.
+export default Sentry.wrap(RootLayout);
