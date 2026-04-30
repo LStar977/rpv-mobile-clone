@@ -5,12 +5,106 @@ import { baseNetwork } from "./base-network";
 import { log } from "./app";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { setupBadgeRoutes } from "./badge-routes";
-import { passportNFTs, activatedRidings, electoralRidingQRCodes, proposals, votes, voteTokenClaims, organizations } from "@shared/schema";
-import { eq, count, and } from "drizzle-orm";
+import { passportNFTs, activatedRidings, electoralRidingQRCodes, proposals, votes, voteTokenClaims, organizations, transactions } from "@shared/schema";
+import { eq, count, and, sql } from "drizzle-orm";
 import { db } from "./db";
 import { savePushToken, notifyNewProposal, notifyTokenClaimed, notifyProposalVote } from "./notifications";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import jwt from "jsonwebtoken";
+import { randomUUID, createHmac, timingSafeEqual } from "crypto";
+
+// Redact PII before logging. Returns first 8 chars + ellipsis so logs stay
+// useful for tracing a single request through the system without spilling
+// full identifiers to disk / Sentry / log aggregators.
+function rid(value: string | null | undefined): string {
+  if (!value) return "—";
+  if (value.length <= 8) return value;
+  return value.slice(0, 8) + "…";
+}
+
+// Tiny in-memory IP rate limiter — windowMs / max bucket per ip+key.
+// Single-instance only; resets on restart, which is fine for our threat model.
+function makeIpRateLimiter(windowMs: number, max: number) {
+  const buckets = new Map<string, { count: number; resetAt: number }>();
+  return (req: any, res: any, next: any) => {
+    const ip = (req.ip || req.socket?.remoteAddress || "unknown") as string;
+    const now = Date.now();
+    const b = buckets.get(ip);
+    if (!b || b.resetAt < now) {
+      buckets.set(ip, { count: 1, resetAt: now + windowMs });
+      return next();
+    }
+    if (b.count >= max) {
+      return res.status(429).json({ error: "Too many requests. Please slow down." });
+    }
+    b.count += 1;
+    next();
+  };
+}
+
+// Verifies the x-hmac-signature header that Veriff attaches to every webhook
+// payload (HMAC-SHA256 of the raw body, keyed with VERIFF_MASTER_SIGNATURE_KEY).
+// Without this check, an attacker who knows the webhook URL could mark any
+// arbitrary userId as verified by POSTing crafted JSON.
+function verifyVeriffSignature(req: any): boolean {
+  const secret = process.env.VERIFF_MASTER_SIGNATURE_KEY;
+  if (!secret) {
+    log("VERIFF_MASTER_SIGNATURE_KEY not configured — refusing webhook");
+    return false;
+  }
+  const sig = (req.headers["x-hmac-signature"] || req.headers["x-signature"]) as string | undefined;
+  if (!sig || typeof sig !== "string") return false;
+
+  const rawBody: Buffer | undefined = req.rawBody as Buffer | undefined;
+  if (!rawBody) return false;
+
+  const expected = createHmac("sha256", secret).update(rawBody).digest("hex");
+  // timingSafeEqual requires equal-length buffers; bail if Veriff sent a sig of
+  // unexpected length.
+  if (sig.length !== expected.length) return false;
+  try {
+    return timingSafeEqual(Buffer.from(sig, "utf8"), Buffer.from(expected, "utf8"));
+  } catch {
+    return false;
+  }
+}
+
+// One-time bulk RPV transfer per user, fired when verification is approved.
+// Idempotent — safe to call from every verification-approved branch; only the
+// first call actually transfers tokens. Failures are swallowed so a transient
+// blockchain hiccup never blocks the verification itself.
+const INITIAL_BALLOT_GRANT = 1000;
+
+async function grantInitialBallotsIfNeeded(userId: string): Promise<void> {
+  try {
+    const user = await storage.getUser(userId);
+    if (!user || (user as any).initialBallotsGranted) return;
+
+    const wallet = await storage.getUserWallet(userId);
+    if (!wallet) {
+      log(`grantInitialBallots: user ${userId} has no wallet yet, skipping`);
+      return;
+    }
+
+    const rpvTokenAddress = process.env.RPV_TOKEN_ADDRESS;
+    if (!rpvTokenAddress) {
+      log(`grantInitialBallots: RPV_TOKEN_ADDRESS not configured`);
+      return;
+    }
+
+    const result = await baseNetwork.transferRPVToken(rpvTokenAddress, wallet.address, INITIAL_BALLOT_GRANT);
+    if (result.success) {
+      await (storage as any).markInitialBallotsGranted(userId);
+      log(`✅ Granted ${INITIAL_BALLOT_GRANT} RPV to user ${userId} (tx=${result.txHash})`);
+    } else {
+      log(`grantInitialBallots: transfer failed for user ${userId}: ${result.error}`);
+    }
+  } catch (e) {
+    log(`grantInitialBallots error for user ${userId}: ${e}`);
+  }
+}
+
+const DAILY_BALLOT_CAP = 20;
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Setup OAuth authentication (Google, Apple, GitHub)
@@ -126,10 +220,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Voting Routes - users transfer RPV token to support/oppose address or option address
-  app.post("/api/voting/submit", async (req, res) => {
-    const { userId, proposalId, position, selectedOption } = req.body;
+  app.post("/api/voting/submit", isAuthenticated, async (req: any, res) => {
+    // Read userId from session, never from request body. Body-supplied userId
+    // was an IDOR vector — any authenticated user could vote as anyone else.
+    const userId = req.user?.claims?.sub;
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
 
-    if (!userId || !proposalId || !position) {
+    const { proposalId, position, selectedOption } = req.body;
+    if (!proposalId || !position) {
       return res.status(400).json({ error: "Missing required fields" });
     }
 
@@ -140,13 +240,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "You have already voted on this proposal" });
       }
 
-      // Ensure user has passport NFT to vote (1 person 1 vote)
-      const hasPassport = await (storage as any).getPassportNFT(userId);
-      if (!hasPassport) {
-        return res.status(403).json({ error: "You must mint your soulbound passport NFT to vote. Visit the Identity page to mint." });
-      }
-
       const user = await storage.getUser(userId);
+
+      // Verified-citizen gate replaces the old passport-NFT gate. Identity
+      // verification (Veriff) is the actual one-person-one-vote enforcement;
+      // the on-chain NFT was a redundant artifact of a removed mint flow.
+      if (!user?.verified) {
+        return res.status(403).json({ error: "You must complete identity verification before voting." });
+      }
       const proposal = await storage.getProposal(proposalId);
       const wallet = await storage.getUserWallet(userId);
 
@@ -295,6 +396,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      // Daily ballot cap enforcement: atomic UPDATE that lazy-resets at UTC
+      // midnight, increments, and rejects when over cap — all in one statement.
+      // The previous read-then-write pattern had a TOCTOU window where two
+      // concurrent requests at cap-1 could both succeed.
+      // Premium subscribers ($7.99/mo) bypass the cap entirely.
+      const isPremium = user?.subscriptionStatus === 'active';
+      if (!isPremium) {
+        const consumed = await (storage as any).consumeBallot(userId, DAILY_BALLOT_CAP);
+        if (!consumed) {
+          return res.status(403).json({
+            error: `Daily voting limit reached (${DAILY_BALLOT_CAP}/day). Upgrade to Premium for unlimited voting.`,
+            dailyCapReached: true,
+          });
+        }
+      }
+
       const rpvTokenAddress = process.env.RPV_TOKEN_ADDRESS;
       if (!rpvTokenAddress) {
         return res.status(500).json({ error: "RPV token not configured" });
@@ -306,19 +423,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "Voting on this proposal has ended" });
       }
 
-      // Check user's RPV balance
+      // Check user's RPV balance and top up if they've fully drained their grant.
+      // Most users will never hit this — they got 1000 tokens at verification.
       const balance = await baseNetwork.getRPVBalance(rpvTokenAddress, wallet.address);
       const userBalance = parseFloat(balance);
 
       log(`User ${userId} RPV balance: ${balance}`);
 
-      // If user has no tokens, transfer 1 RPV to them first
       if (userBalance < 1) {
-        log(`Transferring 1 RPV token to user ${userId} before voting`);
-        const transferResult = await baseNetwork.transferRPVToken(rpvTokenAddress, wallet.address, 1);
+        log(`Top-up: transferring ${INITIAL_BALLOT_GRANT} RPV to user ${userId}`);
+        const transferResult = await baseNetwork.transferRPVToken(rpvTokenAddress, wallet.address, INITIAL_BALLOT_GRANT);
         if (!transferResult.success) {
-          log(`Warning: Failed to transfer RPV token to user: ${transferResult.error}`);
-          // Continue anyway - vote will fail if transfer didn't work
+          log(`Warning: top-up transfer failed for user ${userId}: ${transferResult.error}`);
+          // Continue anyway — vote will fail if transfer didn't work
         }
       }
 
@@ -340,16 +457,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Record vote in database (with selected option if multiple-choice)
       await storage.recordVote(userId, proposalId, position, undefined, voteResult.txHash, selectedOption);
-      // For multiple-choice, only update position counts (option counts handled separately if needed)
-      if (!selectedOption) {
+
+      // Demo account is sandboxed: vote is recorded in the user's history,
+      // but real proposal counters don't move so App Store reviewers can't
+      // pollute production stats.
+      const isDemoAccount = user?.email === 'demo@represent.app';
+      if (!selectedOption && !isDemoAccount) {
         await storage.updateProposalVotes(proposalId, position);
       }
+      // (ballot counter was already incremented atomically by consumeBallot above)
 
       // Check and award badges
       let newBadges = [];
       try {
         const { db } = await import('./db');
-        const { badges, userBadges, votes } = await import('../shared/schema');
+        const { badges, userBadges, votes } = await import('@shared/schema');
         const { eq, and } = await import('drizzle-orm');
 
         // Get user votes to check for badges
@@ -393,7 +515,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         log(`Badge check error (non-critical): ${badgeError}`);
       }
 
-      log(`Vote recorded on-chain: user=${userId}, proposal=${proposalId}, position=${position}, tx=${voteResult.txHash}`);
+      log(`Vote recorded on-chain: user=${rid(userId)}, proposal=${proposalId}, position=${position}, tx=${voteResult.txHash}`);
 
       // Notify proposal owner that someone voted on their proposal
       if (proposal.userId !== userId) {
@@ -589,7 +711,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const { db } = await import('./db');
       const { eq } = await import('drizzle-orm');
-      const { badges, userBadges } = await import('../shared/schema');
+      const { badges, userBadges } = await import('@shared/schema');
 
       const earnedBadges = await db
         .select({
@@ -684,7 +806,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "Unauthorized" });
       }
 
-      const { votes } = await import("../shared/schema");
+      const { votes } = await import("@shared/schema");
       const { eq } = await import("drizzle-orm");
 
       // Get total vote count
@@ -802,7 +924,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "User not found" });
       }
 
-      const { proposals, votes } = await import("../shared/schema");
+      const { proposals, votes } = await import("@shared/schema");
       const { eq, isNull, and } = await import("drizzle-orm");
 
       // Get all proposals where user hasn't voted
@@ -1006,7 +1128,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       await storage.recordVote(userId, proposalId, position);
 
-      log(`Geo-gated vote recorded: user=${userId}, proposal=${proposalId}, location=${country}/${state}`);
+      log(`Geo-gated vote recorded: user=${rid(userId)}, proposal=${proposalId}, location=${country}/${state}`);
 
       res.json({
         success: true,
@@ -1048,7 +1170,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(400).json({ error: "userId required" });
     }
 
-    log(`Identity verify request: userId=${userId}, method=${verificationMethod}, firstName="${firstName}", lastName="${lastName}"`);
+    log(`Identity verify request: userId=${rid(userId)}, method=${verificationMethod}`);
 
     try {
       if (verificationMethod === 'veriff') {
@@ -1147,6 +1269,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           verifiedAt: new Date(),
         });
 
+        await grantInitialBallotsIfNeeded(userId);
+
         log(`User manually verified: user=${userId}`);
 
         res.json({
@@ -1182,7 +1306,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         dateOfBirth: dateOfBirth || null,
       });
 
-      log(`Profile updated: userId=${userId}, name="${name}", country="${country}", state="${state}", city="${city}", documentType="${documentType}", gender="${gender}", dateOfBirth="${dateOfBirth}"`);
+      log(`Profile updated: userId=${rid(userId)}, country="${country}", state="${state}", city="${city}", documentType="${documentType}"`);
 
       res.json({
         success: true,
@@ -1382,6 +1506,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             verifiedAt: new Date(),
           });
 
+          await grantInitialBallotsIfNeeded(userId);
+
           return res.json({
             verified: true,
             message: "Identity verified! You can now mint your passport."
@@ -1433,6 +1559,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 verifiedAt: new Date(),
               });
 
+              await grantInitialBallotsIfNeeded(userId);
+
               return res.json({
                 verified: true,
                 message: "Identity verified! You can now mint your passport."
@@ -1473,6 +1601,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Veriff Webhook - called by Veriff when verification completes
   app.post("/api/verification-callback", async (req, res) => {
+    if (!verifyVeriffSignature(req)) {
+      log(`Veriff webhook rejected: invalid or missing HMAC signature on /api/verification-callback`);
+      return res.status(401).json({ error: "Invalid signature" });
+    }
     try {
       const { verification } = req.body;
       if (!verification) {
@@ -1483,7 +1615,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const verificationId = verification.id;
       const status = verification.status;
 
-      log(`Veriff webhook received: userId=${userId}, status=${status}`);
+      log(`Veriff webhook received: userId=${rid(userId)}, status=${status}`);
 
       if (status === 'approved') {
         // Extract location and document data from Veriff response
@@ -1521,7 +1653,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         await storage.updateUserVerification(userId, updateData);
 
-        log(`User verified via Veriff webhook: user=${userId}, verificationId=${verificationId}, document=${document.type}, country=${address.country}`);
+        await grantInitialBallotsIfNeeded(userId);
+
+        log(`User verified via Veriff webhook: user=${rid(userId)}, verificationId=${rid(verificationId)}, document=${document.type}, country=${address.country}`);
       }
 
       // Always respond 200 to Veriff webhook
@@ -1534,6 +1668,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Veriff Webhook - alternate endpoint (same logic as /api/verification-callback)
   app.post("/api/veriff/webhook", async (req, res) => {
+    if (!verifyVeriffSignature(req)) {
+      log(`Veriff webhook rejected: invalid or missing HMAC signature on /api/veriff/webhook`);
+      return res.status(401).json({ error: "Invalid signature" });
+    }
     try {
       const { verification } = req.body;
       log(`Veriff webhook received at /api/veriff/webhook: ${JSON.stringify(req.body).substring(0, 500)}`);
@@ -1546,7 +1684,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const verificationId = verification.id;
       const status = verification.status;
 
-      log(`Veriff webhook: userId=${userId}, status=${status}, verificationId=${verificationId}`);
+      log(`Veriff webhook: userId=${rid(userId)}, status=${status}, verificationId=${rid(verificationId)}`);
 
       if (status === 'approved') {
         const person = verification.person || {};
@@ -1577,7 +1715,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         log(`Veriff webhook data: document.country=${document.country}, address.country=${address.country}`);
         await storage.updateUserVerification(userId, updateData);
-        log(`User verified via /api/veriff/webhook: user=${userId}, verificationId=${verificationId}, country=${country}`);
+        await grantInitialBallotsIfNeeded(userId);
+        log(`User verified via /api/veriff/webhook: user=${rid(userId)}, verificationId=${rid(verificationId)}, country=${country}`);
       }
 
       res.status(200).json({ received: true });
@@ -1587,19 +1726,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Sentinel AI Document Analysis - using OpenAI Integration
-  app.post("/api/sentinel/analyze", async (req, res) => {
-    const { title, text, issueType } = req.body;
+  // Sentinel AI Document Analysis (calls OpenAI). Two-layer cost protection:
+  //  1) IP-level: 10 requests / minute / IP — defends against scrape bursts.
+  //  2) Per-user daily: 5/day free, 50/day premium — caps OpenAI spend per user.
+  // Auth required so per-user accounting is meaningful.
+  const sentinelIpLimiter = makeIpRateLimiter(60_000, 10);
+  const SENTINEL_FREE_DAILY = 5;
+  const SENTINEL_PREMIUM_DAILY = 50;
 
+  app.post("/api/sentinel/analyze", isAuthenticated, sentinelIpLimiter, async (req: any, res) => {
+    const userId = req.user?.claims?.sub;
+    if (!userId) return res.status(401).json({ error: "Unauthorized" });
+
+    const { title, text, issueType } = req.body;
     if (!text || !title) {
       return res.status(400).json({ error: "title and text required" });
     }
 
     try {
-      const { analyzeGovernanceText } = await import("./lib/analysis");
-      const analysis = await analyzeGovernanceText({ title, text, issueType: issueType || 'policy' });
+      const user = await storage.getUser(userId);
+      const isPremium = user?.subscriptionStatus === "active";
+      const dailyCap = isPremium ? SENTINEL_PREMIUM_DAILY : SENTINEL_FREE_DAILY;
+      const consumed = await (storage as any).consumeSentinelUse(userId, dailyCap);
+      if (!consumed) {
+        return res.status(429).json({
+          error: `Daily Sentinel limit reached (${dailyCap}/day).${isPremium ? "" : " Upgrade to Premium for higher limits."}`,
+          dailyCapReached: true,
+        });
+      }
 
-      log(`Sentinel analysis: title=${title}, issueType=${issueType || 'policy'}`);
+      const { analyzeGovernanceText } = await import("./lib/analysis");
+      const analysis = await analyzeGovernanceText({ title, text, issueType: issueType || "policy" });
+
+      log(`Sentinel analysis: user=${userId}, title=${title}, issueType=${issueType || "policy"}`);
 
       res.json({
         success: true,
@@ -1886,7 +2045,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         city: city || null,
       });
 
-      log(`✅ Admin verified user: ${user.id}, email=${email}`);
+      await grantInitialBallotsIfNeeded(user.id);
+
+      log(`✅ Admin verified user: ${rid(user.id)}`);
 
       res.json({ success: true, userId: user.id, verified: true });
     } catch (error) {
@@ -1963,6 +2124,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         log(`Veriff check-decision: Updating user ${userId} with: ${JSON.stringify(updateData)}`);
         await storage.updateUserVerification(userId, updateData);
+        await grantInitialBallotsIfNeeded(userId);
         log(`✅ User ${userId} verified via Veriff check-decision. Country: ${updateData.country}, State: ${updateData.state}, City: ${updateData.city}`);
       }
 
@@ -2023,7 +2185,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Generate unique tokenId based on userId and timestamp
       const tokenId = Math.floor(Math.random() * 1000000).toString();
 
-      log(`🎫 Passport mint request: userId=${effectiveUserId}, wallet=${wallet.address}, contractAddress=${passportContractAddress}`);
+      log(`🎫 Passport mint request: userId=${rid(effectiveUserId)}, contractAddress=${passportContractAddress}`);
 
       // Call the actual minting function
       const mintResult = await baseNetwork.mintPassportNFT(
@@ -2069,7 +2231,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         mintResult.txHash || ''
       );
 
-      log(`✅ Passport minted successfully: userId=${effectiveUserId}, tokenId=${tokenId}, txHash=${mintResult.txHash}`);
+      log(`✅ Passport minted successfully: userId=${rid(effectiveUserId)}, tokenId=${tokenId}, txHash=${mintResult.txHash}`);
 
       res.json({
         success: true,
@@ -3603,9 +3765,207 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ─── End organization sub-resource endpoints ────────────────────────────────
 
+  // ─── Apple In-App Purchase (IAP) receipt validation ─────────────────────────
+  // Mobile (lib/iap.ts) POSTs { receipt, productId, organizationId? } here
+  // after a successful App Store purchase. We verify the receipt with Apple,
+  // map the productId to a feature, and update the user/org subscription
+  // state. Idempotent on Apple's transaction_id.
+  //
+  // Requires APPLE_SHARED_SECRET env var (generated in App Store Connect).
+  app.post("/api/iap/validate-receipt", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims?.sub;
+      if (!userId) return res.status(401).json({ error: "Unauthorized" });
+
+      const { receipt, productId, organizationId } = req.body;
+      if (!receipt || !productId) {
+        return res.status(400).json({ error: "Missing receipt or productId" });
+      }
+
+      const sharedSecret = process.env.APPLE_SHARED_SECRET;
+      if (!sharedSecret) {
+        log("APPLE_SHARED_SECRET not configured — set it in env after generating in App Store Connect");
+        return res.status(500).json({ error: "IAP validation not configured" });
+      }
+
+      const verifyWithApple = async (url: string) => {
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            'receipt-data': receipt,
+            'password': sharedSecret,
+            'exclude-old-transactions': true,
+          }),
+        });
+        return response.json();
+      };
+
+      // Try production first; on status 21007 ("sandbox receipt sent to prod"),
+      // retry against sandbox. This is Apple's recommended pattern so the same
+      // code works in TestFlight + App Store.
+      let appleResponse: any = await verifyWithApple('https://buy.itunes.apple.com/verifyReceipt');
+      if (appleResponse.status === 21007) {
+        log(`IAP: sandbox receipt detected, retrying for user=${userId}`);
+        appleResponse = await verifyWithApple('https://sandbox.itunes.apple.com/verifyReceipt');
+      }
+
+      if (appleResponse.status !== 0) {
+        log(`IAP validation failed: status=${appleResponse.status}, user=${userId}, product=${productId}`);
+        return res.status(400).json({ error: `Apple receipt invalid (status ${appleResponse.status})` });
+      }
+
+      // Find the matching transaction in the receipt. Apple returns transactions
+      // in receipt.in_app (one-time purchases) and latest_receipt_info (subs).
+      const inApp: any[] = appleResponse.receipt?.in_app || [];
+      const latestReceiptInfo: any[] = appleResponse.latest_receipt_info || [];
+      const allTransactions = [...inApp, ...latestReceiptInfo];
+      const matchingTx = allTransactions.find((tx: any) => tx.product_id === productId);
+
+      if (!matchingTx) {
+        log(`IAP: no matching transaction for productId=${productId}, user=${userId}`);
+        return res.status(400).json({ error: "Product not found in receipt" });
+      }
+
+      const appleTxId: string = matchingTx.transaction_id;
+      const originalTxId: string = matchingTx.original_transaction_id || appleTxId;
+
+      // Idempotency: skip if we've already processed this Apple transaction
+      const existingTx = await db.select().from(transactions)
+        .where(and(eq(transactions.userId, userId), eq(transactions.txHash, appleTxId)))
+        .limit(1);
+      if (existingTx.length > 0) {
+        log(`IAP: transaction ${appleTxId} already processed for user=${userId}`);
+        return res.json({ valid: true, message: "Already processed" });
+      }
+
+      // Map productId → feature and update DB
+      let productType = 'unknown';
+      let expiresAt: Date | undefined;
+      const expiresMs = matchingTx.expires_date_ms ? parseInt(matchingTx.expires_date_ms, 10) : null;
+      if (expiresMs) expiresAt = new Date(expiresMs);
+
+      if (productId === 'com.representwallet.app.verification') {
+        productType = 'verification';
+        await storage.updateUser(userId, { verificationPaid: true } as any);
+      } else if (productId === 'com.representwallet.app.premium') {
+        productType = 'premium';
+        await storage.updateUser(userId, {
+          subscriptionStatus: 'active',
+          subscriptionEndDate: expiresAt,
+          stripeSubscriptionId: `iap:${originalTxId}`,
+        } as any);
+      } else if (productId.startsWith('com.representwallet.app.org.')) {
+        productType = 'organization';
+        if (!organizationId) {
+          return res.status(400).json({ error: "organizationId required for org subscriptions" });
+        }
+        // Caller must be a member of the org before we activate its subscription
+        const isMember = await storage.isOrganizationMember(organizationId, userId);
+        if (!isMember) {
+          return res.status(403).json({ error: "Not a member of this organization" });
+        }
+        await db.update(organizations).set({
+          subscriptionStatus: 'active',
+          stripeSubscriptionId: `iap:${originalTxId}`,
+        }).where(eq(organizations.id, organizationId));
+      } else if (productId.startsWith('com.representwallet.app.ballots.')) {
+        // Ballot packs were retired in favor of the daily-allowance model.
+        // We return 410 Gone so any in-flight purchases from older app builds
+        // get a clear error instead of silently succeeding.
+        log(`IAP: ballot pack purchase rejected (deprecated product) productId=${productId}, user=${userId}`);
+        return res.status(410).json({ error: "Ballot packs are no longer sold. Upgrade to Premium for unlimited voting." });
+      } else {
+        log(`IAP: unknown productId=${productId}, user=${userId}`);
+        return res.status(400).json({ error: "Unknown product" });
+      }
+
+      // Record transaction for audit + idempotency
+      await db.insert(transactions).values({
+        id: randomUUID(),
+        userId,
+        txHash: appleTxId,
+        type: `iap_${productType}`,
+        amount: matchingTx.price ? String(matchingTx.price) : null,
+        status: 'completed',
+        data: { productId, originalTxId, organizationId, environment: appleResponse.environment } as any,
+        createdAt: new Date(),
+      });
+
+      log(`✅ IAP validated: user=${userId}, product=${productId}, tx=${appleTxId}`);
+
+      res.json({
+        valid: true,
+        productType,
+        expiresAt: expiresAt?.toISOString(),
+      });
+    } catch (error: any) {
+      log(`IAP validation error: ${error.message}`);
+      res.status(500).json({ error: "Failed to validate receipt" });
+    }
+  });
+
+  // Admin: one-shot backfill of the initial 1000-RPV grant for users who
+  // verified before the daily-allowance system shipped. Idempotent — only
+  // touches users where initialBallotsGranted=false. Safe to run multiple
+  // times. Gated by VERIFF_MASTER_SIGNATURE_KEY (existing admin secret).
+  app.post("/api/admin/backfill-initial-ballots", async (req: any, res) => {
+    try {
+      const adminKey = req.headers['x-admin-key'];
+      if (!adminKey || adminKey !== process.env.VERIFF_MASTER_SIGNATURE_KEY) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+
+      const pending = await (storage as any).getUsersNeedingInitialGrant();
+      log(`Backfill: ${pending.length} verified users need initial ballot grant`);
+
+      let granted = 0;
+      let skipped = 0;
+      for (const user of pending) {
+        await grantInitialBallotsIfNeeded(user.id);
+        // Re-check to count successes (helper swallows errors)
+        const refreshed = await storage.getUser(user.id);
+        if ((refreshed as any)?.initialBallotsGranted) {
+          granted++;
+        } else {
+          skipped++;
+        }
+      }
+
+      log(`Backfill complete: granted=${granted}, skipped=${skipped}`);
+      res.json({ success: true, total: pending.length, granted, skipped });
+    } catch (error: any) {
+      log(`Backfill error: ${error.message}`);
+      res.status(500).json({ error: "Backfill failed" });
+    }
+  });
+
   // Health check
-  app.get("/api/health", (req, res) => {
-    res.json({ status: "ok", network: "Base Sepolia" });
+  // Real health check: probes the DB and verifies critical env vars are set.
+  // Replit's autoscaler + external uptime monitors call this; a static "ok"
+  // would mask outages. Returns 503 if anything fails so monitors fire.
+  app.get("/api/health", async (req, res) => {
+    const checks: Record<string, "ok" | string> = {};
+    const required = [
+      "DATABASE_URL",
+      "VERIFF_MASTER_SIGNATURE_KEY",
+      "RPV_TOKEN_ADDRESS",
+      "JWT_SECRET",
+    ];
+    for (const k of required) {
+      checks[k] = process.env[k] ? "ok" : "missing";
+    }
+    try {
+      await db.execute(sql`SELECT 1`);
+      checks.db = "ok";
+    } catch (e: any) {
+      checks.db = `error: ${e?.message || "unknown"}`;
+    }
+    const failed = Object.entries(checks).filter(([, v]) => v !== "ok");
+    if (failed.length > 0) {
+      return res.status(503).json({ status: "degraded", checks, network: "Base Sepolia" });
+    }
+    res.json({ status: "ok", checks, network: "Base Sepolia" });
   });
 
   const httpServer = createServer(app);

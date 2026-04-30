@@ -10,6 +10,7 @@ import {
   showPaymentError,
   showPaymentSuccess,
 } from './stripe';
+import { useAuthStore } from './auth';
 
 export interface PaymentResult {
   success: boolean;
@@ -85,6 +86,16 @@ async function processIAPPurchase(
   const validation = await validateReceipt(result.receipt, token, productId, organizationId);
   if (!validation.valid) {
     return { success: false, error: validation.error || 'Receipt validation failed' };
+  }
+
+  // Refetch the user object so subscriptionStatus flips to 'active' in the
+  // app immediately. The ballot store's useSyncBallotTier hook listens to
+  // the user object and will flip tier='premium' as a side-effect, which
+  // updates the Free→Premium UI state without a manual pull-to-refresh.
+  try {
+    await useAuthStore.getState().checkAuth();
+  } catch (e) {
+    // Non-fatal — purchase succeeded, the next route load will sync state.
   }
 
   return { success: true };

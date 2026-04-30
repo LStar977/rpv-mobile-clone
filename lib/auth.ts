@@ -20,12 +20,14 @@ interface AuthState {
   token: string | null;
   isLoading: boolean;
   isAuthenticated: boolean;
+  hydrated: boolean;
   login: (provider: 'google' | 'apple', idToken: string, userData?: Partial<User>) => Promise<boolean>;
   emailLogin: (email: string, password: string, name?: string, isSignup?: boolean) => Promise<{ success: boolean; error?: string }>;
   demoLogin: () => Promise<boolean>;
   logout: () => Promise<void>;
   deleteAccount: () => Promise<boolean>;
   checkAuth: () => Promise<void>;
+  hydrate: () => Promise<void>;
   setLoading: (loading: boolean) => void;
 }
 
@@ -37,8 +39,38 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   token: null,
   isLoading: true,
   isAuthenticated: false,
+  hydrated: false,
 
   setLoading: (loading: boolean) => set({ isLoading: loading }),
+
+  // Synchronous-feeling rehydrate from SecureStore. Runs once at app start;
+  // populates user/token/isAuthenticated optimistically from cache so the UI
+  // can render the authed shell on first paint instead of flashing the
+  // sign-in screen. checkAuth() then validates against the server in the
+  // background and clears state if the cached token has been revoked.
+  hydrate: async () => {
+    try {
+      const [token, userJson] = await Promise.all([
+        SecureStore.getItemAsync(TOKEN_KEY),
+        SecureStore.getItemAsync(USER_KEY),
+      ]);
+      if (token && userJson) {
+        try {
+          const user = JSON.parse(userJson) as User;
+          set({ user, token, isAuthenticated: true, isLoading: false, hydrated: true });
+          // Background re-validate against server; clears state if revoked.
+          get().checkAuth();
+          return;
+        } catch {
+          // Cached user JSON is corrupt — fall through to unauthed state.
+        }
+      }
+      set({ user: null, token: null, isAuthenticated: false, isLoading: false, hydrated: true });
+    } catch (e) {
+      console.error('Auth hydrate error:', e);
+      set({ hydrated: true, isLoading: false });
+    }
+  },
 
   login: async (provider: 'google' | 'apple', idToken: string, userData?: Partial<User>) => {
     try {

@@ -12,7 +12,6 @@ import {
   Image,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as Clipboard from 'expo-clipboard';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
@@ -120,7 +119,7 @@ const ALL_BADGES = [
   { id: 'proposal_5', name: 'Active Legislator', description: 'Create 5 proposals', icon: '📋', tier: 'epic' as const, category: 'creator' },
   { id: 'referral_5', name: 'Community Builder', description: 'Refer 5 new users', icon: '🤝', tier: 'rare' as const, category: 'social' },
   { id: 'referral_20', name: 'Movement Leader', description: 'Refer 20 new users', icon: '👥', tier: 'epic' as const, category: 'social' },
-  { id: 'passport_minted', name: 'Verified Citizen', description: 'Mint your Represent Passport NFT', icon: '🛂', tier: 'epic' as const, category: 'identity' },
+  { id: 'passport_minted', name: 'Verified Citizen', description: 'Complete identity verification with Veriff', icon: '🛂', tier: 'epic' as const, category: 'identity' },
   { id: 'early_adopter', name: 'Early Adopter', description: 'Join during the beta period', icon: '🚀', tier: 'legendary' as const, category: 'special' },
   { id: 'democratic_spirit', name: 'Democratic Spirit', description: 'Vote on both sides of the aisle', icon: '⚖️', tier: 'rare' as const, category: 'special' },
   { id: 'global_citizen', name: 'Global Citizen', description: 'Participate in governance across multiple regions', icon: '🌍', tier: 'legendary' as const, category: 'special' },
@@ -467,23 +466,18 @@ function AccountParticulars({
   name,
   email,
   location,
-  walletAddress,
   verified,
-  onCopyWallet,
 }: {
   name: string;
   email: string;
   location: string;
-  walletAddress?: string | null;
   verified: boolean;
-  onCopyWallet?: () => void;
 }) {
   const id = useIdentityColors();
   const rows = [
     { label: 'Name', value: name || '—', verified: true },
     { label: 'Email', value: email || '—', verified: true },
     { label: 'Location', value: location || '—', verified: true },
-    ...(walletAddress ? [{ label: 'Wallet', value: `${walletAddress.slice(0, 6)}···${walletAddress.slice(-4)}`, mono: true, action: 'copy' as const }] : []),
   ];
 
   return (
@@ -502,14 +496,8 @@ function AccountParticulars({
       {rows.map((r, i) => (
         <View key={i} style={[premiumStyles.particularRow, i < rows.length - 1 && [premiumStyles.particularRowBorder, { borderBottomColor: id.LINE }]]}>
           <Text style={[premiumStyles.particularLabel, { color: id.FG_FAINT }]}>{r.label}</Text>
-          <Text style={[premiumStyles.particularValue, { color: id.FG }, r.mono && premiumStyles.monoText]}>{r.value}</Text>
-          {r.action === 'copy' ? (
-            <TouchableOpacity onPress={onCopyWallet} style={[premiumStyles.copyButton, { backgroundColor: id.BG_RAISED, borderColor: id.LINE_STRONG }]}>
-              <Ionicons name="copy-outline" size={13} color={id.FG_MUTED} />
-            </TouchableOpacity>
-          ) : (
-            <View style={[premiumStyles.verifiedDot, { backgroundColor: id.GREEN }]} />
-          )}
+          <Text style={[premiumStyles.particularValue, { color: id.FG }]}>{r.value}</Text>
+          <View style={[premiumStyles.verifiedDot, { backgroundColor: id.GREEN }]} />
         </View>
       ))}
     </View>
@@ -696,12 +684,6 @@ export default function IdentityScreen() {
     } finally {
       setStartingKyc(false);
     }
-  };
-
-  const copyWalletAddress = async (address: string) => {
-    await Clipboard.setStringAsync(address);
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    Alert.alert('Copied', 'Wallet address copied to clipboard');
   };
 
   // Calculate earned badges
@@ -924,9 +906,7 @@ export default function IdentityScreen() {
               name={displayName}
               email={displayEmail}
               location={displayLocation}
-              walletAddress={user?.walletAddress}
               verified={verification.verified}
-              onCopyWallet={() => user?.walletAddress && copyWalletAddress(user.walletAddress)}
             />
           </Animated.View>
         )}

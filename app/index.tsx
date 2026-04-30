@@ -11,6 +11,7 @@ import {
   Alert,
   Dimensions,
   ActivityIndicator,
+  Linking,
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -1003,6 +1004,13 @@ export default function AuthScreen() {
     }
   }, [isAuthenticated]);
 
+  // While authenticated, render nothing — the effect above is replacing
+  // the route. Without this guard the sign-in UI flashes for one frame
+  // on cold start when SecureStore-cached credentials are valid.
+  if (isAuthenticated) {
+    return null;
+  }
+
   const handleBiometricLogin = async () => {
     const result = await authenticateWithBiometrics(`Use ${biometricType} to sign in`);
     if (result.success) {
@@ -1412,12 +1420,33 @@ export default function AuthScreen() {
         </Animated.View>
 
         {/* Terms */}
-        <Animated.Text
+        <Animated.View
           entering={FadeIn.delay(500).duration(400)}
-          style={[styles.terms, { color: colors.textTertiary }]}
+          style={styles.termsContainer}
         >
-          By continuing, you agree to our Terms of Service and Privacy Policy
-        </Animated.Text>
+          <Text style={[styles.terms, { color: colors.textTertiary }]}>
+            By continuing, you agree to our{' '}
+            <Text
+              style={[styles.termsLink, { color: colors.gold }]}
+              onPress={() => {
+                haptics.light();
+                Linking.openURL('https://representportal.com/terms');
+              }}
+            >
+              Terms of Service
+            </Text>
+            {' '}and{' '}
+            <Text
+              style={[styles.termsLink, { color: colors.gold }]}
+              onPress={() => {
+                haptics.light();
+                Linking.openURL('https://representportal.com/privacy');
+              }}
+            >
+              Privacy Policy
+            </Text>
+          </Text>
+        </Animated.View>
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -1713,11 +1742,18 @@ const styles = StyleSheet.create({
     ...TYPOGRAPHY.body,
     fontWeight: '600',
   },
+  termsContainer: {
+    marginTop: SPACING.xl,
+    paddingHorizontal: SPACING.lg,
+  },
   terms: {
     ...TYPOGRAPHY.captionSmall,
     textAlign: 'center',
-    marginTop: SPACING.xl,
-    paddingHorizontal: SPACING.lg,
+  },
+  termsLink: {
+    ...TYPOGRAPHY.captionSmall,
+    fontWeight: '600',
+    textDecorationLine: 'underline',
   },
   // Premium CTA Button styles
   premiumCTAContainer: {

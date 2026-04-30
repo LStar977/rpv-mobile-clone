@@ -1,6 +1,6 @@
 import type { Express } from 'express';
 import { db } from './db';
-import { badges, userBadges, votes, proposals, users } from '../shared/schema';
+import { badges, userBadges, votes, proposals, users } from '@shared/schema';
 import { eq, and, count } from 'drizzle-orm';
 
 export function setupBadgeRoutes(app: Express) {

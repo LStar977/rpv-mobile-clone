@@ -38,7 +38,13 @@ export const users = pgTable("users", {
   stripeSubscriptionId: varchar("stripe_subscription_id"),
   subscriptionStatus: varchar("subscription_status").default('free'), // 'free', 'active', 'canceled', 'past_due'
   subscriptionEndDate: timestamp("subscription_end_date"),
-  verificationPaid: boolean("verification_paid").default(false), // True when $4.99 payment completed
+  verificationPaid: boolean("verification_paid").default(false), // Legacy from $4.99 payment; verification is now free
+  initialBallotsGranted: boolean("initial_ballots_granted").default(false), // True after one-time RPV token grant on verification
+  ballotsUsedToday: integer("ballots_used_today").default(0), // Daily vote counter, capped at 20 for non-premium users
+  ballotsResetAt: timestamp("ballots_reset_at").defaultNow(), // Timestamp of last daily-counter reset; used for lazy-reset pattern
+  sentinelUsesToday: integer("sentinel_uses_today").default(0), // Per-user daily Sentinel AI counter (cost control)
+  sentinelResetAt: timestamp("sentinel_reset_at").defaultNow(), // Last Sentinel counter reset
+  deleted: boolean("deleted").default(false), // Soft-deleted (PII anonymized); user can no longer log in
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

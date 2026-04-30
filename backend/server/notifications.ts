@@ -1,5 +1,5 @@
 import { db } from './db';
-import { pushTokens, users, proposals } from '../shared/schema';
+import { pushTokens, users, proposals } from '@shared/schema';
 import { eq, and, or, isNull } from 'drizzle-orm';
 
 const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send';
@@ -49,6 +49,27 @@ async function getUserPushTokens(userId: string): Promise<string[]> {
   return tokens.map(t => t.token);
 }
 
+// Tokens whose Expo response says they're permanently dead. Each one will
+// keep producing errors on every notification round-trip until removed.
+const TERMINAL_PUSH_ERRORS = new Set([
+  'DeviceNotRegistered',
+  'InvalidCredentials',
+]);
+
+async function pruneDeadPushTokens(deadTokens: string[]): Promise<void> {
+  if (deadTokens.length === 0) return;
+  try {
+    // Token uniquely identifies a device-install; if it's dead, drop every
+    // row carrying it regardless of which userId owns it.
+    for (const token of deadTokens) {
+      await db.delete(pushTokens).where(eq(pushTokens.token, token));
+    }
+    console.log(`Pruned ${deadTokens.length} dead push token(s)`);
+  } catch (e) {
+    console.error('Error pruning dead push tokens:', e);
+  }
+}
+
 async function sendPushNotifications(messages: ExpoPushMessage[]): Promise<void> {
   if (messages.length === 0) return;
 
@@ -63,7 +84,23 @@ async function sendPushNotifications(messages: ExpoPushMessage[]): Promise<void>
     });
 
     const result = await response.json();
-    console.log('Push notification result:', result);
+
+    // Expo returns { data: [{ status: 'ok' | 'error', details?: { error } }] }
+    // in the same order as our messages. Any "error" with a terminal code
+    // means that token is dead — prune it so subsequent rounds don't waste
+    // network calls on it.
+    const tickets = Array.isArray(result?.data) ? result.data : [];
+    const dead: string[] = [];
+    for (let i = 0; i < tickets.length; i++) {
+      const t = tickets[i];
+      if (t?.status === 'error' && t?.details?.error && TERMINAL_PUSH_ERRORS.has(t.details.error)) {
+        const token = messages[i]?.to;
+        if (token) dead.push(token);
+      }
+    }
+    if (dead.length > 0) {
+      await pruneDeadPushTokens(dead);
+    }
   } catch (error) {
     console.error('Error sending push notifications:', error);
   }

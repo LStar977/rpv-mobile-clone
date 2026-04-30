@@ -82,8 +82,8 @@ export default function PrivacyScreen() {
           <View style={styles.row}>
             <Ionicons name="lock-closed" size={24} color={colors.gold} />
             <View style={styles.info}>
-              <Text style={[styles.cardTitle, { color: colors.text }]}>Encrypted Wallet</Text>
-              <Text style={[styles.cardSubtitle, { color: colors.textSecondary }]}>Your keys are securely stored</Text>
+              <Text style={[styles.cardTitle, { color: colors.text }]}>Encrypted Storage</Text>
+              <Text style={[styles.cardSubtitle, { color: colors.textSecondary }]}>Your account credentials are securely stored</Text>
             </View>
             <Ionicons name="checkmark-circle" size={20} color={colors.success} />
           </View>

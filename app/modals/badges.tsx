@@ -25,7 +25,7 @@ const ALL_BADGES: Badge[] = [
   { id: 'proposal_5', name: 'Active Legislator', description: 'Create 5 proposals', icon: '📋', tier: 'epic', category: 'creator', unlocked: false },
   { id: 'referral_5', name: 'Community Builder', description: 'Refer 5 new users', icon: '🤝', tier: 'rare', category: 'social', unlocked: false },
   { id: 'referral_20', name: 'Movement Leader', description: 'Refer 20 new users', icon: '👥', tier: 'epic', category: 'social', unlocked: false },
-  { id: 'passport_minted', name: 'Verified Citizen', description: 'Mint your Represent Passport NFT', icon: '🛂', tier: 'epic', category: 'identity', unlocked: false },
+  { id: 'passport_minted', name: 'Verified Citizen', description: 'Complete identity verification with Veriff', icon: '🛂', tier: 'epic', category: 'identity', unlocked: false },
   { id: 'early_adopter', name: 'Early Adopter', description: 'Join during the beta period', icon: '🚀', tier: 'legendary', category: 'special', unlocked: false },
   { id: 'democratic_spirit', name: 'Democratic Spirit', description: 'Vote on both sides of the aisle', icon: '⚖️', tier: 'rare', category: 'special', unlocked: false },
   { id: 'global_citizen', name: 'Global Citizen', description: 'Participate in governance across multiple regions', icon: '🌍', tier: 'legendary', category: 'special', unlocked: false },

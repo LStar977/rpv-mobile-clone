@@ -18,7 +18,10 @@
       "usesAppleSignIn": true,
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
-        "NSPhotoLibraryUsageDescription": "This app needs access to your photo library to attach images to proposals.",
+        "NSCameraUsageDescription": "Represent uses your camera to verify your identity through our partner Veriff.",
+        "NSFaceIDUsageDescription": "Represent uses Face ID to securely sign you in to your verified civic account.",
+        "NSMicrophoneUsageDescription": "Represent uses your microphone during identity verification recordings.",
+        "NSPhotoLibraryUsageDescription": "Represent needs access to your photo library to attach images to proposals.",
         "CFBundleURLTypes": [
           {
             "CFBundleURLSchemes": [
@@ -52,7 +55,8 @@
           "enableGooglePay": true
         }
       ],
-      "react-native-iap"
+      "react-native-iap",
+      "@sentry/react-native/expo"
     ],
     "extra": {
       "router": {
