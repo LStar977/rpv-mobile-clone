@@ -1896,8 +1896,10 @@ export default function ProposalsScreen() {
 
 
   const handleVote = async (proposalId: number | string, vote: 'support' | 'oppose') => {
-    // Seed proposals: local-only voting (no auth/API required)
-    if (isSeedProposal(proposalId)) {
+    // Seed proposals + demo account votes: local-only, never hit the API.
+    // Demo account is sandboxed so App Store reviewers don't pollute real proposal counts.
+    const isDemoAccount = user?.email === 'demo@represent.app';
+    if (isSeedProposal(proposalId) || isDemoAccount) {
       setVotedProposals((prev) => new Set([...prev, proposalId as any]));
       setProposals((prev) =>
         prev.map((p) =>
