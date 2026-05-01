@@ -480,7 +480,6 @@ const prStyles = StyleSheet.create({
     letterSpacing: 0.05,
   },
   sectionCard: {
-    marginHorizontal: 24,
     backgroundColor: PR_BG_CARD,
     borderWidth: 1,
     borderColor: PR_LINE,
@@ -530,12 +529,11 @@ const prStyles = StyleSheet.create({
 
   // Appearance
   appearanceCard: {
-    marginHorizontal: 24,
     backgroundColor: PR_BG_CARD,
     borderWidth: 1,
     borderColor: PR_LINE,
-    borderRadius: 14,
-    padding: 16,
+    borderRadius: 16,
+    padding: 18,
   },
   appearanceHeader: {
     flexDirection: 'row',
