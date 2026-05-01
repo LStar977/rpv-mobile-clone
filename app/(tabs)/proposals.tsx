@@ -390,13 +390,30 @@ function VoteHeader({
     <View style={{ paddingTop: insetTop + 8, backgroundColor: pc.BG }}>
       {/* Title block */}
       <View style={voteHeaderStyles.titleBlock}>
-        <View>
-          <Text style={[voteHeaderStyles.serifTitle, { color: pc.FG }]}>Proposals</Text>
-          <View style={voteHeaderStyles.subtitleRow}>
-            <Text style={[voteHeaderStyles.subtitleText, { color: pc.FG_MUTED }]}>{activeCount} active</Text>
-            <View style={[voteHeaderStyles.dotSeparator, { backgroundColor: pc.LINE_STRONG }]} />
-            <Text style={[voteHeaderStyles.subtitleText, { color: pc.FG_MUTED }]}>{closingSoon} closing soon</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' }}>
+          <View style={{ flex: 1 }}>
+            <Text style={[voteHeaderStyles.serifTitle, { color: pc.FG }]}>Proposals</Text>
+            <View style={voteHeaderStyles.subtitleRow}>
+              <Text style={[voteHeaderStyles.subtitleText, { color: pc.FG_MUTED }]}>{activeCount} active</Text>
+              <View style={[voteHeaderStyles.dotSeparator, { backgroundColor: pc.LINE_STRONG }]} />
+              <Text style={[voteHeaderStyles.subtitleText, { color: pc.FG_MUTED }]}>{closingSoon} closing soon</Text>
+            </View>
           </View>
+          <TouchableOpacity
+            onPress={() => router.push('/modals/vote-reels')}
+            style={{
+              flexDirection: 'row', alignItems: 'center', gap: 6,
+              paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999,
+              backgroundColor: pc.BG_RAISED,
+              borderWidth: 1, borderColor: pc.GOLD,
+              marginBottom: 4,
+            }}
+            hitSlop={8}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="flash" size={14} color={pc.GOLD} />
+            <Text style={{ color: pc.GOLD, fontSize: 12, fontWeight: '700', letterSpacing: 0.5 }}>Reels</Text>
+          </TouchableOpacity>
         </View>
       </View>
 
