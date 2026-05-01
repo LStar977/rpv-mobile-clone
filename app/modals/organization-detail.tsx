@@ -304,7 +304,7 @@ function SectionTabs({ active, onChange, isAdmin, hasSubOrgs }: { active: TabTyp
     { key: 'announcements', label: 'Announcements' },
     { key: 'members',       label: 'Members' },
   ];
-  if (hasSubOrgs) tabs.push({ key: 'subOrders', label: 'Chapters' });
+  if (hasSubOrgs) tabs.push({ key: 'subOrders', label: 'Sub-orgs' });
   if (isAdmin) {
     tabs.push({ key: 'insights', label: 'Insights' });
     tabs.push({ key: 'settings', label: 'Settings' });
@@ -655,7 +655,7 @@ function InsightsSection({ insights, subOrgs, loading, sealedAt }: { insights: O
     .map((s: any) => {
       const n = (s.memberCount ?? s.members ?? 0) as number;
       const pct = totalMembers > 0 ? (n / totalMembers) * 100 : 0;
-      return { ward: s.name || 'Chapter', n, pct };
+      return { ward: s.name || 'Sub-org', n, pct };
     })
     .filter((w: any) => w.n > 0)
     .slice(0, 5);
@@ -783,7 +783,7 @@ function InsightsSection({ insights, subOrgs, loading, sealedAt }: { insights: O
           borderRadius: 10, paddingHorizontal: 14, paddingTop: 12, paddingBottom: 8, marginBottom: 12,
         }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 }}>
-            <Text style={{ fontSize: 11, color: O_FG_MUTED, letterSpacing: -0.05 }}>Members by chapter</Text>
+            <Text style={{ fontSize: 11, color: O_FG_MUTED, letterSpacing: -0.05 }}>Members by sub-org</Text>
             <Text style={{ fontFamily: MONO, fontSize: 8, color: O_FG_FAINT, letterSpacing: 1.4 }}>
               {String(wardData.length).padStart(2, '0')} OF {String(subOrgs.length || wardData.length).padStart(2, '0')}
             </Text>
@@ -830,12 +830,12 @@ function SubOrdersSection({ subOrgs, totalMembers, onPress, onLongPress, isAdmin
     <View style={{ paddingHorizontal: 14 }}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 10 }}>
         <Text style={{ fontSize: 13, color: O_FG_MUTED, letterSpacing: -0.05 }}>
-          {subOrgs.length} {subOrgs.length === 1 ? 'chapter' : 'chapters'} · {totalMembers.toLocaleString()} total members
+          {subOrgs.length} {subOrgs.length === 1 ? 'sub-org' : 'sub-orgs'} · {totalMembers.toLocaleString()} total members
         </Text>
       </View>
       <View style={{ gap: 8 }}>
         {subOrgs.map((c, i) => {
-          const monogram = monogramFromName(c.name || 'Chapter');
+          const monogram = monogramFromName(c.name || 'Sub-org');
           const founded = formatRomanYM(c.createdAt || c.created_at);
           const status = (c.status || 'active').toLowerCase();
           const memberCount = (c.memberCount ?? c.members ?? 0) as number;
@@ -867,7 +867,7 @@ function SubOrdersSection({ subOrgs, totalMembers, onPress, onLongPress, isAdmin
                 <Text numberOfLines={1} style={{
                   fontFamily: SERIF, fontSize: 14, fontWeight: '500',
                   color: O_FG, letterSpacing: -0.05, lineHeight: 16, marginBottom: 3,
-                }}>{c.name || 'Untitled chapter'}</Text>
+                }}>{c.name || 'Untitled sub-org'}</Text>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                   <Text style={{ fontSize: 11, color: O_FG_FAINT, letterSpacing: -0.05 }}>
                     <Text style={{ color: O_FG_MUTED }}>{memberCount}</Text> {memberCount === 1 ? 'member' : 'members'}
@@ -2255,7 +2255,7 @@ export default function OrganizationDetailScreen() {
             <TouchableOpacity onPress={() => setShowCreateSubOrgModal(false)} disabled={creatingSubOrg}>
               <Text style={[styles.modalCancel, { color: O_FG_MUTED }]}>Cancel</Text>
             </TouchableOpacity>
-            <Text style={[styles.modalTitle, { color: O_FG, fontFamily: SERIF, fontStyle: 'italic' }]}>New chapter</Text>
+            <Text style={[styles.modalTitle, { color: O_FG, fontFamily: SERIF, fontStyle: 'italic' }]}>New sub-org</Text>
             <TouchableOpacity onPress={handleCreateSubOrg} disabled={creatingSubOrg || !newSubOrg.name.trim()}>
               {creatingSubOrg ? <ActivityIndicator size="small" color={O_GOLD} /> : <Text style={[styles.modalSubmit, { color: newSubOrg.name.trim() ? O_GOLD : O_FG_FAINT }]}>Create</Text>}
             </TouchableOpacity>
