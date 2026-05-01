@@ -8,7 +8,7 @@ import type { User, Wallet, PricingPlan, InsertUser, UpsertUser, PassportNFT, El
 export interface VerificationData {
   verified: boolean;
   verificationId?: string;
-  verificationMethod?: 'veriff' | 'manual';
+  verificationMethod?: 'veriff' | 'didit' | 'manual';
   verifiedAt?: Date;
   country?: string;
   state?: string;

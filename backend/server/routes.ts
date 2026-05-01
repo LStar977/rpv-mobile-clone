@@ -69,6 +69,124 @@ function verifyVeriffSignature(req: any): boolean {
   }
 }
 
+// Didit webhook signature: HMAC-SHA256 of the raw body keyed with
+// DIDIT_WEBHOOK_SECRET, sent in the X-Signature header. X-Timestamp gives a
+// freshness window — reject anything older than 5 minutes to block replays.
+function verifyDiditSignature(req: any): boolean {
+  const secret = process.env.DIDIT_WEBHOOK_SECRET;
+  if (!secret) {
+    log("DIDIT_WEBHOOK_SECRET not configured — refusing webhook");
+    return false;
+  }
+  const sig = req.headers["x-signature"] as string | undefined;
+  const ts = req.headers["x-timestamp"] as string | undefined;
+  if (!sig || !ts) return false;
+
+  // 5-minute freshness window. Didit sends the timestamp in seconds.
+  const tsNum = parseInt(ts, 10);
+  if (Number.isNaN(tsNum)) return false;
+  if (Math.abs(Math.floor(Date.now() / 1000) - tsNum) > 300) return false;
+
+  const rawBody: Buffer | undefined = req.rawBody as Buffer | undefined;
+  if (!rawBody) return false;
+
+  const expected = createHmac("sha256", secret).update(rawBody).digest("hex");
+  if (sig.length !== expected.length) return false;
+  try {
+    return timingSafeEqual(Buffer.from(sig, "utf8"), Buffer.from(expected, "utf8"));
+  } catch {
+    return false;
+  }
+}
+
+// Create a Didit verification session via their REST API. Returns the hosted
+// verification URL the mobile WebView loads, plus the session_id we persist
+// on the user record for later decision lookups.
+async function createDiditSession(userId: string, firstName?: string, lastName?: string): Promise<{ sessionId: string; sessionUrl: string }> {
+  const apiKey = process.env.DIDIT_API_KEY;
+  const workflowId = process.env.DIDIT_WORKFLOW_ID;
+  if (!apiKey || !workflowId) {
+    throw new Error("Didit not configured (set DIDIT_API_KEY + DIDIT_WORKFLOW_ID)");
+  }
+  const domain = process.env.REPLIT_DEV_DOMAIN || process.env.REPLIT_DEPLOYMENT_URL || "localhost:5000";
+  const callbackUrl = `https://${domain}/api/didit/webhook`;
+  const body: any = {
+    workflow_id: workflowId,
+    callback: callbackUrl,
+    vendor_data: userId,
+  };
+  if (firstName && lastName) {
+    body.expected_details = { first_name: firstName.trim(), last_name: lastName.trim() };
+  }
+  const res = await fetch("https://verification.didit.me/v3/session/", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-api-key": apiKey },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`Didit session creation failed: ${res.status} ${errText}`);
+  }
+  const data: any = await res.json();
+  // Response: { session_id, session_token, url, status, workflow_id, ... }
+  return { sessionId: data.session_id, sessionUrl: data.url };
+}
+
+// Fetch the latest verification decision for a Didit session.
+async function fetchDiditDecision(sessionId: string): Promise<any> {
+  const apiKey = process.env.DIDIT_API_KEY;
+  if (!apiKey) throw new Error("Didit not configured");
+  const res = await fetch(`https://verification.didit.me/v3/session/${sessionId}/decision/`, {
+    headers: { "x-api-key": apiKey },
+  });
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`Didit decision fetch failed: ${res.status} ${errText}`);
+  }
+  return res.json();
+}
+
+// Map Didit's decision payload to the user fields we persist. Didit's exact
+// shape needs to be confirmed against a real test session — this mapper makes
+// best-effort guesses that fall back to undefined so a missing field never
+// throws. Sandbox-test once with a real verification and adjust the field
+// paths as needed.
+function mapDiditDecisionToUserFields(decision: any): {
+  firstName?: string;
+  lastName?: string;
+  dateOfBirth?: string;
+  gender?: string;
+  documentType?: string;
+  country?: string;
+  state?: string;
+  city?: string;
+} {
+  const id = decision?.id_verification ?? decision?.kyc ?? decision ?? {};
+  const address = id.address ?? {};
+  const isPassport = String(id.document_type ?? id.documentType ?? "").toUpperCase().includes("PASSPORT");
+  return {
+    firstName: id.first_name ?? id.firstName,
+    lastName: id.last_name ?? id.lastName,
+    dateOfBirth: id.date_of_birth ?? id.dateOfBirth,
+    gender: normalizeGender(id.gender),
+    documentType: id.document_type ?? id.documentType,
+    // Passport: nationality from doc; ID card / driver's license: address country
+    country: isPassport
+      ? (id.document_country ?? id.documentCountry ?? address.country)
+      : (address.country ?? id.document_country ?? id.documentCountry),
+    state: address.state ?? address.region,
+    city: address.city,
+  };
+}
+
+function normalizeGender(g: any): string | undefined {
+  if (!g || typeof g !== "string") return undefined;
+  const u = g.trim().toUpperCase();
+  if (u === "M" || u === "MALE") return "male";
+  if (u === "F" || u === "FEMALE") return "female";
+  return g.toLowerCase();
+}
+
 // One-time bulk RPV transfer per user, fired when verification is approved.
 // Idempotent — safe to call from every verification-approved branch; only the
 // first call actually transfers tokens. Failures are swallowed so a transient
@@ -2027,6 +2145,141 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       log(`Veriff create session error: ${error}`);
       res.status(500).json({ error: "Failed to create verification session" });
+    }
+  });
+
+  // ─── Didit verification routes (replacing Veriff) ──────────────────────────
+  // Didit's pricing model is dramatically cheaper than Veriff (500 free / month
+  // / feature, then $0.15/verification) and the integration shape is similar:
+  // hosted verification URL + REST decision + HMAC-signed webhook. The Veriff
+  // routes above stay wired during the rollout for rollback safety.
+
+  app.post("/api/didit/create-session", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims?.sub;
+      if (!userId) return res.status(401).json({ error: "Unauthorized" });
+
+      const user = await storage.getUser(userId);
+      if (!user) return res.status(404).json({ error: "User not found" });
+
+      if (user.verified) {
+        return res.status(400).json({ error: "User already verified" });
+      }
+
+      const { sessionId, sessionUrl } = await createDiditSession(
+        userId,
+        user.firstName || (user.name?.split(" ")[0]),
+        user.lastName || (user.name?.split(" ").slice(1).join(" ")),
+      );
+
+      // Persist session id so check-decision and sync-location can look it up
+      await storage.updateUserVerification(userId, {
+        verificationId: sessionId,
+        verificationMethod: "didit",
+        verified: false,
+      });
+
+      log(`Didit session created: user=${rid(userId)}, sessionId=${rid(sessionId)}`);
+
+      res.json({
+        sessionToken: sessionId,
+        verificationId: sessionId,
+        sessionUrl,
+      });
+    } catch (error: any) {
+      log(`Didit create session error: ${error?.message || error}`);
+      res.status(500).json({ error: error?.message || "Failed to create verification session" });
+    }
+  });
+
+  app.post("/api/didit/webhook", async (req: any, res) => {
+    if (!verifyDiditSignature(req)) {
+      log(`Didit webhook rejected: invalid signature, missing header, or stale timestamp`);
+      return res.status(401).json({ error: "Invalid signature" });
+    }
+    try {
+      const { session_id, status, vendor_data, decision } = req.body || {};
+      log(`Didit webhook: userId=${rid(vendor_data)}, status=${status}, sessionId=${rid(session_id)}`);
+
+      if (!session_id || !vendor_data) {
+        return res.status(200).json({ received: true });
+      }
+
+      if (status === "Approved" || status === "approved") {
+        const fields = mapDiditDecisionToUserFields(decision || req.body);
+        const updateData: any = {
+          verified: true,
+          verificationId: session_id,
+          verificationMethod: "didit",
+          verifiedAt: new Date(),
+        };
+        if (fields.documentType) updateData.documentType = fields.documentType;
+        if (fields.country) updateData.country = fields.country;
+        if (fields.state) updateData.state = fields.state;
+        if (fields.city) updateData.city = fields.city;
+        if (fields.dateOfBirth) updateData.dateOfBirth = fields.dateOfBirth;
+        if (fields.gender) updateData.gender = fields.gender;
+        if (fields.firstName) updateData.firstName = fields.firstName;
+        if (fields.lastName) updateData.lastName = fields.lastName;
+
+        await storage.updateUserVerification(vendor_data, updateData);
+        await grantInitialBallotsIfNeeded(vendor_data);
+        log(`User verified via Didit webhook: user=${rid(vendor_data)}, country=${fields.country}`);
+      }
+
+      res.status(200).json({ received: true });
+    } catch (error: any) {
+      log(`Didit webhook error: ${error?.message || error}`);
+      // Always 200 so Didit doesn't retry storms; we logged the failure
+      res.status(200).json({ received: true });
+    }
+  });
+
+  app.get("/api/didit/check-decision", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims?.sub;
+      if (!userId) return res.status(401).json({ error: "Unauthorized" });
+
+      const verificationId = String(req.query.verificationId || "");
+      if (!verificationId) {
+        return res.status(400).json({ error: "verificationId is required" });
+      }
+
+      const decision = await fetchDiditDecision(verificationId);
+      const status = decision?.status as string | undefined;
+      log(`Didit check-decision: user=${rid(userId)}, sessionId=${rid(verificationId)}, status=${status}`);
+
+      if (status === "Approved" || status === "approved") {
+        const user = await storage.getUser(userId);
+        if (user && !user.verified) {
+          const fields = mapDiditDecisionToUserFields(decision);
+          const updateData: any = {
+            verified: true,
+            verificationId,
+            verificationMethod: "didit",
+            verifiedAt: new Date(),
+          };
+          if (fields.documentType) updateData.documentType = fields.documentType;
+          if (fields.country) updateData.country = fields.country;
+          if (fields.state) updateData.state = fields.state;
+          if (fields.city) updateData.city = fields.city;
+          if (fields.dateOfBirth) updateData.dateOfBirth = fields.dateOfBirth;
+          if (fields.gender) updateData.gender = fields.gender;
+          if (fields.firstName) updateData.firstName = fields.firstName;
+          if (fields.lastName) updateData.lastName = fields.lastName;
+          await storage.updateUserVerification(userId, updateData);
+          await grantInitialBallotsIfNeeded(userId);
+          log(`User verified via Didit check-decision: user=${rid(userId)}, country=${fields.country}`);
+        }
+      }
+
+      res.json({
+        status: status?.toLowerCase() || "unknown",
+        decision: status?.toLowerCase() || "unknown",
+      });
+    } catch (error: any) {
+      log(`Didit check-decision error: ${error?.message || error}`);
+      res.status(500).json({ error: error?.message || "Failed to check decision" });
     }
   });
 
