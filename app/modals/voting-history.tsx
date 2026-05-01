@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuthStore } from '../../lib/auth';
 import { limitsApi, UsageLimits } from '../../lib/api';
 import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS } from '../../lib/theme';
@@ -64,6 +65,7 @@ function FilterChip({
 export default function VotingHistoryScreen() {
   const { colors } = useTheme();
   const { token } = useAuthStore();
+  const insets = useSafeAreaInsets();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [votedProposals, setVotedProposals] = useState<VotedProposal[]>([]);
@@ -167,6 +169,22 @@ export default function VotingHistoryScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingTop: insets.top + 8,
+        paddingHorizontal: 16,
+        paddingBottom: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: colors.border,
+      }}>
+        <TouchableOpacity onPress={() => router.back()} style={{ width: 40, height: 40, alignItems: 'center', justifyContent: 'center' }}>
+          <Ionicons name="chevron-back" size={24} color={colors.text} />
+        </TouchableOpacity>
+        <Text style={{ fontFamily: 'Georgia', fontSize: 20, fontWeight: '600', color: colors.text }}>Voting History</Text>
+        <View style={{ width: 40 }} />
+      </View>
       <ScrollView
         style={styles.content}
         contentContainerStyle={styles.contentContainer}

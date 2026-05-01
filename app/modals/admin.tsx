@@ -19,6 +19,7 @@ import Animated, {
   FadeInUp,
 } from 'react-native-reanimated';
 import { router } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuthStore } from '../../lib/auth';
 import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS } from '../../lib/theme';
 import { adminApi, proposalsApi, Proposal, AdminStats } from '../../lib/api';
@@ -124,6 +125,7 @@ function AdminProposalCard({
 export default function AdminDashboard() {
   const { colors } = useTheme();
   const { user } = useAuthStore();
+  const insets = useSafeAreaInsets();
 
   const [activeTab, setActiveTab] = useState<TabType>('stats');
   const [loading, setLoading] = useState(true);
@@ -223,7 +225,7 @@ export default function AdminDashboard() {
   if (!isAdmin) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <View style={styles.header}>
+        <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
           <TouchableOpacity
             style={[styles.backButton, { backgroundColor: colors.surface }]}
             onPress={() => router.back()}
@@ -272,7 +274,7 @@ export default function AdminDashboard() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
         <TouchableOpacity
           style={[styles.backButton, { backgroundColor: colors.surface }]}
           onPress={() => router.back()}

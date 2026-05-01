@@ -17,6 +17,7 @@ import Animated, {
   FadeInUp,
 } from 'react-native-reanimated';
 import { router } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuthStore } from '../../lib/auth';
 import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS, responsive } from '../../lib/theme';
 import { analyticsApi, AnalyticsData, ProposalAnalytics } from '../../lib/api';
@@ -234,6 +235,7 @@ function ProposalAnalyticsCard({ proposal, index }: { proposal: ProposalAnalytic
 export default function AnalyticsScreen() {
   const { colors } = useTheme();
   const { token, user } = useAuthStore();
+  const insets = useSafeAreaInsets();
 
   const [isPremium, setIsPremium] = useState(false);
   const [loadingSubscription, setLoadingSubscription] = useState(true);
@@ -351,6 +353,22 @@ export default function AnalyticsScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingTop: insets.top + 8,
+        paddingHorizontal: 16,
+        paddingBottom: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: colors.border,
+      }}>
+        <TouchableOpacity onPress={() => router.back()} style={{ width: 40, height: 40, alignItems: 'center', justifyContent: 'center' }}>
+          <Ionicons name="chevron-back" size={24} color={colors.text} />
+        </TouchableOpacity>
+        <Text style={{ fontFamily: 'Georgia', fontSize: 20, fontWeight: '600', color: colors.text }}>Analytics</Text>
+        <View style={{ width: 40 }} />
+      </View>
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}

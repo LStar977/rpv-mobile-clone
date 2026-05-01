@@ -18,7 +18,7 @@ import Svg, { Circle } from 'react-native-svg';
 import { useAuthStore } from '../../lib/auth';
 import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS, ThemePreference, responsive } from '../../lib/theme';
 import { Button, TierBadge } from '../../components/ui';
-import { adminApi } from '../../lib/api';
+import { adminApi, organizationsApi, userApi } from '../../lib/api';
 import { restorePurchases } from '../../lib/iap';
 import type { UserTier } from '../../components/ui';
 
@@ -728,6 +728,9 @@ export default function ProfileScreen() {
   const [userTier, setUserTier] = useState<UserTier>('free');
   const [refreshing, setRefreshing] = useState(false);
   const [badgesEarned, setBadgesEarned] = useState<number | null>(null);
+  const [orgCount, setOrgCount] = useState<number | null>(null);
+  const [adminOrgCount, setAdminOrgCount] = useState<number | null>(null);
+  const [votesCast, setVotesCast] = useState<number | null>(null);
   const BADGES_TOTAL = 15;
 
   // Fetch user's subscription tier
@@ -785,6 +788,27 @@ export default function ProfileScreen() {
       }
     })();
   }, [token, user?.id]);
+
+  // Live counts for Activity rows. Each falls back to null on failure so
+  // the row hides the secondary label rather than showing a stale value.
+  useEffect(() => {
+    if (!token) return;
+    (async () => {
+      try {
+        const orgsRes = await organizationsApi.getMyOrganizations();
+        if (Array.isArray(orgsRes.data)) {
+          setOrgCount(orgsRes.data.length);
+          setAdminOrgCount(orgsRes.data.filter((o: any) => o.role === 'admin').length);
+        }
+      } catch { /* keep null */ }
+      try {
+        const votedRes = await userApi.getVotedProposals();
+        if (Array.isArray(votedRes.data)) {
+          setVotesCast(votedRes.data.length);
+        }
+      } catch { /* keep null */ }
+    })();
+  }, [token]);
 
   useFocusEffect(
     useCallback(() => {
@@ -867,8 +891,8 @@ export default function ProfileScreen() {
 
         {/* Section I: Civic Record */}
         <PrSection title="Activity" delay={200}>
-          <PrRow icon="business-outline" label="My organizations" value="3" onPress={() => navigateTo('/modals/organizations')} />
-          <PrRow icon="time-outline" label="Voting history" sub="234 ballots cast" onPress={() => navigateTo('/modals/voting-history')} />
+          <PrRow icon="business-outline" label="My organizations" value={orgCount !== null ? String(orgCount) : undefined} onPress={() => navigateTo('/modals/organizations')} />
+          <PrRow icon="time-outline" label="Voting history" sub={votesCast !== null ? `${votesCast.toLocaleString()} ballots cast` : undefined} onPress={() => navigateTo('/modals/voting-history')} />
           <PrRow icon="analytics-outline" label="Analytics" sub="Patterns & impact" onPress={() => navigateTo('/modals/analytics')} />
           <PrRow icon="trophy-outline" label="Badges & achievements" value={badgesEarned !== null ? `${badgesEarned} / ${BADGES_TOTAL}` : undefined} valueColor={colors.goldLight} last onPress={() => navigateTo('/modals/badges')} />
         </PrSection>
@@ -898,11 +922,10 @@ export default function ProfileScreen() {
         {/* Section III: Administration */}
         <PrSection title="Administration" delay={300}>
           {adminApi.isAdmin() && (
-            <PrRow icon="shield-checkmark-outline" label="Admin dashboard" sub="2 organizations" onPress={() => navigateTo('/modals/admin')} />
+            <PrRow icon="shield-checkmark-outline" label="Admin dashboard" sub={adminOrgCount !== null ? `${adminOrgCount} organization${adminOrgCount === 1 ? '' : 's'}` : undefined} onPress={() => navigateTo('/modals/admin')} />
           )}
-          <PrRow icon="notifications-outline" label="Notifications" value="On" valueColor={colors.success} onPress={() => navigateTo('/modals/privacy')} />
           <PrRow icon="settings-outline" label="Settings & privacy" onPress={() => navigateTo('/modals/privacy')} />
-          <PrRow icon="document-text-outline" label="Legal" last onPress={() => navigateTo('/modals/privacy')} />
+          <PrRow icon="document-text-outline" label="Legal" last onPress={() => navigateTo('/modals/legal')} />
         </PrSection>
 
         {/* Section IV: Appearance */}
