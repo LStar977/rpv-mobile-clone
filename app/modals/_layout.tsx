@@ -27,7 +27,6 @@ export default function ModalsLayout() {
       <Stack.Screen name="admin" />
       <Stack.Screen name="my-proposals" />
       <Stack.Screen name="community-proposals" />
-      <Stack.Screen name="vote-reels" options={{ presentation: 'fullScreenModal', gestureEnabled: false }} />
     </Stack>
   );
 }
