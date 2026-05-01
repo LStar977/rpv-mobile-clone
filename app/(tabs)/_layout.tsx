@@ -155,20 +155,20 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="groups"
-        options={{
-          title: 'Groups',
-          tabBarIcon: ({ color, focused }) => (
-            <TabIcon name="people-outline" color={color} focused={focused} />
-          ),
-        }}
-      />
-      <Tabs.Screen
         name="sentinel"
         options={{
           title: 'Sentinel',
           tabBarIcon: ({ color, focused }) => (
             <TabIcon name="sparkles-outline" color={color} focused={focused} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="groups"
+        options={{
+          title: 'Groups',
+          tabBarIcon: ({ color, focused }) => (
+            <TabIcon name="people-outline" color={color} focused={focused} />
           ),
         }}
       />
