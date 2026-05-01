@@ -51,7 +51,9 @@ function formatRomanYearMonth(iso?: string | null): string {
 }
 
 function folioFromOrg(name: string, id: string): string {
-  const initials = name
+  const safeName = name || '';
+  const safeId = id ? String(id) : '';
+  const initials = safeName
     .split(/\s+/)
     .filter(Boolean)
     .map((w) => w[0])
@@ -60,13 +62,13 @@ function folioFromOrg(name: string, id: string): string {
     .replace(/[^A-Z]/g, '')
     .slice(0, 3) || 'ORG';
   let hash = 0;
-  for (let i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) >>> 0;
+  for (let i = 0; i < safeId.length; i++) hash = (hash * 31 + safeId.charCodeAt(i)) >>> 0;
   const num = (hash % 9000) + 1000;
   return `FOLIO·${initials}·${num}`;
 }
 
 function monogramFromName(name: string): string {
-  const parts = name.split(/\s+/).filter(Boolean);
+  const parts = (name || '').split(/\s+/).filter(Boolean);
   if (!parts.length) return 'O';
   return parts[0][0].toUpperCase();
 }

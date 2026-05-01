@@ -81,13 +81,15 @@ function formatTimeMono(iso?: string | null): string {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 function folioFromOrg(name: string, id: string): string {
-  const initials = name.split(/\s+/).filter(Boolean).map(w => w[0]).join('').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 3) || 'ORG';
+  const safeName = name || '';
+  const safeId = id ? String(id) : '';
+  const initials = safeName.split(/\s+/).filter(Boolean).map(w => w[0]).join('').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 3) || 'ORG';
   let h = 0;
-  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
+  for (let i = 0; i < safeId.length; i++) h = (h * 31 + safeId.charCodeAt(i)) >>> 0;
   return `${initials}·${(h % 9000) + 1000}`;
 }
 function monogramFromName(n: string): string {
-  const p = n.split(/\s+/).filter(Boolean);
+  const p = (n || '').split(/\s+/).filter(Boolean);
   if (!p.length) return 'O';
   return p.length >= 2 ? (p[0][0] + p[p.length - 1][0]).toUpperCase() : p[0].slice(0, 2).toUpperCase();
 }
