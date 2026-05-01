@@ -1,5 +1,6 @@
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Linking, Alert, Platform } from 'react-native';
 import { useState, useEffect } from 'react';
+import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -161,27 +162,10 @@ export default function SubscriptionScreen() {
   };
 
   const handleManageBilling = async () => {
-    setActionLoading('manage');
-    try {
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (token) headers['Authorization'] = `Bearer ${token}`;
-
-      const response = await fetch(`${API_URL}/api/stripe/portal`, {
-        method: 'POST',
-        headers,
-      });
-
-      if (response.ok) {
-        const { url } = await response.json();
-        await Linking.openURL(url);
-      } else {
-        throw new Error('Failed to open billing portal');
-      }
-    } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to open billing');
-    } finally {
-      setActionLoading(null);
-    }
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    // iOS subscriptions are managed in Apple's settings, not a web portal.
+    // App Review rejects external payment-management URLs for digital subs.
+    await Linking.openURL('https://apps.apple.com/account/subscriptions');
   };
 
   const handleContactOrganizations = () => {
