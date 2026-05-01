@@ -256,57 +256,41 @@ function TopBar({ title, isAdmin, onBack, onOverflow, insetTop }: { title: strin
 
 // ─── hero ─────────────────────────────────────────────────────────────
 function Hero({ org, proposalCount }: { org: Organization; proposalCount: number }) {
-  const founded = formatRomanYM(org.createdAt);
-  const role = org.role === 'admin' ? 'Admin' : 'Member';
+  const memberCount = org.memberCount ?? 0;
+  const memberLabel = `${memberCount.toLocaleString()} ${memberCount === 1 ? 'member' : 'members'}`;
+  const isAdmin = org.role === 'admin';
 
   return (
     <Animated.View entering={FadeInDown.duration(400)} style={{ paddingHorizontal: 14, marginBottom: 16 }}>
       <View style={{
         backgroundColor: O_BG_CARD,
-        borderRadius: 18,
+        borderRadius: 16,
         borderWidth: 1, borderColor: O_LINE,
-        overflow: 'hidden',
+        paddingHorizontal: 14, paddingVertical: 14,
+        flexDirection: 'row', alignItems: 'center', gap: 13,
       }}>
-        {/* main */}
-        <View style={{ padding: 16, paddingBottom: 14, flexDirection: 'row', gap: 14, alignItems: 'flex-start' }}>
-          <OrgPortrait name={org.name} logoUrl={org.logoUrl} size={72} />
-          <View style={{ flex: 1, minWidth: 0, paddingTop: 2 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginBottom: 6 }}>
-              <Text style={{
-                fontFamily: SERIF, fontSize: 22, fontWeight: '500',
-                color: O_FG, lineHeight: 26, letterSpacing: -0.3,
+        <OrgPortrait name={org.name} logoUrl={org.logoUrl} size={48} />
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+            <Text
+              numberOfLines={1}
+              style={{
                 flex: 1,
-              }}>{org.name}</Text>
-              {org.verified && <View style={{ marginTop: 6 }}><VerifiedTick size={14} /></View>}
-            </View>
-            {!!org.description && (
-              <Text style={{ fontSize: 12.5, color: O_FG_MUTED, letterSpacing: -0.05, lineHeight: 17 }}>
-                {org.description}
+                fontFamily: SERIF, fontSize: 18, fontWeight: '500',
+                color: O_FG, lineHeight: 22, letterSpacing: -0.2,
+              }}
+            >{org.name}</Text>
+            {org.verified && <VerifiedTick size={13} />}
+          </View>
+          <Text style={{ fontSize: 12.5, color: O_FG_FAINT, letterSpacing: -0.05 }}>
+            {memberLabel}
+            {isAdmin && (
+              <Text>
+                <Text style={{ color: O_FG_FAINT }}>  ·  </Text>
+                <Text style={{ color: O_GOLD_L, fontWeight: '500' }}>Admin</Text>
               </Text>
             )}
-          </View>
-        </View>
-
-        {/* stats strip */}
-        <View style={{ flexDirection: 'row', borderTopWidth: 1, borderTopColor: O_LINE }}>
-          <View style={{ flex: 1, paddingHorizontal: 12, paddingVertical: 12, borderRightWidth: 1, borderRightColor: O_LINE }}>
-            <Text style={{ fontSize: 10.5, color: O_FG_FAINT, letterSpacing: -0.05, marginBottom: 3 }}>Members</Text>
-            <Text style={{ fontFamily: SERIF, fontSize: 16, fontWeight: '500', color: O_FG, lineHeight: 18 }}>
-              {(org.memberCount ?? 0).toLocaleString()}
-            </Text>
-          </View>
-          <View style={{ flex: 1, paddingHorizontal: 12, paddingVertical: 12, borderRightWidth: 1, borderRightColor: O_LINE }}>
-            <Text style={{ fontSize: 10.5, color: O_FG_FAINT, letterSpacing: -0.05, marginBottom: 3 }}>Founded</Text>
-            <Text style={{ fontFamily: SERIF, fontSize: 16, fontWeight: '500', color: O_FG, lineHeight: 18 }}>
-              {founded}
-            </Text>
-          </View>
-          <View style={{ flex: 1, paddingHorizontal: 12, paddingVertical: 12 }}>
-            <Text style={{ fontSize: 10.5, color: O_FG_FAINT, letterSpacing: -0.05, marginBottom: 3 }}>Your role</Text>
-            <Text style={{ fontFamily: SERIF, fontSize: 16, fontWeight: '500', color: org.role === 'admin' ? O_GOLD : O_FG, lineHeight: 18 }}>
-              {role}
-            </Text>
-          </View>
+          </Text>
         </View>
       </View>
     </Animated.View>
@@ -1136,9 +1120,6 @@ function ProposalsSection({ proposals, onPress }: { proposals: OrganizationPropo
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
           <FilterChip active={filter === 'all'} onPress={() => setFilter('all')}>All · {counts.all}</FilterChip>
           <FilterChip active={filter === 'open'} onPress={() => setFilter('open')}>Active · {counts.open}</FilterChip>
-          <FilterChip active={filter === 'passed'} onPress={() => setFilter('passed')}>Passed · {counts.passed}</FilterChip>
-          <FilterChip active={filter === 'closed'} onPress={() => setFilter('closed')}>Closed · {counts.closed}</FilterChip>
-          <FilterChip active={filter === 'failed'} onPress={() => setFilter('failed')}>Failed · {counts.failed}</FilterChip>
         </ScrollView>
       </View>
 
@@ -1146,12 +1127,11 @@ function ProposalsSection({ proposals, onPress }: { proposals: OrganizationPropo
         {visible.map((p, i) => {
           const kind = classifyProposal(p);
           const total = (p.supportVotes || 0) + (p.opposeVotes || 0);
-          const cast = total;
-          const tally = `${total} / ${(p as any).quorum || total || 0}`;
-          const pct = total > 0 ? (p.supportVotes || 0) / total : 0;
           const isOpen = kind === 'open';
-          const statusColor = kind === 'open' ? O_GOLD : kind === 'passed' ? O_GREEN : O_FG_FAINT;
-          const statusLabel = kind === 'open' ? 'Open' : kind === 'passed' ? 'Passed' : kind === 'failed' ? 'Failed' : 'Closed';
+          const supportPercent = total > 0 ? Math.round(((p.supportVotes || 0) / total) * 100) : 50;
+          const timeText = proposalTime(p, kind);
+          const timeColor = isOpen ? O_GOLD : O_RED;
+          const timeBg = isOpen ? 'rgba(234,186,88,0.15)' : 'rgba(255,107,91,0.15)';
           return (
             <Animated.View key={String(p.id)} entering={FadeInUp.delay(i * 40).duration(300)}>
               <TouchableOpacity activeOpacity={0.7} onPress={() => onPress(p)}>
@@ -1159,33 +1139,79 @@ function ProposalsSection({ proposals, onPress }: { proposals: OrganizationPropo
                   backgroundColor: O_BG_CARD,
                   borderWidth: 1, borderColor: O_LINE,
                   borderRadius: 14,
-                  paddingHorizontal: 14, paddingVertical: 14,
+                  paddingHorizontal: 16, paddingVertical: 14,
                 }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 10 }}>
-                    <Text style={{ fontFamily: SERIF, fontSize: 16, fontWeight: '500', color: O_FG, letterSpacing: -0.1, lineHeight: 20, flex: 1 }}>
-                      {p.title}
-                    </Text>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 3 }}>
-                      <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: statusColor }} />
-                      <Text style={{ fontSize: 12, fontWeight: '500', color: statusColor }}>{statusLabel}</Text>
+                  {/* header: category + time */}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 10 }}>
+                    <View style={{ paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, backgroundColor: 'rgba(234,186,88,0.15)' }}>
+                      <Text style={{ fontSize: 11, fontWeight: '600', color: O_GOLD, letterSpacing: 0.2 }}>
+                        {p.category || 'General'}
+                      </Text>
                     </View>
-                  </View>
-                  {isOpen && total > 0 && (
-                    <View style={{ height: 3, backgroundColor: O_LINE_STRONG, borderRadius: 1.5, marginBottom: 10, overflow: 'hidden' }}>
+                    {!!timeText && (
                       <View style={{
-                        position: 'absolute', top: 0, bottom: 0, left: 0,
-                        width: `${Math.min(100, Math.max(0, pct * 100))}%`,
-                        backgroundColor: O_GOLD,
-                      }} />
-                    </View>
+                        flexDirection: 'row', alignItems: 'center', gap: 4,
+                        paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6,
+                        backgroundColor: timeBg,
+                      }}>
+                        <Ionicons name="time-outline" size={11} color={timeColor} />
+                        <Text style={{ fontSize: 11, fontWeight: '500', color: timeColor }}>
+                          {timeText}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+
+                  {/* title + description */}
+                  <Text numberOfLines={2} style={{
+                    fontFamily: SERIF, fontSize: 17, fontWeight: '500',
+                    color: O_FG, letterSpacing: -0.2, lineHeight: 22, marginBottom: 6,
+                  }}>
+                    {p.title}
+                  </Text>
+                  {!!p.description && (
+                    <Text numberOfLines={3} style={{
+                      fontSize: 13, color: O_FG_MUTED, letterSpacing: -0.05, lineHeight: 18, marginBottom: 12,
+                    }}>
+                      {p.description}
+                    </Text>
                   )}
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                    <Text style={{ fontSize: 12, color: O_FG_MUTED, letterSpacing: -0.05 }}>
-                      <Text style={{ color: O_FG }}>{cast.toLocaleString()}</Text> {cast === 1 ? 'vote' : 'votes'}
-                    </Text>
-                    <Text style={{ fontSize: 12, color: isOpen ? O_GOLD : O_FG_FAINT, letterSpacing: -0.05 }}>
-                      {proposalTime(p, kind)}
-                    </Text>
+
+                  {/* support / oppose split bar */}
+                  <View style={{ height: 4, backgroundColor: O_RED, borderRadius: 2, overflow: 'hidden', marginBottom: 10 }}>
+                    <View style={{
+                      position: 'absolute', top: 0, bottom: 0, left: 0,
+                      width: `${supportPercent}%`,
+                      backgroundColor: O_GREEN,
+                    }} />
+                  </View>
+
+                  {/* vote stats */}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <View style={{
+                        width: 22, height: 22, borderRadius: 11,
+                        backgroundColor: 'rgba(52,199,89,0.15)',
+                        alignItems: 'center', justifyContent: 'center',
+                      }}>
+                        <Ionicons name="thumbs-up" size={11} color={O_GREEN} />
+                      </View>
+                      <Text style={{ fontSize: 12.5, color: O_FG_MUTED, letterSpacing: -0.05 }}>
+                        {(p.supportVotes || 0).toLocaleString()}
+                      </Text>
+                    </View>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <View style={{
+                        width: 22, height: 22, borderRadius: 11,
+                        backgroundColor: 'rgba(255,107,91,0.15)',
+                        alignItems: 'center', justifyContent: 'center',
+                      }}>
+                        <Ionicons name="thumbs-down" size={11} color={O_RED} />
+                      </View>
+                      <Text style={{ fontSize: 12.5, color: O_FG_MUTED, letterSpacing: -0.05 }}>
+                        {(p.opposeVotes || 0).toLocaleString()}
+                      </Text>
+                    </View>
                   </View>
                 </View>
               </TouchableOpacity>
