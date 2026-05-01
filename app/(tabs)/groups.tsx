@@ -101,60 +101,6 @@ function VerifiedTick({ size = 12 }: { size?: number }) {
   );
 }
 
-function RoleInsignia({ role }: { role: 'admin' | 'member' }) {
-  const isAdmin = role === 'admin';
-  const accent = isAdmin ? G_GOLD : G_FG_MUTED;
-  return (
-    <View style={{
-      flexDirection: 'row', alignItems: 'center', gap: 6,
-      paddingHorizontal: 8, paddingVertical: 4,
-      borderWidth: 1, borderColor: isAdmin ? G_GOLD_D : G_LINE_STRONG,
-      backgroundColor: isAdmin ? 'rgba(234,186,88,0.06)' : 'transparent',
-      borderRadius: 3, alignSelf: 'flex-start',
-    }}>
-      <Svg width={11} height={11} viewBox="0 0 12 12">
-        <Circle cx={6} cy={6} r={5.2} fill="none" stroke={accent} strokeWidth={0.5} />
-        <Circle
-          cx={6} cy={6} r={3.5} fill="none" stroke={accent} strokeWidth={0.4}
-          strokeDasharray={isAdmin ? '0' : '0.8 1.6'}
-        />
-        {isAdmin
-          ? <Path d="M3.5 6l1.7 1.8L8.5 4.4" stroke={accent} strokeWidth={0.9} fill="none" strokeLinecap="round" strokeLinejoin="round" />
-          : <Circle cx={6} cy={6} r={1} fill={accent} />
-        }
-      </Svg>
-      <Text style={{
-        fontSize: 9, fontWeight: '600', letterSpacing: 1.6,
-        textTransform: 'uppercase', color: accent,
-      }}>{isAdmin ? 'Admin' : 'Member'}</Text>
-    </View>
-  );
-}
-
-function OrgSigil({ name, logoUrl, tier }: { name: string; logoUrl?: string; tier: Organization['tier'] }) {
-  const isPro = tier === 'professional';
-  const monogram = monogramFromName(name);
-  return (
-    <View style={{
-      width: 56, height: 56,
-      borderWidth: 1, borderColor: isPro ? G_GOLD_D : G_LINE_STRONG,
-      backgroundColor: '#0A0C0F',
-      alignItems: 'center', justifyContent: 'center',
-      position: 'relative', flexShrink: 0,
-    }}>
-      <CornerTicks color={isPro ? G_GOLD : G_FG_FAINT} size={6} weight={1} />
-      {logoUrl ? (
-        <Image source={{ uri: logoUrl }} style={{ width: 44, height: 44 }} resizeMode="contain" />
-      ) : (
-        <Text style={{
-          fontFamily: SERIF, fontSize: 24, fontWeight: '500', fontStyle: 'italic',
-          color: isPro ? G_GOLD_L : G_FG_MUTED, letterSpacing: -0.5,
-        }}>{monogram}</Text>
-      )}
-    </View>
-  );
-}
-
 // ─── header ───────────────────────────────────────────────────────────
 function GHeader({ stat, admins, onAddPress, insetTop }: { stat: number; admins: number; onAddPress: () => void; insetTop: number }) {
   return (
@@ -195,83 +141,85 @@ function GHeader({ stat, admins, onAddPress, insetTop }: { stat: number; admins:
 }
 
 // ─── ORG CARD ─────────────────────────────────────────────────────────
-function OrgCard({ org, onPress, index }: { org: Organization; onPress: () => void; index: number }) {
-  const isPro = org.tier === 'professional';
-  const role: 'admin' | 'member' = org.role === 'admin' ? 'admin' : 'member';
-  const memberLabel = `${(org.memberCount ?? 0).toLocaleString()} ${(org.memberCount ?? 0) === 1 ? 'member' : 'members'}`;
+function OrgLogo({ name, logoUrl, size = 48 }: { name: string; logoUrl?: string; size?: number }) {
+  if (logoUrl) {
+    return (
+      <Image
+        source={{ uri: logoUrl }}
+        style={{ width: size, height: size, borderRadius: 10, backgroundColor: G_BG_RAISED }}
+        resizeMode="cover"
+      />
+    );
+  }
   return (
-    <Animated.View entering={FadeInUp.delay(index * 80).duration(400)}>
-      <TouchableOpacity activeOpacity={0.85} onPress={onPress}>
-        <View style={{
-          position: 'relative',
-          borderRadius: 18,
-          borderWidth: 1, borderColor: isPro ? G_LINE_STRONG : G_LINE,
-          overflow: 'hidden',
-          shadowColor: '#000', shadowOffset: { width: 0, height: 18 },
-          shadowOpacity: 0.4, shadowRadius: 36, elevation: 8,
-        }}>
-          <LinearGradient
-            colors={isPro ? ['#14171C', '#0B0D10'] : ['#10131A', '#0B0D10']}
-            style={StyleSheet.absoluteFill}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 0, y: 1 }}
-          />
-          {isPro && (
-            <LinearGradient
-              colors={['rgba(234,186,88,0.06)', 'transparent']}
-              style={StyleSheet.absoluteFill}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 0.7, y: 0.55 }}
-            />
-          )}
-          {isPro && <Guilloche opacity={0.05} id={`g-${org.id}`} />}
+    <View style={{
+      width: size, height: size, borderRadius: 10,
+      backgroundColor: G_BG_RAISED,
+      borderWidth: 1, borderColor: G_LINE,
+      alignItems: 'center', justifyContent: 'center',
+    }}>
+      <Text style={{
+        fontFamily: SERIF, fontSize: size * 0.46, fontWeight: '500', fontStyle: 'italic',
+        color: G_GOLD_L, letterSpacing: -0.5,
+      }}>
+        {monogramFromName(name)}
+      </Text>
+    </View>
+  );
+}
 
-          {/* main row */}
-          <View style={{
-            paddingHorizontal: 16, paddingTop: 16, paddingBottom: 14,
-            flexDirection: 'row', gap: 14, alignItems: 'flex-start',
-          }}>
-            <OrgSigil name={org.name} logoUrl={org.logoUrl} tier={org.tier} />
-            <View style={{ flex: 1, minWidth: 0 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                <Text
-                  numberOfLines={2}
-                  style={{
-                    flex: 1,
-                    fontFamily: SERIF, fontSize: 18, fontWeight: '500',
-                    color: G_FG, lineHeight: 22, letterSpacing: -0.2,
-                  }}
-                >
-                  {org.name || 'Unnamed organization'}
-                </Text>
-                {org.verified && <VerifiedTick size={13} />}
-              </View>
-              {!!org.description && (
-                <Text
-                  numberOfLines={2}
-                  style={{
-                    fontSize: 12.5, color: G_FG_MUTED,
-                    letterSpacing: -0.05, lineHeight: 17,
-                    marginBottom: 2,
-                  }}
-                >
-                  {org.description}
+function OrgCard({ org, onPress, index }: { org: Organization; onPress: () => void; index: number }) {
+  const isAdmin = org.role === 'admin';
+  const memberCount = org.memberCount ?? 0;
+  const memberLabel = `${memberCount.toLocaleString()} ${memberCount === 1 ? 'member' : 'members'}`;
+  return (
+    <Animated.View entering={FadeInUp.delay(index * 50).duration(280)}>
+      <TouchableOpacity activeOpacity={0.7} onPress={onPress}>
+        <View style={{
+          backgroundColor: G_BG_CARD,
+          borderWidth: 1, borderColor: G_LINE,
+          borderRadius: 14,
+          padding: 14,
+          flexDirection: 'row', gap: 13, alignItems: 'flex-start',
+        }}>
+          <OrgLogo name={org.name} logoUrl={org.logoUrl} size={48} />
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+              <Text
+                numberOfLines={1}
+                style={{
+                  flex: 1,
+                  fontFamily: SERIF, fontSize: 17, fontWeight: '500',
+                  color: G_FG, lineHeight: 21, letterSpacing: -0.2,
+                }}
+              >
+                {org.name || 'Unnamed organization'}
+              </Text>
+              {org.verified && <VerifiedTick size={13} />}
+            </View>
+            {!!org.description && (
+              <Text
+                numberOfLines={2}
+                style={{
+                  fontSize: 12.5, color: G_FG_MUTED,
+                  letterSpacing: -0.05, lineHeight: 17,
+                  marginBottom: 6,
+                }}
+              >
+                {org.description}
+              </Text>
+            )}
+            <Text style={{ fontSize: 12, color: G_FG_FAINT, letterSpacing: -0.05 }}>
+              {memberLabel}
+              {isAdmin && (
+                <Text>
+                  <Text style={{ color: G_FG_FAINT }}>  ·  </Text>
+                  <Text style={{ color: G_GOLD_L, fontWeight: '500' }}>Admin</Text>
                 </Text>
               )}
-            </View>
-          </View>
-
-          {/* footer strip */}
-          <View style={{
-            paddingHorizontal: 16, paddingVertical: 10,
-            borderTopWidth: 1, borderTopColor: G_LINE,
-            flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-          }}>
-            <Text style={{ fontSize: 12, color: G_FG_MUTED, letterSpacing: -0.05 }}>
-              {memberLabel}
             </Text>
-            <RoleInsignia role={role} />
           </View>
+          <Ionicons name="chevron-forward" size={14} color={G_FG_FAINT} style={{ marginTop: 4 }} />
         </View>
       </TouchableOpacity>
     </Animated.View>
