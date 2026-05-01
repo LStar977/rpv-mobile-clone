@@ -1923,9 +1923,24 @@ export default function OrganizationDetailScreen() {
 
   const handleProposalPress = (p: OrganizationProposal) => {
     Haptics.selectionAsync();
+    // The detail screen hydrates from route params (no API fetch on its end),
+    // so we need to pass every field it reads — otherwise title falls back
+    // to "Proposal", description is empty, votes are 0, etc.
     router.push({
       pathname: '/modals/org-proposal-detail',
-      params: { proposalId: String(p.id), orgId: params.orgId },
+      params: {
+        orgId: params.orgId,
+        proposalId: String(p.id),
+        title: p.title || '',
+        description: p.description || '',
+        category: p.category || 'General',
+        supportVotes: String(p.supportVotes ?? 0),
+        opposeVotes: String(p.opposeVotes ?? 0),
+        deadline: p.deadline || '',
+        userVote: (p as any).userVote || '',
+        isOfficial: String((p as any).isOfficial ?? false),
+        orgName: organization?.name || (params.orgName as string) || '',
+      },
     });
   };
 
