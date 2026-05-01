@@ -3495,8 +3495,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       log(`✅ Organization ${orgId} deleted by user ${rid(userId)}`);
       res.json({ success: true });
     } catch (error: any) {
+      // Surface the underlying DB error so the client can show what failed
+      // (FK constraint name, missing column, etc.). Without this, every
+      // failure looks like a generic "Failed to delete organization".
       log(`Error deleting organization: ${error.message}`);
-      res.status(500).json({ error: "Failed to delete organization" });
+      res.status(500).json({ error: `Failed to delete organization: ${error.message || 'unknown error'}` });
     }
   });
 

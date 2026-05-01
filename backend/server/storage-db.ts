@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { users, wallets, votes, proposals, pricingPlans, platformSettings, voteTokenClaims, passportNFTs, ridingVerifications, electoralRidingQRCodes, referralCodes, referrals, organizations, organizationMembers, organizationInviteCodes, organizationAnnouncements } from "@shared/schema";
+import { users, wallets, votes, proposals, proposalOptionAddresses, pricingPlans, platformSettings, voteTokenClaims, passportNFTs, ridingVerifications, electoralRidingQRCodes, referralCodes, referrals, organizations, organizationMembers, organizationInviteCodes, organizationAnnouncements } from "@shared/schema";
 import { eq, and, gte, lt, sql } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { encryptPrivateKey, decryptPrivateKey, isEncrypted } from "./crypto";
@@ -703,10 +703,12 @@ export class DatabaseStorage implements IStorage {
         .where(eq(proposals.organizationId, orgId));
       const proposalIds = orgProposals.map(p => p.id);
 
-      // Delete votes and token claims that reference org proposals (FK deps)
+      // Delete votes, token claims, and option addresses that reference org
+      // proposals (FK deps must go before the proposal rows themselves).
       for (const proposalId of proposalIds) {
         await tx.delete(votes).where(eq(votes.proposalId, proposalId));
         await tx.delete(voteTokenClaims).where(eq(voteTokenClaims.proposalId, proposalId));
+        await tx.delete(proposalOptionAddresses).where(eq(proposalOptionAddresses.proposalId, proposalId));
       }
 
       // Delete org proposals themselves
