@@ -52,27 +52,19 @@ interface OrgInsights {
 }
 
 // ─── helpers ──────────────────────────────────────────────────────────
-function toRoman(num: number): string {
-  const lookup: [number, string][] = [
-    [1000, 'M'], [900, 'CM'], [500, 'D'], [400, 'CD'],
-    [100, 'C'], [90, 'XC'], [50, 'L'], [40, 'XL'],
-    [10, 'X'], [9, 'IX'], [5, 'V'], [4, 'IV'], [1, 'I'],
-  ];
-  let r = ''; let n = num;
-  for (const [v, s] of lookup) while (n >= v) { r += s; n -= v; }
-  return r;
-}
 function formatRomanYM(iso?: string | null): string {
-  if (!iso) return 'MMXXVI';
+  // (legacy name kept for callers; renders short month/year)
+  if (!iso) return '—';
   const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return 'MMXXVI';
-  return `${toRoman(d.getMonth() + 1)}·${toRoman(d.getFullYear())}`;
+  if (Number.isNaN(d.getTime())) return '—';
+  return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short' });
 }
 function formatRomanDate(iso?: string | null): string {
+  // (legacy name kept for callers; renders human date)
   if (!iso) return '';
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '';
-  return `${String(d.getDate()).padStart(2, '0')} · ${toRoman(d.getMonth() + 1)} · ${toRoman(d.getFullYear())}`;
+  return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
 }
 function formatTimeMono(iso?: string | null): string {
   if (!iso) return '';
@@ -246,10 +238,7 @@ function TopBar({ title, isAdmin, onBack, onOverflow, insetTop }: { title: strin
         <Ionicons name="chevron-back" size={14} color={O_FG_MUTED} />
       </TouchableOpacity>
       <View style={{ flex: 1, paddingHorizontal: 12, alignItems: 'center' }}>
-        <Text style={{ fontFamily: MONO, fontSize: 8.5, color: O_FG_FAINT, letterSpacing: 1.8, textTransform: 'uppercase' }}>
-          Section III · Folio
-        </Text>
-        <Text numberOfLines={1} style={{ fontFamily: SERIF, fontSize: 13, fontStyle: 'italic', color: O_FG, letterSpacing: -0.05, marginTop: 1 }}>
+        <Text numberOfLines={1} style={{ fontFamily: SERIF, fontSize: 15, fontStyle: 'italic', color: O_FG, letterSpacing: -0.1 }}>
           {title}
         </Text>
       </View>
@@ -270,15 +259,8 @@ function TopBar({ title, isAdmin, onBack, onOverflow, insetTop }: { title: strin
 // ─── hero ─────────────────────────────────────────────────────────────
 function Hero({ org, proposalCount }: { org: Organization; proposalCount: number }) {
   const isPro = org.tier === 'professional';
-  const folio = folioFromOrg(org.name, org.id);
   const founded = formatRomanYM(org.createdAt);
-  const estYear = (() => {
-    if (!org.createdAt) return 'MMXXVI';
-    const d = new Date(org.createdAt);
-    return Number.isNaN(d.getTime()) ? 'MMXXVI' : toRoman(d.getFullYear());
-  })();
   const role = org.role === 'admin' ? 'Admin' : 'Member';
-  const tierLabel = isPro ? 'PROFESSIONAL · CHARTERED' : 'COMMUNITY · CHARTERED';
 
   return (
     <Animated.View entering={FadeInDown.duration(400)} style={{ paddingHorizontal: 14, marginBottom: 16 }}>
@@ -304,96 +286,49 @@ function Hero({ org, proposalCount }: { org: Organization; proposalCount: number
         )}
         {isPro && <Guilloche opacity={0.05} id={`oh-${org.id}`} />}
 
-        {/* letterhead strip */}
-        <View style={{
-          paddingHorizontal: 16, paddingVertical: 12,
-          flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-          borderBottomWidth: 1, borderBottomColor: O_LINE,
-        }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <Svg width={14} height={14} viewBox="0 0 14 14">
-              <Circle cx={7} cy={7} r={6.4} fill="none" stroke={O_GOLD} strokeWidth={0.4} />
-              <Circle cx={7} cy={7} r={4.4} fill="none" stroke={O_GOLD} strokeWidth={0.4} />
-              <SvgText x="7" y="9.2" textAnchor="middle" fontFamily={SERIF} fontSize="6.5" fontStyle="italic" fill={O_GOLD}>R</SvgText>
-            </Svg>
-            <Text style={{ fontSize: 9, fontWeight: '600', letterSpacing: 2.3, color: O_GOLD }}>
-              REPRESENT · CHARTER FOLIO
-            </Text>
-          </View>
-          <Text style={{ fontFamily: MONO, fontSize: 8.5, color: O_FG_FAINT, letterSpacing: 1 }}>
-            FOLIO·{folio}
-          </Text>
-        </View>
-
         {/* main */}
         <View style={{ padding: 16, paddingBottom: 14, flexDirection: 'row', gap: 14, alignItems: 'flex-start' }}>
           <OrgPortrait name={org.name} logoUrl={org.logoUrl} tier={org.tier} size={72} />
           <View style={{ flex: 1, minWidth: 0, paddingTop: 2 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-              <Eyebrow size={8.5} ls={1.7}>Registered organization</Eyebrow>
-              <TierSeal tier={org.tier} size={28} />
-            </View>
-            <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginBottom: 8 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginBottom: 6 }}>
               <Text style={{
-                fontFamily: SERIF, fontSize: 19, fontWeight: '500',
-                color: O_FG, lineHeight: 22, letterSpacing: -0.2,
+                fontFamily: SERIF, fontSize: 22, fontWeight: '500',
+                color: O_FG, lineHeight: 26, letterSpacing: -0.3,
                 flex: 1,
               }}>{org.name}</Text>
-              {org.verified && <View style={{ marginTop: 4 }}><VerifiedTick size={13} /></View>}
+              {org.verified && <View style={{ marginTop: 6 }}><VerifiedTick size={14} /></View>}
+              <View style={{ marginTop: 2 }}><TierSeal tier={org.tier} size={26} /></View>
             </View>
             {!!org.description && (
-              <Text style={{ fontSize: 11.5, color: O_FG_MUTED, letterSpacing: -0.05, lineHeight: 16 }}>
+              <Text style={{ fontSize: 12.5, color: O_FG_MUTED, letterSpacing: -0.05, lineHeight: 17 }}>
                 {org.description}
               </Text>
             )}
           </View>
         </View>
 
-        {/* register strip */}
+        {/* stats strip */}
         <View style={{ flexDirection: 'row', borderTopWidth: 1, borderTopColor: O_LINE }}>
-          <View style={{ flex: 1, paddingHorizontal: 12, paddingVertical: 11, borderRightWidth: 1, borderRightColor: O_LINE }}>
-            <Eyebrow size={8.5} ls={1.7} style={{ marginBottom: 4 }}>Members</Eyebrow>
-            <Text style={{ fontFamily: SERIF, fontSize: 14, fontStyle: 'italic', fontWeight: '500', color: O_FG, lineHeight: 14 }}>
+          <View style={{ flex: 1, paddingHorizontal: 12, paddingVertical: 12, borderRightWidth: 1, borderRightColor: O_LINE }}>
+            <Text style={{ fontSize: 10.5, color: O_FG_FAINT, letterSpacing: -0.05, marginBottom: 3 }}>Members</Text>
+            <Text style={{ fontFamily: SERIF, fontSize: 16, fontWeight: '500', color: O_FG, lineHeight: 18 }}>
               {(org.memberCount ?? 0).toLocaleString()}
             </Text>
-            <Text style={{ fontFamily: MONO, fontSize: 8.5, color: O_FG_FAINT, letterSpacing: 1, marginTop: 3, textTransform: 'uppercase' }}>
-              REGISTERED
-            </Text>
           </View>
-          <View style={{ flex: 1, paddingHorizontal: 12, paddingVertical: 11, borderRightWidth: 1, borderRightColor: O_LINE }}>
-            <Eyebrow size={8.5} ls={1.7} style={{ marginBottom: 4 }}>Founded</Eyebrow>
-            <Text style={{ fontFamily: SERIF, fontSize: 14, fontStyle: 'italic', fontWeight: '500', color: O_FG, lineHeight: 14 }}>
+          <View style={{ flex: 1, paddingHorizontal: 12, paddingVertical: 12, borderRightWidth: 1, borderRightColor: O_LINE }}>
+            <Text style={{ fontSize: 10.5, color: O_FG_FAINT, letterSpacing: -0.05, marginBottom: 3 }}>Founded</Text>
+            <Text style={{ fontFamily: SERIF, fontSize: 16, fontWeight: '500', color: O_FG, lineHeight: 18 }}>
               {founded}
             </Text>
-            <Text style={{ fontFamily: MONO, fontSize: 8.5, color: O_FG_FAINT, letterSpacing: 1, marginTop: 3, textTransform: 'uppercase' }}>
-              ON THE REGISTER
-            </Text>
           </View>
-          <View style={{ flex: 1, paddingHorizontal: 12, paddingVertical: 11 }}>
-            <Eyebrow size={8.5} ls={1.7} style={{ marginBottom: 4 }}>Charter</Eyebrow>
-            <Text style={{ fontFamily: SERIF, fontSize: 14, fontWeight: '500', color: org.role === 'admin' ? O_GOLD : O_FG, lineHeight: 14 }}>
+          <View style={{ flex: 1, paddingHorizontal: 12, paddingVertical: 12 }}>
+            <Text style={{ fontSize: 10.5, color: O_FG_FAINT, letterSpacing: -0.05, marginBottom: 3 }}>Your role</Text>
+            <Text style={{ fontFamily: SERIF, fontSize: 16, fontWeight: '500', color: org.role === 'admin' ? O_GOLD : O_FG, lineHeight: 18 }}>
               {role}
-            </Text>
-            <Text style={{ fontFamily: MONO, fontSize: 8.5, color: O_FG_FAINT, letterSpacing: 1, marginTop: 3, textTransform: 'uppercase' }}>
-              YOUR STANDING
             </Text>
           </View>
         </View>
 
-        {/* MRZ-ish footer */}
-        <View style={{
-          paddingHorizontal: 14, paddingVertical: 8,
-          borderTopWidth: 1, borderTopColor: O_LINE,
-          backgroundColor: 'rgba(0,0,0,0.3)',
-          flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-        }}>
-          <Text style={{ fontFamily: MONO, fontSize: 8.5, color: O_FG_MUTED, letterSpacing: 1.4 }}>
-            {tierLabel}
-          </Text>
-          <Text style={{ fontFamily: MONO, fontSize: 8.5, color: O_FG_MUTED, letterSpacing: 1.4 }}>
-            EST {estYear}
-          </Text>
-        </View>
       </View>
     </Animated.View>
   );
@@ -406,7 +341,7 @@ function SectionTabs({ active, onChange, isAdmin, hasSubOrgs }: { active: TabTyp
     { key: 'announcements', label: 'Announcements' },
     { key: 'members',       label: 'Members' },
   ];
-  if (hasSubOrgs) tabs.push({ key: 'subOrders', label: 'Sub-orders' });
+  if (hasSubOrgs) tabs.push({ key: 'subOrders', label: 'Chapters' });
   if (isAdmin) {
     tabs.push({ key: 'insights', label: 'Insights' });
     tabs.push({ key: 'settings', label: 'Settings' });
@@ -491,7 +426,7 @@ function proposalTime(p: OrganizationProposal, kind: ProposalKind): string {
     return `${String(h).padStart(2,'0')}H ${String(m).padStart(2,'0')}M`;
   }
   const seal = p.deadline || p.createdAt;
-  if (seal) return `SEALED ${formatRomanYM(seal)}`;
+  if (seal) return `Closed ${formatRomanYM(seal)}`;
   return '';
 }
 
@@ -534,13 +469,10 @@ function ProposalsEmpty() {
           </Svg>
         </View>
         <Text style={{ fontFamily: SERIF, fontSize: 19, fontWeight: '500', color: O_FG, fontStyle: 'italic', letterSpacing: -0.05, marginBottom: 6 }}>
-          No proposals on the docket
+          No proposals yet
         </Text>
-        <Text style={{ fontSize: 12, color: O_FG_MUTED, lineHeight: 17, textAlign: 'center', maxWidth: 260, marginBottom: 14 }}>
-          The register stands open. The first motion put before this assembly will be inscribed here.
-        </Text>
-        <Text style={{ fontFamily: MONO, fontSize: 8.5, color: O_FG_FAINT, letterSpacing: 2, textTransform: 'uppercase' }}>
-          FOLIO · P·000 / 26 · UNMARKED
+        <Text style={{ fontSize: 13, color: O_FG_MUTED, lineHeight: 18, textAlign: 'center', maxWidth: 260 }}>
+          The first proposal from your group will appear here.
         </Text>
       </View>
     </View>
@@ -611,9 +543,9 @@ function SettingsSection({
         <CornerTicks color={O_GOLD_D} size={9} weight={1} />
         <View style={{ paddingHorizontal: 16, paddingTop: 14, paddingBottom: 18 }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 10 }}>
-            <Eyebrow size={9} ls={2.2} color={O_GOLD}>Active letter of invitation</Eyebrow>
+            <Text style={{ fontSize: 11, color: O_GOLD, letterSpacing: -0.05, fontWeight: '500' }}>Active invite code</Text>
             {expRoman && (
-              <Text style={{ fontFamily: MONO, fontSize: 8.5, color: O_FG_FAINT, letterSpacing: 1.4 }}>EXP · {expRoman}</Text>
+              <Text style={{ fontSize: 11, color: O_FG_FAINT, letterSpacing: -0.05 }}>Expires {expRoman}</Text>
             )}
           </View>
           <Text style={{
@@ -623,9 +555,8 @@ function SettingsSection({
             textShadowColor: 'rgba(234,186,88,0.4)', textShadowRadius: 12,
           }}>{codeText.replace(/(.{4})/g, '$1·').replace(/·$/, '')}</Text>
           <Text style={{
-            fontFamily: SERIF, fontSize: 11, fontStyle: 'italic',
-            color: O_FG_FAINT, textAlign: 'center', marginBottom: 12,
-          }}>Bearer of this code shall be enrolled as a member.</Text>
+            fontSize: 12, color: O_FG_FAINT, textAlign: 'center', marginBottom: 12, lineHeight: 17,
+          }}>Anyone with this code can join your organization.</Text>
           <View style={{ flexDirection: 'row', gap: 8 }}>
             <TouchableOpacity activeOpacity={0.75} onPress={() => onCopy(codeText)} style={{
               flex: 1, paddingVertical: 10,
@@ -635,7 +566,7 @@ function SettingsSection({
               flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
             }}>
               <Ionicons name="checkmark" size={11} color={O_GOLD} />
-              <Text style={{ fontSize: 9.5, fontWeight: '600', letterSpacing: 2, textTransform: 'uppercase', color: O_GOLD }}>Copy</Text>
+              <Text style={{ fontSize: 13, fontWeight: '600', color: O_GOLD }}>Copy</Text>
             </TouchableOpacity>
             <TouchableOpacity activeOpacity={0.75} onPress={onGenerate} disabled={generating} style={{
               flex: 1, paddingVertical: 10,
@@ -646,13 +577,13 @@ function SettingsSection({
             }}>
               {generating
                 ? <ActivityIndicator size="small" color={O_FG_MUTED} />
-                : <Text style={{ fontSize: 9.5, fontWeight: '600', letterSpacing: 2, textTransform: 'uppercase', color: O_FG_MUTED }}>Generate new</Text>
+                : <Text style={{ fontSize: 13, fontWeight: '600', color: O_FG_MUTED }}>New code</Text>
               }
             </TouchableOpacity>
           </View>
           {activeCode?.code && (
             <TouchableOpacity onPress={() => onRevoke(codeText)} style={{ marginTop: 10, alignSelf: 'center' }}>
-              <Text style={{ fontFamily: MONO, fontSize: 8.5, color: O_FG_FAINT, letterSpacing: 1.6, textTransform: 'uppercase', textDecorationLine: 'underline' }}>
+              <Text style={{ fontSize: 12, color: O_FG_FAINT, letterSpacing: -0.05, textDecorationLine: 'underline' }}>
                 Revoke this code
               </Text>
             </TouchableOpacity>
@@ -660,38 +591,38 @@ function SettingsSection({
         </View>
       </View>
 
-      {/* Articles of charter */}
+      {/* Organization details */}
       <View style={{ backgroundColor: O_BG_CARD, borderWidth: 1, borderColor: O_LINE, borderRadius: 12, overflow: 'hidden', marginBottom: 14 }}>
         <View style={{ paddingHorizontal: 14, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: O_LINE, backgroundColor: 'rgba(0,0,0,0.2)' }}>
-          <Eyebrow size={8.5} ls={1.7} color={O_GOLD_D}>Articles of charter</Eyebrow>
+          <Text style={{ fontSize: 11, color: O_FG_MUTED, letterSpacing: -0.05, fontWeight: '600' }}>Organization details</Text>
         </View>
-        <SettingsRow label="Organization name" value={org.name} />
+        <SettingsRow label="Name" value={org.name} />
         <SettingsRow label="Description" value={org.description || '—'} />
         <SettingsRow
           label="Verification"
-          value={org.verified ? `Verified · attested ${formatRomanYM(org.createdAt)}` : 'Pending verification'}
+          value={org.verified ? `Verified ${formatRomanYM(org.createdAt)}` : 'Not verified'}
           gold={org.verified}
         />
-        <SettingsRow label="Charter tier" value={tierText} gold={org.tier === 'professional'} />
+        <SettingsRow label="Plan" value={tierText} gold={org.tier === 'professional'} />
       </View>
 
-      {/* Membership & roles */}
+      {/* Members & roles */}
       <View style={{ backgroundColor: O_BG_CARD, borderWidth: 1, borderColor: O_LINE, borderRadius: 12, overflow: 'hidden', marginBottom: 14 }}>
         <View style={{ paddingHorizontal: 14, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: O_LINE, backgroundColor: 'rgba(0,0,0,0.2)' }}>
-          <Eyebrow size={8.5} ls={1.7} color={O_GOLD_D}>Membership & roles</Eyebrow>
+          <Text style={{ fontSize: 11, color: O_FG_MUTED, letterSpacing: -0.05, fontWeight: '600' }}>Members & roles</Text>
         </View>
-        <SettingsRow label="Members on roll" value={(org.memberCount ?? 0).toLocaleString()} mono />
-        <SettingsRow label="Active invite codes" value={`${inviteCodes.filter((c) => !c.revokedAt).length} on issue`} mono />
+        <SettingsRow label="Total members" value={(org.memberCount ?? 0).toLocaleString()} mono />
+        <SettingsRow label="Active invite codes" value={`${inviteCodes.filter((c) => !c.revokedAt).length}`} mono />
       </View>
 
-      {/* Danger zone */}
+      {/* Manage */}
       <View style={{ backgroundColor: O_BG_CARD, borderWidth: 1, borderColor: O_LINE, borderRadius: 12, overflow: 'hidden', marginBottom: 14 }}>
         <View style={{ paddingHorizontal: 14, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: O_LINE, backgroundColor: 'rgba(0,0,0,0.2)' }}>
-          <Eyebrow size={8.5} ls={1.7} color={O_RED}>Resignation & dissolution</Eyebrow>
+          <Text style={{ fontSize: 11, color: O_RED, letterSpacing: -0.05, fontWeight: '600' }}>Manage</Text>
         </View>
-        <SettingsRow label="Leave organization" value="Withdraw your name from the rolls" onPress={onLeave} />
+        <SettingsRow label="Leave" value="Leave this organization" onPress={onLeave} />
         {canDelete && (
-          <SettingsRow label="Delete charter" value="Permanently dissolve this organization" onPress={onDelete} />
+          <SettingsRow label="Delete" value="Delete this organization permanently" onPress={onDelete} />
         )}
       </View>
     </View>
@@ -743,7 +674,7 @@ function InsightsSection({ insights, subOrgs, loading, sealedAt }: { insights: O
     return (
       <View style={{ paddingHorizontal: 14, paddingVertical: 24, alignItems: 'center' }}>
         <Text style={{ fontFamily: SERIF, fontSize: 14, fontStyle: 'italic', color: O_FG_MUTED }}>
-          No attestation has been recorded yet
+          No data yet
         </Text>
       </View>
     );
@@ -769,10 +700,10 @@ function InsightsSection({ insights, subOrgs, loading, sealedAt }: { insights: O
   const ringFilled = (participationPct / 100) * circ;
 
   const wardData = (insights.subOrgs && insights.subOrgs.length > 0 ? insights.subOrgs : subOrgs)
-    .map((s: any, idx: number) => {
+    .map((s: any) => {
       const n = (s.memberCount ?? s.members ?? 0) as number;
       const pct = totalMembers > 0 ? (n / totalMembers) * 100 : 0;
-      return { ward: `${toRoman(idx + 1)} · ${s.name || 'Chapter'}`, n, pct };
+      return { ward: s.name || 'Chapter', n, pct };
     })
     .filter((w: any) => w.n > 0)
     .slice(0, 5);
@@ -780,43 +711,42 @@ function InsightsSection({ insights, subOrgs, loading, sealedAt }: { insights: O
 
   return (
     <View style={{ paddingHorizontal: 14 }}>
-      {/* attestation header */}
+      {/* summary header */}
       <View style={{
         position: 'relative', marginBottom: 14,
         paddingHorizontal: 14, paddingVertical: 11,
-        borderWidth: 1, borderColor: O_LINE_STRONG, borderRadius: 4,
+        borderWidth: 1, borderColor: O_LINE_STRONG, borderRadius: 8,
         flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
       }}>
         <LinearGradient colors={['rgba(234,186,88,0.04)', 'transparent']} style={StyleSheet.absoluteFill} start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }} />
-        <CornerTicks color={O_GOLD_D} size={5} weight={0.8} />
         <View>
-          <Eyebrow size={8.5} ls={2} color={O_GOLD}>Quarterly attestation</Eyebrow>
-          <Text style={{ fontFamily: SERIF, fontSize: 13, fontStyle: 'italic', fontWeight: '500', color: O_FG, marginTop: 2 }}>
-            {quarter} · {toRoman(new Date().getFullYear())}
+          <Text style={{ fontSize: 11, color: O_GOLD, letterSpacing: -0.05, marginBottom: 2 }}>This quarter</Text>
+          <Text style={{ fontFamily: SERIF, fontSize: 14, fontStyle: 'italic', fontWeight: '500', color: O_FG }}>
+            {quarter} {new Date().getFullYear()}
           </Text>
         </View>
         <View style={{ alignItems: 'flex-end' }}>
-          <Text style={{ fontFamily: MONO, fontSize: 8.5, color: O_FG_FAINT, letterSpacing: 1.4 }}>SEALED</Text>
-          <Text style={{ fontFamily: MONO, fontSize: 8.5, color: O_FG_FAINT, letterSpacing: 1.4 }}>{sealedRoman || formatRomanDate(new Date().toISOString())}</Text>
+          <Text style={{ fontSize: 10.5, color: O_FG_FAINT, letterSpacing: -0.05 }}>Updated</Text>
+          <Text style={{ fontSize: 11, color: O_FG_MUTED, letterSpacing: -0.05 }}>{sealedRoman || formatRomanDate(new Date().toISOString())}</Text>
         </View>
       </View>
 
-      {/* member activity feature chart */}
+      {/* recent activity chart */}
       <View style={{
         backgroundColor: O_BG_CARD, borderWidth: 1, borderColor: O_LINE,
         borderRadius: 12, padding: 14, paddingBottom: 16, marginBottom: 12,
       }}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 }}>
-          <Eyebrow size={9}>Activity on the registry</Eyebrow>
-          <Text style={{ fontFamily: MONO, fontSize: 8.5, color: O_FG_FAINT, letterSpacing: 1.4 }}>
-            {insights.periodDays}D · TRAILING
+          <Text style={{ fontSize: 11, color: O_FG_MUTED, letterSpacing: -0.05 }}>Recent activity</Text>
+          <Text style={{ fontSize: 11, color: O_FG_FAINT, letterSpacing: -0.05 }}>
+            Last {insights.periodDays} days
           </Text>
         </View>
         <Text style={{ fontFamily: SERIF, fontSize: 36, fontStyle: 'italic', fontWeight: '500', color: O_FG, letterSpacing: -1, lineHeight: 36, marginBottom: 4 }}>
           {totalVotes.toLocaleString()}
         </Text>
-        <Text style={{ fontFamily: MONO, fontSize: 9, color: O_FG_FAINT, letterSpacing: 1.4, marginBottom: 12 }}>
-          {(insights.totalProposals || 0).toLocaleString()} MOTIONS · {(insights.totalMembers || 0).toLocaleString()} ON ROLLS
+        <Text style={{ fontSize: 11, color: O_FG_FAINT, letterSpacing: -0.05, marginBottom: 12 }}>
+          {(insights.totalProposals || 0).toLocaleString()} proposals · {(insights.totalMembers || 0).toLocaleString()} {insights.totalMembers === 1 ? 'member' : 'members'}
         </Text>
         {series.length > 0 ? (
           <>
@@ -842,7 +772,7 @@ function InsightsSection({ insights, subOrgs, loading, sealedAt }: { insights: O
           flex: 1, backgroundColor: O_BG_CARD, borderWidth: 1, borderColor: O_LINE,
           borderRadius: 10, padding: 12,
         }}>
-          <Eyebrow size={8.5}>Vote participation</Eyebrow>
+          <Text style={{ fontSize: 11, color: O_FG_MUTED, letterSpacing: -0.05 }}>Participation</Text>
           <Text style={{ fontFamily: SERIF, fontSize: 26, fontStyle: 'italic', fontWeight: '500', color: O_FG, letterSpacing: -0.5, lineHeight: 26, marginTop: 6 }}>
             {participationDisplay.split('.')[0]}
             <Text style={{ fontSize: 16, color: O_FG_FAINT }}>.{participationDisplay.split('.')[1] || '0'}%</Text>
@@ -860,20 +790,20 @@ function InsightsSection({ insights, subOrgs, loading, sealedAt }: { insights: O
               <Circle cx={28} cy={28} r={17} fill="none" stroke={O_GOLD_D} strokeWidth={0.4} strokeDasharray="1 2" />
             </Svg>
           </View>
-          <Text style={{ fontFamily: MONO, fontSize: 8, color: O_FG_FAINT, letterSpacing: 1.4, textAlign: 'center', marginTop: 6 }}>
-            {totalVotes} / {totalMembers} MEMBERS
+          <Text style={{ fontSize: 11, color: O_FG_FAINT, letterSpacing: -0.05, textAlign: 'center', marginTop: 6 }}>
+            {totalVotes} of {totalMembers} {totalMembers === 1 ? 'member' : 'members'}
           </Text>
         </View>
         <View style={{
           flex: 1, backgroundColor: O_BG_CARD, borderWidth: 1, borderColor: O_LINE,
           borderRadius: 10, padding: 12,
         }}>
-          <Eyebrow size={8.5}>Quorum threshold</Eyebrow>
+          <Text style={{ fontSize: 11, color: O_FG_MUTED, letterSpacing: -0.05 }}>Quorum</Text>
           <Text style={{ fontFamily: SERIF, fontSize: 26, fontStyle: 'italic', fontWeight: '500', color: quorumMet ? O_GREEN : O_FG_MUTED, letterSpacing: -0.5, lineHeight: 26, marginTop: 6 }}>
             {quorumMet ? 'Met' : 'Below'}
           </Text>
-          <Text style={{ fontFamily: MONO, fontSize: 8.5, color: O_FG_MUTED, letterSpacing: 1.2, marginTop: 4 }}>
-            {quorumThreshold} REQUIRED
+          <Text style={{ fontSize: 11, color: O_FG_MUTED, letterSpacing: -0.05, marginTop: 4 }}>
+            {quorumThreshold} required
           </Text>
           <View style={{ marginTop: 12, height: 6, backgroundColor: O_LINE_STRONG, borderRadius: 1, overflow: 'hidden', position: 'relative' }}>
             <View style={{
@@ -887,9 +817,9 @@ function InsightsSection({ insights, subOrgs, loading, sealedAt }: { insights: O
             }} />
           </View>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 }}>
-            <Text style={{ fontFamily: MONO, fontSize: 8, color: O_FG_FAINT, letterSpacing: 1 }}>0%</Text>
-            <Text style={{ fontFamily: MONO, fontSize: 8, color: quorumMet ? O_GREEN : O_FG_FAINT, letterSpacing: 1 }}>50% QUORUM</Text>
-            <Text style={{ fontFamily: MONO, fontSize: 8, color: O_FG_FAINT, letterSpacing: 1 }}>100%</Text>
+            <Text style={{ fontSize: 9, color: O_FG_FAINT }}>0%</Text>
+            <Text style={{ fontSize: 9, color: quorumMet ? O_GREEN : O_FG_FAINT }}>50% needed</Text>
+            <Text style={{ fontSize: 9, color: O_FG_FAINT }}>100%</Text>
           </View>
         </View>
       </View>
@@ -901,7 +831,7 @@ function InsightsSection({ insights, subOrgs, loading, sealedAt }: { insights: O
           borderRadius: 10, paddingHorizontal: 14, paddingTop: 12, paddingBottom: 8, marginBottom: 12,
         }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 }}>
-            <Eyebrow size={8.5}>Distribution by chapter</Eyebrow>
+            <Text style={{ fontSize: 11, color: O_FG_MUTED, letterSpacing: -0.05 }}>Members by chapter</Text>
             <Text style={{ fontFamily: MONO, fontSize: 8, color: O_FG_FAINT, letterSpacing: 1.4 }}>
               {String(wardData.length).padStart(2, '0')} OF {String(subOrgs.length || wardData.length).padStart(2, '0')}
             </Text>
@@ -947,11 +877,8 @@ function SubOrdersSection({ subOrgs, totalMembers, onPress, onLongPress, isAdmin
   return (
     <View style={{ paddingHorizontal: 14 }}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 10 }}>
-        <Eyebrow size={9.5} ls={2}>
-          {String(subOrgs.length).padStart(2, '0')} chapter{subOrgs.length === 1 ? '' : 's'} · {totalMembers.toLocaleString()} total
-        </Eyebrow>
-        <Text style={{ fontFamily: MONO, fontSize: 9, color: O_FG_FAINT, letterSpacing: 1 }}>
-          SHOWING {String(subOrgs.length).padStart(2, '0')}
+        <Text style={{ fontSize: 13, color: O_FG_MUTED, letterSpacing: -0.05 }}>
+          {subOrgs.length} {subOrgs.length === 1 ? 'chapter' : 'chapters'} · {totalMembers.toLocaleString()} total members
         </Text>
       </View>
       <View style={{ gap: 8 }}>
@@ -992,12 +919,12 @@ function SubOrdersSection({ subOrgs, totalMembers, onPress, onLongPress, isAdmin
                   color: O_FG, letterSpacing: -0.05, lineHeight: 16, marginBottom: 3,
                 }}>{c.name || 'Untitled chapter'}</Text>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <Text style={{ fontFamily: MONO, fontSize: 8.5, color: O_FG_FAINT, letterSpacing: 1.4 }}>
-                    <Text style={{ color: O_FG_MUTED }}>{memberCount}</Text> MEMBERS
+                  <Text style={{ fontSize: 11, color: O_FG_FAINT, letterSpacing: -0.05 }}>
+                    <Text style={{ color: O_FG_MUTED }}>{memberCount}</Text> {memberCount === 1 ? 'member' : 'members'}
                   </Text>
                   <View style={{ width: 2, height: 2, borderRadius: 1, backgroundColor: O_FG_FAINT }} />
-                  <Text style={{ fontFamily: MONO, fontSize: 8.5, color: O_FG_FAINT, letterSpacing: 1.4 }}>
-                    EST {founded}
+                  <Text style={{ fontSize: 11, color: O_FG_FAINT, letterSpacing: -0.05 }}>
+                    Founded {founded}
                   </Text>
                 </View>
               </View>
@@ -1052,12 +979,12 @@ function MembersSection({ members, totalCount, search, onSearch, isAdmin, onMemb
             </Svg>
           </View>
           <TextInput
-            style={{ flex: 1, fontFamily: MONO, fontSize: 11, color: O_FG, letterSpacing: 1.4, paddingVertical: 0 }}
-            placeholder="SEARCH THE REGISTRY"
+            style={{ flex: 1, fontSize: 13, color: O_FG, paddingVertical: 0 }}
+            placeholder="Search members"
             placeholderTextColor={O_FG_FAINT}
             value={search}
             onChangeText={onSearch}
-            autoCapitalize="characters"
+            autoCapitalize="none"
             autoCorrect={false}
           />
           <Text style={{ fontFamily: MONO, fontSize: 9, color: O_FG_FAINT, letterSpacing: 1.7 }}>
@@ -1069,10 +996,10 @@ function MembersSection({ members, totalCount, search, onSearch, isAdmin, onMemb
       {!showList ? (
         <View style={{ paddingHorizontal: 14, paddingVertical: 24, alignItems: 'center' }}>
           <Text style={{ fontFamily: SERIF, fontSize: 15, fontStyle: 'italic', color: O_FG_MUTED, textAlign: 'center', marginBottom: 6 }}>
-            {isAdmin ? 'The registry stands empty' : 'Member registry visible to admins only'}
+            {isAdmin ? 'No members yet' : 'Member list visible to admins only'}
           </Text>
-          <Text style={{ fontFamily: MONO, fontSize: 9, color: O_FG_FAINT, letterSpacing: 1.4, textAlign: 'center', textTransform: 'uppercase' }}>
-            {totalCount > 0 ? `${totalCount} on the rolls` : 'Awaiting first inscription'}
+          <Text style={{ fontSize: 12, color: O_FG_FAINT, textAlign: 'center' }}>
+            {totalCount > 0 ? `${totalCount.toLocaleString()} ${totalCount === 1 ? 'member' : 'members'}` : ''}
           </Text>
         </View>
       ) : (
@@ -1126,8 +1053,8 @@ function MembersSection({ members, totalCount, search, onSearch, isAdmin, onMemb
                     <Text numberOfLines={1} style={{ fontFamily: SERIF, fontSize: 14, fontWeight: '500', color: O_FG, letterSpacing: -0.05, lineHeight: 16 }}>
                       {fullName}
                     </Text>
-                    <Text style={{ fontFamily: MONO, fontSize: 8.5, color: O_FG_FAINT, letterSpacing: 1.4, marginTop: 2 }}>
-                      JOINED · {joined}
+                    <Text style={{ fontSize: 11, color: O_FG_FAINT, letterSpacing: -0.05, marginTop: 2 }}>
+                      Joined {joined}
                     </Text>
                   </View>
                   <Text style={{ fontSize: 8.5, fontWeight: '600', letterSpacing: 1.7, color: roleColor }}>
@@ -1156,10 +1083,10 @@ function AnnouncementsEmpty() {
         <LinearGradient colors={['#0E1116', '#0A0C0F']} style={StyleSheet.absoluteFill} />
         <CornerTicks color={O_GOLD_D} size={10} weight={1} />
         <Text style={{ fontFamily: SERIF, fontSize: 18, fontStyle: 'italic', color: O_FG, marginBottom: 6 }}>
-          No dispatches yet
+          No announcements yet
         </Text>
-        <Text style={{ fontSize: 12, color: O_FG_MUTED, textAlign: 'center', maxWidth: 240, lineHeight: 17 }}>
-          The registrar's quill awaits the first dispatch to the membership.
+        <Text style={{ fontSize: 13, color: O_FG_MUTED, textAlign: 'center', maxWidth: 240, lineHeight: 18 }}>
+          Updates from admins will appear here.
         </Text>
       </View>
     </View>
@@ -1172,10 +1099,10 @@ function AnnouncementsSection({ announcements, isAdmin, onDelete }: { announceme
     <View style={{ paddingHorizontal: 14 }}>
       {announcements.map((d, i) => {
         const date = d.createdAt || d.created_at || d.publishedAt;
-        const headline = d.title || d.headline || 'Untitled dispatch';
+        const headline = d.title || d.headline || 'Untitled announcement';
         const body = d.content || d.body || '';
         const author = d.authorName || d.author?.name || d.signedBy || '';
-        const role = d.authorRole || (d.pinned ? 'Chief steward' : 'Registrar');
+        const role = d.authorRole || 'Admin';
         const isMostRecent = i === 0;
         return (
           <View key={String(d.id || i)} style={{
@@ -1202,7 +1129,7 @@ function AnnouncementsSection({ announcements, isAdmin, onDelete }: { announceme
                 </Text>
               )}
               {d.pinned && (
-                <Text style={{ fontFamily: MONO, fontSize: 8, color: O_GOLD_L, letterSpacing: 1.4 }}>· PINNED</Text>
+                <Text style={{ fontSize: 10, color: O_GOLD_L, letterSpacing: -0.05 }}>· Pinned</Text>
               )}
             </View>
             <Text style={{
@@ -1215,7 +1142,7 @@ function AnnouncementsSection({ announcements, isAdmin, onDelete }: { announceme
               </Text>
             )}
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-              <Text style={{ fontFamily: MONO, fontSize: 8.5, color: O_FG_FAINT, letterSpacing: 1.6, textTransform: 'uppercase' }}>
+              <Text style={{ fontSize: 11, color: O_FG_FAINT, letterSpacing: -0.05 }}>
                 — {author ? `${author} · ${role}` : role}
               </Text>
               {isAdmin && d.id && (
@@ -1359,10 +1286,10 @@ function InviteCodeModal({ visible, onClose, onConfirm, generating }: { visible:
             <Circle cx={7} cy={7} r={6.4} fill="none" stroke={O_GOLD} strokeWidth={0.5} />
             <Path d="M7 3v8M3 7h8" stroke={O_GOLD} strokeWidth={0.6} fill="none" />
           </Svg>
-          <Eyebrow size={9} ls={2.4} color={O_GOLD}>Issue letter of invitation</Eyebrow>
+          <Text style={{ fontSize: 12, color: O_GOLD, letterSpacing: -0.05, fontWeight: '600' }}>New invite code</Text>
         </View>
-        <Text style={{ fontFamily: SERIF, fontSize: 19, fontStyle: 'italic', fontWeight: '500', color: O_FG, letterSpacing: -0.05, marginBottom: 16 }}>
-          A new bearer-code, sealed by your hand
+        <Text style={{ fontSize: 13, color: O_FG_MUTED, lineHeight: 19, marginBottom: 16, maxWidth: 320 }}>
+          Anyone with this code can join your organization.
         </Text>
 
         <View style={{
@@ -1377,19 +1304,19 @@ function InviteCodeModal({ visible, onClose, onConfirm, generating }: { visible:
             start={{ x: 0.5, y: 0.2 }} end={{ x: 0.5, y: 0.8 }}
           />
           <CornerTicks color={O_GOLD} size={6} weight={1} />
-          <Text style={{ fontFamily: MONO, fontSize: 8, color: O_FG_FAINT, letterSpacing: 2.2, marginBottom: 8 }}>
-            NEW · UNUSED · BEARER CODE
+          <Text style={{ fontSize: 11, color: O_FG_FAINT, letterSpacing: -0.05, marginBottom: 8 }}>
+            Your new code
           </Text>
           <Text style={{
             fontFamily: MONO, fontSize: 22, fontWeight: '500',
             color: O_GOLD_L, letterSpacing: 4,
             textShadowColor: 'rgba(234,186,88,0.45)', textShadowRadius: 14,
           }}>
-            {generating ? 'GENERATING...' : 'TO BE ISSUED'}
+            {generating ? 'Generating…' : 'Tap below to create'}
           </Text>
         </View>
 
-        <Eyebrow size={8.5} style={{ marginBottom: 8 }}>Validity period</Eyebrow>
+        <Text style={{ fontSize: 11, color: O_FG_MUTED, letterSpacing: -0.05, fontWeight: '600', marginBottom: 8 }}>Expires after</Text>
         <View style={{ flexDirection: 'row', gap: 6, marginBottom: 14 }}>
           {(['24h', '07d', '30d', '90d'] as const).map((p) => (
             <TouchableOpacity
@@ -1410,14 +1337,14 @@ function InviteCodeModal({ visible, onClose, onConfirm, generating }: { visible:
           ))}
         </View>
 
-        <Eyebrow size={8.5} style={{ marginBottom: 8 }}>Single use</Eyebrow>
+        <Text style={{ fontSize: 11, color: O_FG_MUTED, letterSpacing: -0.05, fontWeight: '600', marginBottom: 8 }}>Single use</Text>
         <View style={{
           paddingHorizontal: 12, paddingVertical: 11,
-          borderWidth: 1, borderColor: O_LINE_STRONG, borderRadius: 3,
+          borderWidth: 1, borderColor: O_LINE_STRONG, borderRadius: 6,
           flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16,
         }}>
-          <Text style={{ fontFamily: SERIF, fontSize: 13, fontStyle: 'italic', fontWeight: '500', color: O_FG }}>
-            One bearer only
+          <Text style={{ fontSize: 14, color: O_FG }}>
+            One person only
           </Text>
           <Switch
             value={singleUse}
@@ -1454,7 +1381,7 @@ function InviteCodeModal({ visible, onClose, onConfirm, generating }: { visible:
               <ActivityIndicator size="small" color={O_GOLD_L} />
             ) : (
               <Text style={{ fontSize: 10, fontWeight: '700', letterSpacing: 2.2, textTransform: 'uppercase', color: O_GOLD_L }}>
-                Affix seal · Issue
+                Generate code
               </Text>
             )}
           </TouchableOpacity>
@@ -1477,8 +1404,8 @@ function MemberRoleModal({ visible, onClose, member, onConfirm }: { visible: boo
   const joined = formatRomanYM(member.joinedAt || member.createdAt || member.created_at);
 
   const options: Array<{ role: 'admin' | 'member'; label: string; desc: string }> = [
-    { role: 'admin',  label: 'Admin',  desc: 'Bears the seal · may post dispatches and amend the charter' },
-    { role: 'member', label: 'Member', desc: 'Holds the franchise to vote on motions before the assembly' },
+    { role: 'admin',  label: 'Admin',  desc: 'Can manage members, post announcements, and edit settings' },
+    { role: 'member', label: 'Member', desc: 'Can vote on proposals and view announcements' },
   ];
 
   return (
@@ -1502,17 +1429,17 @@ function MemberRoleModal({ visible, onClose, member, onConfirm }: { visible: boo
             <Text style={{ fontFamily: SERIF, fontSize: 16, fontStyle: 'italic', color: O_GOLD_L }}>{monogram}</Text>
           </View>
           <View style={{ flex: 1, minWidth: 0 }}>
-            <Eyebrow size={8} color={O_FG_FAINT}>Editing membership</Eyebrow>
+            <Text style={{ fontSize: 11, color: O_FG_FAINT, letterSpacing: -0.05 }}>Edit role</Text>
             <Text style={{ fontFamily: SERIF, fontSize: 16, fontWeight: '500', color: O_FG, fontStyle: 'italic', letterSpacing: -0.05, marginTop: 2 }}>
               {fullName}
             </Text>
-            <Text style={{ fontFamily: MONO, fontSize: 8.5, color: O_FG_FAINT, letterSpacing: 1.5, marginTop: 1 }}>
-              FOLIO·{folio} · JOINED {joined}
+            <Text style={{ fontSize: 11, color: O_FG_FAINT, letterSpacing: -0.05, marginTop: 1 }}>
+              Joined {joined}
             </Text>
           </View>
         </View>
 
-        <Eyebrow size={9} style={{ marginBottom: 10 }}>Assign role on the registry</Eyebrow>
+        <Text style={{ fontSize: 11, color: O_FG_MUTED, letterSpacing: -0.05, fontWeight: '600', marginBottom: 10 }}>Choose a role</Text>
         <View style={{ gap: 8, marginBottom: 16 }}>
           {options.map((opt) => {
             const active = selected === opt.role;
@@ -1578,7 +1505,7 @@ function MemberRoleModal({ visible, onClose, member, onConfirm }: { visible: boo
           >
             <CornerTicks color={O_GOLD} size={4} weight={0.8} />
             <Text style={{ fontSize: 10, fontWeight: '700', letterSpacing: 2.2, textTransform: 'uppercase', color: O_GOLD_L }}>
-              Inscribe & seal
+              Save changes
             </Text>
           </TouchableOpacity>
         </View>
@@ -2066,7 +1993,7 @@ export default function OrganizationDetailScreen() {
       <View style={[styles.container, { backgroundColor: O_BG, alignItems: 'center', justifyContent: 'center' }]}>
         <ActivityIndicator size="small" color={O_GOLD} />
         <Text style={{ fontFamily: MONO, fontSize: 10, color: O_FG_FAINT, letterSpacing: 1.4, marginTop: 12, textTransform: 'uppercase' }}>
-          Consulting the registry
+          Loading
         </Text>
       </View>
     );
@@ -2209,7 +2136,7 @@ export default function OrganizationDetailScreen() {
             <TouchableOpacity onPress={() => setShowCreateModal(false)} style={styles.modalCloseBtn}>
               <Ionicons name="close" size={22} color={O_FG} />
             </TouchableOpacity>
-            <Text style={[styles.modalTitle, { color: O_FG, fontFamily: SERIF, fontStyle: 'italic' }]}>Inscribe motion</Text>
+            <Text style={[styles.modalTitle, { color: O_FG, fontFamily: SERIF, fontStyle: 'italic' }]}>New proposal</Text>
             <TouchableOpacity
               style={[styles.modalSubmitBtn, { backgroundColor: creating ? O_FG_FAINT : O_GOLD }]}
               onPress={handleCreateProposal} disabled={creating}
@@ -2300,7 +2227,7 @@ export default function OrganizationDetailScreen() {
             <TouchableOpacity onPress={() => setShowAnnouncementModal(false)} style={styles.modalCloseBtn}>
               <Ionicons name="close" size={22} color={O_FG} />
             </TouchableOpacity>
-            <Text style={[styles.modalTitle, { color: O_FG, fontFamily: SERIF, fontStyle: 'italic' }]}>New dispatch</Text>
+            <Text style={[styles.modalTitle, { color: O_FG, fontFamily: SERIF, fontStyle: 'italic' }]}>New announcement</Text>
             <TouchableOpacity
               style={[styles.modalSubmitBtn, { backgroundColor: creatingAnnouncement ? O_FG_FAINT : O_GOLD }]}
               onPress={handleCreateAnnouncement} disabled={creatingAnnouncement}
@@ -2360,7 +2287,7 @@ export default function OrganizationDetailScreen() {
             <TouchableOpacity onPress={() => setShowCreateSubOrgModal(false)} disabled={creatingSubOrg}>
               <Text style={[styles.modalCancel, { color: O_FG_MUTED }]}>Cancel</Text>
             </TouchableOpacity>
-            <Text style={[styles.modalTitle, { color: O_FG, fontFamily: SERIF, fontStyle: 'italic' }]}>New sub-order</Text>
+            <Text style={[styles.modalTitle, { color: O_FG, fontFamily: SERIF, fontStyle: 'italic' }]}>New chapter</Text>
             <TouchableOpacity onPress={handleCreateSubOrg} disabled={creatingSubOrg || !newSubOrg.name.trim()}>
               {creatingSubOrg ? <ActivityIndicator size="small" color={O_GOLD} /> : <Text style={[styles.modalSubmit, { color: newSubOrg.name.trim() ? O_GOLD : O_FG_FAINT }]}>Create</Text>}
             </TouchableOpacity>

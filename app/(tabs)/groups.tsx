@@ -29,44 +29,6 @@ const SERIF = 'Georgia';
 const MONO = 'JetBrainsMono-Regular';
 
 // ─── helpers ──────────────────────────────────────────────────────────
-function toRomanNumeral(num: number): string {
-  const lookup: [number, string][] = [
-    [1000, 'M'], [900, 'CM'], [500, 'D'], [400, 'CD'],
-    [100, 'C'], [90, 'XC'], [50, 'L'], [40, 'XL'],
-    [10, 'X'], [9, 'IX'], [5, 'V'], [4, 'IV'], [1, 'I'],
-  ];
-  let result = '';
-  let n = num;
-  for (const [value, numeral] of lookup) {
-    while (n >= value) { result += numeral; n -= value; }
-  }
-  return result;
-}
-
-function formatRomanYearMonth(iso?: string | null): string {
-  if (!iso) return 'MMXXVI';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return 'MMXXVI';
-  return `${toRomanNumeral(d.getMonth() + 1)}·${toRomanNumeral(d.getFullYear())}`;
-}
-
-function folioFromOrg(name: string, id: string): string {
-  const safeName = name || '';
-  const safeId = id ? String(id) : '';
-  const initials = safeName
-    .split(/\s+/)
-    .filter(Boolean)
-    .map((w) => w[0])
-    .join('')
-    .toUpperCase()
-    .replace(/[^A-Z]/g, '')
-    .slice(0, 3) || 'ORG';
-  let hash = 0;
-  for (let i = 0; i < safeId.length; i++) hash = (hash * 31 + safeId.charCodeAt(i)) >>> 0;
-  const num = (hash % 9000) + 1000;
-  return `FOLIO·${initials}·${num}`;
-}
-
 function monogramFromName(name: string): string {
   const parts = (name || '').split(/\s+/).filter(Boolean);
   if (!parts.length) return 'O';
@@ -169,25 +131,6 @@ function RoleInsignia({ role }: { role: 'admin' | 'member' }) {
   );
 }
 
-function TierMark({ tier }: { tier: Organization['tier'] }) {
-  const isPro = tier === 'professional';
-  const label = isPro ? 'PROFESSIONAL' : 'COMMUNITY';
-  const color = isPro ? G_GOLD : G_FG_MUTED;
-  const line = isPro ? G_GOLD_D : G_LINE_STRONG;
-  return (
-    <View style={{
-      paddingHorizontal: 6, paddingVertical: 2,
-      borderWidth: 1, borderColor: line, borderRadius: 2,
-      alignSelf: 'flex-start',
-    }}>
-      <Text style={{
-        fontFamily: MONO, fontSize: 8.5, fontWeight: '500',
-        letterSpacing: 1.5, color,
-      }}>{label}</Text>
-    </View>
-  );
-}
-
 function OrgSigil({ name, logoUrl, tier }: { name: string; logoUrl?: string; tier: Organization['tier'] }) {
   const isPro = tier === 'professional';
   const monogram = monogramFromName(name);
@@ -214,26 +157,15 @@ function OrgSigil({ name, logoUrl, tier }: { name: string; logoUrl?: string; tie
 
 // ─── header ───────────────────────────────────────────────────────────
 function GHeader({ stat, admins, onAddPress, insetTop }: { stat: number; admins: number; onAddPress: () => void; insetTop: number }) {
-  const padded = (n: number) => n.toString().padStart(2, '0');
   return (
-    <Animated.View entering={FadeInDown.duration(400)} style={{ paddingTop: insetTop + 8, paddingHorizontal: 24, paddingBottom: 18 }}>
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <View style={{
-            width: 6, height: 6, borderRadius: 3, backgroundColor: G_GREEN, marginRight: 8,
-            shadowColor: G_GREEN, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.3, shadowRadius: 3,
-          }} />
-          <GEyebrow>Chartered orders · in good standing</GEyebrow>
-        </View>
-        <Text style={{ fontFamily: MONO, fontSize: 9.5, color: G_FG_FAINT, letterSpacing: 0.8 }}>SECTION III</Text>
-      </View>
-      <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 14 }}>
+    <Animated.View entering={FadeInDown.duration(400)} style={{ paddingTop: insetTop + 12, paddingHorizontal: 24, paddingBottom: 18 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 10 }}>
         <Text style={{
-          fontFamily: SERIF, fontSize: 44, fontWeight: '500',
-          letterSpacing: -1, lineHeight: 44, color: G_FG, flex: 1,
+          fontFamily: SERIF, fontSize: 38, fontWeight: '500',
+          letterSpacing: -0.8, lineHeight: 40, color: G_FG, flex: 1,
         }}>
           My{' '}
-          <Text style={{ fontStyle: 'italic', color: G_GOLD_L, fontWeight: '400' }}>organizations</Text>
+          <Text style={{ fontStyle: 'italic', color: G_GOLD_L, fontWeight: '400' }}>groups</Text>
         </Text>
         <TouchableOpacity
           onPress={onAddPress}
@@ -243,23 +175,21 @@ function GHeader({ stat, admins, onAddPress, insetTop }: { stat: number; admins:
             backgroundColor: 'rgba(234,186,88,0.08)',
             borderWidth: 1, borderColor: G_GOLD_D,
             alignItems: 'center', justifyContent: 'center',
-            marginTop: 4,
             shadowColor: G_GOLD, shadowOffset: { width: 0, height: 4 },
             shadowOpacity: 0.1, shadowRadius: 12,
           }}
         >
-          <Ionicons name="add" size={18} color={G_GOLD} />
+          <Ionicons name="add" size={20} color={G_GOLD} />
         </TouchableOpacity>
       </View>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-        <Text style={{ fontFamily: MONO, fontSize: 10, color: G_FG_MUTED, letterSpacing: 1.4 }}>
-          ORGANIZATIONS · <Text style={{ color: G_FG }}>{padded(stat)}</Text>
+      {stat > 0 && (
+        <Text style={{ fontSize: 13, color: G_FG_MUTED, letterSpacing: -0.05 }}>
+          {stat} {stat === 1 ? 'organization' : 'organizations'}
+          {admins > 0 && (
+            <Text style={{ color: G_FG_FAINT }}> · admin in {admins}</Text>
+          )}
         </Text>
-        <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: G_FG_FAINT, opacity: 0.6 }} />
-        <Text style={{ fontFamily: MONO, fontSize: 10, color: G_FG_MUTED, letterSpacing: 1.4 }}>
-          ADMIN ROLES · <Text style={{ color: G_GOLD }}>{padded(admins)}</Text>
-        </Text>
-      </View>
+      )}
     </Animated.View>
   );
 }
@@ -267,9 +197,8 @@ function GHeader({ stat, admins, onAddPress, insetTop }: { stat: number; admins:
 // ─── ORG CARD ─────────────────────────────────────────────────────────
 function OrgCard({ org, onPress, index }: { org: Organization; onPress: () => void; index: number }) {
   const isPro = org.tier === 'professional';
-  const folio = folioFromOrg(org.name, org.id);
-  const joined = formatRomanYearMonth(org.createdAt);
   const role: 'admin' | 'member' = org.role === 'admin' ? 'admin' : 'member';
+  const memberLabel = `${(org.memberCount ?? 0).toLocaleString()} ${(org.memberCount ?? 0) === 1 ? 'member' : 'members'}`;
   return (
     <Animated.View entering={FadeInUp.delay(index * 80).duration(400)}>
       <TouchableOpacity activeOpacity={0.85} onPress={onPress}>
@@ -301,67 +230,47 @@ function OrgCard({ org, onPress, index }: { org: Organization; onPress: () => vo
           <View style={{
             paddingHorizontal: 16, paddingTop: 16, paddingBottom: 14,
             flexDirection: 'row', gap: 14, alignItems: 'flex-start',
-            borderBottomWidth: 1, borderBottomColor: G_LINE,
           }}>
             <OrgSigil name={org.name} logoUrl={org.logoUrl} tier={org.tier} />
             <View style={{ flex: 1, minWidth: 0 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                <GEyebrow style={{ fontSize: 8.5, letterSpacing: 1.7 }}>Registered</GEyebrow>
-                {org.verified && <VerifiedTick size={11} />}
+                <Text
+                  numberOfLines={2}
+                  style={{
+                    flex: 1,
+                    fontFamily: SERIF, fontSize: 18, fontWeight: '500',
+                    color: G_FG, lineHeight: 22, letterSpacing: -0.2,
+                  }}
+                >
+                  {org.name || 'Unnamed organization'}
+                </Text>
+                {org.verified && <VerifiedTick size={13} />}
               </View>
-              <Text
-                numberOfLines={2}
-                style={{
-                  fontFamily: SERIF, fontSize: 19, fontWeight: '500',
-                  color: G_FG, lineHeight: 21, letterSpacing: -0.2,
-                  marginBottom: 6,
-                }}
-              >
-                {org.name || 'Unnamed Organization'}
-              </Text>
-              <Text
-                numberOfLines={2}
-                style={{
-                  fontSize: 11.5, color: G_FG_MUTED,
-                  letterSpacing: -0.05, lineHeight: 16,
-                }}
-              >
-                {org.description || ''}
-              </Text>
+              {!!org.description && (
+                <Text
+                  numberOfLines={2}
+                  style={{
+                    fontSize: 12.5, color: G_FG_MUTED,
+                    letterSpacing: -0.05, lineHeight: 17,
+                    marginBottom: 2,
+                  }}
+                >
+                  {org.description}
+                </Text>
+              )}
             </View>
           </View>
 
-          {/* register strip */}
-          <View style={{ flexDirection: 'row' }}>
-            <View style={{ flex: 1.2, paddingHorizontal: 14, paddingVertical: 11, borderRightWidth: 1, borderRightColor: G_LINE }}>
-              <GEyebrow style={{ fontSize: 8.5, letterSpacing: 1.5, marginBottom: 4 }}>Members</GEyebrow>
-              <Text style={{
-                fontFamily: SERIF, fontSize: 15, fontStyle: 'italic',
-                color: G_FG, letterSpacing: -0.05, lineHeight: 16,
-              }}>
-                {(org.memberCount ?? 0).toLocaleString()} registered
-              </Text>
-            </View>
-            <View style={{ flex: 1, paddingHorizontal: 14, paddingVertical: 11, borderRightWidth: 1, borderRightColor: G_LINE }}>
-              <GEyebrow style={{ fontSize: 8.5, letterSpacing: 1.5, marginBottom: 4 }}>Joined</GEyebrow>
-              <Text style={{
-                fontFamily: MONO, fontSize: 11, color: G_FG, letterSpacing: 0.6, lineHeight: 14,
-              }}>{joined}</Text>
-            </View>
-            <View style={{ flex: 1, paddingHorizontal: 14, paddingVertical: 11, alignItems: 'flex-start', justifyContent: 'center' }}>
-              <RoleInsignia role={role} />
-            </View>
-          </View>
-
-          {/* tier footer */}
+          {/* footer strip */}
           <View style={{
-            paddingHorizontal: 14, paddingVertical: 8,
+            paddingHorizontal: 16, paddingVertical: 10,
             borderTopWidth: 1, borderTopColor: G_LINE,
-            backgroundColor: 'rgba(0,0,0,0.25)',
             flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
           }}>
-            <TierMark tier={org.tier} />
-            <Text style={{ fontFamily: MONO, fontSize: 9, color: G_FG_FAINT, letterSpacing: 0.9 }}>{folio}</Text>
+            <Text style={{ fontSize: 12, color: G_FG_MUTED, letterSpacing: -0.05 }}>
+              {memberLabel}
+            </Text>
+            <RoleInsignia role={role} />
           </View>
         </View>
       </TouchableOpacity>
@@ -369,7 +278,7 @@ function OrgCard({ org, onPress, index }: { org: Organization; onPress: () => vo
   );
 }
 
-// ─── charter CTA ──────────────────────────────────────────────────────
+// ─── create-org CTA ───────────────────────────────────────────────────
 function CharterCTA({ onPress }: { onPress: () => void }) {
   return (
     <Animated.View entering={FadeInUp.delay(300).duration(400)} style={{ paddingHorizontal: 16, marginTop: 12 }}>
@@ -379,7 +288,7 @@ function CharterCTA({ onPress }: { onPress: () => void }) {
           borderRadius: 18,
           borderWidth: 1, borderColor: G_GOLD_D,
           overflow: 'hidden',
-          paddingHorizontal: 18, paddingVertical: 20,
+          paddingHorizontal: 18, paddingVertical: 18,
           shadowColor: '#000', shadowOffset: { width: 0, height: 8 },
           shadowOpacity: 0.3, shadowRadius: 24, elevation: 6,
         }}>
@@ -390,41 +299,34 @@ function CharterCTA({ onPress }: { onPress: () => void }) {
             end={{ x: 0, y: 1 }}
           />
           <Guilloche opacity={0.08} id="g-cta" />
-          <CornerTicks color={G_GOLD} size={10} weight={1.2} />
 
-          <GEyebrow color={G_GOLD} style={{ marginBottom: 8 }}>Petition for charter</GEyebrow>
           <Text style={{
             fontFamily: SERIF, fontSize: 22, fontWeight: '500',
-            color: G_FG, letterSpacing: -0.2, lineHeight: 24, marginBottom: 6,
+            color: G_FG, letterSpacing: -0.2, lineHeight: 26, marginBottom: 6,
           }}>
-            Charter your own{' '}
+            Start your own{' '}
             <Text style={{ fontStyle: 'italic', color: G_GOLD_L }}>organization</Text>
           </Text>
           <Text style={{
-            fontSize: 12, color: G_FG_MUTED, letterSpacing: -0.05, lineHeight: 17,
-            marginBottom: 14, maxWidth: 280,
+            fontSize: 13, color: G_FG_MUTED, letterSpacing: -0.05, lineHeight: 18,
+            marginBottom: 14, maxWidth: 300,
           }}>
-            For unions, nonprofits, and community groups requiring verified roll, secure ballots, and audit-grade records.
+            For unions, nonprofits, schools, and community groups. Run secure ballots and member rosters.
           </Text>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6 }}>
-              <Text style={{
-                fontFamily: SERIF, fontSize: 18, fontStyle: 'italic',
-                color: G_GOLD_L, lineHeight: 18,
-              }}>$29</Text>
-              <Text style={{ fontFamily: MONO, fontSize: 9.5, color: G_FG_FAINT, letterSpacing: 1 }}>/MO · ANNUAL DUES</Text>
-            </View>
+            <Text style={{ fontSize: 14, color: G_FG_MUTED, letterSpacing: -0.05 }}>
+              <Text style={{ color: G_GOLD_L, fontWeight: '600' }}>$29</Text>/month
+            </Text>
             <View style={{
-              paddingHorizontal: 14, paddingVertical: 8,
+              paddingHorizontal: 14, paddingVertical: 9,
               backgroundColor: G_GOLD,
-              borderRadius: 4,
+              borderRadius: 999,
               flexDirection: 'row', alignItems: 'center', gap: 6,
             }}>
               <Text style={{
-                fontSize: 11, fontWeight: '600', letterSpacing: 1.7,
-                textTransform: 'uppercase', color: '#0A0C0F',
-              }}>Begin charter</Text>
-              <Ionicons name="arrow-forward" size={11} color="#0A0C0F" />
+                fontSize: 13, fontWeight: '600', color: '#0A0C0F',
+              }}>Get started</Text>
+              <Ionicons name="arrow-forward" size={13} color="#0A0C0F" />
             </View>
           </View>
         </View>
@@ -456,91 +358,62 @@ function EmptyLedger({ onJoinPress, onCreatePress }: { onJoinPress: () => void; 
         <Guilloche opacity={0.05} id="g-empty" />
         <CornerTicks color={G_GOLD_D} size={12} weight={1.2} />
 
-        {/* engraved sigil */}
-        <View style={{ alignSelf: 'center', width: 88, height: 88, marginBottom: 20, alignItems: 'center', justifyContent: 'center' }}>
-          <Svg width={88} height={88} viewBox="0 0 88 88">
-            <Circle cx={44} cy={44} r={42} fill="none" stroke={G_GOLD_D} strokeWidth={0.6} />
-            <Circle cx={44} cy={44} r={36} fill="none" stroke={G_GOLD_D} strokeWidth={0.4} strokeDasharray="1 2" />
-            {Array.from({ length: 12 }).map((_, i) => {
-              const a = ((i * 30 - 90) * Math.PI) / 180;
-              return (
-                <Line
-                  key={i}
-                  x1={44 + 39 * Math.cos(a)}
-                  y1={44 + 39 * Math.sin(a)}
-                  x2={44 + 42 * Math.cos(a)}
-                  y2={44 + 42 * Math.sin(a)}
-                  stroke={G_GOLD_D}
-                  strokeWidth={0.6}
-                />
-              );
-            })}
-            <G transform="translate(28 26)" stroke={G_GOLD_L} strokeWidth={0.9} fill="none" strokeLinejoin="round">
-              <Path d="M4 2h20l4 4v28a2 2 0 0 1-2 2H4z" />
-              <Path d="M24 2v4h4" />
-              <Path d="M9 14h14M9 19h14M9 24h10" />
-            </G>
+        {/* simple sigil */}
+        <View style={{ alignSelf: 'center', width: 72, height: 72, marginBottom: 18, alignItems: 'center', justifyContent: 'center' }}>
+          <Svg width={72} height={72} viewBox="0 0 72 72">
+            <Circle cx={36} cy={36} r={34} fill="none" stroke={G_GOLD_D} strokeWidth={0.6} />
+            <Circle cx={36} cy={36} r={28} fill="none" stroke={G_GOLD_D} strokeWidth={0.4} strokeDasharray="1 2" />
           </Svg>
+          <View style={{ position: 'absolute', alignItems: 'center', justifyContent: 'center' }}>
+            <Ionicons name="people-outline" size={28} color={G_GOLD_L} />
+          </View>
         </View>
 
         <Text style={{
-          fontFamily: SERIF, fontSize: 26, fontWeight: '500',
+          fontFamily: SERIF, fontSize: 24, fontWeight: '500',
           color: G_FG, letterSpacing: -0.3, lineHeight: 28,
           textAlign: 'center', marginBottom: 8,
         }}>
-          An <Text style={{ fontStyle: 'italic', color: G_GOLD_L }}>empty ledger</Text>
+          No groups yet
         </Text>
         <Text style={{
           fontSize: 13, color: G_FG_MUTED, letterSpacing: -0.05, lineHeight: 19,
-          textAlign: 'center', maxWidth: 280, alignSelf: 'center', marginBottom: 24,
+          textAlign: 'center', maxWidth: 280, alignSelf: 'center', marginBottom: 22,
         }}>
-          No organizations are yet inscribed under your name. Petition for membership by invitation, or charter a new order of your own.
+          Join one with an invite code from your union, school, or community group — or start your own.
         </Text>
-
-        <View style={{
-          height: 1, backgroundColor: G_GOLD_D, opacity: 0.4,
-          width: 200, alignSelf: 'center', marginBottom: 22,
-        }} />
 
         <TouchableOpacity
           activeOpacity={0.85}
           onPress={onJoinPress}
           style={{
-            paddingHorizontal: 16, paddingVertical: 13,
-            backgroundColor: G_GOLD, borderRadius: 5,
+            paddingHorizontal: 18, paddingVertical: 13,
+            backgroundColor: G_GOLD, borderRadius: 999,
             flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
             gap: 8, marginBottom: 10,
           }}
         >
-          <Ionicons name="key-outline" size={14} color="#0A0C0F" />
-          <Text style={{
-            fontSize: 11.5, fontWeight: '600', letterSpacing: 2,
-            textTransform: 'uppercase', color: '#0A0C0F',
-          }}>Enter invite code</Text>
+          <Ionicons name="key-outline" size={15} color="#0A0C0F" />
+          <Text style={{ fontSize: 14, fontWeight: '600', color: '#0A0C0F' }}>
+            Enter invite code
+          </Text>
         </TouchableOpacity>
 
         <TouchableOpacity
           activeOpacity={0.85}
           onPress={onCreatePress}
           style={{
-            paddingHorizontal: 16, paddingVertical: 13,
+            paddingHorizontal: 18, paddingVertical: 13,
             backgroundColor: 'transparent',
             borderWidth: 1, borderColor: G_GOLD_D,
-            borderRadius: 5,
+            borderRadius: 999,
             alignItems: 'center', justifyContent: 'center',
           }}
         >
-          <Text style={{
-            fontSize: 11.5, fontWeight: '600', letterSpacing: 2,
-            textTransform: 'uppercase', color: G_GOLD,
-          }}>Charter a new organization</Text>
+          <Text style={{ fontSize: 14, fontWeight: '600', color: G_GOLD }}>
+            Start your own
+          </Text>
         </TouchableOpacity>
-
-        <Text style={{
-          fontFamily: MONO, fontSize: 8.5, color: G_FG_FAINT,
-          letterSpacing: 2, textTransform: 'uppercase',
-          textAlign: 'center', marginTop: 18,
-        }}>FOLIO · 0000 / 2033 · AWAITING ENTRY</Text>
       </View>
     </Animated.View>
   );
@@ -611,15 +484,15 @@ function InviteSheet({
         {/* grabber */}
         <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: G_LINE_STRONG, alignSelf: 'center', marginBottom: 18 }} />
 
-        {/* eyebrow + close */}
+        {/* title + close */}
         <View style={{ paddingHorizontal: 22, paddingBottom: 14, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <View style={{ flex: 1 }}>
-            <GEyebrow color={G_GOLD} style={{ marginBottom: 6 }}>Letter of invitation</GEyebrow>
             <Text style={{
               fontFamily: SERIF, fontSize: 24, fontWeight: '500',
-              color: G_FG, letterSpacing: -0.3, lineHeight: 26,
+              color: G_FG, letterSpacing: -0.3, lineHeight: 28,
             }}>
-              Enter <Text style={{ fontStyle: 'italic', color: G_GOLD_L }}>invite code</Text>
+              Join with an{' '}
+              <Text style={{ fontStyle: 'italic', color: G_GOLD_L }}>invite code</Text>
             </Text>
           </View>
           <TouchableOpacity
@@ -636,15 +509,12 @@ function InviteSheet({
           </TouchableOpacity>
         </View>
 
-        {/* hairline */}
-        <View style={{ height: 1, backgroundColor: G_LINE_STRONG, marginHorizontal: 22, marginBottom: 18 }} />
-
         {/* copy */}
         <Text style={{
-          paddingHorizontal: 22, fontSize: 12.5, color: G_FG_MUTED,
-          letterSpacing: -0.05, lineHeight: 18, marginBottom: 18,
+          paddingHorizontal: 22, fontSize: 13, color: G_FG_MUTED,
+          letterSpacing: -0.05, lineHeight: 19, marginBottom: 18,
         }}>
-          A six- to twelve-character alphanumeric code, issued by an admin of the chartering organization.
+          Ask an admin of your union, school, or community group for their invite code.
         </Text>
 
         {/* code field */}
@@ -684,17 +554,9 @@ function InviteSheet({
               selectionColor={G_GOLD}
             />
           </View>
-          <View style={{
-            flexDirection: 'row', justifyContent: 'space-between',
-            marginTop: 8,
-          }}>
-            <Text style={{ fontFamily: MONO, fontSize: 9, color: G_FG_FAINT, letterSpacing: 1.3 }}>
-              {codeLen} / 12 CHAR · ALPHANUMERIC
-            </Text>
-            <Text style={{ fontFamily: MONO, fontSize: 9, color: lengthOk ? G_GREEN : G_FG_FAINT, letterSpacing: 1.3 }}>
-              {lengthOk ? '● READY' : '○ ENTER CODE'}
-            </Text>
-          </View>
+          <Text style={{ fontFamily: MONO, fontSize: 10, color: G_FG_FAINT, letterSpacing: 0.6, marginTop: 8, textAlign: 'right' }}>
+            {codeLen} / 12
+          </Text>
         </View>
 
         {/* primary action */}
@@ -706,48 +568,24 @@ function InviteSheet({
             style={{
               paddingHorizontal: 16, paddingVertical: 14,
               backgroundColor: lengthOk ? G_GOLD : 'rgba(234,186,88,0.3)',
-              borderRadius: 5,
+              borderRadius: 999,
               flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-              gap: 10,
+              gap: 8,
             }}
           >
             {joining ? (
               <ActivityIndicator size="small" color="#0A0C0F" />
             ) : (
               <>
-                <Text style={{
-                  fontSize: 11.5, fontWeight: '600', letterSpacing: 2,
-                  textTransform: 'uppercase', color: '#0A0C0F',
-                }}>Petition for membership</Text>
-                <Ionicons name="arrow-forward" size={11} color="#0A0C0F" />
+                <Text style={{ fontSize: 14, fontWeight: '600', color: '#0A0C0F' }}>
+                  Join organization
+                </Text>
+                <Ionicons name="arrow-forward" size={14} color="#0A0C0F" />
               </>
             )}
           </TouchableOpacity>
-          <Text style={{
-            fontFamily: MONO, fontSize: 8.5, color: G_FG_FAINT,
-            letterSpacing: 1.7, textAlign: 'center',
-            textTransform: 'uppercase', marginTop: 10,
-          }}>
-            On submission, code witnessed by the assembly registrar
-          </Text>
         </View>
       </View>
-    </View>
-  );
-}
-
-// ─── footer signature ─────────────────────────────────────────────────
-function FooterSig() {
-  return (
-    <View style={{ paddingHorizontal: 24, paddingTop: 8, paddingBottom: 28, alignItems: 'center' }}>
-      <Text style={{
-        fontFamily: SERIF, fontSize: 13, fontStyle: 'italic',
-        color: G_FG_FAINT, letterSpacing: -0.05, marginBottom: 4,
-      }}>Sealed by the assembly</Text>
-      <Text style={{
-        fontFamily: MONO, fontSize: 8.5, color: G_FG_FAINT,
-        letterSpacing: 2, textTransform: 'uppercase',
-      }}>SECTION III · CHARTERED ORDERS · IV·MMXXVI</Text>
     </View>
   );
 }
@@ -816,7 +654,7 @@ export default function GroupsScreen() {
       <View style={[styles.container, { backgroundColor: G_BG, alignItems: 'center', justifyContent: 'center' }]}>
         <ActivityIndicator size="small" color={G_GOLD} />
         <Text style={{ fontFamily: MONO, fontSize: 10, color: G_FG_FAINT, letterSpacing: 1.4, marginTop: 12, textTransform: 'uppercase' }}>
-          Consulting the registrar
+          Loading
         </Text>
       </View>
     );
@@ -869,8 +707,6 @@ export default function GroupsScreen() {
           </>
         )}
 
-        <View style={{ height: 18 }} />
-        <FooterSig />
       </ScrollView>
 
       {showInviteSheet && (
