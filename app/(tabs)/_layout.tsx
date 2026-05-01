@@ -155,11 +155,11 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="identity"
+        name="groups"
         options={{
-          title: 'Identity',
+          title: 'Groups',
           tabBarIcon: ({ color, focused }) => (
-            <TabIcon name="shield-checkmark-outline" color={color} focused={focused} />
+            <TabIcon name="people-outline" color={color} focused={focused} />
           ),
         }}
       />

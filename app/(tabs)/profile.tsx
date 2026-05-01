@@ -18,8 +18,10 @@ import Svg, { Circle } from 'react-native-svg';
 import { useAuthStore } from '../../lib/auth';
 import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS, ThemePreference, responsive } from '../../lib/theme';
 import { Button, TierBadge } from '../../components/ui';
-import { adminApi, organizationsApi, userApi } from '../../lib/api';
+import { adminApi, organizationsApi, userApi, veriffApi } from '../../lib/api';
 import { restorePurchases } from '../../lib/iap';
+import { PassportCard, type PassportStatus } from '../../components/identity/PassportCard';
+import { useTutorialStore } from '../../lib/tutorial';
 import type { UserTier } from '../../components/ui';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://representportal.com';
@@ -183,100 +185,6 @@ function PrHeader({ folio }: { folio: string }) {
   return (
     <Animated.View entering={FadeInDown.duration(400)} style={prStyles.header}>
       <PrEyebrow>Profile</PrEyebrow>
-    </Animated.View>
-  );
-}
-
-// ── Portrait Card (replaces profile card) ────────────────────────────
-function PortraitCard({
-  name,
-  email,
-  tier,
-  memberSince,
-  isActive,
-  onTierPress,
-}: {
-  name: string;
-  email: string;
-  tier: string;
-  memberSince: string;
-  isActive: boolean;
-  onTierPress: () => void;
-}) {
-  const pr = useProfileColors();
-  const { isDark } = useTheme();
-  const initials = name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() || 'U';
-
-  return (
-    <Animated.View entering={FadeInUp.delay(100).duration(400)} style={[prStyles.portraitCard, { borderColor: pr.LINE_STRONG }]}>
-      <LinearGradient
-        colors={isDark ? ['#11141A', '#0B0D11'] : ['#FFFFFF', '#F8F6F3']}
-        style={StyleSheet.absoluteFill}
-      />
-
-      {/* Corner ticks */}
-      {[
-        { top: 10, left: 10, borders: ['Top', 'Left'] },
-        { top: 10, right: 10, borders: ['Top', 'Right'] },
-        { bottom: 10, left: 10, borders: ['Bottom', 'Left'] },
-        { bottom: 10, right: 10, borders: ['Bottom', 'Right'] },
-      ].map((c, i) => (
-        <View
-          key={i}
-          style={[
-            prStyles.cornerTick,
-            { top: c.top, left: c.left, right: c.right, bottom: c.bottom },
-            c.borders.includes('Top') && { borderTopWidth: 1, borderTopColor: `${pr.GD}A6` },
-            c.borders.includes('Bottom') && { borderBottomWidth: 1, borderBottomColor: `${pr.GD}A6` },
-            c.borders.includes('Left') && { borderLeftWidth: 1, borderLeftColor: `${pr.GD}A6` },
-            c.borders.includes('Right') && { borderRightWidth: 1, borderRightColor: `${pr.GD}A6` },
-          ]}
-        />
-      ))}
-
-      <View style={prStyles.portraitMain}>
-        {/* Monogram */}
-        <View style={prStyles.monogramContainer}>
-          <LinearGradient
-            colors={[pr.GL, pr.GD]}
-            style={prStyles.monogramGradient}
-            start={{ x: 0.3, y: 0 }}
-            end={{ x: 0.7, y: 1 }}
-          />
-          <Text style={[prStyles.monogramText, { color: isDark ? '#1A1308' : '#1A1308' }]}>{initials}</Text>
-          {/* Outer engraved ring */}
-          <Svg width={74} height={74} viewBox="0 0 74 74" style={prStyles.monogramRing}>
-            <Circle cx={37} cy={37} r={35} fill="none" stroke={pr.GD} strokeWidth={0.5} strokeDasharray="1 3" opacity={0.6} />
-          </Svg>
-        </View>
-
-        <View style={{ flex: 1, minWidth: 0 }}>
-          <PrEyebrow>Registered name</PrEyebrow>
-          <Text style={[prStyles.portraitName, { color: pr.FG }]}>{name || 'Citizen'}</Text>
-          <Text style={[prStyles.portraitEmail, { color: pr.FG_MUTED }]}>{email}</Text>
-        </View>
-      </View>
-
-      {/* Membership strip */}
-      <View style={[prStyles.membershipStrip, { borderTopColor: pr.LINE }]}>
-        <TouchableOpacity style={prStyles.membershipCell} onPress={onTierPress} activeOpacity={0.7}>
-          <Text style={[prStyles.membershipLabel, { color: pr.FG_FAINT }]}>TIER</Text>
-          <Text style={[prStyles.membershipValue, prStyles.tierValue, { color: pr.GL }]}>{tier}</Text>
-        </TouchableOpacity>
-        <View style={prStyles.membershipCell}>
-          <Text style={[prStyles.membershipLabel, { color: pr.FG_FAINT }]}>JOINED</Text>
-          <Text style={[prStyles.membershipValue, { color: pr.FG }]}>{memberSince}</Text>
-        </View>
-        <View style={prStyles.membershipCell}>
-          <Text style={[prStyles.membershipLabel, { color: pr.FG_FAINT }]}>STANDING</Text>
-          <View style={prStyles.standingRow}>
-            <View style={[prStyles.statusDot, { backgroundColor: isActive ? pr.GREEN : pr.FG_FAINT, shadowColor: pr.GREEN }]} />
-            <Text style={[prStyles.membershipValue, { color: isActive ? pr.GREEN : pr.FG_FAINT }]}>
-              {isActive ? 'Active' : 'Inactive'}
-            </Text>
-          </View>
-        </View>
-      </View>
     </Animated.View>
   );
 }
@@ -723,14 +631,21 @@ const prStyles = StyleSheet.create({
 
 export default function ProfileScreen() {
   const { colors, themePreference, setThemePreference, isDark } = useTheme();
-  const { user, logout, token } = useAuthStore();
+  const { user, logout, token, isAuthenticated } = useAuthStore();
   const insets = useSafeAreaInsets();
   const [userTier, setUserTier] = useState<UserTier>('free');
   const [refreshing, setRefreshing] = useState(false);
   const [badgesEarned, setBadgesEarned] = useState<number | null>(null);
-  const [orgCount, setOrgCount] = useState<number | null>(null);
   const [adminOrgCount, setAdminOrgCount] = useState<number | null>(null);
   const [votesCast, setVotesCast] = useState<number | null>(null);
+  const [verification, setVerification] = useState<{ verified: boolean; status: PassportStatus; verifiedAt?: string | null }>({
+    verified: false,
+    status: 'unverified',
+    verifiedAt: null,
+  });
+  const [profileLocation, setProfileLocation] = useState<{ country?: string; state?: string; city?: string } | null>(null);
+  const [startingKyc, setStartingKyc] = useState(false);
+  const { isActive: tutorialActive, completeAction: completeTutorialAction } = useTutorialStore();
   const BADGES_TOTAL = 15;
 
   // Fetch user's subscription tier
@@ -789,39 +704,109 @@ export default function ProfileScreen() {
     })();
   }, [token, user?.id]);
 
-  // Live counts for Activity rows. Each falls back to null on failure so
-  // the row hides the secondary label rather than showing a stale value.
-  useEffect(() => {
+  // Live counts for Activity rows + verification status for the passport
+  // card. Each falls back to null on failure so the row hides its secondary
+  // label rather than showing a stale value.
+  const fetchProfileData = useCallback(async () => {
     if (!token) return;
-    (async () => {
-      try {
-        const orgsRes = await organizationsApi.getMyOrganizations();
-        if (Array.isArray(orgsRes.data)) {
-          setOrgCount(orgsRes.data.length);
-          setAdminOrgCount(orgsRes.data.filter((o: any) => o.role === 'admin').length);
+    try {
+      const orgsRes = await organizationsApi.getMyOrganizations();
+      if (Array.isArray(orgsRes.data)) {
+        setAdminOrgCount(orgsRes.data.filter((o: any) => o.role === 'admin').length);
+      }
+    } catch { /* keep null */ }
+    try {
+      const votedRes = await userApi.getVotedProposals();
+      if (Array.isArray(votedRes.data)) {
+        setVotesCast(votedRes.data.length);
+      }
+    } catch { /* keep null */ }
+    try {
+      const [verRes, profRes] = await Promise.allSettled([
+        userApi.getVerificationStatus(),
+        userApi.getProfile(),
+      ]);
+      const isDemoAccount = user?.email === 'demo@represent.app';
+      if (verRes.status === 'fulfilled') {
+        const v = (verRes.value?.data || {}) as any;
+        setVerification({
+          verified: isDemoAccount ? true : !!v.verified,
+          status: isDemoAccount ? 'verified' : ((v.status as PassportStatus) || (v.verified ? 'verified' : 'unverified')),
+          verifiedAt: isDemoAccount ? new Date().toISOString() : (v.verifiedAt || v.verified_at || null),
+        });
+      }
+      if (profRes.status === 'fulfilled') {
+        const p: any = profRes.value?.data || null;
+        if (p) {
+          setProfileLocation({ country: p.country, state: p.state, city: p.city });
         }
-      } catch { /* keep null */ }
-      try {
-        const votedRes = await userApi.getVotedProposals();
-        if (Array.isArray(votedRes.data)) {
-          setVotesCast(votedRes.data.length);
-        }
-      } catch { /* keep null */ }
-    })();
-  }, [token]);
+      }
+    } catch { /* keep defaults */ }
+  }, [token, user?.email]);
+
+  useEffect(() => {
+    fetchProfileData();
+  }, [fetchProfileData]);
 
   useFocusEffect(
     useCallback(() => {
       fetchTier();
-    }, [fetchTier])
+      fetchProfileData();
+    }, [fetchTier, fetchProfileData])
   );
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    await fetchTier();
+    await Promise.all([fetchTier(), fetchProfileData()]);
     setRefreshing(false);
-  }, [fetchTier]);
+  }, [fetchTier, fetchProfileData]);
+
+  const handleStartKyc = useCallback(async () => {
+    if (tutorialActive) {
+      completeTutorialAction('tap-button');
+      return;
+    }
+    if (!isAuthenticated) {
+      Alert.alert('Sign In Required', 'Please sign in to begin verification.');
+      return;
+    }
+    if (verification.status === 'pending') {
+      // Pending: re-fetch status instead of starting a new session.
+      await fetchProfileData();
+      return;
+    }
+
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setStartingKyc(true);
+    try {
+      const response = await veriffApi.createSession();
+      if (response.data?.sessionUrl && response.data?.verificationId) {
+        router.push({
+          pathname: '/modals/veriff',
+          params: {
+            sessionUrl: response.data.sessionUrl,
+            verificationId: response.data.verificationId,
+          },
+        });
+      } else {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        Alert.alert(
+          'Verification Error',
+          (response.data as any)?.error || 'Could not start verification session. Please try again.'
+        );
+      }
+    } catch (error) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      console.error('Veriff session error:', error);
+      Alert.alert(
+        'Connection Error',
+        'Unable to connect to the verification service. Please check your connection and try again.'
+      );
+    } finally {
+      setStartingKyc(false);
+    }
+  }, [tutorialActive, completeTutorialAction, isAuthenticated, verification.status, fetchProfileData]);
 
   const handleLogout = () => {
     Alert.alert('Log Out', 'Are you sure you want to log out?', [
@@ -839,27 +824,29 @@ export default function ProfileScreen() {
 
   const navigateTo = (screen: string) => router.push(screen as any);
 
-  const getInitial = () =>
-    user?.name?.charAt(0).toUpperCase() || user?.email?.charAt(0).toUpperCase() || 'U';
-
   const getLocationString = () => {
     // Demo account should use hardcoded location for App Store review
     const isDemoAccount = user?.email === 'demo@represent.app';
     if (isDemoAccount) {
       return 'Toronto, Ontario, Canada';
     }
-    const parts = [user?.city, user?.state, user?.country].filter(Boolean);
+    const parts = [
+      profileLocation?.city || user?.city,
+      profileLocation?.state || user?.state,
+      profileLocation?.country || user?.country,
+    ].filter(Boolean);
     return parts.length > 0 ? parts.join(', ') : null;
+  };
+
+  const getMemberSinceShort = () => {
+    if (!verification.verifiedAt) return 'Apr 2026';
+    const d = new Date(verification.verifiedAt);
+    if (Number.isNaN(d.getTime())) return 'Apr 2026';
+    return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short' });
   };
 
   // Get tier label for display
   const tierLabel = userTier === 'premium' ? 'Premium' : userTier === 'verified' ? 'Verified' : 'Free';
-
-  // Get member since date
-  const getMemberSince = () => {
-    // Use a reasonable default; in production, pull from user object
-    return 'Apr 2026';
-  };
 
   // Generate folio code from user id
   const getFolioCode = () => {
@@ -879,19 +866,20 @@ export default function ProfileScreen() {
         {/* Premium Header */}
         <PrHeader folio={getFolioCode()} />
 
-        {/* Portrait Card */}
-        <PortraitCard
+        {/* Passport Card (replaces former PortraitCard) */}
+        <PassportCard
           name={user?.name || 'Citizen'}
-          email={user?.email || ''}
-          tier={tierLabel}
-          memberSince={getMemberSince()}
-          isActive={true}
-          onTierPress={() => navigateTo('/modals/subscription')}
+          location={getLocationString() || ''}
+          verified={verification.verified}
+          status={verification.status}
+          folio={getFolioCode()}
+          memberSince={getMemberSinceShort()}
+          onVerify={handleStartKyc}
+          startingKyc={startingKyc}
         />
 
         {/* Section I: Civic Record */}
         <PrSection title="Activity" delay={200}>
-          <PrRow icon="business-outline" label="My organizations" value={orgCount !== null ? String(orgCount) : undefined} onPress={() => navigateTo('/modals/organizations')} />
           <PrRow icon="time-outline" label="Voting history" sub={votesCast !== null ? `${votesCast.toLocaleString()} ballots cast` : undefined} onPress={() => navigateTo('/modals/voting-history')} />
           <PrRow icon="analytics-outline" label="Analytics" sub="Patterns & impact" onPress={() => navigateTo('/modals/analytics')} />
           <PrRow icon="trophy-outline" label="Badges & achievements" value={badgesEarned !== null ? `${badgesEarned} / ${BADGES_TOTAL}` : undefined} valueColor={colors.goldLight} last onPress={() => navigateTo('/modals/badges')} />

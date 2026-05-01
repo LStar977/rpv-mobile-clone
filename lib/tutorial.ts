@@ -23,7 +23,7 @@ export interface TutorialStep {
   type: TutorialStepType;
   title: string;
   description: string;
-  targetTab?: 'dashboard' | 'proposals' | 'identity' | 'sentinel' | 'profile';
+  targetTab?: 'dashboard' | 'proposals' | 'groups' | 'sentinel' | 'profile';
   targetElement?: string;
   requiredAction: TutorialActionType;
   gesture?: GestureType;
@@ -65,23 +65,11 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     highlightPadding: 12,
   },
   {
-    id: 'tap-identity',
-    type: 'action',
-    title: 'View Your Identity',
-    description: 'Tap the Identity tab to see your civic ID card.',
-    targetTab: 'proposals', // Current tab, we want them to navigate TO identity
-    targetElement: 'tab-identity',
-    requiredAction: 'tap-tab',
-    gesture: 'tap',
-    position: 'top',
-    highlightPadding: 8,
-  },
-  {
     id: 'id-card-info',
     type: 'info',
-    title: 'Your Digital Civic ID',
-    description: 'This is your identity in the Represent community. It shows your verification status and achievements.',
-    targetTab: 'identity',
+    title: 'Your Civic Passport',
+    description: 'Your Profile shows your civic identity passport — verification status, location, and folio.',
+    targetTab: 'profile',
     targetElement: 'id-card',
     requiredAction: 'tap-anywhere',
     position: 'bottom',
@@ -92,7 +80,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     type: 'action',
     title: 'Get Verified',
     description: 'Tap Verify Now to unlock voting on location-restricted proposals.',
-    targetTab: 'identity',
+    targetTab: 'profile',
     targetElement: 'verify-button',
     requiredAction: 'tap-button',
     gesture: 'tap',
@@ -104,7 +92,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     type: 'action',
     title: 'Meet Sentinel AI',
     description: 'Tap the Sentinel tab to discover AI-powered governance analysis.',
-    targetTab: 'identity', // Current tab, navigate TO sentinel
+    targetTab: 'profile', // Current tab, navigate TO sentinel
     targetElement: 'tab-sentinel',
     requiredAction: 'tap-tab',
     gesture: 'tap',

@@ -163,7 +163,7 @@ export default function ReceiptScreen() {
     if (type === 'verification') {
       router.replace('/modals/veriff');
     } else if (type === 'organization') {
-      router.replace('/modals/organizations');
+      router.replace('/(tabs)/groups');
     } else {
       router.back();
     }

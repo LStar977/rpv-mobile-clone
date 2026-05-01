@@ -321,7 +321,7 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
   const handleVerifyNow = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     await handleComplete();
-    router.push('/(tabs)/identity');
+    router.push('/(tabs)/profile');
   };
 
   const onViewableItemsChanged = useRef(

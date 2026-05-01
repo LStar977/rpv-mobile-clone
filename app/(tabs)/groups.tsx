@@ -11,10 +11,8 @@ import { useAuthStore } from '../../lib/auth';
 import { organizationsApi, Organization } from '../../lib/api';
 import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS } from '../../lib/theme';
 
-const SERIF_FONT = Platform.OS === 'ios' ? 'Georgia' : 'serif';
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
-// Organization Card Component
 function OrganizationCard({
   organization,
   onPress,
@@ -38,7 +36,6 @@ function OrganizationCard({
       activeOpacity={0.8}
     >
       <View style={styles.orgCardContent}>
-        {/* Logo */}
         <View style={[styles.orgLogo, { backgroundColor: `${getTierColor()}15` }]}>
           {organization.logoUrl ? (
             <Animated.Image
@@ -50,7 +47,6 @@ function OrganizationCard({
           )}
         </View>
 
-        {/* Info */}
         <View style={styles.orgInfo}>
           <View style={styles.orgNameRow}>
             <Text style={[styles.orgName, { color: colors.text }]} numberOfLines={1}>
@@ -78,14 +74,12 @@ function OrganizationCard({
           </View>
         </View>
 
-        {/* Chevron */}
         <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
       </View>
     </AnimatedTouchable>
   );
 }
 
-// Empty State Component
 function EmptyState({ onJoinPress, onCreatePress }: { onJoinPress: () => void; onCreatePress: () => void }) {
   const { colors } = useTheme();
 
@@ -121,7 +115,6 @@ function EmptyState({ onJoinPress, onCreatePress }: { onJoinPress: () => void; o
   );
 }
 
-// Join Organization Modal
 function JoinOrganizationSheet({
   visible,
   onClose,
@@ -217,7 +210,6 @@ function JoinOrganizationSheet({
         </TouchableOpacity>
       </View>
 
-      {/* Info Card */}
       <View style={[styles.infoCard, { backgroundColor: `${colors.info}10`, borderColor: `${colors.info}25` }]}>
         <Ionicons name="information-circle-outline" size={18} color={colors.info} />
         <Text style={[styles.infoCardText, { color: colors.textSecondary }]}>
@@ -228,7 +220,7 @@ function JoinOrganizationSheet({
   );
 }
 
-export default function OrganizationsScreen() {
+export default function GroupsScreen() {
   const { colors } = useTheme();
   const { token } = useAuthStore();
   const insets = useSafeAreaInsets();
@@ -284,11 +276,7 @@ export default function OrganizationsScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Header */}
-      <View style={[styles.header, { borderBottomColor: colors.border, paddingTop: insets.top + 8 }]}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="chevron-back" size={24} color={colors.text} />
-        </TouchableOpacity>
+      <View style={[styles.header, { borderBottomColor: colors.border, paddingTop: insets.top + 16 }]}>
         <Text style={[styles.headerTitle, { color: colors.text }]}>My Organizations</Text>
         <TouchableOpacity
           onPress={() => {
@@ -301,7 +289,6 @@ export default function OrganizationsScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Content */}
       {loading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.gold} />
@@ -330,7 +317,6 @@ export default function OrganizationsScreen() {
             />
           ) : (
             <>
-              {/* Stats Row */}
               <Animated.View entering={FadeInDown.duration(400)} style={styles.statsRow}>
                 <View style={[styles.statCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                   <Text style={[styles.statValue, { color: colors.gold }]}>{organizations.length}</Text>
@@ -344,7 +330,6 @@ export default function OrganizationsScreen() {
                 </View>
               </Animated.View>
 
-              {/* Organizations List */}
               {organizations.map((org, index) => (
                 <OrganizationCard
                   key={org.id}
@@ -354,7 +339,6 @@ export default function OrganizationsScreen() {
                 />
               ))}
 
-              {/* Upsell Card for Organizations */}
               <Animated.View
                 entering={FadeInUp.delay(organizations.length * 100 + 100).duration(400)}
                 style={[styles.upsellCard, { backgroundColor: colors.surface, borderColor: colors.gold }]}
@@ -394,7 +378,6 @@ export default function OrganizationsScreen() {
         </ScrollView>
       )}
 
-      {/* Join Organization Sheet */}
       {showJoinSheet && (
         <View style={styles.overlay}>
           <TouchableOpacity
@@ -414,27 +397,18 @@ export default function OrganizationsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
+  container: { flex: 1 },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: SPACING.lg,
-    paddingTop: SPACING.xl,
     paddingBottom: SPACING.md,
     borderBottomWidth: 1,
   },
-  backButton: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   headerTitle: {
     fontFamily: 'Georgia',
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: '500',
   },
   addButton: {
@@ -453,14 +427,9 @@ const styles = StyleSheet.create({
   loadingText: {
     ...TYPOGRAPHY.bodyMedium,
   },
-  content: {
-    flex: 1,
-  },
-  contentContainer: {
-    padding: SPACING.lg,
-  },
+  content: { flex: 1 },
+  contentContainer: { padding: SPACING.lg },
 
-  // Stats Row
   statsRow: {
     flexDirection: 'row',
     gap: SPACING.md,
@@ -483,7 +452,6 @@ const styles = StyleSheet.create({
     marginTop: SPACING.xxs,
   },
 
-  // Organization Card
   orgCard: {
     borderRadius: BORDER_RADIUS.xl,
     borderWidth: 1,
@@ -491,10 +459,7 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.md,
     ...SHADOWS.sm,
   },
-  orgCardContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
+  orgCardContent: { flexDirection: 'row', alignItems: 'center' },
   orgLogo: {
     width: 56,
     height: 56,
@@ -508,9 +473,7 @@ const styles = StyleSheet.create({
     height: 56,
     borderRadius: 28,
   },
-  orgInfo: {
-    flex: 1,
-  },
+  orgInfo: { flex: 1 },
   orgNameRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -551,7 +514,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 
-  // Empty State
   emptyState: {
     alignItems: 'center',
     padding: SPACING.xxxl,
@@ -608,7 +570,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 
-  // Upsell Card
   upsellCard: {
     borderRadius: BORDER_RADIUS.xxl,
     borderWidth: 1.5,
@@ -629,9 +590,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginRight: SPACING.md,
   },
-  upsellText: {
-    flex: 1,
-  },
+  upsellText: { flex: 1 },
   upsellTitle: {
     ...TYPOGRAPHY.labelLarge,
     fontWeight: '600',
@@ -655,7 +614,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 
-  // Overlay
   overlay: {
     ...StyleSheet.absoluteFillObject,
     justifyContent: 'flex-end',
@@ -665,7 +623,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.5)',
   },
 
-  // Join Sheet
   joinSheet: {
     borderTopLeftRadius: BORDER_RADIUS.xxl,
     borderTopRightRadius: BORDER_RADIUS.xxl,
@@ -747,7 +704,5 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
 
-  bottomSpacer: {
-    height: 100,
-  },
+  bottomSpacer: { height: 100 },
 });

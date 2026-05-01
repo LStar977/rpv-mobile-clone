@@ -49,7 +49,7 @@ export default function VeriffScreen() {
       }
       if (url.includes('finished') || url.includes('success')) {
         router.replace({
-          pathname: '/(tabs)/identity',
+          pathname: '/(tabs)/profile',
           params: { verificationId, completed: 'true' },
         });
       }
