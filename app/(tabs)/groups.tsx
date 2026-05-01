@@ -117,15 +117,13 @@ function GHeader({ stat, admins, onAddPress, insetTop }: { stat: number; admins:
           onPress={onAddPress}
           activeOpacity={0.7}
           style={{
-            width: 42, height: 42, borderRadius: 21,
-            backgroundColor: 'rgba(234,186,88,0.08)',
-            borderWidth: 1, borderColor: G_GOLD_D,
+            width: 36, height: 36, borderRadius: 8,
+            backgroundColor: G_BG_RAISED,
+            borderWidth: 1, borderColor: G_LINE_STRONG,
             alignItems: 'center', justifyContent: 'center',
-            shadowColor: G_GOLD, shadowOffset: { width: 0, height: 4 },
-            shadowOpacity: 0.1, shadowRadius: 12,
           }}
         >
-          <Ionicons name="add" size={20} color={G_GOLD} />
+          <Ionicons name="add" size={18} color={G_FG_MUTED} />
         </TouchableOpacity>
       </View>
       {stat > 0 && (
@@ -230,23 +228,17 @@ function OrgCard({ org, onPress, index }: { org: Organization; onPress: () => vo
 function CharterCTA({ onPress }: { onPress: () => void }) {
   return (
     <Animated.View entering={FadeInUp.delay(300).duration(400)} style={{ paddingHorizontal: 16, marginTop: 12 }}>
-      <TouchableOpacity activeOpacity={0.9} onPress={onPress}>
+      <TouchableOpacity activeOpacity={0.85} onPress={onPress}>
         <View style={{
-          position: 'relative',
+          backgroundColor: G_BG_CARD,
           borderRadius: 18,
-          borderWidth: 1, borderColor: G_GOLD_D,
-          overflow: 'hidden',
+          borderWidth: 1, borderColor: G_LINE,
           paddingHorizontal: 18, paddingVertical: 18,
-          shadowColor: '#000', shadowOffset: { width: 0, height: 8 },
-          shadowOpacity: 0.3, shadowRadius: 24, elevation: 6,
         }}>
-          <LinearGradient
-            colors={['rgba(234,186,88,0.06)', 'rgba(234,186,88,0.02)']}
-            style={StyleSheet.absoluteFill}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 0, y: 1 }}
-          />
-          <Guilloche opacity={0.08} id="g-cta" />
+          <View style={{
+            position: 'absolute', top: 0, bottom: 0, left: 0, width: 2,
+            backgroundColor: G_GOLD, opacity: 0.7,
+          }} />
 
           <Text style={{
             fontFamily: SERIF, fontSize: 22, fontWeight: '500',
@@ -289,32 +281,20 @@ function EmptyLedger({ onJoinPress, onCreatePress }: { onJoinPress: () => void; 
     <Animated.View entering={FadeInDown.duration(400)} style={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 20 }}>
       <View style={{
         position: 'relative',
-        borderRadius: 20,
-        borderWidth: 1, borderColor: G_LINE_STRONG,
-        overflow: 'hidden',
+        backgroundColor: G_BG_CARD,
+        borderRadius: 18,
+        borderWidth: 1, borderColor: G_LINE,
         paddingHorizontal: 24, paddingTop: 36, paddingBottom: 28,
-        minHeight: 360,
-        shadowColor: '#000', shadowOffset: { width: 0, height: 18 },
-        shadowOpacity: 0.4, shadowRadius: 36, elevation: 8,
+        minHeight: 320,
       }}>
-        <LinearGradient
-          colors={['#0E1116', '#0A0C0F']}
-          style={StyleSheet.absoluteFill}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 0, y: 1 }}
-        />
-        <Guilloche opacity={0.05} id="g-empty" />
-        <CornerTicks color={G_GOLD_D} size={12} weight={1.2} />
-
-        {/* simple sigil */}
-        <View style={{ alignSelf: 'center', width: 72, height: 72, marginBottom: 18, alignItems: 'center', justifyContent: 'center' }}>
-          <Svg width={72} height={72} viewBox="0 0 72 72">
-            <Circle cx={36} cy={36} r={34} fill="none" stroke={G_GOLD_D} strokeWidth={0.6} />
-            <Circle cx={36} cy={36} r={28} fill="none" stroke={G_GOLD_D} strokeWidth={0.4} strokeDasharray="1 2" />
-          </Svg>
-          <View style={{ position: 'absolute', alignItems: 'center', justifyContent: 'center' }}>
-            <Ionicons name="people-outline" size={28} color={G_GOLD_L} />
-          </View>
+        {/* icon */}
+        <View style={{
+          alignSelf: 'center', width: 64, height: 64, borderRadius: 32,
+          backgroundColor: G_BG_RAISED,
+          alignItems: 'center', justifyContent: 'center',
+          marginBottom: 18,
+        }}>
+          <Ionicons name="people-outline" size={28} color={G_GOLD_L} />
         </View>
 
         <Text style={{
@@ -476,7 +456,6 @@ function InviteSheet({
             shadowColor: G_GOLD, shadowOffset: { width: 0, height: 4 },
             shadowOpacity: 0.06, shadowRadius: 14,
           }}>
-            <CornerTicks color={G_GOLD} size={6} weight={1} />
             <View style={{
               position: 'absolute', left: 14, top: 0, bottom: 0,
               alignItems: 'center', justifyContent: 'center',

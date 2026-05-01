@@ -165,28 +165,28 @@ function TierSeal({ tier, size = 36 }: { tier: Organization['tier']; size?: numb
   );
 }
 
-function OrgPortrait({ name, logoUrl, tier, size = 72 }: { name: string; logoUrl?: string; tier: Organization['tier']; size?: number }) {
-  const isPro = tier === 'professional';
-  const monogram = monogramFromName(name);
+function OrgPortrait({ name, logoUrl, size = 72 }: { name: string; logoUrl?: string; size?: number }) {
+  if (logoUrl) {
+    return (
+      <ExpoImage
+        source={{ uri: logoUrl }}
+        style={{ width: size, height: size, borderRadius: 12, backgroundColor: O_BG_RAISED }}
+        contentFit="cover"
+        cachePolicy="memory-disk"
+      />
+    );
+  }
   return (
     <View style={{
-      width: size, height: size * 1.12,
-      borderWidth: 1, borderColor: isPro ? O_GOLD_D : O_LINE_STRONG,
-      backgroundColor: '#0A0C0F',
-      alignItems: 'center', justifyContent: 'center',
-      position: 'relative', flexShrink: 0,
+      width: size, height: size, borderRadius: 12,
+      backgroundColor: O_BG_RAISED,
+      borderWidth: 1, borderColor: O_LINE,
+      alignItems: 'center', justifyContent: 'center', flexShrink: 0,
     }}>
-      <CornerTicks color={isPro ? O_GOLD : O_FG_FAINT} size={8} weight={1.2} />
-      {logoUrl ? (
-        <ExpoImage source={{ uri: logoUrl }} style={{ width: size * 0.7, height: size * 0.7 }} contentFit="contain" cachePolicy="memory-disk" />
-      ) : (
-        <Text style={{
-          fontFamily: SERIF, fontSize: size * 0.42, fontWeight: '500', fontStyle: 'italic',
-          color: isPro ? O_GOLD_L : O_FG_MUTED, letterSpacing: -1,
-          textShadowColor: isPro ? 'rgba(234,186,88,0.25)' : 'transparent',
-          textShadowRadius: 8,
-        }}>{monogram}</Text>
-      )}
+      <Text style={{
+        fontFamily: SERIF, fontSize: size * 0.46, fontWeight: '500', fontStyle: 'italic',
+        color: O_GOLD_L, letterSpacing: -0.5,
+      }}>{monogramFromName(name)}</Text>
     </View>
   );
 }
@@ -229,28 +229,26 @@ function TopBar({ title, isAdmin, onBack, onOverflow, insetTop }: { title: strin
       borderBottomWidth: 1, borderBottomColor: O_LINE,
     }}>
       <TouchableOpacity onPress={onBack} activeOpacity={0.7} style={{
-        width: 36, height: 36, borderRadius: 4,
-        borderWidth: 1, borderColor: O_LINE_STRONG,
-        backgroundColor: 'rgba(13,15,18,0.7)',
-        alignItems: 'center', justifyContent: 'center', position: 'relative',
+        width: 36, height: 36, borderRadius: 8,
+        borderWidth: 1, borderColor: O_LINE,
+        backgroundColor: O_BG_RAISED,
+        alignItems: 'center', justifyContent: 'center',
       }}>
-        <CornerTicks color={O_GOLD_D} size={4} weight={0.8} />
-        <Ionicons name="chevron-back" size={14} color={O_FG_MUTED} />
+        <Ionicons name="chevron-back" size={16} color={O_FG_MUTED} />
       </TouchableOpacity>
       <View style={{ flex: 1, paddingHorizontal: 12, alignItems: 'center' }}>
-        <Text numberOfLines={1} style={{ fontFamily: SERIF, fontSize: 15, fontStyle: 'italic', color: O_FG, letterSpacing: -0.1 }}>
+        <Text numberOfLines={1} style={{ fontFamily: SERIF, fontSize: 17, color: O_FG, letterSpacing: -0.2 }}>
           {title}
         </Text>
       </View>
       <TouchableOpacity onPress={onOverflow} activeOpacity={0.7} style={{
-        width: 36, height: 36, borderRadius: 4,
-        borderWidth: 1, borderColor: O_LINE_STRONG,
-        backgroundColor: 'rgba(13,15,18,0.7)',
-        alignItems: 'center', justifyContent: 'center', position: 'relative',
+        width: 36, height: 36, borderRadius: 8,
+        borderWidth: 1, borderColor: O_LINE,
+        backgroundColor: O_BG_RAISED,
+        alignItems: 'center', justifyContent: 'center',
         opacity: isAdmin ? 1 : 0.4,
       }}>
-        <CornerTicks color={O_GOLD_D} size={4} weight={0.8} />
-        <Ionicons name="ellipsis-horizontal" size={14} color={O_FG_MUTED} />
+        <Ionicons name="ellipsis-horizontal" size={16} color={O_FG_MUTED} />
       </TouchableOpacity>
     </View>
   );
@@ -258,37 +256,20 @@ function TopBar({ title, isAdmin, onBack, onOverflow, insetTop }: { title: strin
 
 // ─── hero ─────────────────────────────────────────────────────────────
 function Hero({ org, proposalCount }: { org: Organization; proposalCount: number }) {
-  const isPro = org.tier === 'professional';
   const founded = formatRomanYM(org.createdAt);
   const role = org.role === 'admin' ? 'Admin' : 'Member';
 
   return (
     <Animated.View entering={FadeInDown.duration(400)} style={{ paddingHorizontal: 14, marginBottom: 16 }}>
       <View style={{
-        position: 'relative',
+        backgroundColor: O_BG_CARD,
         borderRadius: 18,
-        borderWidth: 1, borderColor: isPro ? O_LINE_STRONG : O_LINE,
+        borderWidth: 1, borderColor: O_LINE,
         overflow: 'hidden',
-        shadowColor: '#000', shadowOffset: { width: 0, height: 18 },
-        shadowOpacity: 0.4, shadowRadius: 36, elevation: 8,
       }}>
-        <LinearGradient
-          colors={isPro ? ['#14171C', '#0B0D10'] : ['#10131A', '#0B0D10']}
-          style={StyleSheet.absoluteFill}
-          start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }}
-        />
-        {isPro && (
-          <LinearGradient
-            colors={['rgba(234,186,88,0.07)', 'transparent']}
-            style={StyleSheet.absoluteFill}
-            start={{ x: 0, y: 0 }} end={{ x: 0.7, y: 0.55 }}
-          />
-        )}
-        {isPro && <Guilloche opacity={0.05} id={`oh-${org.id}`} />}
-
         {/* main */}
         <View style={{ padding: 16, paddingBottom: 14, flexDirection: 'row', gap: 14, alignItems: 'flex-start' }}>
-          <OrgPortrait name={org.name} logoUrl={org.logoUrl} tier={org.tier} size={72} />
+          <OrgPortrait name={org.name} logoUrl={org.logoUrl} size={72} />
           <View style={{ flex: 1, minWidth: 0, paddingTop: 2 }}>
             <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginBottom: 6 }}>
               <Text style={{
@@ -297,7 +278,6 @@ function Hero({ org, proposalCount }: { org: Organization; proposalCount: number
                 flex: 1,
               }}>{org.name}</Text>
               {org.verified && <View style={{ marginTop: 6 }}><VerifiedTick size={14} /></View>}
-              <View style={{ marginTop: 2 }}><TierSeal tier={org.tier} size={26} /></View>
             </View>
             {!!org.description && (
               <Text style={{ fontSize: 12.5, color: O_FG_MUTED, letterSpacing: -0.05, lineHeight: 17 }}>
@@ -328,7 +308,6 @@ function Hero({ org, proposalCount }: { org: Organization; proposalCount: number
             </Text>
           </View>
         </View>
-
       </View>
     </Animated.View>
   );
@@ -361,21 +340,13 @@ function SectionTabs({ active, onChange, isAdmin, hasSubOrgs }: { active: TabTyp
                 borderBottomWidth: 1.5,
                 borderBottomColor: isActive ? O_GOLD : 'transparent',
                 marginBottom: -1,
-                flexDirection: 'row', alignItems: 'center', gap: 4,
               }}
             >
               <Text style={{
-                fontSize: 9.5, fontWeight: '600', letterSpacing: 1.7,
+                fontSize: 11, fontWeight: '600', letterSpacing: 2.2,
                 textTransform: 'uppercase',
                 color: isActive ? O_GOLD : O_FG_FAINT,
               }}>{t.label}</Text>
-              {isActive && (
-                <View style={{
-                  width: 4, height: 4, borderRadius: 2, backgroundColor: O_GOLD,
-                  shadowColor: O_GOLD, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.6, shadowRadius: 4,
-                  marginLeft: 2,
-                }} />
-              )}
             </TouchableOpacity>
           );
         })}
@@ -418,12 +389,14 @@ function proposalFolio(p: OrganizationProposal): string {
 function proposalTime(p: OrganizationProposal, kind: ProposalKind): string {
   if (kind === 'open' && p.deadline) {
     const ms = new Date(p.deadline).getTime() - Date.now();
-    if (ms <= 0) return 'CLOSING';
+    if (ms <= 0) return 'Closing';
     const d = Math.floor(ms / 86400000);
     const h = Math.floor((ms % 86400000) / 3600000);
-    const m = Math.floor((ms % 3600000) / 60000);
-    if (d > 0) return `${String(d).padStart(2,'0')}D ${String(h).padStart(2,'0')}H ${String(m).padStart(2,'0')}M`;
-    return `${String(h).padStart(2,'0')}H ${String(m).padStart(2,'0')}M`;
+    if (d > 1) return `${d} days left`;
+    if (d === 1) return '1 day left';
+    if (h > 1) return `${h} hours left`;
+    if (h === 1) return '1 hour left';
+    return 'Closing soon';
   }
   const seal = p.deadline || p.createdAt;
   if (seal) return `Closed ${formatRomanYM(seal)}`;
@@ -433,14 +406,14 @@ function proposalTime(p: OrganizationProposal, kind: ProposalKind): string {
 function FilterChip({ children, active, onPress }: { children: React.ReactNode; active: boolean; onPress: () => void }) {
   return (
     <TouchableOpacity activeOpacity={0.75} onPress={onPress} style={{
-      paddingHorizontal: 11, paddingVertical: 6,
-      borderWidth: 1, borderColor: active ? O_GOLD_D : O_LINE_STRONG,
-      backgroundColor: active ? 'rgba(234,186,88,0.08)' : 'transparent',
-      borderRadius: 2, marginRight: 6,
+      paddingHorizontal: 12, paddingVertical: 7,
+      borderWidth: 1, borderColor: active ? O_GOLD : O_LINE,
+      backgroundColor: active ? 'rgba(234,186,88,0.1)' : 'transparent',
+      borderRadius: 999, marginRight: 6,
     }}>
       <Text style={{
-        fontSize: 9.5, fontWeight: '600', letterSpacing: 1.5,
-        textTransform: 'uppercase', color: active ? O_GOLD : O_FG_MUTED,
+        fontSize: 12, fontWeight: '500',
+        color: active ? O_GOLD : O_FG_MUTED,
       }}>{children}</Text>
     </TouchableOpacity>
   );
@@ -450,25 +423,19 @@ function ProposalsEmpty() {
   return (
     <View style={{ paddingHorizontal: 14 }}>
       <View style={{
-        position: 'relative',
-        borderWidth: 1, borderColor: O_LINE_STRONG, borderRadius: 14,
-        paddingHorizontal: 24, paddingVertical: 40,
-        alignItems: 'center', overflow: 'hidden',
+        backgroundColor: O_BG_CARD,
+        borderWidth: 1, borderColor: O_LINE, borderRadius: 14,
+        paddingHorizontal: 24, paddingVertical: 36,
+        alignItems: 'center',
       }}>
-        <LinearGradient colors={['#0E1116', '#0A0C0F']} style={StyleSheet.absoluteFill} />
-        <Guilloche opacity={0.04} id="g-empty-prop" />
-        <CornerTicks color={O_GOLD_D} size={10} weight={1} />
-        <View style={{ width: 56, height: 56, marginBottom: 14, alignItems: 'center', justifyContent: 'center' }}>
-          <Svg width={56} height={56} viewBox="0 0 56 56">
-            <Circle cx={28} cy={28} r={26} fill="none" stroke={O_GOLD_D} strokeWidth={0.4} />
-            <Circle cx={28} cy={28} r={22} fill="none" stroke={O_GOLD_D} strokeWidth={0.3} strokeDasharray="1 2" />
-            <Line x1={14} y1={38} x2={42} y2={38} stroke={O_GOLD_D} strokeWidth={0.5} />
-            <G transform="translate(20 14)" stroke={O_GOLD_L} strokeWidth={0.8} fill="none" strokeLinecap="round">
-              <Path d="M2 16L14 4M2 16l-1 4 4-1L14 4M11 7l3 3" />
-            </G>
-          </Svg>
+        <View style={{
+          width: 56, height: 56, borderRadius: 28,
+          backgroundColor: O_BG_RAISED,
+          alignItems: 'center', justifyContent: 'center', marginBottom: 14,
+        }}>
+          <Ionicons name="document-text-outline" size={24} color={O_GOLD_L} />
         </View>
-        <Text style={{ fontFamily: SERIF, fontSize: 19, fontWeight: '500', color: O_FG, fontStyle: 'italic', letterSpacing: -0.05, marginBottom: 6 }}>
+        <Text style={{ fontFamily: SERIF, fontSize: 19, fontWeight: '500', color: O_FG, letterSpacing: -0.1, marginBottom: 6 }}>
           No proposals yet
         </Text>
         <Text style={{ fontSize: 13, color: O_FG_MUTED, lineHeight: 18, textAlign: 'center', maxWidth: 260 }}>
@@ -534,26 +501,27 @@ function SettingsSection({
     <View style={{ paddingHorizontal: 14 }}>
       {/* active invite code panel */}
       <View style={{
-        position: 'relative',
-        borderWidth: 1, borderColor: O_LINE_STRONG, borderRadius: 14,
-        overflow: 'hidden', marginBottom: 16,
+        backgroundColor: O_BG_CARD,
+        borderWidth: 1, borderColor: O_LINE,
+        borderRadius: 14, marginBottom: 16,
       }}>
-        <LinearGradient colors={['#11141A', '#0A0C10']} style={StyleSheet.absoluteFill} start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }} />
-        <Guilloche opacity={0.05} id="g-set-inv" />
-        <CornerTicks color={O_GOLD_D} size={9} weight={1} />
-        <View style={{ paddingHorizontal: 16, paddingTop: 14, paddingBottom: 18 }}>
+        <View style={{ paddingHorizontal: 16, paddingTop: 14, paddingBottom: 16 }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 10 }}>
             <Text style={{ fontSize: 11, color: O_GOLD, letterSpacing: -0.05, fontWeight: '500' }}>Active invite code</Text>
             {expRoman && (
               <Text style={{ fontSize: 11, color: O_FG_FAINT, letterSpacing: -0.05 }}>Expires {expRoman}</Text>
             )}
           </View>
-          <Text style={{
-            fontFamily: MONO, fontSize: 24, fontWeight: '500',
-            color: O_GOLD_L, letterSpacing: 4, textAlign: 'center',
-            marginVertical: 8,
-            textShadowColor: 'rgba(234,186,88,0.4)', textShadowRadius: 12,
-          }}>{codeText.replace(/(.{4})/g, '$1·').replace(/·$/, '')}</Text>
+          <View style={{
+            marginVertical: 10, paddingVertical: 14,
+            backgroundColor: O_BG_RAISED, borderRadius: 10,
+            alignItems: 'center',
+          }}>
+            <Text style={{
+              fontFamily: MONO, fontSize: 22, fontWeight: '500',
+              color: O_GOLD_L, letterSpacing: 4, textAlign: 'center',
+            }}>{codeText.replace(/(.{4})/g, '$1·').replace(/·$/, '')}</Text>
+          </View>
           <Text style={{
             fontSize: 12, color: O_FG_FAINT, textAlign: 'center', marginBottom: 12, lineHeight: 17,
           }}>Anyone with this code can join your organization.</Text>
@@ -593,7 +561,7 @@ function SettingsSection({
 
       {/* Organization details */}
       <View style={{ backgroundColor: O_BG_CARD, borderWidth: 1, borderColor: O_LINE, borderRadius: 12, overflow: 'hidden', marginBottom: 14 }}>
-        <View style={{ paddingHorizontal: 14, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: O_LINE, backgroundColor: 'rgba(0,0,0,0.2)' }}>
+        <View style={{ paddingHorizontal: 14, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: O_LINE, backgroundColor: O_BG_RAISED }}>
           <Text style={{ fontSize: 11, color: O_FG_MUTED, letterSpacing: -0.05, fontWeight: '600' }}>Organization details</Text>
         </View>
         <SettingsRow label="Name" value={org.name} />
@@ -608,7 +576,7 @@ function SettingsSection({
 
       {/* Members & roles */}
       <View style={{ backgroundColor: O_BG_CARD, borderWidth: 1, borderColor: O_LINE, borderRadius: 12, overflow: 'hidden', marginBottom: 14 }}>
-        <View style={{ paddingHorizontal: 14, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: O_LINE, backgroundColor: 'rgba(0,0,0,0.2)' }}>
+        <View style={{ paddingHorizontal: 14, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: O_LINE, backgroundColor: O_BG_RAISED }}>
           <Text style={{ fontSize: 11, color: O_FG_MUTED, letterSpacing: -0.05, fontWeight: '600' }}>Members & roles</Text>
         </View>
         <SettingsRow label="Total members" value={(org.memberCount ?? 0).toLocaleString()} mono />
@@ -617,7 +585,7 @@ function SettingsSection({
 
       {/* Manage */}
       <View style={{ backgroundColor: O_BG_CARD, borderWidth: 1, borderColor: O_LINE, borderRadius: 12, overflow: 'hidden', marginBottom: 14 }}>
-        <View style={{ paddingHorizontal: 14, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: O_LINE, backgroundColor: 'rgba(0,0,0,0.2)' }}>
+        <View style={{ paddingHorizontal: 14, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: O_LINE, backgroundColor: O_BG_RAISED }}>
           <Text style={{ fontSize: 11, color: O_RED, letterSpacing: -0.05, fontWeight: '600' }}>Manage</Text>
         </View>
         <SettingsRow label="Leave" value="Leave this organization" onPress={onLeave} />
@@ -903,13 +871,11 @@ function SubOrdersSection({ subOrgs, totalMembers, onPress, onLongPress, isAdmin
               }}
             >
               <View style={{
-                width: 40, height: 44, flexShrink: 0,
-                borderWidth: 1, borderColor: O_LINE_STRONG,
-                backgroundColor: '#0A0C0F',
-                alignItems: 'center', justifyContent: 'center', position: 'relative',
+                width: 44, height: 44, borderRadius: 10, flexShrink: 0,
+                backgroundColor: O_BG_RAISED,
+                alignItems: 'center', justifyContent: 'center',
               }}>
-                <CornerTicks color={O_FG_FAINT} size={4} weight={0.7} />
-                <Text style={{ fontFamily: SERIF, fontSize: 16, fontStyle: 'italic', color: O_FG_MUTED, letterSpacing: -0.5 }}>
+                <Text style={{ fontFamily: SERIF, fontSize: 16, fontStyle: 'italic', color: O_GOLD_L, letterSpacing: -0.5 }}>
                   {monogram}
                 </Text>
               </View>
@@ -967,16 +933,13 @@ function MembersSection({ members, totalCount, search, onSearch, isAdmin, onMemb
         <View style={{
           position: 'relative',
           backgroundColor: O_BG_CARD,
-          borderWidth: 1, borderColor: O_LINE_STRONG,
-          borderRadius: 4,
+          borderWidth: 1, borderColor: O_LINE,
+          borderRadius: 10,
           paddingLeft: 36, paddingRight: 12, paddingVertical: 10,
           flexDirection: 'row', alignItems: 'center',
         }}>
-          <CornerTicks color={O_GOLD_D} size={4} weight={0.8} />
           <View style={{ position: 'absolute', left: 12, top: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' }}>
-            <Svg width={14} height={14} viewBox="0 0 14 14">
-              <Path d="M2 12l8-8M3 11l1.5-3.5L8 6l3-1 1-3-3 1-1 3-1.5 3.5L3 11z" stroke={O_GOLD} strokeWidth={1} strokeLinecap="round" strokeLinejoin="round" fill="none" />
-            </Svg>
+            <Ionicons name="search" size={14} color={O_FG_FAINT} />
           </View>
           <TextInput
             style={{ flex: 1, fontSize: 13, color: O_FG, paddingVertical: 0 }}
@@ -987,7 +950,7 @@ function MembersSection({ members, totalCount, search, onSearch, isAdmin, onMemb
             autoCapitalize="none"
             autoCorrect={false}
           />
-          <Text style={{ fontFamily: MONO, fontSize: 9, color: O_FG_FAINT, letterSpacing: 1.7 }}>
+          <Text style={{ fontSize: 11, color: O_FG_FAINT, letterSpacing: -0.05 }}>
             {totalCount.toLocaleString()}
           </Text>
         </View>
@@ -1019,14 +982,13 @@ function MembersSection({ members, totalCount, search, onSearch, isAdmin, onMemb
               return (
                 <TouchableOpacity
                   key={m.id || m.userId || i}
-                  activeOpacity={0.75}
+                  activeOpacity={0.7}
                   onPress={() => onMemberPress(m)}
                   style={{
                     paddingHorizontal: 14, paddingVertical: 11,
                     flexDirection: 'row', alignItems: 'center', gap: 12,
                     borderBottomWidth: i < filtered.length - 1 ? 1 : 0,
                     borderBottomColor: O_LINE,
-                    backgroundColor: isAdminRow ? 'rgba(234,186,88,0.025)' : 'transparent',
                     position: 'relative',
                   }}
                 >
@@ -1034,31 +996,27 @@ function MembersSection({ members, totalCount, search, onSearch, isAdmin, onMemb
                     <View style={{
                       position: 'absolute', left: 0, top: 0, bottom: 0, width: 2,
                       backgroundColor: O_GOLD,
-                      shadowColor: O_GOLD, shadowOffset: { width: 0, height: 0 },
-                      shadowOpacity: 0.3, shadowRadius: 4,
                     }} />
                   )}
                   <View style={{
-                    width: 32, height: 32, flexShrink: 0,
-                    borderWidth: 1, borderColor: isAdminRow ? O_GOLD_D : O_LINE_STRONG,
-                    backgroundColor: '#0A0C0F',
-                    alignItems: 'center', justifyContent: 'center', position: 'relative',
+                    width: 36, height: 36, borderRadius: 8, flexShrink: 0,
+                    backgroundColor: O_BG_RAISED,
+                    alignItems: 'center', justifyContent: 'center',
                   }}>
-                    <CornerTicks color={isAdminRow ? O_GOLD : O_FG_FAINT} size={3} weight={0.6} />
-                    <Text style={{ fontFamily: SERIF, fontSize: 11, fontStyle: 'italic', color: isAdminRow ? O_GOLD_L : O_FG_MUTED }}>
+                    <Text style={{ fontFamily: SERIF, fontSize: 13, fontStyle: 'italic', color: isAdminRow ? O_GOLD_L : O_FG_MUTED }}>
                       {monogram}
                     </Text>
                   </View>
                   <View style={{ flex: 1, minWidth: 0 }}>
-                    <Text numberOfLines={1} style={{ fontFamily: SERIF, fontSize: 14, fontWeight: '500', color: O_FG, letterSpacing: -0.05, lineHeight: 16 }}>
+                    <Text numberOfLines={1} style={{ fontSize: 14, fontWeight: '500', color: O_FG, letterSpacing: -0.05, lineHeight: 18 }}>
                       {fullName}
                     </Text>
                     <Text style={{ fontSize: 11, color: O_FG_FAINT, letterSpacing: -0.05, marginTop: 2 }}>
                       Joined {joined}
                     </Text>
                   </View>
-                  <Text style={{ fontSize: 8.5, fontWeight: '600', letterSpacing: 1.7, color: roleColor }}>
-                    {memberRole.toUpperCase()}
+                  <Text style={{ fontSize: 12, fontWeight: '500', color: roleColor }}>
+                    {isAdminRow ? 'Admin' : 'Member'}
                   </Text>
                 </TouchableOpacity>
               );
@@ -1075,14 +1033,19 @@ function AnnouncementsEmpty() {
   return (
     <View style={{ paddingHorizontal: 14 }}>
       <View style={{
-        position: 'relative',
-        borderWidth: 1, borderColor: O_LINE_STRONG, borderRadius: 14,
+        backgroundColor: O_BG_CARD,
+        borderWidth: 1, borderColor: O_LINE, borderRadius: 14,
         paddingHorizontal: 24, paddingVertical: 36,
-        alignItems: 'center', overflow: 'hidden',
+        alignItems: 'center',
       }}>
-        <LinearGradient colors={['#0E1116', '#0A0C0F']} style={StyleSheet.absoluteFill} />
-        <CornerTicks color={O_GOLD_D} size={10} weight={1} />
-        <Text style={{ fontFamily: SERIF, fontSize: 18, fontStyle: 'italic', color: O_FG, marginBottom: 6 }}>
+        <View style={{
+          width: 56, height: 56, borderRadius: 28,
+          backgroundColor: O_BG_RAISED,
+          alignItems: 'center', justifyContent: 'center', marginBottom: 14,
+        }}>
+          <Ionicons name="megaphone-outline" size={24} color={O_GOLD_L} />
+        </View>
+        <Text style={{ fontFamily: SERIF, fontSize: 18, fontWeight: '500', color: O_FG, letterSpacing: -0.1, marginBottom: 6 }}>
           No announcements yet
         </Text>
         <Text style={{ fontSize: 13, color: O_FG_MUTED, textAlign: 'center', maxWidth: 240, lineHeight: 18 }}>
@@ -1104,53 +1067,46 @@ function AnnouncementsSection({ announcements, isAdmin, onDelete }: { announceme
         const author = d.authorName || d.author?.name || d.signedBy || '';
         const role = d.authorRole || 'Admin';
         const isMostRecent = i === 0;
+        const isLast = i === announcements.length - 1;
         return (
-          <View key={String(d.id || i)} style={{
-            position: 'relative',
-            paddingLeft: 18, paddingBottom: 18,
-            borderLeftWidth: 1, borderLeftColor: O_LINE,
-            marginLeft: 6,
-          }}>
-            <View style={{
-              position: 'absolute', left: -4, top: 4,
-              width: 7, height: 7, borderRadius: 4,
-              backgroundColor: isMostRecent ? O_GOLD : O_LINE_STRONG,
-              borderWidth: 1, borderColor: isMostRecent ? O_GOLD_D : O_LINE_STRONG,
-              shadowColor: O_GOLD, shadowOffset: { width: 0, height: 0 },
-              shadowOpacity: isMostRecent ? 0.5 : 0, shadowRadius: 4,
-            }} />
-            <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 8, marginBottom: 4 }}>
-              <Text style={{ fontFamily: MONO, fontSize: 9, fontWeight: '500', color: O_GOLD, letterSpacing: 1.7 }}>
+          <View
+            key={String(d.id || i)}
+            style={{
+              backgroundColor: O_BG_CARD,
+              borderWidth: 1, borderColor: O_LINE,
+              borderRadius: 14,
+              paddingHorizontal: 14, paddingVertical: 14,
+              marginBottom: isLast ? 0 : 10,
+            }}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+              {isMostRecent && (
+                <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: O_GOLD }} />
+              )}
+              <Text style={{ fontSize: 11, color: O_FG_FAINT, letterSpacing: -0.05 }}>
                 {formatRomanDate(date)}
               </Text>
-              {!!date && (
-                <Text style={{ fontFamily: MONO, fontSize: 8.5, color: O_FG_FAINT, letterSpacing: 1 }}>
-                  · {formatTimeMono(date)}
-                </Text>
-              )}
               {d.pinned && (
-                <Text style={{ fontSize: 10, color: O_GOLD_L, letterSpacing: -0.05 }}>· Pinned</Text>
+                <Text style={{ fontSize: 11, color: O_GOLD_L, letterSpacing: -0.05 }}>· Pinned</Text>
               )}
-            </View>
-            <Text style={{
-              fontFamily: SERIF, fontSize: 16, fontStyle: 'italic', fontWeight: '500',
-              color: O_FG, letterSpacing: -0.05, lineHeight: 19, marginBottom: 6,
-            }}>{headline}</Text>
-            {!!body && (
-              <Text style={{ fontSize: 12, color: O_FG_MUTED, letterSpacing: -0.05, lineHeight: 17, marginBottom: 6 }}>
-                {body}
-              </Text>
-            )}
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-              <Text style={{ fontSize: 11, color: O_FG_FAINT, letterSpacing: -0.05 }}>
-                — {author ? `${author} · ${role}` : role}
-              </Text>
               {isAdmin && d.id && (
-                <TouchableOpacity onPress={() => onDelete(String(d.id), headline)} hitSlop={8}>
-                  <Ionicons name="trash-outline" size={12} color={O_FG_FAINT} />
+                <TouchableOpacity onPress={() => onDelete(String(d.id), headline)} hitSlop={8} style={{ marginLeft: 'auto' }}>
+                  <Ionicons name="trash-outline" size={13} color={O_FG_FAINT} />
                 </TouchableOpacity>
               )}
             </View>
+            <Text style={{
+              fontFamily: SERIF, fontSize: 16, fontWeight: '500',
+              color: O_FG, letterSpacing: -0.1, lineHeight: 20, marginBottom: 6,
+            }}>{headline}</Text>
+            {!!body && (
+              <Text style={{ fontSize: 12.5, color: O_FG_MUTED, letterSpacing: -0.05, lineHeight: 17, marginBottom: 6 }}>
+                {body}
+              </Text>
+            )}
+            <Text style={{ fontSize: 11, color: O_FG_FAINT, letterSpacing: -0.05 }}>
+              {author ? `${author} · ${role}` : role}
+            </Text>
           </View>
         );
       })}
@@ -1178,11 +1134,11 @@ function ProposalsSection({ proposals, onPress }: { proposals: OrganizationPropo
     <View>
       <View style={{ paddingHorizontal: 14, paddingBottom: 12 }}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          <FilterChip active={filter === 'all'} onPress={() => setFilter('all')}>All · {pad(counts.all)}</FilterChip>
-          <FilterChip active={filter === 'open'} onPress={() => setFilter('open')}>Active · {pad(counts.open)}</FilterChip>
-          <FilterChip active={filter === 'passed'} onPress={() => setFilter('passed')}>Passed · {pad(counts.passed)}</FilterChip>
-          <FilterChip active={filter === 'closed'} onPress={() => setFilter('closed')}>Closed · {pad(counts.closed)}</FilterChip>
-          <FilterChip active={filter === 'failed'} onPress={() => setFilter('failed')}>Failed · {pad(counts.failed)}</FilterChip>
+          <FilterChip active={filter === 'all'} onPress={() => setFilter('all')}>All · {counts.all}</FilterChip>
+          <FilterChip active={filter === 'open'} onPress={() => setFilter('open')}>Active · {counts.open}</FilterChip>
+          <FilterChip active={filter === 'passed'} onPress={() => setFilter('passed')}>Passed · {counts.passed}</FilterChip>
+          <FilterChip active={filter === 'closed'} onPress={() => setFilter('closed')}>Closed · {counts.closed}</FilterChip>
+          <FilterChip active={filter === 'failed'} onPress={() => setFilter('failed')}>Failed · {counts.failed}</FilterChip>
         </ScrollView>
       </View>
 
@@ -1194,46 +1150,40 @@ function ProposalsSection({ proposals, onPress }: { proposals: OrganizationPropo
           const tally = `${total} / ${(p as any).quorum || total || 0}`;
           const pct = total > 0 ? (p.supportVotes || 0) / total : 0;
           const isOpen = kind === 'open';
+          const statusColor = kind === 'open' ? O_GOLD : kind === 'passed' ? O_GREEN : O_FG_FAINT;
+          const statusLabel = kind === 'open' ? 'Open' : kind === 'passed' ? 'Passed' : kind === 'failed' ? 'Failed' : 'Closed';
           return (
             <Animated.View key={String(p.id)} entering={FadeInUp.delay(i * 40).duration(300)}>
-              <TouchableOpacity activeOpacity={0.85} onPress={() => onPress(p)}>
+              <TouchableOpacity activeOpacity={0.7} onPress={() => onPress(p)}>
                 <View style={{
-                  position: 'relative',
                   backgroundColor: O_BG_CARD,
-                  borderWidth: 1, borderColor: isOpen ? O_LINE_STRONG : O_LINE,
-                  borderRadius: 12,
-                  paddingHorizontal: 14, paddingVertical: 12,
-                  shadowColor: isOpen ? O_GOLD : 'transparent',
-                  shadowOffset: { width: 0, height: 0 },
-                  shadowOpacity: isOpen ? 0.08 : 0,
-                  shadowRadius: 4,
+                  borderWidth: 1, borderColor: O_LINE,
+                  borderRadius: 14,
+                  paddingHorizontal: 14, paddingVertical: 14,
                 }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10, marginBottom: 8 }}>
-                    <View style={{ flex: 1, minWidth: 0 }}>
-                      <Text style={{ fontFamily: MONO, fontSize: 8.5, color: O_FG_FAINT, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 4 }}>
-                        {proposalFolio(p)}
-                      </Text>
-                      <Text style={{ fontFamily: SERIF, fontSize: 15, fontWeight: '500', color: O_FG, letterSpacing: -0.05, lineHeight: 18 }}>
-                        {p.title}
-                      </Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 10 }}>
+                    <Text style={{ fontFamily: SERIF, fontSize: 16, fontWeight: '500', color: O_FG, letterSpacing: -0.1, lineHeight: 20, flex: 1 }}>
+                      {p.title}
+                    </Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 3 }}>
+                      <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: statusColor }} />
+                      <Text style={{ fontSize: 12, fontWeight: '500', color: statusColor }}>{statusLabel}</Text>
                     </View>
-                    <Pill kind={kind}>{kind}</Pill>
                   </View>
                   {isOpen && total > 0 && (
-                    <View style={{ height: 3, backgroundColor: O_LINE_STRONG, borderRadius: 1, marginBottom: 8, overflow: 'hidden' }}>
+                    <View style={{ height: 3, backgroundColor: O_LINE_STRONG, borderRadius: 1.5, marginBottom: 10, overflow: 'hidden' }}>
                       <View style={{
                         position: 'absolute', top: 0, bottom: 0, left: 0,
                         width: `${Math.min(100, Math.max(0, pct * 100))}%`,
                         backgroundColor: O_GOLD,
-                        shadowColor: O_GOLD, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.3, shadowRadius: 4,
                       }} />
                     </View>
                   )}
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                    <Text style={{ fontFamily: MONO, fontSize: 9.5, color: O_FG_MUTED, letterSpacing: 1 }}>
-                      <Text style={{ color: O_FG }}>{cast}</Text> CAST
+                    <Text style={{ fontSize: 12, color: O_FG_MUTED, letterSpacing: -0.05 }}>
+                      <Text style={{ color: O_FG }}>{cast.toLocaleString()}</Text> {cast === 1 ? 'vote' : 'votes'}
                     </Text>
-                    <Text style={{ fontFamily: MONO, fontSize: 9.5, color: isOpen ? O_GOLD : O_FG_FAINT, letterSpacing: 1 }}>
+                    <Text style={{ fontSize: 12, color: isOpen ? O_GOLD : O_FG_FAINT, letterSpacing: -0.05 }}>
                       {proposalTime(p, kind)}
                     </Text>
                   </View>
@@ -1255,18 +1205,14 @@ function BottomSheet({ onClose, children }: { onClose: () => void; children: Rea
       <TouchableOpacity activeOpacity={1} onPress={onClose} style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(2,4,6,0.72)' }]} />
       <View style={{
         position: 'absolute', left: 0, right: 0, bottom: 0,
-        backgroundColor: '#0A0C10',
+        backgroundColor: O_BG_CARD,
         borderTopLeftRadius: 20, borderTopRightRadius: 20,
-        borderTopWidth: 1, borderTopColor: O_GOLD_D,
-        borderLeftWidth: 1, borderLeftColor: O_LINE_STRONG,
-        borderRightWidth: 1, borderRightColor: O_LINE_STRONG,
+        borderTopWidth: 1, borderTopColor: O_LINE,
         paddingTop: 14,
         paddingBottom: 28 + insets.bottom,
         overflow: 'hidden',
-        shadowColor: '#000', shadowOffset: { width: 0, height: -20 }, shadowOpacity: 0.6, shadowRadius: 60, elevation: 24,
+        shadowColor: '#000', shadowOffset: { width: 0, height: -8 }, shadowOpacity: 0.5, shadowRadius: 30, elevation: 24,
       }}>
-        <LinearGradient colors={['#11141A', '#0A0C10']} style={StyleSheet.absoluteFill} start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }} />
-        <Guilloche opacity={0.05} id="g-sheet" />
         <View style={{ width: 36, height: 3, borderRadius: 2, backgroundColor: O_LINE_STRONG, alignSelf: 'center', marginBottom: 14 }} />
         {children}
       </View>
@@ -1293,26 +1239,18 @@ function InviteCodeModal({ visible, onClose, onConfirm, generating }: { visible:
         </Text>
 
         <View style={{
-          position: 'relative',
-          paddingHorizontal: 16, paddingVertical: 20,
-          borderWidth: 1, borderColor: O_GOLD_D,
-          borderRadius: 8, marginBottom: 14, alignItems: 'center', overflow: 'hidden',
+          paddingHorizontal: 16, paddingVertical: 18,
+          backgroundColor: O_BG_RAISED,
+          borderRadius: 10, marginBottom: 14, alignItems: 'center',
         }}>
-          <LinearGradient
-            colors={['rgba(234,186,88,0.1)', 'transparent']}
-            style={StyleSheet.absoluteFill}
-            start={{ x: 0.5, y: 0.2 }} end={{ x: 0.5, y: 0.8 }}
-          />
-          <CornerTicks color={O_GOLD} size={6} weight={1} />
           <Text style={{ fontSize: 11, color: O_FG_FAINT, letterSpacing: -0.05, marginBottom: 8 }}>
             Your new code
           </Text>
           <Text style={{
-            fontFamily: MONO, fontSize: 22, fontWeight: '500',
-            color: O_GOLD_L, letterSpacing: 4,
-            textShadowColor: 'rgba(234,186,88,0.45)', textShadowRadius: 14,
+            fontFamily: MONO, fontSize: 18, fontWeight: '500',
+            color: O_GOLD_L, letterSpacing: 3,
           }}>
-            {generating ? 'Generating…' : 'Tap below to create'}
+            {generating ? 'Generating…' : 'Tap to create'}
           </Text>
         </View>
 
@@ -1376,7 +1314,6 @@ function InviteCodeModal({ visible, onClose, onConfirm, generating }: { visible:
               opacity: generating ? 0.7 : 1,
             }}
           >
-            <CornerTicks color={O_GOLD} size={4} weight={0.8} />
             {generating ? (
               <ActivityIndicator size="small" color={O_GOLD_L} />
             ) : (
@@ -1419,13 +1356,11 @@ function MemberRoleModal({ visible, onClose, member, onConfirm }: { visible: boo
           flexDirection: 'row', alignItems: 'center', gap: 12,
           position: 'relative',
         }}>
-          <CornerTicks color={O_GOLD_D} size={4} weight={0.8} />
           <View style={{
             width: 44, height: 44,
             borderWidth: 1, borderColor: O_GOLD_D, backgroundColor: '#0A0C0F',
             alignItems: 'center', justifyContent: 'center', position: 'relative',
           }}>
-            <CornerTicks color={O_GOLD} size={4} weight={0.7} />
             <Text style={{ fontFamily: SERIF, fontSize: 16, fontStyle: 'italic', color: O_GOLD_L }}>{monogram}</Text>
           </View>
           <View style={{ flex: 1, minWidth: 0 }}>
@@ -1457,7 +1392,6 @@ function MemberRoleModal({ visible, onClose, member, onConfirm }: { visible: boo
                   position: 'relative',
                 }}
               >
-                {active && <CornerTicks color={O_GOLD} size={4} weight={0.8} />}
                 <View style={{
                   width: 14, height: 14, borderRadius: 7,
                   borderWidth: 1, borderColor: active ? O_GOLD : O_LINE_STRONG,
@@ -1503,7 +1437,6 @@ function MemberRoleModal({ visible, onClose, member, onConfirm }: { visible: boo
               shadowColor: O_GOLD, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.25, shadowRadius: 12,
             }}
           >
-            <CornerTicks color={O_GOLD} size={4} weight={0.8} />
             <Text style={{ fontSize: 10, fontWeight: '700', letterSpacing: 2.2, textTransform: 'uppercase', color: O_GOLD_L }}>
               Save changes
             </Text>
@@ -2080,16 +2013,14 @@ export default function OrganizationDetailScreen() {
           onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setShowCreateModal(true); }}
           style={{
             position: 'absolute', right: 18, bottom: 24 + insets.bottom,
-            width: 56, height: 56, borderRadius: 28,
-            borderWidth: 1, borderColor: O_GOLD_D,
-            backgroundColor: 'rgba(234,186,88,0.12)',
+            width: 52, height: 52, borderRadius: 26,
+            backgroundColor: O_GOLD,
             alignItems: 'center', justifyContent: 'center',
-            shadowColor: O_GOLD, shadowOffset: { width: 0, height: 4 },
-            shadowOpacity: 0.3, shadowRadius: 16, elevation: 8,
+            shadowColor: '#000', shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.4, shadowRadius: 12, elevation: 8,
           }}
         >
-          <CornerTicks color={O_GOLD} size={6} weight={1} />
-          <Ionicons name="add" size={22} color={O_GOLD} />
+          <Ionicons name="add" size={22} color="#0A0C0F" />
         </TouchableOpacity>
       )}
       {activeTab === 'announcements' && isAdmin && (
@@ -2098,16 +2029,14 @@ export default function OrganizationDetailScreen() {
           onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setShowAnnouncementModal(true); }}
           style={{
             position: 'absolute', right: 18, bottom: 24 + insets.bottom,
-            width: 56, height: 56, borderRadius: 28,
-            borderWidth: 1, borderColor: O_GOLD_D,
-            backgroundColor: 'rgba(234,186,88,0.12)',
+            width: 52, height: 52, borderRadius: 26,
+            backgroundColor: O_GOLD,
             alignItems: 'center', justifyContent: 'center',
-            shadowColor: O_GOLD, shadowOffset: { width: 0, height: 4 },
-            shadowOpacity: 0.3, shadowRadius: 16, elevation: 8,
+            shadowColor: '#000', shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.4, shadowRadius: 12, elevation: 8,
           }}
         >
-          <CornerTicks color={O_GOLD} size={6} weight={1} />
-          <Ionicons name="add" size={22} color={O_GOLD} />
+          <Ionicons name="add" size={22} color="#0A0C0F" />
         </TouchableOpacity>
       )}
       {activeTab === 'subOrders' && isAdmin && (
@@ -2116,16 +2045,14 @@ export default function OrganizationDetailScreen() {
           onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setShowCreateSubOrgModal(true); }}
           style={{
             position: 'absolute', right: 18, bottom: 24 + insets.bottom,
-            width: 56, height: 56, borderRadius: 28,
-            borderWidth: 1, borderColor: O_GOLD_D,
-            backgroundColor: 'rgba(234,186,88,0.12)',
+            width: 52, height: 52, borderRadius: 26,
+            backgroundColor: O_GOLD,
             alignItems: 'center', justifyContent: 'center',
-            shadowColor: O_GOLD, shadowOffset: { width: 0, height: 4 },
-            shadowOpacity: 0.3, shadowRadius: 16, elevation: 8,
+            shadowColor: '#000', shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.4, shadowRadius: 12, elevation: 8,
           }}
         >
-          <CornerTicks color={O_GOLD} size={6} weight={1} />
-          <Ionicons name="add" size={22} color={O_GOLD} />
+          <Ionicons name="add" size={22} color="#0A0C0F" />
         </TouchableOpacity>
       )}
 
