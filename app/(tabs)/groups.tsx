@@ -224,57 +224,6 @@ function OrgCard({ org, onPress, index }: { org: Organization; onPress: () => vo
   );
 }
 
-// ─── create-org CTA ───────────────────────────────────────────────────
-function CharterCTA({ onPress }: { onPress: () => void }) {
-  return (
-    <Animated.View entering={FadeInUp.delay(300).duration(400)} style={{ paddingHorizontal: 16, marginTop: 12 }}>
-      <TouchableOpacity activeOpacity={0.85} onPress={onPress}>
-        <View style={{
-          backgroundColor: G_BG_CARD,
-          borderRadius: 18,
-          borderWidth: 1, borderColor: G_LINE,
-          paddingHorizontal: 18, paddingVertical: 18,
-        }}>
-          <View style={{
-            position: 'absolute', top: 0, bottom: 0, left: 0, width: 2,
-            backgroundColor: G_GOLD, opacity: 0.7,
-          }} />
-
-          <Text style={{
-            fontFamily: SERIF, fontSize: 22, fontWeight: '500',
-            color: G_FG, letterSpacing: -0.2, lineHeight: 26, marginBottom: 6,
-          }}>
-            Start your own{' '}
-            <Text style={{ fontStyle: 'italic', color: G_GOLD_L }}>organization</Text>
-          </Text>
-          <Text style={{
-            fontSize: 13, color: G_FG_MUTED, letterSpacing: -0.05, lineHeight: 18,
-            marginBottom: 14, maxWidth: 300,
-          }}>
-            For unions, nonprofits, schools, and community groups. Run secure ballots and member rosters.
-          </Text>
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
-            <Text style={{ fontSize: 14, color: G_FG_MUTED, letterSpacing: -0.05 }}>
-              <Text style={{ color: G_GOLD_L, fontWeight: '600' }}>$29</Text>/month
-            </Text>
-            <View style={{
-              paddingHorizontal: 14, paddingVertical: 9,
-              backgroundColor: G_GOLD,
-              borderRadius: 999,
-              flexDirection: 'row', alignItems: 'center', gap: 6,
-            }}>
-              <Text style={{
-                fontSize: 13, fontWeight: '600', color: '#0A0C0F',
-              }}>Get started</Text>
-              <Ionicons name="arrow-forward" size={13} color="#0A0C0F" />
-            </View>
-          </View>
-        </View>
-      </TouchableOpacity>
-    </Animated.View>
-  );
-}
-
 // ─── empty ledger ─────────────────────────────────────────────────────
 function EmptyLedger({ onJoinPress, onCreatePress }: { onJoinPress: () => void; onCreatePress: () => void }) {
   return (
@@ -579,6 +528,15 @@ export default function GroupsScreen() {
     router.push('/modals/create-organization');
   };
 
+  const handleAdd = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    Alert.alert('Add organization', undefined, [
+      { text: 'Join with invite code', onPress: () => setShowInviteSheet(true) },
+      { text: 'Start a new organization', onPress: handleCharter },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  };
+
   const handleInviteSuccess = (org: Organization) => {
     setOrganizations((prev) => [...prev, org]);
     Alert.alert('Welcome!', `You've been admitted to ${org.name}.`);
@@ -611,10 +569,7 @@ export default function GroupsScreen() {
         <GHeader
           stat={organizations.length}
           admins={adminCount}
-          onAddPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            setShowInviteSheet(true);
-          }}
+          onAddPress={handleAdd}
           insetTop={insets.top}
         />
 
@@ -638,7 +593,6 @@ export default function GroupsScreen() {
                 />
               ))}
             </View>
-            <CharterCTA onPress={handleCharter} />
           </>
         )}
 
