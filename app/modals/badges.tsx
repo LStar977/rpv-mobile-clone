@@ -102,6 +102,38 @@ export default function BadgesScreen() {
 
   const fetchBadges = async () => {
     try {
+      // Demo account — seed unlocked badges for App Store review.
+      if (user?.email === 'demo@represent.app') {
+        const now = Date.now();
+        const day = 24 * 60 * 60 * 1000;
+        const seededEarnedAt: Record<string, string> = {
+          first_vote:         new Date(now - 45 * day).toISOString(),
+          first_vote_country: new Date(now - 45 * day).toISOString(),
+          first_vote_state:   new Date(now - 32 * day).toISOString(),
+          vote_streak_5:      new Date(now - 18 * day).toISOString(),
+          passport_minted:    new Date(now - 60 * day).toISOString(),
+          early_adopter:      new Date(now - 60 * day).toISOString(),
+          democratic_spirit:  new Date(now - 12 * day).toISOString(),
+        };
+        const allWithStatus = ALL_BADGES.map(badge => ({
+          ...badge,
+          unlocked: badge.id in seededEarnedAt,
+          earnedAt: seededEarnedAt[badge.id],
+        }));
+        allWithStatus.sort((a, b) => {
+          if (a.unlocked && !b.unlocked) return -1;
+          if (!a.unlocked && b.unlocked) return 1;
+          const tierOrder = { legendary: 0, epic: 1, rare: 2, common: 3 };
+          return tierOrder[a.tier] - tierOrder[b.tier];
+        });
+        setBadges(allWithStatus);
+        const unlockedCount = allWithStatus.filter(b => b.unlocked).length;
+        Animated.timing(progressAnim, { toValue: unlockedCount / allWithStatus.length, duration: 1000, useNativeDriver: false }).start();
+        setLoading(false);
+        setRefreshing(false);
+        return;
+      }
+
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
       const response = await fetch(`${API_URL}/api/badges/user/${user?.id}`, { headers });

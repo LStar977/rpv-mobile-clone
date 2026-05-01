@@ -64,7 +64,7 @@ function FilterChip({
 
 export default function VotingHistoryScreen() {
   const { colors } = useTheme();
-  const { token } = useAuthStore();
+  const { token, user } = useAuthStore();
   const insets = useSafeAreaInsets();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -81,6 +81,29 @@ export default function VotingHistoryScreen() {
 
   const fetchData = async () => {
     try {
+      // Demo account — show seeded voting history for App Store review.
+      if (user?.email === 'demo@represent.app') {
+        const now = Date.now();
+        const day = 24 * 60 * 60 * 1000;
+        setVotedProposals([
+          { id: 1001, title: 'Extend library hours to 24/7 during finals week', position: 'support', supportVotes: 1336, opposeVotes: 184, votedAt: new Date(now - 2 * day).toISOString() },
+          { id: 1002, title: 'Mandate AI ethics course in CS curriculum', position: 'support', supportVotes: 479, opposeVotes: 92, votedAt: new Date(now - 5 * day).toISOString() },
+          { id: 1003, title: 'Replace dining hall vendor with local sustainable provider', position: 'support', supportVotes: 1125, opposeVotes: 312, votedAt: new Date(now - 8 * day).toISOString() },
+          { id: 1004, title: 'Build new engineering lab in Bessemer Hall', position: 'oppose', supportVotes: 567, opposeVotes: 491, votedAt: new Date(now - 12 * day).toISOString() },
+          { id: 1005, title: 'Move CS 101 to online-first format', position: 'oppose', supportVotes: 248, opposeVotes: 612, votedAt: new Date(now - 18 * day).toISOString() },
+          { id: 1006, title: 'Increase funding for student mental health services', position: 'support', supportVotes: 2104, opposeVotes: 88, votedAt: new Date(now - 24 * day).toISOString() },
+          { id: 1007, title: 'Adopt 4-day class week pilot for spring semester', position: 'support', supportVotes: 891, opposeVotes: 423, votedAt: new Date(now - 32 * day).toISOString() },
+          { id: 1008, title: 'Require carbon-offset purchases for university travel', position: 'support', supportVotes: 654, opposeVotes: 287, votedAt: new Date(now - 45 * day).toISOString() },
+        ]);
+        setUsageLimits({
+          tier: 'premium',
+          proposals: { used: 4, limit: 'unlimited', period: 'month', resetDate: new Date(now + 15 * day).toISOString() },
+          votes: { used: 8, limit: 'unlimited' },
+        });
+        setLoading(false);
+        return;
+      }
+
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
 
