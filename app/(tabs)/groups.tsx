@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, ActivityIndicator, RefreshControl, Image } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, ActivityIndicator, RefreshControl, Image, Modal } from 'react-native';
 import { useState, useCallback, useMemo } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -391,12 +391,19 @@ function InviteSheet({
   const lengthOk = codeLen >= 6 && codeLen <= 12;
 
   return (
-    <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
-      <TouchableOpacity
-        activeOpacity={1}
-        onPress={onClose}
-        style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(4,7,7,0.7)' }]}
-      />
+    <Modal
+      visible
+      transparent
+      animationType="slide"
+      onRequestClose={onClose}
+      statusBarTranslucent
+    >
+      <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+        <TouchableOpacity
+          activeOpacity={1}
+          onPress={onClose}
+          style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(4,7,7,0.7)' }]}
+        />
       <View style={{
         position: 'absolute', left: 0, right: 0, bottom: 0,
         backgroundColor: G_BG_CARD,
@@ -513,7 +520,8 @@ function InviteSheet({
           </TouchableOpacity>
         </View>
       </View>
-    </View>
+      </View>
+    </Modal>
   );
 }
 
