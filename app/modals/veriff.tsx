@@ -41,18 +41,21 @@ export default function VeriffScreen() {
   }, []);
 
   const handleNavigationStateChange = (navState: any) => {
-    const url = navState.url;
-    if (url.includes('veriff.com')) {
-      if (url.includes('cancelled') || url.includes('canceled')) {
-        setErrorState('cancelled');
-        return;
-      }
-      if (url.includes('finished') || url.includes('success')) {
-        router.replace({
-          pathname: '/(tabs)/profile',
-          params: { verificationId, completed: 'true' },
-        });
-      }
+    const url = navState.url || '';
+    // KYC provider host: Didit (active) — Veriff host kept for any in-flight
+    // sessions during the rollout window.
+    const isKycHost = url.includes('didit.me') || url.includes('verify.didit.me') || url.includes('veriff.com');
+    if (!isKycHost) return;
+
+    if (url.includes('cancelled') || url.includes('canceled')) {
+      setErrorState('cancelled');
+      return;
+    }
+    if (url.includes('finished') || url.includes('success') || url.includes('complete')) {
+      router.replace({
+        pathname: '/(tabs)/profile',
+        params: { verificationId, completed: 'true' },
+      });
     }
   };
 

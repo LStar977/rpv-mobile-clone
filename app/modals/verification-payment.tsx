@@ -77,7 +77,7 @@ export default function VerificationPaymentScreen() {
         >
           <Ionicons name="information-circle-outline" size={20} color={colors.info} />
           <Text style={[styles.processText, { color: colors.textSecondary }]}>
-            You'll complete identity verification via Veriff using a government-issued ID.
+            You'll complete identity verification using a government-issued ID.
             Your location will be verified automatically.
           </Text>
         </Animated.View>
@@ -132,7 +132,7 @@ export default function VerificationPaymentScreen() {
         </TouchableOpacity>
         <View style={styles.paymentMethodsRow}>
           <Text style={[styles.ctaDisclaimer, { color: colors.textTertiary }]}>
-            Quick identity verification via Veriff
+            Quick, secure identity verification
           </Text>
         </View>
       </View>

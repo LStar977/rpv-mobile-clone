@@ -110,7 +110,7 @@ export default function PrivacyScreen() {
         <View style={[styles.infoBox, { backgroundColor: colors.goldLight }]}>
           <Ionicons name="information-circle-outline" size={18} color={colors.gold} />
           <Text style={[styles.infoBoxText, { color: colors.gold }]}>
-            Your identity verification data is processed by Veriff and not stored on our servers.
+            Your identity verification data is processed by Didit and not stored on our servers.
           </Text>
         </View>
 

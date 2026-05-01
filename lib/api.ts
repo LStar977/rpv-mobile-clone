@@ -641,14 +641,18 @@ export const proposalsApi = {
   },
 };
 
-export const veriffApi = {
+// Provider-neutral KYC client. Backend routes were renamed from /api/veriff/*
+// to /api/didit/* during the Veriff → Didit migration. The veriffApi alias is
+// kept so any stale imports still compile.
+export const kycApi = {
   async createSession(): Promise<ApiResponse<{ sessionUrl: string; sessionId: string; verificationId?: string }>> {
-    return apiRequest('/api/veriff/create-session', { method: 'POST' });
+    return apiRequest('/api/didit/create-session', { method: 'POST' });
   },
   async checkDecision(verificationId: string): Promise<ApiResponse<{ status: string; decision?: string }>> {
-    return apiRequest(`/api/veriff/check-decision?verificationId=${verificationId}`);
+    return apiRequest(`/api/didit/check-decision?verificationId=${verificationId}`);
   },
 };
+export const veriffApi = kycApi;
 
 export const organizationsApi = {
   async getMyOrganizations(): Promise<ApiResponse<Organization[]>> {
