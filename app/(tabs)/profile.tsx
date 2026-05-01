@@ -229,36 +229,29 @@ function PrRow({
       activeOpacity={0.7}
     >
       <View style={[prStyles.rowIcon, { backgroundColor: pr.BG_RAISED, borderColor: pr.LINE }]}>
-        <Ionicons name={icon} size={16} color={pr.GL} />
+        <Ionicons name={icon} size={18} color={pr.GL} />
       </View>
       <View style={{ flex: 1, minWidth: 0 }}>
         <Text style={[prStyles.rowLabel, { color: pr.FG }]}>{label}</Text>
         {sub && <Text style={[prStyles.rowSub, { color: pr.FG_FAINT }]}>{sub}</Text>}
       </View>
       {value && <Text style={[prStyles.rowValue, { color: valueColor || pr.FG_MUTED }]}>{value}</Text>}
-      <Ionicons name="chevron-forward" size={12} color={pr.FG_FAINT} />
+      <Ionicons name="chevron-forward" size={14} color={pr.FG_FAINT} />
     </TouchableOpacity>
   );
 }
 
 // ── Section Card Wrapper ─────────────────────────────────────────────
 function PrSection({
-  roman,
-  title,
-  sub,
   children,
   delay = 0,
 }: {
-  roman?: string;
-  title: string;
-  sub?: string;
   children: React.ReactNode;
   delay?: number;
 }) {
   const pr = useProfileColors();
   return (
     <Animated.View entering={FadeInUp.delay(delay).duration(400)} style={prStyles.section}>
-      <PrSectionHeading roman={roman} title={title} sub={sub} />
       <View style={[prStyles.sectionCard, { backgroundColor: pr.BG_CARD, borderColor: pr.LINE }]}>
         {children}
       </View>
@@ -279,14 +272,10 @@ function PrAppearance({
 
   return (
     <Animated.View entering={FadeInUp.delay(400).duration(400)} style={prStyles.section}>
-      <PrSectionHeading title="Appearance" />
       <View style={[prStyles.appearanceCard, { backgroundColor: pr.BG_CARD, borderColor: pr.LINE }]}>
-        <View style={prStyles.appearanceHeader}>
-          <Text style={[prStyles.appearanceLabel, { color: pr.FG_MUTED }]}>
-            Currently set to <Text style={{ color: pr.GL, fontWeight: '600' }}>{themeLabel}</Text>
-          </Text>
-          <Text style={[prStyles.appearanceVersion, { color: pr.FG_FAINT }]}>UI · v4.26</Text>
-        </View>
+        <Text style={[prStyles.appearanceLabel, { color: pr.FG_MUTED, marginBottom: 14 }]}>
+          Currently set to <Text style={{ color: pr.GL, fontWeight: '600' }}>{themeLabel}</Text>
+        </Text>
         <View style={prStyles.appearanceRow}>
           {(['system', 'dark', 'light'] as ThemePreference[]).map((mode) => {
             const active = currentTheme === mode;
@@ -461,7 +450,7 @@ const prStyles = StyleSheet.create({
 
   // Section
   section: {
-    marginBottom: 26,
+    marginBottom: 22,
   },
   sectionHeading: {
     paddingHorizontal: 24,
@@ -495,15 +484,15 @@ const prStyles = StyleSheet.create({
     backgroundColor: PR_BG_CARD,
     borderWidth: 1,
     borderColor: PR_LINE,
-    borderRadius: 14,
-    paddingHorizontal: 16,
+    borderRadius: 16,
+    paddingHorizontal: 18,
   },
 
   // Row
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 14,
+    paddingVertical: 16,
     gap: 14,
   },
   rowBorder: {
@@ -511,9 +500,9 @@ const prStyles = StyleSheet.create({
     borderBottomColor: PR_LINE,
   },
   rowIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
+    width: 40,
+    height: 40,
+    borderRadius: 10,
     backgroundColor: PR_BG_RAISED,
     borderWidth: 1,
     borderColor: PR_LINE,
@@ -522,20 +511,20 @@ const prStyles = StyleSheet.create({
   },
   rowLabel: {
     fontFamily: 'System',
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '500',
     color: PR_FG,
     letterSpacing: -0.1,
   },
   rowSub: {
     fontFamily: 'System',
-    fontSize: 11,
+    fontSize: 12.5,
     color: PR_FG_FAINT,
     marginTop: 2,
   },
   rowValue: {
     fontFamily: 'System',
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '500',
   },
 
@@ -863,9 +852,6 @@ export default function ProfileScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.gold} />
         }
       >
-        {/* Premium Header */}
-        <PrHeader folio={getFolioCode()} />
-
         {/* Passport Card (replaces former PortraitCard) */}
         <PassportCard
           name={user?.name || 'Citizen'}
@@ -879,14 +865,14 @@ export default function ProfileScreen() {
         />
 
         {/* Section I: Civic Record */}
-        <PrSection title="Activity" delay={200}>
+        <PrSection delay={200}>
           <PrRow icon="time-outline" label="Voting history" sub={votesCast !== null ? `${votesCast.toLocaleString()} ballots cast` : undefined} onPress={() => navigateTo('/modals/voting-history')} />
           <PrRow icon="analytics-outline" label="Analytics" sub="Patterns & impact" onPress={() => navigateTo('/modals/analytics')} />
           <PrRow icon="trophy-outline" label="Badges & achievements" value={badgesEarned !== null ? `${badgesEarned} / ${BADGES_TOTAL}` : undefined} valueColor={colors.goldLight} last onPress={() => navigateTo('/modals/badges')} />
         </PrSection>
 
         {/* Section II: Membership */}
-        <PrSection title="Membership" delay={250}>
+        <PrSection delay={250}>
           <PrRow icon="card-outline" label="Subscription" sub={`${tierLabel} tier`} value="Upgrade" valueColor={colors.goldLight} onPress={() => navigateTo('/modals/subscription')} />
           {Platform.OS === 'ios' && (
             <PrRow
@@ -908,7 +894,7 @@ export default function ProfileScreen() {
         </PrSection>
 
         {/* Section III: Administration */}
-        <PrSection title="Administration" delay={300}>
+        <PrSection delay={300}>
           {adminApi.isAdmin() && (
             <PrRow icon="shield-checkmark-outline" label="Admin dashboard" sub={adminOrgCount !== null ? `${adminOrgCount} organization${adminOrgCount === 1 ? '' : 's'}` : undefined} onPress={() => navigateTo('/modals/admin')} />
           )}
