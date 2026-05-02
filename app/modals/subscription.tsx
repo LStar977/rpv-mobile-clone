@@ -69,7 +69,7 @@ const TIERS = {
   },
   organization: {
     name: 'Organizations',
-    price: '$29-99',
+    price: '$29-299',
     period: '/month',
     description: 'For unions, nonprofits & groups',
     icon: 'business' as const,

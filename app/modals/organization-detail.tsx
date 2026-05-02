@@ -891,13 +891,14 @@ function SubOrdersSection({ subOrgs, totalMembers, onPress, onLongPress, isAdmin
 }
 
 // ─── Members section ──────────────────────────────────────────────────
-function MembersSection({ members, totalCount, search, onSearch, isAdmin, onMemberPress }: {
+function MembersSection({ members, totalCount, search, onSearch, isAdmin, onMemberPress, onImportRoster }: {
   members: any[];
   totalCount: number;
   search: string;
   onSearch: (s: string) => void;
   isAdmin: boolean;
   onMemberPress: (m: any) => void;
+  onImportRoster: () => void;
 }) {
   const filtered = useMemo(() => {
     if (!search.trim()) return members;
@@ -938,6 +939,25 @@ function MembersSection({ members, totalCount, search, onSearch, isAdmin, onMemb
             {totalCount.toLocaleString()}
           </Text>
         </View>
+
+        {isAdmin && (
+          <TouchableOpacity
+            onPress={onImportRoster}
+            activeOpacity={0.7}
+            style={{
+              marginTop: 10,
+              backgroundColor: O_BG_CARD,
+              borderWidth: 1, borderColor: O_LINE,
+              borderRadius: 10,
+              paddingHorizontal: 12, paddingVertical: 10,
+              flexDirection: 'row', alignItems: 'center', gap: 10,
+            }}
+          >
+            <Ionicons name="cloud-upload-outline" size={16} color={O_GOLD} />
+            <Text style={{ flex: 1, fontSize: 13, color: O_FG, letterSpacing: -0.05 }}>Import members from CSV</Text>
+            <Ionicons name="chevron-forward" size={14} color={O_FG_FAINT} />
+          </TouchableOpacity>
+        )}
       </View>
 
       {!showList ? (
@@ -2012,6 +2032,13 @@ export default function OrganizationDetailScreen() {
                 setEditingMember(m);
                 setShowRoleModal(true);
               }
+            }}
+            onImportRoster={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              router.push({
+                pathname: '/modals/import-roster',
+                params: { orgId: organization?.id ?? '', orgName: organization?.name ?? '' },
+              });
             }}
           />
         )}

@@ -27,7 +27,7 @@ import { processOrganizationPayment } from '../../lib/payment';
 
 type Step = 'details' | 'tier' | 'payment';
 
-type OrgTier = 'starter' | 'professional' | 'enterprise';
+type OrgTier = 'starter' | 'professional' | 'premium' | 'enterprise';
 
 const ORG_TIERS: Record<OrgTier, {
   name: string;
@@ -55,13 +55,13 @@ const ORG_TIERS: Record<OrgTier, {
   },
   professional: {
     name: 'Professional',
-    price: '$79',
-    priceValue: 79,
+    price: '$99',
+    priceValue: 99,
     description: 'For growing organizations with advanced needs',
     icon: 'business-outline',
     popular: true,
     features: [
-      'Up to 1,000 members',
+      'Up to 500 members',
       'Everything in Starter',
       'Advanced analytics',
       'Custom branding',
@@ -69,19 +69,34 @@ const ORG_TIERS: Record<OrgTier, {
       'API access',
     ],
   },
+  premium: {
+    name: 'Premium',
+    price: '$299',
+    priceValue: 299,
+    description: 'For large unions, parties, and federations',
+    icon: 'shield-checkmark-outline',
+    features: [
+      'Up to 2,500 members',
+      'Everything in Professional',
+      'Verified voting + audit log export',
+      'Roster import (CSV)',
+      'Dedicated onboarding',
+      'SLA + 24h response time',
+    ],
+  },
   enterprise: {
     name: 'Enterprise',
     price: 'Contact Us',
     priceValue: 0,
-    description: 'For large organizations and institutions',
+    description: 'For 2,500+ member organizations',
     icon: 'globe-outline',
     contactOnly: true,
     features: [
       'Unlimited members',
-      'Everything in Professional',
+      'Everything in Premium',
       'Dedicated account manager',
       'Custom integrations',
-      'SLA guarantees',
+      'Custom SLA',
       'White-label options',
     ],
   },

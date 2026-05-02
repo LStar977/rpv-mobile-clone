@@ -135,6 +135,30 @@ export const organizationInviteCodes = pgTable("organization_invite_codes", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Per-email invitations created via the CSV roster importer (and later, the
+// single-invite admin UI). Distinct from `organizationInviteCodes`, which
+// stores share-link codes consumed by anyone who has the code. An invite row
+// is bound to ONE email address and represents pending consent — the invitee
+// is NOT a member until they sign in via the magic link and accept.
+export const organizationInvites = pgTable("organization_invites", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  organizationId: varchar("organization_id").notNull().references(() => organizations.id),
+  email: varchar("email").notNull(), // lowercased before insert
+  firstName: varchar("first_name"),
+  lastName: varchar("last_name"),
+  inviteToken: varchar("invite_token").notNull().unique(), // 32-char URL-safe random
+  invitedBy: varchar("invited_by").notNull().references(() => users.id),
+  role: varchar("role").notNull().default('member'), // 'admin' | 'member'
+  status: varchar("status").notNull().default('pending'), // 'pending' | 'accepted' | 'expired' | 'revoked'
+  metadata: jsonb("metadata"), // arbitrary extra columns from the CSV
+  invitedAt: timestamp("invited_at").defaultNow(),
+  acceptedAt: timestamp("accepted_at"),
+  expiresAt: timestamp("expires_at").notNull(),
+}, (table) => ({
+  uniqueOrgEmail: unique().on(table.organizationId, table.email),
+  emailIdx: index("org_invites_email_idx").on(table.email),
+}));
+
 export const organizationAnnouncements = pgTable("organization_announcements", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   organizationId: varchar("organization_id").notNull().references(() => organizations.id),
