@@ -1161,6 +1161,33 @@ export const organizationsApi = {
     return apiRequest(`/api/organizations/${orgId}/invite-codes/${code}`, { method: 'DELETE' });
   },
 
+  // Per-email roster invites (CSV import)
+  async importRoster(
+    orgId: string,
+    rows: Array<{ email: string; firstName?: string; lastName?: string; role?: 'admin' | 'member'; metadata?: any }>
+  ): Promise<ApiResponse<{
+    created: number;
+    skippedExistingMembers: string[];
+    skippedAlreadyInvited: string[];
+    invalid: Array<{ email: string; reason: string }>;
+    sentEmails: number;
+  }>> {
+    return apiRequest(`/api/organizations/${orgId}/invites/import`, {
+      method: 'POST',
+      body: JSON.stringify({ rows }),
+    });
+  },
+
+  async getPendingInvites(orgId: string): Promise<ApiResponse<any[]>> {
+    const result = await apiRequest<any>(`/api/organizations/${orgId}/invites?status=pending`);
+    if (result.data?.invites) return { data: result.data.invites, error: null };
+    return { data: [], error: result.error };
+  },
+
+  async revokeInvite(orgId: string, inviteId: string): Promise<ApiResponse<{ success: boolean }>> {
+    return apiRequest(`/api/organizations/${orgId}/invites/${inviteId}`, { method: 'DELETE' });
+  },
+
   // Create organization
   async createOrganization(data: {
     name: string;
