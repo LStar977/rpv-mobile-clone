@@ -29,7 +29,7 @@ export interface Organization {
   description: string;
   logoUrl?: string;
   memberCount: number;
-  tier: 'starter' | 'professional';
+  tier: 'starter' | 'professional' | 'premium' | 'enterprise';
   verified: boolean;
   createdAt: string;
   role?: 'admin' | 'member';
@@ -1166,15 +1166,11 @@ export const organizationsApi = {
     name: string;
     description: string;
     logoUrl?: string;
-    type: 'starter' | 'professional' | 'enterprise';
+    type: 'starter' | 'professional' | 'premium' | 'enterprise';
   }): Promise<ApiResponse<Organization>> {
     const rawResult = await apiRequest<any>('/api/organizations', {
       method: 'POST',
-      body: JSON.stringify({
-        ...data,
-        // Map 'starter' to 'community' for backend compatibility
-        type: data.type === 'starter' ? 'community' : data.type,
-      }),
+      body: JSON.stringify(data),
     });
 
     // Backend returns { organization: {...} }; unwrap to a flat Organization
@@ -1222,7 +1218,7 @@ export const organizationsApi = {
         description: data.description,
         logoUrl: data.logoUrl,
         memberCount: 1,
-        tier: data.type === 'enterprise' ? 'professional' : 'starter',
+        tier: data.type,
         verified: false,
         createdAt: new Date().toISOString(),
         role: 'admin',

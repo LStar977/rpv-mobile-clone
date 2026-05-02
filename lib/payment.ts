@@ -48,14 +48,17 @@ export async function processPremiumPayment(token: string | null): Promise<Payme
 /**
  * Process organization subscription
  */
+export type OrgTier = 'starter' | 'professional' | 'premium' | 'enterprise';
+
 export async function processOrganizationPayment(
   token: string | null,
-  tier: 'community' | 'professional' | 'enterprise',
+  tier: OrgTier,
   organizationId: string
 ): Promise<PaymentResult> {
-  const tierToProduct: Record<string, string> = {
-    community: IAP_PRODUCTS.orgCommunity,
+  const tierToProduct: Record<OrgTier, string> = {
+    starter: IAP_PRODUCTS.orgStarter,
     professional: IAP_PRODUCTS.orgProfessional,
+    premium: IAP_PRODUCTS.orgPremium,
     enterprise: IAP_PRODUCTS.orgEnterprise,
   };
 
@@ -166,7 +169,7 @@ async function processStripePremium(token: string | null): Promise<PaymentResult
 
 async function processStripeOrganization(
   token: string | null,
-  tier: 'community' | 'professional' | 'enterprise',
+  tier: OrgTier,
   organizationId: string
 ): Promise<PaymentResult> {
   try {

@@ -3,11 +3,16 @@ import { Platform, Alert } from 'react-native';
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://representportal.com';
 
 // Product IDs - must match App Store Connect
+// Note: orgStarter intentionally points at the legacy `.org.community` SKU.
+// The App Store SKU was registered as "community" originally; we kept the
+// existing string here so existing subscribers + App Store Connect stay
+// aligned. Only the JS-side identifier was renamed.
 export const IAP_PRODUCTS = {
   verification: 'com.representwallet.app.verification',
   premium: 'com.representwallet.app.premium',
-  orgCommunity: 'com.representwallet.app.org.community',
+  orgStarter: 'com.representwallet.app.org.community',
   orgProfessional: 'com.representwallet.app.org.professional',
+  orgPremium: 'com.representwallet.app.org.premium',
   orgEnterprise: 'com.representwallet.app.org.enterprise',
 } as const;
 

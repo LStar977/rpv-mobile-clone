@@ -86,12 +86,12 @@ export async function fetchPremiumPaymentIntent(token: string | null): Promise<P
 }
 
 /**
- * Fetch payment intent for organization subscription ($29-99/month)
+ * Fetch payment intent for organization subscription ($29-299/month)
  * Requires organizationId - org must be created first with pending status
  */
 export async function fetchOrganizationPaymentIntent(
   token: string | null,
-  tier: 'community' | 'professional' | 'enterprise',
+  tier: 'starter' | 'professional' | 'premium' | 'enterprise',
   organizationId: string
 ): Promise<PaymentIntentResponse & { paymentIntentId?: string; subscriptionId?: string }> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
@@ -303,7 +303,10 @@ export function showPaymentSuccess(
   const amounts = {
     verification: '$4.99',
     premium: '$7.99',
-    organization: options?.tier === 'enterprise' ? '$99.00' : options?.tier === 'professional' ? '$49.00' : '$29.00',
+    organization:
+      options?.tier === 'Premium' ? '$299.00'
+        : options?.tier === 'Professional' ? '$99.00'
+        : '$29.00',
   };
 
   router.push({
