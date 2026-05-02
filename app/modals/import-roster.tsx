@@ -208,16 +208,21 @@ export default function ImportRosterScreen() {
     setStage('importing');
     try {
       const apiResult = await organizationsApi.importRoster(orgId, parsed);
+      console.log('[importRoster] response:', JSON.stringify(apiResult));
       if (apiResult.error || !apiResult.data) {
         setErrorMsg(apiResult.error || 'Import failed');
         setStage('preview');
         return;
       }
       // Backend may have its own invalid list (server-side validation).
-      // Merge with our client-side invalid count.
+      // Merge with our client-side invalid count. Default array fields so
+      // the done screen renders even if the backend omits them.
+      const d: any = apiResult.data;
       const merged: ImportResult = {
-        ...apiResult.data,
-        invalid: [...invalid, ...(apiResult.data.invalid || [])],
+        created: typeof d.created === 'number' ? d.created : 0,
+        skippedExistingMembers: Array.isArray(d.skippedExistingMembers) ? d.skippedExistingMembers : [],
+        skippedAlreadyInvited: Array.isArray(d.skippedAlreadyInvited) ? d.skippedAlreadyInvited : [],
+        invalid: [...invalid, ...(Array.isArray(d.invalid) ? d.invalid : [])],
       };
       setResult(merged);
       setStage('done');
