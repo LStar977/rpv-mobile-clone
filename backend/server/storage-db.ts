@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { users, wallets, votes, proposals, proposalOptionAddresses, pricingPlans, platformSettings, voteTokenClaims, passportNFTs, ridingVerifications, electoralRidingQRCodes, referralCodes, referrals, organizations, organizationMembers, organizationInviteCodes, organizationAnnouncements } from "@shared/schema";
+import { users, wallets, votes, proposals, proposalOptionAddresses, pricingPlans, platformSettings, voteTokenClaims, passportNFTs, ridingVerifications, electoralRidingQRCodes, referralCodes, referrals, organizations, organizationMembers, organizationInviteCodes, organizationInvites, organizationAnnouncements } from "@shared/schema";
 import { eq, and, gte, lt, sql } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { encryptPrivateKey, decryptPrivateKey, isEncrypted } from "./crypto";
@@ -778,6 +778,97 @@ export class DatabaseStorage implements IStorage {
         )
       );
     return (result.rowCount ?? 0) > 0;
+  }
+
+  // ---------- Per-email invitations (CSV roster import + single-invite UI) ----------
+
+  async createOrgInvites(rows: Array<{
+    organizationId: string;
+    email: string;
+    firstName?: string;
+    lastName?: string;
+    role?: string;
+    metadata?: any;
+    invitedBy: string;
+    inviteToken: string;
+    expiresAt: Date;
+  }>): Promise<any[]> {
+    if (rows.length === 0) return [];
+    const values = rows.map(r => ({
+      id: randomUUID(),
+      organizationId: r.organizationId,
+      email: r.email.toLowerCase().trim(),
+      firstName: r.firstName ?? null,
+      lastName: r.lastName ?? null,
+      inviteToken: r.inviteToken,
+      invitedBy: r.invitedBy,
+      role: r.role ?? 'member',
+      status: 'pending',
+      metadata: r.metadata ?? null,
+      invitedAt: new Date(),
+      expiresAt: r.expiresAt,
+    }));
+    // ON CONFLICT DO NOTHING: if a pending invite already exists for the same
+    // (orgId, email) — e.g. the admin re-uploads a CSV with overlap — we skip
+    // silently rather than erroring. The unique constraint catches it.
+    const result = await db.insert(organizationInvites).values(values)
+      .onConflictDoNothing({ target: [organizationInvites.organizationId, organizationInvites.email] })
+      .returning();
+    return result;
+  }
+
+  async getOrgInvites(orgId: string, status?: string): Promise<any[]> {
+    const conds = [eq(organizationInvites.organizationId, orgId)];
+    if (status) conds.push(eq(organizationInvites.status, status));
+    return await db.select().from(organizationInvites)
+      .where(and(...conds))
+      .orderBy(organizationInvites.invitedAt);
+  }
+
+  async findOrgInviteByToken(token: string): Promise<any> {
+    const result = await db.select().from(organizationInvites)
+      .where(eq(organizationInvites.inviteToken, token)).limit(1);
+    return result[0];
+  }
+
+  async findPendingInviteForUser(orgId: string, email: string): Promise<any> {
+    const result = await db.select().from(organizationInvites)
+      .where(and(
+        eq(organizationInvites.organizationId, orgId),
+        eq(organizationInvites.email, email.toLowerCase().trim()),
+        eq(organizationInvites.status, 'pending'),
+      )).limit(1);
+    return result[0];
+  }
+
+  async markInviteAccepted(inviteId: string): Promise<void> {
+    await db.update(organizationInvites)
+      .set({ status: 'accepted', acceptedAt: new Date() })
+      .where(eq(organizationInvites.id, inviteId));
+  }
+
+  async revokeOrgInvite(inviteId: string, orgId: string): Promise<boolean> {
+    const result = await db.update(organizationInvites)
+      .set({ status: 'revoked' })
+      .where(and(
+        eq(organizationInvites.id, inviteId),
+        eq(organizationInvites.organizationId, orgId),
+        eq(organizationInvites.status, 'pending'),
+      ));
+    return (result.rowCount ?? 0) > 0;
+  }
+
+  async getExistingMemberEmails(orgId: string, emails: string[]): Promise<Set<string>> {
+    if (emails.length === 0) return new Set();
+    const lower = emails.map(e => e.toLowerCase().trim());
+    const rows = await db.select({ email: users.email })
+      .from(organizationMembers)
+      .innerJoin(users, eq(organizationMembers.userId, users.id))
+      .where(and(
+        eq(organizationMembers.organizationId, orgId),
+        sql`lower(${users.email}) = ANY(${lower})`,
+      ));
+    return new Set(rows.map(r => (r.email || '').toLowerCase()));
   }
 
   async getOrgAnnouncements(orgId: string): Promise<any[]> {

@@ -9,6 +9,7 @@ import { passportNFTs, activatedRidings, electoralRidingQRCodes, proposals, vote
 import { eq, count, and, sql } from "drizzle-orm";
 import { db } from "./db";
 import { savePushToken, notifyNewProposal, notifyTokenClaimed, notifyProposalVote } from "./notifications";
+import { sendEmail, buildOrgInviteEmail } from "./email";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import jwt from "jsonwebtoken";
 import { randomUUID, createHmac, timingSafeEqual } from "crypto";
@@ -4104,6 +4105,269 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       log(`Error revoking invite code: ${error.message}`);
       res.status(500).json({ error: "Failed to revoke invite code" });
+    }
+  });
+
+  // ---------- Per-email invitations (CSV roster import) ----------
+  // These differ from /invite-codes (share-link codes consumed by anyone).
+  // Each invite is bound to one email address; the invitee accepts via a
+  // tokenized magic link, signs in with Google, and is added to the org.
+
+  const INVITE_EXPIRY_DAYS = 30;
+  const MAX_INVITES_PER_REQUEST = 1000;
+  const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const WEB_PORTAL_URL = process.env.WEB_PORTAL_URL || "https://representportal.com";
+
+  // POST /api/organizations/:orgId/invites/import — bulk-import roster (admin only)
+  // Body: { rows: [{ email, firstName?, lastName?, role?, metadata? }, ...] }
+  // Returns: { created, skippedExistingMembers, skippedAlreadyInvited, invalid, sentEmails }
+  app.post("/api/organizations/:orgId/invites/import", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims?.sub;
+      const { orgId } = req.params;
+      const { rows } = req.body || {};
+
+      if (!Array.isArray(rows) || rows.length === 0) {
+        return res.status(400).json({ error: "rows must be a non-empty array" });
+      }
+      if (rows.length > MAX_INVITES_PER_REQUEST) {
+        return res.status(400).json({ error: `Too many rows (max ${MAX_INVITES_PER_REQUEST}). Split your CSV into smaller files.` });
+      }
+
+      const org = await storage.getOrganization(orgId);
+      if (!org) return res.status(404).json({ error: "Organization not found" });
+
+      const members = await storage.getOrganizationMembers(orgId);
+      const isAdmin = members.some((m: any) => m.userId === userId && m.role === 'admin');
+      if (!isAdmin) return res.status(403).json({ error: "Only admins can import members" });
+
+      // Stage 1: validate + dedupe
+      type Row = { email: string; firstName?: string; lastName?: string; role?: string; metadata?: any };
+      const valid: Row[] = [];
+      const invalid: Array<{ email: string; reason: string }> = [];
+      const seenInBatch = new Set<string>();
+
+      for (const raw of rows) {
+        const email = String(raw?.email ?? '').toLowerCase().trim();
+        if (!email || !EMAIL_RE.test(email)) {
+          invalid.push({ email: String(raw?.email ?? ''), reason: "invalid email" });
+          continue;
+        }
+        if (seenInBatch.has(email)) {
+          invalid.push({ email, reason: "duplicate in upload" });
+          continue;
+        }
+        seenInBatch.add(email);
+        valid.push({
+          email,
+          firstName: raw?.firstName ? String(raw.firstName).slice(0, 100) : undefined,
+          lastName: raw?.lastName ? String(raw.lastName).slice(0, 100) : undefined,
+          role: raw?.role === 'admin' ? 'admin' : 'member',
+          metadata: raw?.metadata && typeof raw.metadata === 'object' ? raw.metadata : undefined,
+        });
+      }
+
+      // Stage 2: filter out emails that already belong to existing members
+      const existingMemberEmails = await storage.getExistingMemberEmails(orgId, valid.map(r => r.email));
+      const skippedExistingMembers = valid.filter(r => existingMemberEmails.has(r.email)).map(r => r.email);
+      const candidates = valid.filter(r => !existingMemberEmails.has(r.email));
+
+      // Stage 3: filter out emails with an active pending invite
+      const existingInvites = await storage.getOrgInvites(orgId, 'pending');
+      const pendingEmails = new Set(existingInvites.map((i: any) => (i.email || '').toLowerCase()));
+      const skippedAlreadyInvited = candidates.filter(r => pendingEmails.has(r.email)).map(r => r.email);
+      const fresh = candidates.filter(r => !pendingEmails.has(r.email));
+
+      // Stage 4: create invite rows. Use crypto.randomUUID() twice and concat
+      // for a 64-hex-char token — high entropy, URL-safe, no extra deps.
+      const expiresAt = new Date(Date.now() + INVITE_EXPIRY_DAYS * 24 * 60 * 60 * 1000);
+      const invitesToCreate = fresh.map(r => ({
+        organizationId: orgId,
+        email: r.email,
+        firstName: r.firstName,
+        lastName: r.lastName,
+        role: r.role,
+        metadata: r.metadata,
+        invitedBy: userId,
+        inviteToken: (randomUUID() + randomUUID()).replace(/-/g, ''),
+        expiresAt,
+      }));
+
+      const created = await storage.createOrgInvites(invitesToCreate);
+
+      // Stage 5: send emails (fire-and-forget so we don't block the response).
+      // Each send is independent; failures are logged but don't unwind the
+      // import. Admin can re-send via revoke-then-reimport if needed.
+      const inviter = await storage.getUser(userId);
+      const inviterName = (inviter?.firstName && inviter?.lastName)
+        ? `${inviter.firstName} ${inviter.lastName}`
+        : (inviter?.name || inviter?.email || 'A team admin');
+
+      let sentEmails = 0;
+      const sendPromises = created.map(async (inv: any) => {
+        const inviteUrl = `${WEB_PORTAL_URL}/invite/${inv.inviteToken}`;
+        const { subject, html, text } = buildOrgInviteEmail({
+          inviteeFirstName: inv.firstName,
+          orgName: org.name,
+          inviterName,
+          inviteUrl,
+          expiresInDays: INVITE_EXPIRY_DAYS,
+        });
+        const ok = await sendEmail({ to: inv.email, subject, html, text });
+        if (ok) sentEmails++;
+      });
+      // Don't await — let them run in the background. If RESEND_API_KEY is
+      // missing in dev, sendEmail returns false synchronously without
+      // network I/O, so this is still safe.
+      Promise.all(sendPromises).catch(err => log(`Background invite email error: ${err?.message}`));
+
+      log(`Org invite import: org=${orgId} admin=${userId} requested=${rows.length} created=${created.length} skipped_member=${skippedExistingMembers.length} skipped_pending=${skippedAlreadyInvited.length} invalid=${invalid.length}`);
+
+      res.json({
+        created: created.length,
+        skippedExistingMembers,
+        skippedAlreadyInvited,
+        invalid,
+        // sentEmails is approximate — sends are async. Surface the count
+        // we attempted so admin sees something. Real delivery is logged.
+        sentEmails: created.length,
+      });
+    } catch (error: any) {
+      log(`Error importing roster: ${error.message}`);
+      res.status(500).json({ error: "Failed to import roster" });
+    }
+  });
+
+  // GET /api/organizations/:orgId/invites — list pending invites (admin only)
+  app.get("/api/organizations/:orgId/invites", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims?.sub;
+      const { orgId } = req.params;
+      const status = typeof req.query.status === 'string' ? req.query.status : 'pending';
+
+      const org = await storage.getOrganization(orgId);
+      if (!org) return res.status(404).json({ error: "Organization not found" });
+
+      const members = await storage.getOrganizationMembers(orgId);
+      const isAdmin = members.some((m: any) => m.userId === userId && m.role === 'admin');
+      if (!isAdmin) return res.status(403).json({ error: "Only admins can view invites" });
+
+      const invites = await storage.getOrgInvites(orgId, status);
+      // Strip token from list response — only needed when accepting.
+      res.json({
+        invites: invites.map((i: any) => ({
+          id: i.id,
+          email: i.email,
+          firstName: i.firstName,
+          lastName: i.lastName,
+          role: i.role,
+          status: i.status,
+          invitedAt: i.invitedAt,
+          expiresAt: i.expiresAt,
+          acceptedAt: i.acceptedAt,
+        })),
+      });
+    } catch (error: any) {
+      log(`Error fetching invites: ${error.message}`);
+      res.status(500).json({ error: "Failed to fetch invites" });
+    }
+  });
+
+  // DELETE /api/organizations/:orgId/invites/:inviteId — revoke pending invite
+  app.delete("/api/organizations/:orgId/invites/:inviteId", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims?.sub;
+      const { orgId, inviteId } = req.params;
+
+      const members = await storage.getOrganizationMembers(orgId);
+      const isAdmin = members.some((m: any) => m.userId === userId && m.role === 'admin');
+      if (!isAdmin) return res.status(403).json({ error: "Only admins can revoke invites" });
+
+      const ok = await storage.revokeOrgInvite(inviteId, orgId);
+      if (!ok) return res.status(404).json({ error: "Invite not found or already accepted/revoked" });
+      log(`Invite ${inviteId} revoked by admin ${userId}`);
+      res.json({ success: true });
+    } catch (error: any) {
+      log(`Error revoking invite: ${error.message}`);
+      res.status(500).json({ error: "Failed to revoke invite" });
+    }
+  });
+
+  // GET /api/invites/:token — public: fetch invite details so the web/landing
+  // page can render "You've been invited to {orgName} by {inviter}" before
+  // the user signs in. Only returns non-sensitive fields.
+  app.get("/api/invites/:token", async (req: any, res) => {
+    try {
+      const { token } = req.params;
+      const invite = await storage.findOrgInviteByToken(token);
+      if (!invite) return res.status(404).json({ error: "Invite not found" });
+
+      // Auto-mark expired invites without modifying the row aggressively —
+      // status update happens lazily on accept attempts.
+      const expired = invite.expiresAt && new Date(invite.expiresAt).getTime() < Date.now();
+      if (invite.status !== 'pending' || expired) {
+        return res.status(410).json({
+          error: invite.status === 'accepted' ? "Invite already accepted"
+            : invite.status === 'revoked' ? "Invite has been revoked"
+            : "Invite has expired",
+        });
+      }
+
+      const org = await storage.getOrganization(invite.organizationId);
+      const inviter = await storage.getUser(invite.invitedBy);
+      const inviterName = (inviter?.firstName && inviter?.lastName)
+        ? `${inviter.firstName} ${inviter.lastName}`
+        : (inviter?.name || 'Someone');
+
+      res.json({
+        organizationId: invite.organizationId,
+        organizationName: org?.name || 'an organization',
+        organizationLogoUrl: org?.logoUrl || null,
+        inviterName,
+        email: invite.email,
+        firstName: invite.firstName,
+        role: invite.role,
+        expiresAt: invite.expiresAt,
+      });
+    } catch (error: any) {
+      log(`Error fetching invite: ${error.message}`);
+      res.status(500).json({ error: "Failed to fetch invite" });
+    }
+  });
+
+  // POST /api/invites/:token/accept — authenticated. Accepts the invite for
+  // the currently-signed-in user (whose email may differ from the invited
+  // email — the token itself is the proof of consent, not the email match).
+  app.post("/api/invites/:token/accept", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims?.sub;
+      const { token } = req.params;
+
+      const invite = await storage.findOrgInviteByToken(token);
+      if (!invite) return res.status(404).json({ error: "Invite not found" });
+      if (invite.status !== 'pending') {
+        return res.status(410).json({ error: `Invite is ${invite.status}` });
+      }
+      if (invite.expiresAt && new Date(invite.expiresAt).getTime() < Date.now()) {
+        return res.status(410).json({ error: "Invite has expired" });
+      }
+
+      // Already a member? Silently mark accepted and succeed (idempotent).
+      const alreadyMember = await storage.isOrganizationMember(invite.organizationId, userId);
+      if (!alreadyMember) {
+        await storage.addOrganizationMember(invite.organizationId, userId, invite.role || 'member');
+      }
+      await storage.markInviteAccepted(invite.id);
+
+      log(`Invite ${invite.id} accepted by user ${userId} for org ${invite.organizationId}`);
+      res.json({
+        success: true,
+        organizationId: invite.organizationId,
+        role: invite.role,
+      });
+    } catch (error: any) {
+      log(`Error accepting invite: ${error.message}`);
+      res.status(500).json({ error: "Failed to accept invite" });
     }
   });
 
