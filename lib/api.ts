@@ -1174,7 +1174,7 @@ export const organizationsApi = {
   }>> {
     return apiRequest(`/api/organizations/${orgId}/invites/import`, {
       method: 'POST',
-      body: JSON.stringify({ rows }),
+      body: JSON.stringify({ invites: rows }),
     });
   },
 
