@@ -3278,15 +3278,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Organization subscription payment intent (for mobile native payment sheet)
+  // STRIPE_PRICE_ORG_COMMUNITY is the legacy name for the Starter price ID;
+  // it stays wired as a fallback so any in-flight purchases (or
+  // grandfathered subscribers paying through old webhook events) keep
+  // resolving correctly while operators migrate to STRIPE_PRICE_ORG_STARTER.
   const ORG_PRICE_IDS: Record<string, string> = {
-    community: process.env.STRIPE_PRICE_ORG_COMMUNITY || 'price_1SwhrED2jsTroGJyAvU4bZ4r',
+    starter: process.env.STRIPE_PRICE_ORG_STARTER
+      || process.env.STRIPE_PRICE_ORG_COMMUNITY
+      || 'price_1SwhrED2jsTroGJyAvU4bZ4r',
     professional: process.env.STRIPE_PRICE_ORG_PROFESSIONAL || 'price_1SwhsSD2jsTroGJyps2LHaah',
+    premium: process.env.STRIPE_PRICE_ORG_PREMIUM || '',
     enterprise: process.env.STRIPE_PRICE_ORG_ENTERPRISE || 'price_1SwhtFD2jsTroGJylQOkB8tu',
   };
 
   const ORG_EXPECTED_AMOUNTS: Record<string, number> = {
-    community: 2900,
-    professional: 4900,
+    starter: 2900,
+    professional: 9900,
+    premium: 29900,
     enterprise: 9900,
   };
 
@@ -3299,7 +3307,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Missing tier or organizationId" });
       }
 
-      const validTiers = ['community', 'professional', 'enterprise'];
+      const validTiers = ['starter', 'professional', 'premium', 'enterprise'];
       if (!validTiers.includes(tier)) {
         return res.status(400).json({ error: "Invalid tier" });
       }
