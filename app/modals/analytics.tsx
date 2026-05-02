@@ -17,6 +17,7 @@ import Animated, {
   FadeInUp,
 } from 'react-native-reanimated';
 import { router } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuthStore } from '../../lib/auth';
 import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS, responsive } from '../../lib/theme';
 import { analyticsApi, AnalyticsData, ProposalAnalytics } from '../../lib/api';
@@ -234,6 +235,7 @@ function ProposalAnalyticsCard({ proposal, index }: { proposal: ProposalAnalytic
 export default function AnalyticsScreen() {
   const { colors } = useTheme();
   const { token, user } = useAuthStore();
+  const insets = useSafeAreaInsets();
 
   const [isPremium, setIsPremium] = useState(false);
   const [loadingSubscription, setLoadingSubscription] = useState(true);
@@ -279,6 +281,29 @@ export default function AnalyticsScreen() {
 
   const fetchAnalytics = useCallback(async () => {
     try {
+      // Demo account — show seeded analytics for App Store review.
+      if (user?.email === 'demo@represent.app') {
+        const now = Date.now();
+        const day = 24 * 60 * 60 * 1000;
+        setAnalytics({
+          totalProposals: 6,
+          totalVotes: 4842,
+          supportVotes: 3318,
+          opposeVotes: 1524,
+          proposals: [
+            { id: 2001, title: 'Increase funding for student mental health services', views: 3104, supportVotes: 2104, opposeVotes: 88, engagementRate: 0.71, createdAt: new Date(now - 24 * day).toISOString() },
+            { id: 2002, title: 'Extend library hours to 24/7 during finals week', views: 2380, supportVotes: 1336, opposeVotes: 184, engagementRate: 0.64, createdAt: new Date(now - 2 * day).toISOString() },
+            { id: 2003, title: 'Replace dining hall vendor with local sustainable provider', views: 2018, supportVotes: 1125, opposeVotes: 312, engagementRate: 0.71, createdAt: new Date(now - 8 * day).toISOString() },
+            { id: 2004, title: 'Adopt 4-day class week pilot for spring semester', views: 1742, supportVotes: 891, opposeVotes: 423, engagementRate: 0.75, createdAt: new Date(now - 32 * day).toISOString() },
+            { id: 2005, title: 'Mandate AI ethics course in CS curriculum', views: 980, supportVotes: 479, opposeVotes: 92, engagementRate: 0.58, createdAt: new Date(now - 5 * day).toISOString() },
+            { id: 2006, title: 'Build new engineering lab in Bessemer Hall', views: 1310, supportVotes: 567, opposeVotes: 491, engagementRate: 0.81, createdAt: new Date(now - 12 * day).toISOString() },
+          ],
+        });
+        setLoading(false);
+        setRefreshing(false);
+        return;
+      }
+
       const result = await analyticsApi.getProposalAnalytics();
       if (result.data) {
         setAnalytics(result.data);
@@ -289,7 +314,7 @@ export default function AnalyticsScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [user?.email]);
 
   useEffect(() => {
     if (isPremium) {
@@ -351,6 +376,22 @@ export default function AnalyticsScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingTop: insets.top + 8,
+        paddingHorizontal: 16,
+        paddingBottom: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: colors.border,
+      }}>
+        <TouchableOpacity onPress={() => router.back()} style={{ width: 40, height: 40, alignItems: 'center', justifyContent: 'center' }}>
+          <Ionicons name="chevron-back" size={24} color={colors.text} />
+        </TouchableOpacity>
+        <Text style={{ fontFamily: 'Georgia', fontSize: 20, fontWeight: '600', color: colors.text }}>Analytics</Text>
+        <View style={{ width: 40 }} />
+      </View>
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}

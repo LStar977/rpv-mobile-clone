@@ -40,7 +40,7 @@ import { useTheme, SPACING, RADIUS, TYPOGRAPHY, SHADOWS, EASING, responsive } fr
 import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { useAuthStore } from '../lib/auth';
-import { router } from 'expo-router';
+import { router, useRootNavigationState } from 'expo-router';
 import { isBiometricAvailable, getBiometricType, authenticateWithBiometrics, isBiometricEnabled } from '../lib/biometrics';
 import { Button, Input, Card, Badge } from '../components/ui';
 import { haptics } from '../lib/haptics';
@@ -997,12 +997,16 @@ export default function AuthScreen() {
     checkBiometric();
   }, []);
 
-  // Redirect when authenticated
+  // Redirect when authenticated. Gate on navigation root being mounted —
+  // hydrate() can fire setState synchronously during the initial mount,
+  // which fires this effect before Expo Router's nav tree is ready.
+  const rootNavState = useRootNavigationState();
   useEffect(() => {
+    if (!rootNavState?.key) return;
     if (isAuthenticated) {
       router.replace('/(tabs)/dashboard');
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, rootNavState?.key]);
 
   // While authenticated, render nothing — the effect above is replacing
   // the route. Without this guard the sign-in UI flashes for one frame

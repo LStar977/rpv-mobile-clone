@@ -2,12 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, Switch, useColorScheme, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { isBiometricAvailable, isBiometricEnabled, setBiometricEnabled as saveBiometricEnabled, getBiometricType } from '../../lib/biometrics';
 import { useAuthStore } from '../../lib/auth';
 
 export default function PrivacyScreen() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
+  const insets = useSafeAreaInsets();
   const [biometricAvailable, setBiometricAvailable] = useState(false);
   const [biometricType, setBiometricTypeState] = useState('Biometric');
   const [biometricEnabled, setBiometricEnabled] = useState(false);
@@ -48,6 +50,22 @@ export default function PrivacyScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingTop: insets.top + 8,
+        paddingHorizontal: 16,
+        paddingBottom: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: colors.border,
+      }}>
+        <TouchableOpacity onPress={() => router.back()} style={{ width: 40, height: 40, alignItems: 'center', justifyContent: 'center' }}>
+          <Ionicons name="chevron-back" size={24} color={colors.text} />
+        </TouchableOpacity>
+        <Text style={{ fontFamily: 'Georgia', fontSize: 20, fontWeight: '600', color: colors.text }}>Settings & Privacy</Text>
+        <View style={{ width: 40 }} />
+      </View>
       <ScrollView style={styles.content}>
         <View style={[styles.card, { backgroundColor: colors.cardBg, borderColor: colors.border }]}>
           <View style={styles.row}>
@@ -92,7 +110,7 @@ export default function PrivacyScreen() {
         <View style={[styles.infoBox, { backgroundColor: colors.goldLight }]}>
           <Ionicons name="information-circle-outline" size={18} color={colors.gold} />
           <Text style={[styles.infoBoxText, { color: colors.gold }]}>
-            Your identity verification data is processed by Veriff and not stored on our servers.
+            Your identity verification data is processed by Didit and not stored on our servers.
           </Text>
         </View>
 

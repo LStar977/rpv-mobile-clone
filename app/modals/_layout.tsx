@@ -19,7 +19,6 @@ export default function ModalsLayout() {
       <Stack.Screen name="voting-history" />
       <Stack.Screen name="privacy" />
       <Stack.Screen name="analytics" />
-      <Stack.Screen name="organizations" />
       <Stack.Screen name="organization-detail" />
       <Stack.Screen name="org-proposal-detail" />
       <Stack.Screen name="verification-payment" />
@@ -27,6 +26,7 @@ export default function ModalsLayout() {
       <Stack.Screen name="admin" />
       <Stack.Screen name="my-proposals" />
       <Stack.Screen name="community-proposals" />
+      <Stack.Screen name="legal" />
     </Stack>
   );
 }

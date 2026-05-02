@@ -1,9 +1,11 @@
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Linking, Alert, Platform } from 'react-native';
 import { useState, useEffect } from 'react';
+import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuthStore } from '../../lib/auth';
 import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS, responsive } from '../../lib/theme';
 import { showPaymentError, showPaymentSuccess } from '../../lib/stripe';
@@ -85,6 +87,7 @@ const TIERS = {
 export default function SubscriptionScreen() {
   const { colors } = useTheme();
   const { user, token } = useAuthStore();
+  const insets = useSafeAreaInsets();
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [subscription, setSubscription] = useState<SubscriptionData | null>(null);
@@ -159,27 +162,10 @@ export default function SubscriptionScreen() {
   };
 
   const handleManageBilling = async () => {
-    setActionLoading('manage');
-    try {
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (token) headers['Authorization'] = `Bearer ${token}`;
-
-      const response = await fetch(`${API_URL}/api/stripe/portal`, {
-        method: 'POST',
-        headers,
-      });
-
-      if (response.ok) {
-        const { url } = await response.json();
-        await Linking.openURL(url);
-      } else {
-        throw new Error('Failed to open billing portal');
-      }
-    } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to open billing');
-    } finally {
-      setActionLoading(null);
-    }
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    // iOS subscriptions are managed in Apple's settings, not a web portal.
+    // App Review rejects external payment-management URLs for digital subs.
+    await Linking.openURL('https://apps.apple.com/account/subscriptions');
   };
 
   const handleContactOrganizations = () => {
@@ -362,7 +348,7 @@ export default function SubscriptionScreen() {
   if (loading) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <View style={[styles.header, { borderBottomColor: colors.border }]}>
+        <View style={[styles.header, { borderBottomColor: colors.border, paddingTop: insets.top + 8 }]}>
           <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
             <Ionicons name="close" size={24} color={colors.text} />
           </TouchableOpacity>
@@ -378,7 +364,7 @@ export default function SubscriptionScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={[styles.header, { borderBottomColor: colors.border }]}>
+      <View style={[styles.header, { borderBottomColor: colors.border, paddingTop: insets.top + 8 }]}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <Ionicons name="close" size={24} color={colors.text} />
         </TouchableOpacity>

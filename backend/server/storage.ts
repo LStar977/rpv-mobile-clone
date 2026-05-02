@@ -4,7 +4,7 @@ import { randomUUID } from "crypto";
 export interface VerificationData {
   verified: boolean;
   verificationId?: string;
-  verificationMethod?: 'veriff' | 'manual';
+  verificationMethod?: 'veriff' | 'didit' | 'manual';
   verifiedAt?: Date;
   country?: string;
   state?: string;

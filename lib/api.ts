@@ -44,6 +44,7 @@ export interface OrganizationProposal extends Proposal {
 
 // Demo organization data for App Store review
 const DEMO_ORGANIZATION_ID = 'demo-org-001';
+const DEMO_WESTBROOK_ID = 'demo-org-westbrook';
 
 const SEED_ORGANIZATIONS: Organization[] = [
   {
@@ -55,6 +56,17 @@ const SEED_ORGANIZATIONS: Organization[] = [
     tier: 'professional',
     verified: true,
     createdAt: '2024-06-15T10:00:00Z',
+    role: 'admin',
+  },
+  {
+    id: DEMO_WESTBROOK_ID,
+    name: 'Westbrook University',
+    description: 'Westbrook University uses Represent to give every student and faculty member a direct voice in campus decisions. Sub-organizations let each department run its own polls while leadership sees the full picture.',
+    logoUrl: 'https://images.unsplash.com/photo-1562774053-701939374585?w=200&h=200&fit=crop',
+    memberCount: 3209,
+    tier: 'enterprise',
+    verified: true,
+    createdAt: '2024-08-22T10:00:00Z',
     role: 'admin',
   },
 ];
@@ -100,6 +112,90 @@ const SEED_ORGANIZATION_PROPOSALS: OrganizationProposal[] = [
     creatorId: 'demo-user',
     organizationId: DEMO_ORGANIZATION_ID,
     organizationName: 'Community Voices Coalition',
+    isOfficial: true,
+  },
+  {
+    id: 'westbrook-proposal-1',
+    title: 'Extend library hours to 24/7 during finals week',
+    description: 'Expand operating hours at Carrigan Library and the engineering branch to round-the-clock access during the two weeks before finals each semester. Funded by reallocating existing weekend custodial budget.',
+    category: 'Campus Operations',
+    supportVotes: 1247,
+    opposeVotes: 89,
+    deadline: new Date(Date.now() + 9 * 24 * 60 * 60 * 1000).toISOString(),
+    createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
+    creatorId: 'demo-user',
+    organizationId: DEMO_WESTBROOK_ID,
+    organizationName: 'Westbrook University',
+    isOfficial: true,
+  },
+  {
+    id: 'westbrook-proposal-2',
+    title: 'Mandate AI ethics course in CS curriculum',
+    description: 'Add a required 3-credit AI ethics course (CS 287) for all CS majors starting Fall 2026. Course would be co-taught with the Philosophy department and cover topics like bias, transparency, and accountability in AI systems.',
+    category: 'Curriculum',
+    supportVotes: 312,
+    opposeVotes: 167,
+    deadline: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+    createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+    creatorId: 'demo-user',
+    organizationId: DEMO_WESTBROOK_ID,
+    organizationName: 'Westbrook University',
+    isOfficial: true,
+  },
+  {
+    id: 'westbrook-proposal-3',
+    title: 'Replace dining hall vendor with local sustainable provider',
+    description: 'Switch from Sodexo to Hudson Valley Foodworks beginning the next contract cycle (July 2026). Estimated 12% cost increase offset by reduced food waste and stronger ties to regional farms.',
+    category: 'Campus Operations',
+    supportVotes: 891,
+    opposeVotes: 234,
+    deadline: new Date(Date.now() + 18 * 24 * 60 * 60 * 1000).toISOString(),
+    createdAt: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000).toISOString(),
+    creatorId: 'demo-user',
+    organizationId: DEMO_WESTBROOK_ID,
+    organizationName: 'Westbrook University',
+    isOfficial: true,
+  },
+  {
+    id: 'westbrook-proposal-4',
+    title: 'Build new engineering lab in Bessemer Hall',
+    description: 'Approve $4.2M renovation of Bessemer Hall basement to add a maker-space lab with 3D printers, CNC machines, and electronics benches. Funded jointly by the engineering school and a matching alumni gift.',
+    category: 'Facilities',
+    supportVotes: 489,
+    opposeVotes: 78,
+    deadline: new Date(Date.now() + 21 * 24 * 60 * 60 * 1000).toISOString(),
+    createdAt: new Date(Date.now() - 9 * 24 * 60 * 60 * 1000).toISOString(),
+    creatorId: 'demo-user',
+    organizationId: DEMO_WESTBROOK_ID,
+    organizationName: 'Westbrook University',
+    isOfficial: true,
+  },
+  {
+    id: 'westbrook-proposal-5',
+    title: 'Move CS 101 to online-first format',
+    description: 'Convert the introductory CS course from in-person lectures to a flipped/online-first model with optional weekly recitation sections. Same total credit hours; aimed at letting students re-watch lectures during problem sets.',
+    category: 'Curriculum',
+    supportVotes: 198,
+    opposeVotes: 184,
+    deadline: new Date(Date.now() + 11 * 24 * 60 * 60 * 1000).toISOString(),
+    createdAt: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString(),
+    creatorId: 'demo-user',
+    organizationId: DEMO_WESTBROOK_ID,
+    organizationName: 'Westbrook University',
+    isOfficial: true,
+  },
+  {
+    id: 'westbrook-proposal-6',
+    title: 'Add startup incubator funding for student entrepreneurs',
+    description: 'Allocate $250K/year from the Business School endowment to fund a student-run startup incubator providing mentorship, working space, and seed grants of up to $10K per team.',
+    category: 'Programs',
+    supportVotes: 423,
+    opposeVotes: 91,
+    deadline: new Date(Date.now() + 16 * 24 * 60 * 60 * 1000).toISOString(),
+    createdAt: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000).toISOString(),
+    creatorId: 'demo-user',
+    organizationId: DEMO_WESTBROOK_ID,
+    organizationName: 'Westbrook University',
     isOfficial: true,
   },
 ];
@@ -154,6 +250,179 @@ const SEED_INVITE_CODES = [
     createdAt: '2024-12-01T10:00:00Z',
     expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
     usedCount: 5,
+  },
+];
+
+// ─── Westbrook University demo data ──────────────────────────────────────
+// Used by the demo account to showcase sub-organizations + insights.
+// Numbers are tuned to make the spread visible: small high-engagement
+// departments (Athletics, CS) contrast with larger lower-engagement ones
+// (Business, Liberal Arts), so the Insights page tells a clear story.
+
+const SEED_WESTBROOK_SUB_ORGS = [
+  {
+    id: 'westbrook-cs',
+    parentOrgId: DEMO_WESTBROOK_ID,
+    name: 'Computer Science',
+    type: 'department',
+    membershipType: 'invite',
+    description: 'CS undergrads, grads, and faculty.',
+    memberCount: 487,
+    proposalCount: 8,
+    voteCount: 412,
+    participationRate: 0.78,
+    createdAt: '2024-08-22T10:30:00Z',
+  },
+  {
+    id: 'westbrook-engineering',
+    parentOrgId: DEMO_WESTBROOK_ID,
+    name: 'School of Engineering',
+    type: 'department',
+    membershipType: 'invite',
+    description: 'Mechanical, Electrical, Civil, and Bioengineering.',
+    memberCount: 612,
+    proposalCount: 6,
+    voteCount: 489,
+    participationRate: 0.65,
+    createdAt: '2024-08-22T10:35:00Z',
+  },
+  {
+    id: 'westbrook-business',
+    parentOrgId: DEMO_WESTBROOK_ID,
+    name: 'Business School',
+    type: 'department',
+    membershipType: 'invite',
+    description: 'Undergraduate and MBA students, plus business faculty.',
+    memberCount: 745,
+    proposalCount: 4,
+    voteCount: 398,
+    participationRate: 0.54,
+    createdAt: '2024-08-22T10:40:00Z',
+  },
+  {
+    id: 'westbrook-liberal-arts',
+    parentOrgId: DEMO_WESTBROOK_ID,
+    name: 'Liberal Arts',
+    type: 'department',
+    membershipType: 'invite',
+    description: 'Humanities, social sciences, and the arts.',
+    memberCount: 891,
+    proposalCount: 3,
+    voteCount: 287,
+    participationRate: 0.42,
+    createdAt: '2024-08-22T10:45:00Z',
+  },
+  {
+    id: 'westbrook-athletics',
+    parentOrgId: DEMO_WESTBROOK_ID,
+    name: 'Athletics',
+    type: 'department',
+    membershipType: 'invite',
+    description: 'Varsity athletes, coaches, and athletic department staff.',
+    memberCount: 234,
+    proposalCount: 1,
+    voteCount: 156,
+    participationRate: 0.89,
+    createdAt: '2024-08-22T10:50:00Z',
+  },
+];
+
+// 30-day time series with weekday peaks (Mon-Fri ~70/day, Sat-Sun ~25/day).
+// Generated relative to today so the chart always shows recent activity.
+function buildWestbrookVoteTimeSeries(): Array<{ date: string; count: number }> {
+  const series: Array<{ date: string; count: number }> = [];
+  const now = new Date();
+  for (let i = 29; i >= 0; i--) {
+    const d = new Date(now);
+    d.setDate(d.getDate() - i);
+    const dow = d.getDay(); // 0 = Sun, 6 = Sat
+    const isWeekend = dow === 0 || dow === 6;
+    // Slightly varied per-day so the chart isn't a flat line.
+    const variance = ((i * 7919) % 17) - 8; // deterministic -8..+8
+    const base = isWeekend ? 25 : 70;
+    series.push({
+      date: d.toISOString().slice(0, 10),
+      count: Math.max(0, base + variance),
+    });
+  }
+  return series;
+}
+
+const SEED_WESTBROOK_INSIGHTS = {
+  totalMembers: 3209,
+  subOrgCount: 5,
+  totalProposals: 24,
+  totalVotes: 1742,
+  participationRate: 0.58,
+  subOrgs: SEED_WESTBROOK_SUB_ORGS.map(s => ({
+    id: s.id,
+    name: s.name,
+    memberCount: s.memberCount,
+    proposalCount: s.proposalCount,
+    voteCount: s.voteCount,
+    participationRate: s.participationRate,
+  })),
+  voteTimeSeries: buildWestbrookVoteTimeSeries(),
+  periodDays: 30,
+};
+
+const SEED_WESTBROOK_ANNOUNCEMENTS = [
+  {
+    id: 'westbrook-ann-1',
+    title: 'Welcome to the Fall 2025 Voting Season',
+    content: 'Six new proposals are open across departments. Check the Insights tab to see participation rates and how your department compares to the rest of campus.',
+    createdAt: '2025-09-08T08:00:00Z',
+    pinned: true,
+  },
+  {
+    id: 'westbrook-ann-2',
+    title: 'New: Sub-Organizations',
+    content: 'Department admins can now create sub-organizations to run polls scoped to their own students and faculty. Talk to your department chair to get set up.',
+    createdAt: '2025-09-15T12:00:00Z',
+    pinned: false,
+  },
+];
+
+const SEED_WESTBROOK_MEMBERS = [
+  {
+    id: 'demo-user',
+    name: 'App Reviewer',
+    email: 'demo@represent.app',
+    role: 'admin',
+    joinedAt: '2024-08-22T10:00:00Z',
+    profileImageUrl: null,
+  },
+  {
+    id: 'westbrook-faculty-1',
+    name: 'Dr. Elena Rodriguez',
+    email: 'elena.rodriguez@westbrook.edu',
+    role: 'admin',
+    joinedAt: '2024-08-25T09:00:00Z',
+    profileImageUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=100&h=100&fit=crop',
+  },
+  {
+    id: 'westbrook-student-1',
+    name: 'Jamal Patterson',
+    email: 'jpatterson@westbrook.edu',
+    role: 'member',
+    joinedAt: '2024-09-05T14:20:00Z',
+    profileImageUrl: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=100&h=100&fit=crop',
+  },
+  {
+    id: 'westbrook-student-2',
+    name: 'Priya Anand',
+    email: 'panand@westbrook.edu',
+    role: 'member',
+    joinedAt: '2024-09-12T11:45:00Z',
+    profileImageUrl: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100&h=100&fit=crop',
+  },
+  {
+    id: 'westbrook-student-3',
+    name: 'Kevin Walsh',
+    email: 'kwalsh@westbrook.edu',
+    role: 'member',
+    joinedAt: '2024-09-18T16:30:00Z',
+    profileImageUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&h=100&fit=crop',
   },
 ];
 
@@ -372,14 +641,18 @@ export const proposalsApi = {
   },
 };
 
-export const veriffApi = {
+// Provider-neutral KYC client. Backend routes were renamed from /api/veriff/*
+// to /api/didit/* during the Veriff → Didit migration. The veriffApi alias is
+// kept so any stale imports still compile.
+export const kycApi = {
   async createSession(): Promise<ApiResponse<{ sessionUrl: string; sessionId: string; verificationId?: string }>> {
-    return apiRequest('/api/veriff/create-session', { method: 'POST' });
+    return apiRequest('/api/didit/create-session', { method: 'POST' });
   },
   async checkDecision(verificationId: string): Promise<ApiResponse<{ status: string; decision?: string }>> {
-    return apiRequest(`/api/veriff/check-decision?verificationId=${verificationId}`);
+    return apiRequest(`/api/didit/check-decision?verificationId=${verificationId}`);
   },
 };
+export const veriffApi = kycApi;
 
 export const organizationsApi = {
   async getMyOrganizations(): Promise<ApiResponse<Organization[]>> {
@@ -512,6 +785,9 @@ export const organizationsApi = {
   // work on them unchanged.
 
   async getSubOrganizations(orgId: string): Promise<ApiResponse<any[]>> {
+    if (isDemoAccount() && orgId === DEMO_WESTBROOK_ID) {
+      return { data: SEED_WESTBROOK_SUB_ORGS, error: null };
+    }
     const result = await apiRequest<any>(`/api/organizations/${orgId}/sub-orgs`);
     if (Array.isArray(result.data)) return { data: result.data, error: null };
     if (result.data?.subOrgs) return { data: result.data.subOrgs, error: null };
@@ -541,6 +817,9 @@ export const organizationsApi = {
     voteTimeSeries?: Array<{ date: string; count: number }>;
     periodDays: number;
   }>> {
+    if (isDemoAccount() && orgId === DEMO_WESTBROOK_ID) {
+      return { data: SEED_WESTBROOK_INSIGHTS, error: null };
+    }
     return apiRequest(`/api/organizations/${orgId}/insights?period=${periodDays}`);
   },
 
@@ -585,9 +864,11 @@ export const organizationsApi = {
         console.error('Failed to load local demo proposals:', e);
       }
 
-      // For seed organization, also include seed proposals (filtered by deleted IDs)
-      if (orgId === DEMO_ORGANIZATION_ID) {
-        const filteredSeedProposals = SEED_ORGANIZATION_PROPOSALS.filter(p => !deletedIds.includes(String(p.id)));
+      // For seed organizations, return their seed proposals (filtered by deleted IDs)
+      if (orgId === DEMO_ORGANIZATION_ID || orgId === DEMO_WESTBROOK_ID) {
+        const filteredSeedProposals = SEED_ORGANIZATION_PROPOSALS
+          .filter(p => p.organizationId === orgId)
+          .filter(p => !deletedIds.includes(String(p.id)));
         const allProposals = [...filteredSeedProposals, ...localProposals];
         return { data: await mergeUserVotes(allProposals), error: null };
       }
@@ -610,9 +891,12 @@ export const organizationsApi = {
   },
 
   async getOrganizationAnnouncements(orgId: string): Promise<ApiResponse<any[]>> {
-    // For demo organization, return seed announcements
+    // For demo organizations, return seed announcements
     if (isDemoAccount() && orgId === DEMO_ORGANIZATION_ID) {
       return { data: SEED_ORGANIZATION_ANNOUNCEMENTS, error: null };
+    }
+    if (isDemoAccount() && orgId === DEMO_WESTBROOK_ID) {
+      return { data: SEED_WESTBROOK_ANNOUNCEMENTS, error: null };
     }
     const result = await apiRequest<any>(`/api/organizations/${orgId}/announcements`);
     if (Array.isArray(result.data)) return { data: result.data, error: null };
@@ -821,9 +1105,12 @@ export const organizationsApi = {
 
   // Member management
   async getMembers(orgId: string): Promise<ApiResponse<any[]>> {
-    // For demo organization, return seed members
+    // For demo organizations, return seed members
     if (isDemoAccount() && orgId === DEMO_ORGANIZATION_ID) {
       return { data: SEED_ORGANIZATION_MEMBERS, error: null };
+    }
+    if (isDemoAccount() && orgId === DEMO_WESTBROOK_ID) {
+      return { data: SEED_WESTBROOK_MEMBERS, error: null };
     }
     const result = await apiRequest<any>(`/api/organizations/${orgId}/members`);
     if (Array.isArray(result.data)) return { data: result.data, error: null };
@@ -881,7 +1168,7 @@ export const organizationsApi = {
     logoUrl?: string;
     type: 'starter' | 'professional' | 'enterprise';
   }): Promise<ApiResponse<Organization>> {
-    const result = await apiRequest<Organization>('/api/organizations', {
+    const rawResult = await apiRequest<any>('/api/organizations', {
       method: 'POST',
       body: JSON.stringify({
         ...data,
@@ -889,6 +1176,12 @@ export const organizationsApi = {
         type: data.type === 'starter' ? 'community' : data.type,
       }),
     });
+
+    // Backend returns { organization: {...} }; unwrap to a flat Organization
+    // so callers can read .id directly. Matches getMembers/getInviteCodes pattern.
+    const result: ApiResponse<Organization> = rawResult.data?.organization
+      ? { data: rawResult.data.organization, error: null }
+      : { data: rawResult.data, error: rawResult.error };
 
     // For demo account, save with enhanced data to ensure input fields and admin role
     if (isDemoAccount() && result.data) {
