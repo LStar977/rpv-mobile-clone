@@ -3318,8 +3318,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Organization not found" });
       }
 
-      if (org.creatorId !== userId) {
-        return res.status(403).json({ error: "Only the owner can create subscriptions" });
+      const members = await storage.getOrganizationMembers(organizationId);
+      const isAdmin = members.some((m: any) => m.userId === userId && m.role === 'admin');
+      if (org.creatorId !== userId && !isAdmin) {
+        return res.status(403).json({ error: "Only org admins can manage billing" });
       }
 
       const { getUncachableStripeClient } = await import("./stripeClient");
