@@ -524,7 +524,7 @@ function CommunityRow({ tier, name, meta, primary, flag, last, onPress }: {
     </TouchableOpacity>
   );
 }
-const ORG_COLLAPSED_LIMIT = 4;
+const ORG_COLLAPSED_LIMIT = 3;
 
 function YourOrganizations({ orgs, orgProposalsByOrg, votedIds, router }: {
   orgs: Organization[];
