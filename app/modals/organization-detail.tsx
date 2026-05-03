@@ -255,8 +255,11 @@ function TopBar({ title, isAdmin, onBack, onOverflow, insetTop }: { title: strin
 }
 
 // ─── hero ─────────────────────────────────────────────────────────────
-function Hero({ org, proposalCount }: { org: Organization; proposalCount: number }) {
-  const memberCount = org.memberCount ?? 0;
+function Hero({ org, proposalCount, actualMemberCount }: { org: Organization; proposalCount: number; actualMemberCount: number }) {
+  // The deployed backend doesn't always increment org.memberCount when a
+  // user accepts an invite, so prefer the larger of the two when we've
+  // actually loaded the members list.
+  const memberCount = Math.max(org.memberCount ?? 0, actualMemberCount);
   const memberLabel = `${memberCount.toLocaleString()} ${memberCount === 1 ? 'member' : 'members'}`;
   const isAdmin = org.role === 'admin';
 
@@ -464,7 +467,7 @@ function SettingsRow({ label, value, mono, gold, onPress, action }: {
 }
 
 function SettingsSection({
-  org, inviteCodes, generating, onCopy, onGenerate, onRevoke, onLeave, canDelete, onDelete,
+  org, inviteCodes, generating, onCopy, onGenerate, onRevoke, onLeave, canDelete, onDelete, actualMemberCount,
 }: {
   org: Organization;
   inviteCodes: any[];
@@ -475,6 +478,7 @@ function SettingsSection({
   onLeave: () => void;
   canDelete: boolean;
   onDelete: () => void;
+  actualMemberCount: number;
 }) {
   const activeCode = inviteCodes.find((c) => !c.revokedAt && (!c.expiresAt || new Date(c.expiresAt).getTime() > Date.now())) || inviteCodes[0];
   const codeText = activeCode?.code || activeCode?.inviteCode || 'NO·ACTIVE·CODE';
@@ -563,7 +567,7 @@ function SettingsSection({
         <View style={{ paddingHorizontal: 14, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: O_LINE, backgroundColor: O_BG_RAISED }}>
           <Text style={{ fontSize: 11, color: O_FG_MUTED, letterSpacing: -0.05, fontWeight: '600' }}>Members & roles</Text>
         </View>
-        <SettingsRow label="Total members" value={(org.memberCount ?? 0).toLocaleString()} mono />
+        <SettingsRow label="Total members" value={Math.max(org.memberCount ?? 0, actualMemberCount).toLocaleString()} mono />
         <SettingsRow label="Active invite codes" value={`${inviteCodes.filter((c) => !c.revokedAt).length}`} mono />
       </View>
 
@@ -2008,7 +2012,7 @@ export default function OrganizationDetailScreen() {
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={O_GOLD} />}
       >
-        {organization && <Hero org={organization} proposalCount={proposals.length} />}
+        {organization && <Hero org={organization} proposalCount={proposals.length} actualMemberCount={members.length} />}
 
         <SectionTabs
           active={activeTab}
@@ -2022,7 +2026,7 @@ export default function OrganizationDetailScreen() {
         {activeTab === 'members' && (
           <MembersSection
             members={members}
-            totalCount={organization?.memberCount ?? members.length}
+            totalCount={Math.max(organization?.memberCount ?? 0, members.length)}
             search={memberSearch}
             onSearch={setMemberSearch}
             isAdmin={!!isAdmin}
@@ -2070,6 +2074,7 @@ export default function OrganizationDetailScreen() {
             onLeave={handleLeaveOrganization}
             canDelete={canDeleteOrganization()}
             onDelete={handleDeleteOrganization}
+            actualMemberCount={members.length}
           />
         )}
       </ScrollView>
