@@ -4,24 +4,24 @@ import { ArrowRight } from "lucide-react";
 
 export default function Hero() {
   return (
-    <section className="relative overflow-hidden">
-      {/* Globe — fills the right side, crops to keep the sphere centered vertically */}
-      <div className="pointer-events-none absolute inset-y-0 right-0 z-0 w-full lg:w-[60%]">
+    <section className="relative flex min-h-[780px] items-center overflow-hidden lg:h-[calc(100vh-80px)] lg:min-h-[760px]">
+      {/* Globe — fills the right side and bleeds to the bottom edge */}
+      <div className="pointer-events-none absolute inset-0 z-0">
         <Image
           src="/hero-globe.jpg"
           alt=""
           fill
           priority
-          sizes="(min-width: 1024px) 60vw, 100vw"
-          className="object-cover object-center"
+          sizes="100vw"
+          className="object-cover object-right"
         />
         {/* Black-to-transparent fade so the headline reads cleanly */}
-        <div className="absolute inset-y-0 left-0 w-1/2 bg-gradient-to-r from-ink via-ink/85 to-transparent" />
+        <div className="absolute inset-y-0 left-0 w-2/3 bg-gradient-to-r from-ink via-ink/80 to-transparent lg:w-1/2" />
       </div>
 
-      <div className="relative z-10 mx-auto max-w-[1440px] px-8 pt-24 lg:pt-28">
-        <div className="max-w-xl pb-28 lg:pb-32">
-          <h1 className="font-display text-[88px] leading-[0.95] tracking-tight">
+      <div className="relative z-10 mx-auto w-full max-w-[1440px] px-8">
+        <div className="max-w-2xl">
+          <h1 className="font-display text-[96px] font-medium leading-[0.95] tracking-tight">
             <span className="block text-white">Verified</span>
             <span className="block text-gold italic">public</span>
             <span className="block text-white">
@@ -29,7 +29,7 @@ export default function Hero() {
             </span>
           </h1>
 
-          <p className="mt-10 max-w-md text-[17px] leading-relaxed text-white/80">
+          <p className="mt-10 max-w-md text-[17px] leading-relaxed text-white/85">
             Identity-verified, geo-gated voting infrastructure for institutions
             and communities.
           </p>
@@ -52,7 +52,6 @@ export default function Hero() {
             </Link>
           </div>
         </div>
-
       </div>
     </section>
   );
