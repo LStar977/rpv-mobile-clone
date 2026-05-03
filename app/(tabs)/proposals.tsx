@@ -48,6 +48,7 @@ import { useAuthStore } from '../../lib/auth';
 import { useBallotStore } from '../../lib/ballots';
 import { shareProposal } from '../../lib/share';
 import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS, ANIMATION, responsive } from '../../lib/theme';
+import { getTierLabel, getLocationLabel, canUserVoteOnProposal } from '../../lib/proposalGeo';
 import Svg, { Rect, Line, Ellipse, Path, Circle, G, Defs, LinearGradient as SvgLinearGradient, Stop } from 'react-native-svg';
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -300,18 +301,6 @@ function getSceneForCategory(category: string) {
   }
 }
 
-// Get tier label from geo restrictions
-function getTierLabel(geoRestrictions?: string[]): string {
-  if (!geoRestrictions || geoRestrictions.length === 0) return 'GLOBAL';
-  if (geoRestrictions.length === 1) return 'FEDERAL';
-  if (geoRestrictions.length === 2) return 'PROVINCIAL';
-  return 'MUNICIPAL';
-}
-
-function getLocationLabel(geoRestrictions?: string[]): string {
-  if (!geoRestrictions || geoRestrictions.length === 0) return 'Global';
-  return geoRestrictions[geoRestrictions.length - 1];
-}
 
 // Generate dossier ref code from proposal
 function getDossierRef(proposal: Proposal): string {
@@ -618,31 +607,6 @@ function isProposalEnded(p: Proposal) {
   return getTimeRemaining(p.deadline) === 'Ended';
 }
 
-// Check if user can vote on a proposal based on geo restrictions
-// Global proposals (no geo): anyone can vote
-// Geo-restricted: only verified users with matching location
-const canUserVoteOnProposal = (
-  proposal: Proposal,
-  userCountry: string,
-  userState: string,
-  userCity: string,
-  isVerified: boolean
-): boolean => {
-  const proposalGeo = proposal.geoRestrictions || [];
-
-  // Global proposals: anyone can vote
-  if (proposalGeo.length === 0) return true;
-
-  // Geo-restricted proposals require verification
-  if (!isVerified) return false;
-
-  // Check hierarchical location match
-  const userLocation = [userCountry, userState, userCity].filter(Boolean);
-  return proposalGeo.every((restriction, index) => {
-    const userLevel = userLocation[index];
-    return userLevel && userLevel.toLowerCase() === restriction.toLowerCase();
-  });
-};
 
 // Premium Filter Chip
 function FilterChip({
