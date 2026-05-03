@@ -909,12 +909,16 @@ function MembersSection({ members, totalCount, search, onSearch, isAdmin, onMemb
     const q = search.trim().toLowerCase();
     return members.filter((m) => {
       const n = (m.name || m.userName || m.user?.name || '').toLowerCase();
+      if (n.includes(q)) return true;
+      // Email search is admin-only — prevents non-admins from enumerating
+      // emails by typing partial matches.
+      if (!isAdmin) return false;
       const e = (m.email || m.user?.email || '').toLowerCase();
-      return n.includes(q) || e.includes(q);
+      return e.includes(q);
     });
-  }, [members, search]);
+  }, [members, search, isAdmin]);
 
-  const showList = isAdmin && members.length > 0;
+  const showList = members.length > 0;
 
   return (
     <View>
@@ -967,7 +971,7 @@ function MembersSection({ members, totalCount, search, onSearch, isAdmin, onMemb
       {!showList ? (
         <View style={{ paddingHorizontal: 14, paddingVertical: 24, alignItems: 'center' }}>
           <Text style={{ fontFamily: SERIF, fontSize: 15, fontStyle: 'italic', color: O_FG_MUTED, textAlign: 'center', marginBottom: 6 }}>
-            {isAdmin ? 'No members yet' : 'Member list visible to admins only'}
+            No members yet
           </Text>
           <Text style={{ fontSize: 12, color: O_FG_FAINT, textAlign: 'center' }}>
             {totalCount > 0 ? `${totalCount.toLocaleString()} ${totalCount === 1 ? 'member' : 'members'}` : ''}
@@ -990,7 +994,8 @@ function MembersSection({ members, totalCount, search, onSearch, isAdmin, onMemb
               return (
                 <TouchableOpacity
                   key={m.id || m.userId || i}
-                  activeOpacity={0.7}
+                  activeOpacity={isAdmin ? 0.7 : 1}
+                  disabled={!isAdmin}
                   onPress={() => onMemberPress(m)}
                   style={{
                     paddingHorizontal: 14, paddingVertical: 11,

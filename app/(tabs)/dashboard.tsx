@@ -715,8 +715,19 @@ function OrgRow({ org, pendingCount, last, onPress }: {
         <View style={[styles.communityFlag, {
           backgroundColor: pendingCount > 0 ? `${dc.GOLD}1A` : dc.BG_RAISED,
           borderColor: pendingCount > 0 ? `${dc.GOLD}4D` : dc.LINE_STRONG,
+          overflow: 'hidden',
         }]}>
-          <Text style={[styles.communityFlagText, { color: pendingCount > 0 ? dc.GOLD : dc.FG_MUTED }]}>{initial}</Text>
+          {org.logoUrl ? (
+            <ExpoImage
+              source={{ uri: org.logoUrl }}
+              style={{ width: '100%', height: '100%' }}
+              contentFit="cover"
+              cachePolicy="memory-disk"
+              transition={150}
+            />
+          ) : (
+            <Text style={[styles.communityFlagText, { color: pendingCount > 0 ? dc.GOLD : dc.FG_MUTED }]}>{initial}</Text>
+          )}
         </View>
         <View style={{ flex: 1, minWidth: 0 }}>
           <View style={styles.communityNameRow}>
