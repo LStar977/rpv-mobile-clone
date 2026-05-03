@@ -6,7 +6,6 @@ import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuthStore } from '../../lib/auth';
-import { limitsApi, UsageLimits } from '../../lib/api';
 import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS } from '../../lib/theme';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://representportal.com';
@@ -69,7 +68,6 @@ export default function VotingHistoryScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [votedProposals, setVotedProposals] = useState<VotedProposal[]>([]);
-  const [usageLimits, setUsageLimits] = useState<UsageLimits | null>(null);
 
   // Filter state
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('all');
@@ -95,11 +93,6 @@ export default function VotingHistoryScreen() {
           { id: 1007, title: 'Adopt 4-day class week pilot for spring semester', position: 'support', supportVotes: 891, opposeVotes: 423, votedAt: new Date(now - 32 * day).toISOString() },
           { id: 1008, title: 'Require carbon-offset purchases for university travel', position: 'support', supportVotes: 654, opposeVotes: 287, votedAt: new Date(now - 45 * day).toISOString() },
         ]);
-        setUsageLimits({
-          tier: 'premium',
-          proposals: { used: 4, limit: 'unlimited', period: 'month', resetDate: new Date(now + 15 * day).toISOString() },
-          votes: { used: 8, limit: 'unlimited' },
-        });
         setLoading(false);
         return;
       }
@@ -107,11 +100,7 @@ export default function VotingHistoryScreen() {
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
 
-      // Fetch voting history and usage limits in parallel
-      const [historyResponse, limitsResult] = await Promise.all([
-        fetch(`${API_URL}/api/user/voted-proposals`, { headers }),
-        limitsApi.getUsageLimits(),
-      ]);
+      const historyResponse = await fetch(`${API_URL}/api/user/voted-proposals`, { headers });
 
       if (historyResponse.ok) {
         const data = await historyResponse.json();
@@ -126,10 +115,6 @@ export default function VotingHistoryScreen() {
             votedAt: p.votedAt || p.timestamp,
           }))
         );
-      }
-
-      if (limitsResult.data) {
-        setUsageLimits(limitsResult.data);
       }
     } catch (error) {
       console.error('Failed to fetch voting history:', error);
@@ -223,45 +208,6 @@ export default function VotingHistoryScreen() {
           />
         }
       >
-        {/* Vote Limits Card (for non-premium users) */}
-        {usageLimits && usageLimits.votes.limit !== 'unlimited' && (
-          <Animated.View
-            entering={FadeInDown.duration(400)}
-            style={[styles.limitsCard, { backgroundColor: colors.surface, borderColor: colors.gold }]}
-          >
-            <View style={styles.limitsHeader}>
-              <View style={[styles.limitsIconBg, { backgroundColor: `${colors.gold}15` }]}>
-                <Ionicons name="ticket-outline" size={20} color={colors.gold} />
-              </View>
-              <View style={styles.limitsInfo}>
-                <Text style={[styles.limitsTitle, { color: colors.text }]}>Votes Remaining</Text>
-                <Text style={[styles.limitsSubtitle, { color: colors.textSecondary }]}>
-                  {usageLimits.tier === 'free' ? 'Free tier limit' : 'Monthly limit'}
-                </Text>
-              </View>
-              <View style={styles.limitsCount}>
-                <Text style={[styles.limitsCountValue, { color: colors.gold }]}>
-                  {Math.max(0, (usageLimits.votes.limit as number) - usageLimits.votes.used)}
-                </Text>
-                <Text style={[styles.limitsCountLabel, { color: colors.textTertiary }]}>
-                  of {usageLimits.votes.limit}
-                </Text>
-              </View>
-            </View>
-            <View style={[styles.limitsProgressBg, { backgroundColor: `${colors.gold}20` }]}>
-              <View
-                style={[
-                  styles.limitsProgressFill,
-                  {
-                    backgroundColor: colors.gold,
-                    width: `${Math.min(100, (usageLimits.votes.used / (usageLimits.votes.limit as number)) * 100)}%`,
-                  },
-                ]}
-              />
-            </View>
-          </Animated.View>
-        )}
-
         {/* Stats Card */}
         <Animated.View
           entering={FadeInDown.delay(100).duration(400)}
@@ -455,60 +401,6 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   content: { flex: 1 },
   contentContainer: { padding: SPACING.lg },
-
-  // Limits Card
-  limitsCard: {
-    borderRadius: BORDER_RADIUS.xxl,
-    borderWidth: 1.5,
-    padding: SPACING.lg,
-    marginBottom: SPACING.lg,
-    ...SHADOWS.sm,
-  },
-  limitsHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: SPACING.md,
-  },
-  limitsIconBg: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  limitsInfo: {
-    flex: 1,
-    marginLeft: SPACING.md,
-  },
-  limitsTitle: {
-    fontFamily: 'Georgia',
-    fontSize: 16,
-    fontWeight: '500',
-  },
-  limitsSubtitle: {
-    ...TYPOGRAPHY.bodySmall,
-    marginTop: 2,
-  },
-  limitsCount: {
-    alignItems: 'flex-end',
-  },
-  limitsCountValue: {
-    fontFamily: 'Georgia',
-    fontSize: 24,
-    fontWeight: '500',
-  },
-  limitsCountLabel: {
-    ...TYPOGRAPHY.labelSmall,
-  },
-  limitsProgressBg: {
-    height: 6,
-    borderRadius: 3,
-    overflow: 'hidden',
-  },
-  limitsProgressFill: {
-    height: '100%',
-    borderRadius: 3,
-  },
 
   // Stats Card
   statsCard: {

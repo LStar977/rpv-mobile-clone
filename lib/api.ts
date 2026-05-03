@@ -1393,10 +1393,6 @@ export interface UsageLimits {
     period: 'month' | 'week';
     resetDate: string;
   };
-  votes: {
-    used: number;
-    limit: number | 'unlimited';
-  };
 }
 
 export const analyticsApi = {
@@ -1434,10 +1430,6 @@ export const limitsApi = {
           limit: 1,
           period: 'month',
           resetDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-        },
-        votes: {
-          used: 0,
-          limit: 5,
         },
       },
       error: result.error,
