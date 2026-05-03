@@ -55,8 +55,9 @@ function useDashboardColors() {
 // ═══════════════════════════════════════════════════════════════════════════
 // MAIN
 // ═══════════════════════════════════════════════════════════════════════════
-function classifyScope(p: Proposal): 'federal' | 'provincial' | 'municipal' {
+function classifyScope(p: Proposal): 'global' | 'federal' | 'provincial' | 'municipal' {
   const len = (p.geoRestrictions || []).length;
+  if (len === 0) return 'global';
   if (len >= 3) return 'municipal';
   if (len === 2) return 'provincial';
   return 'federal';
@@ -148,7 +149,7 @@ export default function DashboardScreen() {
   const pendingProposals = activeProposals.filter(p => !votedIds.has(String(p.id)));
   const pendingCount = pendingProposals.length;
 
-  const breakdown = { federal: 0, provincial: 0, municipal: 0 };
+  const breakdown = { global: 0, federal: 0, provincial: 0, municipal: 0 };
   pendingProposals.forEach(p => { breakdown[classifyScope(p)]++; });
 
   // Featured: pending proposal with closest upcoming deadline
@@ -263,10 +264,10 @@ function TopBar({ name, city, state, verified, onAvatarPress, onVerifyPress }: {
     </Animated.View>
   );
 }
-function Hero({ pendingCount, breakdown, onBeginVoting }: { pendingCount: number; breakdown: { federal: number; provincial: number; municipal: number }; onBeginVoting: () => void }) {
+function Hero({ pendingCount, breakdown, onBeginVoting }: { pendingCount: number; breakdown: { global: number; federal: number; provincial: number; municipal: number }; onBeginVoting: () => void }) {
   const dc = useDashboardColors();
   const dateStr = new Date().toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' }).replace(/\//g, ' · ');
-  const total = Math.max(breakdown.federal + breakdown.provincial + breakdown.municipal, 1);
+  const total = Math.max(breakdown.global + breakdown.federal + breakdown.provincial + breakdown.municipal, 1);
   const isPlural = pendingCount !== 1;
   return (
     <Animated.View entering={FadeInUp.duration(500).delay(100)} style={[styles.hero, { backgroundColor: dc.BG_CARD, borderColor: dc.LINE }]}>
@@ -285,12 +286,14 @@ function Hero({ pendingCount, breakdown, onBeginVoting }: { pendingCount: number
         </View>
 
         <View style={[styles.breakdownBarTrack, { backgroundColor: dc.LINE }]}>
+          {breakdown.global > 0 && <View style={{ flex: breakdown.global, backgroundColor: dc.GREEN }} />}
           {breakdown.federal > 0 && <View style={{ flex: breakdown.federal, backgroundColor: dc.GOLD }} />}
           {breakdown.provincial > 0 && <View style={{ flex: breakdown.provincial, backgroundColor: dc.GOLD_LIGHT, opacity: 0.6 }} />}
           {breakdown.municipal > 0 && <View style={{ flex: breakdown.municipal, backgroundColor: dc.GOLD_DARK, opacity: 0.7 }} />}
           {total === 0 && <View style={{ flex: 1, backgroundColor: dc.LINE }} />}
         </View>
         <View style={styles.breakdownLegend}>
+          {breakdown.global > 0 && <Text style={[styles.breakdownLegendItem, { color: dc.FG_FAINT }]}><Text style={{ color: dc.GREEN }}>● </Text>{breakdown.global} global</Text>}
           <Text style={[styles.breakdownLegendItem, { color: dc.FG_FAINT }]}><Text style={{ color: dc.GOLD }}>● </Text>{breakdown.federal} federal</Text>
           <Text style={[styles.breakdownLegendItem, { color: dc.FG_FAINT }]}><Text style={{ color: dc.GOLD_LIGHT }}>● </Text>{breakdown.provincial} provincial</Text>
           <Text style={[styles.breakdownLegendItem, { color: dc.FG_FAINT }]}><Text style={{ color: dc.GOLD_DARK }}>● </Text>{breakdown.municipal} municipal</Text>
@@ -370,7 +373,7 @@ function Featured({ proposal, onPress }: { proposal?: Proposal; onPress: () => v
   const supportPct = totalVotes > 0 ? Math.round((proposal.supportVotes / totalVotes) * 100) : 0;
   const opposePct = totalVotes > 0 ? 100 - supportPct : 0;
   const scope = (proposal.geoRestrictions || []).length;
-  const tierLabel = scope >= 3 ? 'MUNI' : scope === 2 ? 'PROV' : 'FED';
+  const tierLabel = scope === 0 ? 'GLBL' : scope >= 3 ? 'MUNI' : scope === 2 ? 'PROV' : 'FED';
   const idDigits = String(proposal.id).match(/\d+/g)?.join('') || '000';
   const refCode = `${tierLabel} · ${idDigits.slice(-3).padStart(3, '0')}`;
 
@@ -751,6 +754,7 @@ function SentinelDigest({ items }: { items: Proposal[] }) {
   };
   const tierLabel = (p: Proposal) => {
     const len = (p.geoRestrictions || []).length;
+    if (len === 0) return 'Global';
     return len >= 3 ? 'Municipal' : len === 2 ? 'Provincial' : 'Federal';
   };
   const compact = (n: number) => {

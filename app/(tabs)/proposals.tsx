@@ -302,10 +302,15 @@ function getSceneForCategory(category: string) {
 
 // Get tier label from geo restrictions
 function getTierLabel(geoRestrictions?: string[]): string {
-  if (!geoRestrictions || geoRestrictions.length === 0) return 'FEDERAL';
+  if (!geoRestrictions || geoRestrictions.length === 0) return 'GLOBAL';
   if (geoRestrictions.length === 1) return 'FEDERAL';
   if (geoRestrictions.length === 2) return 'PROVINCIAL';
   return 'MUNICIPAL';
+}
+
+function getLocationLabel(geoRestrictions?: string[]): string {
+  if (!geoRestrictions || geoRestrictions.length === 0) return 'Global';
+  return geoRestrictions[geoRestrictions.length - 1];
 }
 
 // Generate dossier ref code from proposal
@@ -834,9 +839,7 @@ function SwipeCard({ proposal, onSwipeLeft, onSwipeRight, onSwipeUp, onTap, isTo
 
   const tierLabel = getTierLabel(proposal.geoRestrictions);
   const categoryColor = getCategoryColor();
-  const location = proposal.geoRestrictions && proposal.geoRestrictions.length > 0
-    ? proposal.geoRestrictions[proposal.geoRestrictions.length - 1]
-    : 'Canada';
+  const location = getLocationLabel(proposal.geoRestrictions);
 
   return (
     <GestureDetector gesture={composedGesture}>
@@ -2559,9 +2562,7 @@ export default function ProposalsScreen() {
             const pct = total > 0 ? Math.round(((detail.supportVotes || 0) / total) * 100) : 0;
             const tierLabel = getTierLabel(detail.geoRestrictions);
             const category = detail.category || 'General';
-            const location = detail.geoRestrictions && detail.geoRestrictions.length > 0
-              ? detail.geoRestrictions[detail.geoRestrictions.length - 1]
-              : 'Canada';
+            const location = getLocationLabel(detail.geoRestrictions);
             const timeRemaining = getTimeRemaining(detail.deadline);
             const ended = isProposalEnded(detail);
             const cat = category.toLowerCase();
