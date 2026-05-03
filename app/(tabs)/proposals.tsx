@@ -1743,6 +1743,12 @@ export default function ProposalsScreen() {
   const filteredProposals = useMemo(() => {
     // Reverse to show most recent proposals first
     return [...proposals].reverse().filter((proposal) => {
+      // Unverified users can only act on global proposals (geoRestrictions
+      // empty), so hide geo-restricted ones from the list to keep the view
+      // honest. canUserVoteOnProposal still gates the vote button as a
+      // belt-and-suspenders measure.
+      if (!isVerified && (proposal.geoRestrictions || []).length > 0) return false;
+
       const matchesSearch =
         searchQuery === '' ||
         proposal.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -1789,6 +1795,7 @@ export default function ProposalsScreen() {
     selectedFilterAge,
     selectedFilterGender,
     user?.id,
+    isVerified,
   ]);
 
   const activeCount = useMemo(() => filteredProposals.filter((p) => !isProposalEnded(p)).length, [filteredProposals]);
@@ -2376,15 +2383,29 @@ export default function ProposalsScreen() {
       ) : filteredProposals.length === 0 ? (
         <Animated.View entering={FadeIn.duration(400)} style={styles.emptyState}>
           <View style={[styles.emptyIcon, { backgroundColor: `${colors.gold}15` }]}>
-            <Ionicons name="document-text-outline" size={48} color={colors.gold} />
+            <Ionicons name={!isVerified && !hasActiveFilters ? 'shield-checkmark-outline' : 'document-text-outline'} size={48} color={colors.gold} />
           </View>
-          <Text style={[styles.emptyTitle, { color: colors.text }]}>No proposals found</Text>
+          <Text style={[styles.emptyTitle, { color: colors.text }]}>
+            {!isVerified && !hasActiveFilters ? 'No global proposals open' : 'No proposals found'}
+          </Text>
           <Text style={[styles.emptyDesc, { color: colors.textSecondary }]}>
-            {hasActiveFilters ? 'Try adjusting your filters' : 'Be the first to create one!'}
+            {hasActiveFilters
+              ? 'Try adjusting your filters'
+              : !isVerified
+                ? 'There are no global proposals open right now. Verify your identity to vote on proposals in your country, province, and city.'
+                : 'Be the first to create one!'}
           </Text>
           {!hasActiveFilters && (
             <TouchableOpacity
-              onPress={() => setShowCreateModal(true)}
+              onPress={() => {
+                if (!isVerified) {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                  setVerificationModalType('vote');
+                  setShowVerificationModal(true);
+                } else {
+                  setShowCreateModal(true);
+                }
+              }}
               style={styles.emptyBtn}
             >
               <LinearGradient
@@ -2393,8 +2414,8 @@ export default function ProposalsScreen() {
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
               >
-                <Ionicons name="add-circle-outline" size={20} color="#000" />
-                <Text style={styles.emptyBtnText}>Create Proposal</Text>
+                <Ionicons name={!isVerified ? 'shield-checkmark' : 'add-circle-outline'} size={20} color="#000" />
+                <Text style={styles.emptyBtnText}>{!isVerified ? 'Get Verified' : 'Create Proposal'}</Text>
               </LinearGradient>
             </TouchableOpacity>
           )}
