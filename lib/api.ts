@@ -577,15 +577,18 @@ export const userApi = {
   async getVerificationStatus(): Promise<ApiResponse<{ verified: boolean; hasPassport: boolean; country?: string; state?: string; city?: string }>> {
     const result = await apiRequest<any>('/api/auth/verify');
     if (result.data?.user) {
-      return { 
-        data: { 
-          verified: result.data.user.verified || false,
-          hasPassport: result.data.user.hasPassport || false,
-          country: result.data.user.country,
-          state: result.data.user.state,
-          city: result.data.user.city,
-        }, 
-        error: null 
+      const u = result.data.user;
+      const verified = !!(u.verified || u.isVerified || u.is_verified || u.kycVerified || u.kyc_verified || u.passport_verified);
+      console.log('[verify] backend user keys:', Object.keys(u).join(','), '| derived verified:', verified);
+      return {
+        data: {
+          verified,
+          hasPassport: !!(u.hasPassport || u.has_passport),
+          country: u.country,
+          state: u.state,
+          city: u.city,
+        },
+        error: null
       };
     }
     return { data: { verified: false, hasPassport: false }, error: result.error };
