@@ -100,6 +100,7 @@ export default function OrgProposalDetailScreen() {
 
     try {
       const result = await organizationsApi.voteOnProposal(orgId, proposalId, vote);
+      console.log('[voteOnProposal] response:', JSON.stringify(result));
 
       if (result.error) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
@@ -107,12 +108,19 @@ export default function OrgProposalDetailScreen() {
         return;
       }
 
-      if (result.data) {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        setUserVote(vote);
-        setSupportVotes(result.data.supportVotes);
-        setOpposeVotes(result.data.opposeVotes);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setUserVote(vote);
+      // Optimistic local update — increment our side by 1. Server may also
+      // return updated totals; if so, prefer them, but only when they're
+      // actually numbers (deployed backend response shape varies).
+      if (vote === 'support') {
+        setSupportVotes((v) => (v ?? 0) + 1);
+      } else {
+        setOpposeVotes((v) => (v ?? 0) + 1);
       }
+      const d: any = result.data;
+      if (d && typeof d.supportVotes === 'number') setSupportVotes(d.supportVotes);
+      if (d && typeof d.opposeVotes === 'number') setOpposeVotes(d.opposeVotes);
     } catch (error) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       Alert.alert('Error', 'Failed to submit vote. Please try again.');
@@ -237,7 +245,7 @@ export default function OrgProposalDetailScreen() {
             <View style={styles.voteCount}>
               <Ionicons name="thumbs-up" size={20} color={colors.success} />
               <Text style={[styles.voteCountNumber, { color: colors.success }]}>
-                {supportVotes.toLocaleString()}
+                {(supportVotes ?? 0).toLocaleString()}
               </Text>
               <Text style={[styles.voteCountLabel, { color: colors.textSecondary }]}>
                 Support ({total > 0 ? Math.round(supportPct) : 0}%)
@@ -246,7 +254,7 @@ export default function OrgProposalDetailScreen() {
             <View style={styles.voteCount}>
               <Ionicons name="thumbs-down" size={20} color={colors.error} />
               <Text style={[styles.voteCountNumber, { color: colors.error }]}>
-                {opposeVotes.toLocaleString()}
+                {(opposeVotes ?? 0).toLocaleString()}
               </Text>
               <Text style={[styles.voteCountLabel, { color: colors.textSecondary }]}>
                 Oppose ({total > 0 ? Math.round(100 - supportPct) : 0}%)
