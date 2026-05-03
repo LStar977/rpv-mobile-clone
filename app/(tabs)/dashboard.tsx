@@ -9,7 +9,7 @@ import Svg, { Circle, Line, Path, Defs, LinearGradient as SvgLinearGradient, Sto
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { SPACING, useTheme } from '../../lib/theme';
 import { useAuthStore } from '../../lib/auth';
-import { proposalsApi, userApi, type Proposal } from '../../lib/api';
+import { proposalsApi, userApi, organizationsApi, type Proposal, type Organization, type OrganizationProposal } from '../../lib/api';
 import { useFocusEffect } from 'expo-router';
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -70,6 +70,8 @@ export default function DashboardScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [proposals, setProposals] = useState<Proposal[]>([]);
   const [votedIds, setVotedIds] = useState<Set<string>>(new Set());
+  const [userOrganizations, setUserOrganizations] = useState<Organization[]>([]);
+  const [orgProposalsByOrg, setOrgProposalsByOrg] = useState<Record<string, OrganizationProposal[]>>({});
 
   const displayName = user?.name?.split(' ')[0] || 'User';
   const userCity = user?.city || '';
@@ -78,12 +80,23 @@ export default function DashboardScreen() {
   const isVerified = user?.verified ?? false;
 
   const loadData = useCallback(async () => {
-    const [propRes, votedRes] = await Promise.all([
+    const [propRes, votedRes, orgsRes] = await Promise.all([
       proposalsApi.getAll(),
       userApi.getVotedProposals(),
+      organizationsApi.getMyOrganizations(),
     ]);
     if (propRes.data) setProposals(propRes.data);
     if (votedRes.data) setVotedIds(new Set(votedRes.data.map(String)));
+    if (orgsRes.data) {
+      setUserOrganizations(orgsRes.data);
+      const perOrg = await Promise.all(
+        orgsRes.data.map(async (org) => {
+          const r = await organizationsApi.getOrganizationProposals(org.id);
+          return [org.id, (r.data || []) as OrganizationProposal[]] as const;
+        })
+      );
+      setOrgProposalsByOrg(Object.fromEntries(perOrg));
+    }
   }, []);
 
   useEffect(() => { loadData(); }, [loadData]);
@@ -100,7 +113,11 @@ export default function DashboardScreen() {
 
   // Derived data
   const now = Date.now();
-  const activeProposals = proposals.filter(p => {
+  // Org proposals are surfaced in their own section below; the civic inbox
+  // (Hero, breakdown, featured, digest) only counts non-org proposals so
+  // that org-scoped proposals don't get bucketed as federal/provincial/etc.
+  const civicProposals = proposals.filter(p => !(p as any).organizationId);
+  const activeProposals = civicProposals.filter(p => {
     if (!p.deadline) return true;
     return new Date(p.deadline).getTime() > now;
   });
@@ -117,12 +134,13 @@ export default function DashboardScreen() {
 
   // Impact stats
   const votedCount = votedIds.size;
-  const passedCount = proposals.filter(p =>
+  const passedCount = civicProposals.filter(p =>
     votedIds.has(String(p.id)) && p.deadline && new Date(p.deadline).getTime() <= now
   ).length;
 
-  // Sentinel digest: most-engaged active proposals (highest vote count, then closing soonest)
-  const digestItems = proposals
+  // Sentinel digest: most-engaged active civic proposals (org proposals
+  // surface in the Your Organizations section instead).
+  const digestItems = civicProposals
     .filter(p => p.deadline && new Date(p.deadline).getTime() > now)
     .sort((a, b) => {
       const aVotes = a.supportVotes + a.opposeVotes;
@@ -155,12 +173,20 @@ export default function DashboardScreen() {
         <ImpactRing pending={pendingCount} voted={votedCount} passed={passedCount} />
         {isVerified && userCountry && (
           <Communities
-            proposals={proposals}
+            proposals={civicProposals}
             votedIds={votedIds}
             country={userCountry}
             state={userState}
             city={userCity}
             onPrimaryPress={navigateToProposals}
+            router={router}
+          />
+        )}
+        {userOrganizations.length > 0 && (
+          <YourOrganizations
+            orgs={userOrganizations}
+            orgProposalsByOrg={orgProposalsByOrg}
+            votedIds={votedIds}
             router={router}
           />
         )}
@@ -498,6 +524,86 @@ function CommunityRow({ tier, name, meta, primary, flag, last, onPress }: {
     </TouchableOpacity>
   );
 }
+function YourOrganizations({ orgs, orgProposalsByOrg, votedIds, router }: {
+  orgs: Organization[];
+  orgProposalsByOrg: Record<string, OrganizationProposal[]>;
+  votedIds: Set<string>;
+  router: any;
+}) {
+  const dc = useDashboardColors();
+  const now = Date.now();
+
+  const rows = orgs.map((org) => {
+    const orgProps = orgProposalsByOrg[org.id] || [];
+    const pendingCount = orgProps.filter((p) => {
+      const active = !p.deadline || new Date(p.deadline).getTime() > now;
+      return active && !votedIds.has(String(p.id));
+    }).length;
+    return { org, pendingCount };
+  });
+
+  return (
+    <Animated.View entering={FadeInUp.duration(500).delay(450)} style={styles.sectionPad}>
+      <View style={styles.sectionHeader}>
+        <Text style={[styles.eyebrow, { color: dc.GOLD }]}>Your Organizations</Text>
+      </View>
+
+      <View style={[styles.communityCard, { backgroundColor: dc.BG_CARD, borderColor: dc.LINE }]}>
+        {rows.map((row, i) => (
+          <OrgRow
+            key={row.org.id}
+            org={row.org}
+            pendingCount={row.pendingCount}
+            last={i === rows.length - 1}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              router.push({
+                pathname: '/modals/organization-detail',
+                params: { orgId: row.org.id, orgName: row.org.name, orgRole: row.org.role || 'member' },
+              });
+            }}
+          />
+        ))}
+      </View>
+    </Animated.View>
+  );
+}
+
+function OrgRow({ org, pendingCount, last, onPress }: {
+  org: Organization; pendingCount: number; last: boolean; onPress: () => void;
+}) {
+  const dc = useDashboardColors();
+  const initial = org.name.charAt(0).toUpperCase();
+  const memberLabel = `${org.memberCount} ${org.memberCount === 1 ? 'member' : 'members'}`;
+  const pendingLabel =
+    pendingCount === 0
+      ? 'No proposals awaiting your voice'
+      : `${pendingCount} ${pendingCount === 1 ? 'proposal' : 'proposals'} awaiting your voice`;
+  return (
+    <TouchableOpacity onPress={onPress} activeOpacity={0.7}>
+      <View style={[styles.communityRow, !last && [styles.communityRowBorder, { borderBottomColor: dc.LINE }]]}>
+        {pendingCount > 0 && <View style={[styles.communityPrimaryBar, { backgroundColor: dc.GOLD }]} />}
+        <View style={[styles.communityFlag, {
+          backgroundColor: pendingCount > 0 ? `${dc.GOLD}1A` : dc.BG_RAISED,
+          borderColor: pendingCount > 0 ? `${dc.GOLD}4D` : dc.LINE_STRONG,
+        }]}>
+          <Text style={[styles.communityFlagText, { color: pendingCount > 0 ? dc.GOLD : dc.FG_MUTED }]}>{initial}</Text>
+        </View>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <View style={styles.communityNameRow}>
+            <Text style={[styles.communityName, { color: dc.FG }]} numberOfLines={1}>{org.name}</Text>
+            <Text style={[styles.communityTier, { color: dc.FG_FAINT }]}>{memberLabel}</Text>
+          </View>
+          <Text style={[styles.communityMeta, { color: pendingCount > 0 ? dc.GOLD : dc.FG_FAINT }]}>{pendingLabel}</Text>
+        </View>
+        <Svg width={7} height={12} viewBox="0 0 7 12">
+          <Path d="M1 1 L6 6 L1 11" stroke={dc.FG_FAINT} strokeWidth={1.5} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+        </Svg>
+      </View>
+    </TouchableOpacity>
+  );
+}
+
 function SentinelDigest({ items }: { items: Proposal[] }) {
   const dc = useDashboardColors();
   const now = Date.now();
