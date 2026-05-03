@@ -524,6 +524,8 @@ function CommunityRow({ tier, name, meta, primary, flag, last, onPress }: {
     </TouchableOpacity>
   );
 }
+const ORG_COLLAPSED_LIMIT = 4;
+
 function YourOrganizations({ orgs, orgProposalsByOrg, votedIds, router }: {
   orgs: Organization[];
   orgProposalsByOrg: Record<string, OrganizationProposal[]>;
@@ -531,30 +533,51 @@ function YourOrganizations({ orgs, orgProposalsByOrg, votedIds, router }: {
   router: any;
 }) {
   const dc = useDashboardColors();
+  const [expanded, setExpanded] = useState(false);
   const now = Date.now();
 
-  const rows = orgs.map((org) => {
-    const orgProps = orgProposalsByOrg[org.id] || [];
-    const pendingCount = orgProps.filter((p) => {
-      const active = !p.deadline || new Date(p.deadline).getTime() > now;
-      return active && !votedIds.has(String(p.id));
-    }).length;
-    return { org, pendingCount };
-  });
+  const rows = orgs
+    .map((org) => {
+      const orgProps = orgProposalsByOrg[org.id] || [];
+      const pendingCount = orgProps.filter((p) => {
+        const active = !p.deadline || new Date(p.deadline).getTime() > now;
+        return active && !votedIds.has(String(p.id));
+      }).length;
+      return { org, pendingCount };
+    })
+    .sort((a, b) => {
+      if (b.pendingCount !== a.pendingCount) return b.pendingCount - a.pendingCount;
+      return a.org.name.localeCompare(b.org.name);
+    });
+
+  // Always show every org that has something awaiting the user; pad with
+  // caught-up orgs up to the collapsed limit so the section stays useful
+  // for users with mostly-quiet orgs too.
+  const pendingRows = rows.filter((r) => r.pendingCount > 0);
+  const restRows = rows.filter((r) => r.pendingCount === 0);
+  const collapsedRows = expanded
+    ? rows
+    : [...pendingRows, ...restRows.slice(0, Math.max(0, ORG_COLLAPSED_LIMIT - pendingRows.length))];
+  const hiddenCount = rows.length - collapsedRows.length;
+  const totalPending = pendingRows.reduce((s, r) => s + r.pendingCount, 0);
 
   return (
     <Animated.View entering={FadeInUp.duration(500).delay(450)} style={styles.sectionPad}>
       <View style={styles.sectionHeader}>
         <Text style={[styles.eyebrow, { color: dc.GOLD }]}>Your Organizations</Text>
+        <Text style={[styles.eyebrowMeta, { color: dc.FG_FAINT }]}>
+          {orgs.length} {orgs.length === 1 ? 'community' : 'communities'}
+          {totalPending > 0 ? ` · ${totalPending} pending` : ''}
+        </Text>
       </View>
 
       <View style={[styles.communityCard, { backgroundColor: dc.BG_CARD, borderColor: dc.LINE }]}>
-        {rows.map((row, i) => (
+        {collapsedRows.map((row, i) => (
           <OrgRow
             key={row.org.id}
             org={row.org}
             pendingCount={row.pendingCount}
-            last={i === rows.length - 1}
+            last={i === collapsedRows.length - 1 && hiddenCount === 0 && !expanded}
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
               router.push({
@@ -564,6 +587,33 @@ function YourOrganizations({ orgs, orgProposalsByOrg, votedIds, router }: {
             }}
           />
         ))}
+        {(hiddenCount > 0 || expanded) && (
+          <TouchableOpacity
+            onPress={() => {
+              Haptics.selectionAsync();
+              setExpanded((v) => !v);
+            }}
+            activeOpacity={0.7}
+          >
+            <View style={[styles.orgExpandRow, { borderTopColor: dc.LINE }]}>
+              <Text style={[styles.orgExpandText, { color: dc.GOLD }]}>
+                {expanded
+                  ? 'Show fewer'
+                  : `Show all ${orgs.length} communities${hiddenCount > 0 ? ` (+${hiddenCount})` : ''}`}
+              </Text>
+              <Svg width={10} height={6} viewBox="0 0 10 6">
+                <Path
+                  d={expanded ? 'M1 5 L5 1 L9 5' : 'M1 1 L5 5 L9 1'}
+                  stroke={dc.GOLD}
+                  strokeWidth={1.5}
+                  fill="none"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </Svg>
+            </View>
+          </TouchableOpacity>
+        )}
       </View>
     </Animated.View>
   );
@@ -784,6 +834,16 @@ const styles = StyleSheet.create({
     letterSpacing: 1.3, textTransform: 'uppercase',
   },
   sectionMetaGold: { fontFamily: SANS, fontSize: 11, fontWeight: '500', color: G_GOLD },
+  eyebrowMeta: {
+    fontFamily: SANS, fontSize: 11, color: FG_FAINT,
+    letterSpacing: 0.3,
+  },
+  orgExpandRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 8, paddingVertical: 14, paddingHorizontal: 16,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  orgExpandText: { fontFamily: SANS, fontSize: 13, fontWeight: '500' },
 
   // Featured
   featuredCard: {
