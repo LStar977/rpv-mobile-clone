@@ -547,9 +547,27 @@ export const userApi = {
   },
   async getVotedProposals(): Promise<ApiResponse<(number | string)[]>> {
     const result = await apiRequest<any>('/api/user/voted-proposals');
-    if (result.data?.votedProposals) return { data: result.data.votedProposals, error: null };
-    if (Array.isArray(result.data)) return { data: result.data, error: null };
-    return { data: [], error: result.error };
+    let backendIds: (number | string)[] = [];
+    if (result.data?.votedProposals) backendIds = result.data.votedProposals;
+    else if (Array.isArray(result.data)) backendIds = result.data;
+
+    // Also include locally-recorded org-proposal votes so the dashboard
+    // pending counter decrements after voting on an org proposal. The
+    // deployed backend's /api/user/voted-proposals only tracks global
+    // proposal votes (via /api/voting/submit), not org-proposal votes
+    // (cast through /api/organizations/.../proposals/.../vote).
+    try {
+      const stored = await AsyncStorage.getItem(ORG_VOTES_STORAGE_KEY);
+      if (stored) {
+        const votes: Record<string, 'support' | 'oppose'> = JSON.parse(stored);
+        const orgProposalIds = Object.keys(votes)
+          .map((k) => k.split(':')[1])
+          .filter(Boolean);
+        backendIds = Array.from(new Set([...backendIds.map(String), ...orgProposalIds]));
+      }
+    } catch {}
+
+    return { data: backendIds, error: result.error };
   },
   async getProfile(): Promise<ApiResponse<any>> {
     const result = await apiRequest<any>('/api/auth/verify');
