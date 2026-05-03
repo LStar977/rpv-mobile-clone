@@ -198,7 +198,7 @@ export default function DashboardScreen() {
             }
           }}
         />
-        <ImpactRing pending={pendingCount} voted={votedCount} passed={passedCount} />
+        {isVerified && <ImpactRing pending={pendingCount} voted={votedCount} passed={passedCount} />}
         {isVerified && userCountry && (
           <Communities
             proposals={civicProposals}
