@@ -25,10 +25,10 @@ const O_BG = '#040707';
 const O_LINE = '#1A1F1F';
 const O_GOLD = '#EABA58';
 const O_GOLD_DIM = 'rgba(234, 186, 88, 0.55)';
-const O_LAND = '#0F1416';
-const O_LAND_ACTIVE = '#1B2226';
-const O_LAND_BORDER = 'rgba(234, 186, 88, 0.10)';
-const O_LAND_BORDER_ACTIVE = 'rgba(234, 186, 88, 0.45)';
+const O_LAND = '#1B2329';
+const O_LAND_ACTIVE = '#2D3A44';
+const O_LAND_BORDER = 'rgba(244, 245, 246, 0.13)';
+const O_LAND_BORDER_ACTIVE = 'rgba(234, 186, 88, 0.75)';
 
 // Internal SVG dimensions. The viewBox is fixed at 2:1, world fits exactly.
 const MAP_W = 1000;
@@ -65,40 +65,41 @@ const COUNTRIES: Array<{
   };
 });
 
-// One pulse circle per active country. Reanimated drives the animated props.
-function PulseDot({
+// Animated beacon ring expanding outward from an active country.
+// Two of these rendered per country at staggered phases produces the
+// double-pulse "radio tower" look that makes the planet read as alive.
+function BeaconRing({
   cx,
   cy,
   intensity,
   delay,
+  maxRadius,
 }: {
   cx: number;
   cy: number;
   intensity: number; // 0..1
   delay: number;
+  maxRadius: number;
 }) {
-  // Pulse period: 1.6s for high intensity, 3.2s for low. Bounded so the slowest
-  // is still visibly alive.
-  const period = 1600 + (1 - intensity) * 1600;
-  const r = useSharedValue(6);
-  const opacity = useSharedValue(0.35);
+  // Period: 1.4s for high intensity, 3.0s for low.
+  const period = 1400 + (1 - intensity) * 1600;
+  const r = useSharedValue(4);
+  const opacity = useSharedValue(0.7);
 
-  // Kick off repeating animation. withDelay staggers neighboring countries so
-  // the planet doesn't pulse in lockstep.
   r.value = withDelay(
     delay,
     withRepeat(
-      withTiming(14 + intensity * 10, { duration: period, easing: Easing.inOut(Easing.quad) }),
+      withTiming(maxRadius, { duration: period, easing: Easing.out(Easing.quad) }),
       -1,
-      true,
+      false,
     ),
   );
   opacity.value = withDelay(
     delay,
     withRepeat(
-      withTiming(0.0, { duration: period, easing: Easing.inOut(Easing.quad) }),
+      withTiming(0, { duration: period, easing: Easing.out(Easing.quad) }),
       -1,
-      true,
+      false,
     ),
   );
 
@@ -111,7 +112,9 @@ function PulseDot({
     <AnimatedCircle
       cx={cx}
       cy={cy}
-      fill={O_GOLD}
+      fill="none"
+      stroke={O_GOLD}
+      strokeWidth={1.5}
       animatedProps={animatedProps}
     />
   );
@@ -123,13 +126,14 @@ export type WorldMapProps = {
 };
 
 export function WorldMap({ countryStats, onSelectCountry }: WorldMapProps) {
-  // Pan + pinch state.
+  // Pan + pinch state. Start slightly zoomed in (1.4) so the planet feels
+  // bigger on first paint — most empty ocean is hidden by default.
   const tx = useSharedValue(0);
   const ty = useSharedValue(0);
-  const scale = useSharedValue(1);
+  const scale = useSharedValue(1.4);
   const startX = useSharedValue(0);
   const startY = useSharedValue(0);
-  const startScale = useSharedValue(1);
+  const startScale = useSharedValue(1.4);
 
   const pan = Gesture.Pan()
     .onStart(() => {
@@ -171,9 +175,7 @@ export function WorldMap({ countryStats, onSelectCountry }: WorldMapProps) {
 
   const screen = Dimensions.get('window');
   const aspect = MAP_W / MAP_H;
-  // Render the map at full screen width; it will overflow vertically if the
-  // available area is smaller than width/2 — pan/pinch lets the user explore.
-  const renderW = screen.width - 24;
+  const renderW = screen.width;
   const renderH = renderW / aspect;
 
   return (
@@ -208,35 +210,55 @@ export function WorldMap({ countryStats, onSelectCountry }: WorldMapProps) {
               })}
             </G>
 
-            {/* Animated pulse dots for active countries only. */}
+            {/* Static glow halo + center dot for each active country.
+                The double-ring beacon animation rides on top. */}
             <G pointerEvents="none">
               {COUNTRIES.filter((c) => countryStats.has(c.name)).map((c, i) => {
                 const stat = countryStats.get(c.name)!;
                 const intensity = Math.min(stat.totalVotes / maxVotes, 1);
+                const maxR = 22 + intensity * 14;
                 return (
-                  <PulseDot
-                    key={c.name}
-                    cx={c.centroid[0]}
-                    cy={c.centroid[1]}
-                    intensity={intensity}
-                    delay={(i * 230) % 2000}
-                  />
+                  <G key={`beacon-${c.name}`}>
+                    {/* Soft halo behind the dot — static, not animated */}
+                    <Circle
+                      cx={c.centroid[0]}
+                      cy={c.centroid[1]}
+                      r={9}
+                      fill={O_GOLD}
+                      opacity={0.18}
+                    />
+                    <Circle
+                      cx={c.centroid[0]}
+                      cy={c.centroid[1]}
+                      r={5}
+                      fill={O_GOLD}
+                      opacity={0.4}
+                    />
+                    {/* Two staggered beacon rings */}
+                    <BeaconRing
+                      cx={c.centroid[0]}
+                      cy={c.centroid[1]}
+                      intensity={intensity}
+                      delay={(i * 230) % 2200}
+                      maxRadius={maxR}
+                    />
+                    <BeaconRing
+                      cx={c.centroid[0]}
+                      cy={c.centroid[1]}
+                      intensity={intensity}
+                      delay={((i * 230) % 2200) + (1400 + (1 - intensity) * 1600) / 2}
+                      maxRadius={maxR}
+                    />
+                    {/* Solid center dot — always crisp */}
+                    <Circle
+                      cx={c.centroid[0]}
+                      cy={c.centroid[1]}
+                      r={3}
+                      fill={O_GOLD}
+                    />
+                  </G>
                 );
               })}
-            </G>
-
-            {/* Static center dot for each active country (always visible
-                under the fading pulse). */}
-            <G pointerEvents="none">
-              {COUNTRIES.filter((c) => countryStats.has(c.name)).map((c) => (
-                <Circle
-                  key={`dot-${c.name}`}
-                  cx={c.centroid[0]}
-                  cy={c.centroid[1]}
-                  r={3}
-                  fill={O_GOLD}
-                />
-              ))}
             </G>
           </Svg>
 
