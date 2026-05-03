@@ -10,6 +10,7 @@ import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { SPACING, useTheme } from '../../lib/theme';
 import { useAuthStore } from '../../lib/auth';
 import { proposalsApi, userApi, organizationsApi, veriffApi, type Proposal, type Organization, type OrganizationProposal } from '../../lib/api';
+import { useModerationStore, useSyncMutes } from '../../lib/moderation';
 import { useFocusEffect } from 'expo-router';
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -137,8 +138,13 @@ export default function DashboardScreen() {
   // that org-scoped proposals don't get bucketed as federal/provincial/etc.
   // Unverified users can only act on global proposals (geoRestrictions empty),
   // so filter geo-restricted ones out for them — see proposals.tsx:626.
+  // Also exclude proposals from muted creators.
+  const mutedUserIds = useModerationStore((s) => s.mutedUserIds);
+  useSyncMutes();
   const civicProposals = proposals.filter(p => {
     if ((p as any).organizationId) return false;
+    const creatorId = (p as any).creatorId || (p as any).userId;
+    if (creatorId && mutedUserIds.includes(String(creatorId))) return false;
     if (isVerified) return true;
     return ((p as any).geoRestrictions || []).length === 0;
   });

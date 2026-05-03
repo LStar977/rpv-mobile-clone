@@ -49,6 +49,8 @@ import { useBallotStore } from '../../lib/ballots';
 import { shareProposal } from '../../lib/share';
 import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS, ANIMATION, responsive } from '../../lib/theme';
 import { getTierLabel, getLocationLabel, canUserVoteOnProposal } from '../../lib/proposalGeo';
+import { useModerationStore, useSyncMutes } from '../../lib/moderation';
+import { ProposalModerationMenu } from '../../components/moderation/ProposalModerationMenu';
 import Svg, { Rect, Line, Ellipse, Path, Circle, G, Defs, LinearGradient as SvgLinearGradient, Stop } from 'react-native-svg';
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1632,6 +1634,11 @@ export default function ProposalsScreen() {
   const [showVerificationModal, setShowVerificationModal] = useState(false);
   const [verificationModalType, setVerificationModalType] = useState<'vote' | 'proposal' | 'limit'>('vote');
   const [pendingLimitTier, setPendingLimitTier] = useState<'free' | 'verified'>('free');
+  const [showModerationMenu, setShowModerationMenu] = useState(false);
+
+  // Pull the muted-user list (persistent, hydrates locally on mount).
+  const mutedUserIds = useModerationStore((s) => s.mutedUserIds);
+  useSyncMutes();
 
   // Vote confirmation overlay state
   const [showVoteOverlay, setShowVoteOverlay] = useState(false);
@@ -1708,8 +1715,14 @@ export default function ProposalsScreen() {
   }, []);
 
   const filteredProposals = useMemo(() => {
+    const mutedSet = new Set(mutedUserIds);
     // Reverse to show most recent proposals first
     return [...proposals].reverse().filter((proposal) => {
+      // Hide proposals from muted creators. Backend should filter too once the
+      // mute endpoint is live; this is the client-side belt for offline + lag.
+      const creatorId = (proposal as any).creatorId || (proposal as any).userId;
+      if (creatorId && mutedSet.has(String(creatorId))) return false;
+
       // Unverified users can only act on global proposals (geoRestrictions
       // empty), so hide geo-restricted ones from the list to keep the view
       // honest. canUserVoteOnProposal still gates the vote button as a
@@ -1763,6 +1776,7 @@ export default function ProposalsScreen() {
     selectedFilterGender,
     user?.id,
     isVerified,
+    mutedUserIds,
   ]);
 
   const activeCount = useMemo(() => filteredProposals.filter((p) => !isProposalEnded(p)).length, [filteredProposals]);
@@ -2508,17 +2522,31 @@ export default function ProposalsScreen() {
             <TouchableOpacity onPress={closeProposal} style={detailStyles.headerBtn} activeOpacity={0.7}>
               <Ionicons name="chevron-down" size={20} color={FG} />
             </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => {
-                if (!detail) return;
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                shareProposal({ id: detail.id as number, title: detail.title, description: detail.description });
-              }}
-              style={detailStyles.headerBtn}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="share-outline" size={16} color={FG} />
-            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', gap: 6 }}>
+              <TouchableOpacity
+                onPress={() => {
+                  if (!detail) return;
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  shareProposal({ id: detail.id as number, title: detail.title, description: detail.description });
+                }}
+                style={detailStyles.headerBtn}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="share-outline" size={16} color={FG} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => {
+                  if (!detail) return;
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  setShowModerationMenu(true);
+                }}
+                style={detailStyles.headerBtn}
+                activeOpacity={0.7}
+                accessibilityLabel="Proposal options"
+              >
+                <Ionicons name="ellipsis-horizontal" size={18} color={FG} />
+              </TouchableOpacity>
+            </View>
           </View>
 
           {detail && (() => {
@@ -2673,6 +2701,18 @@ export default function ProposalsScreen() {
               </ScrollView>
             );
           })()}
+
+          <ProposalModerationMenu
+            visible={showModerationMenu}
+            onClose={() => setShowModerationMenu(false)}
+            proposalId={detail?.id ?? null}
+            creatorId={(detail as any)?.creatorId ?? (detail as any)?.userId ?? null}
+            creatorName={detail?.creatorName || 'Community Member'}
+            onMuted={() => {
+              // Close the detail view too — user just hid the creator
+              closeProposal();
+            }}
+          />
         </View>
       </Modal>
 

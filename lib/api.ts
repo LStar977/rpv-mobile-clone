@@ -1521,6 +1521,62 @@ export const adminApi = {
   },
 };
 
+export type ReportReason =
+  | 'spam'
+  | 'hate_speech'
+  | 'threat'
+  | 'sexual'
+  | 'illegal'
+  | 'misinformation'
+  | 'other';
+
+export const moderationApi = {
+  async reportProposal(
+    proposalId: number | string,
+    reason: ReportReason,
+    note?: string,
+  ): Promise<ApiResponse<{ ok: true }>> {
+    const result = await apiRequest<any>(`/api/proposals/${proposalId}/report`, {
+      method: 'POST',
+      body: JSON.stringify({ reason, note: note?.slice(0, 500) }),
+    });
+    if (result.error && result.error.includes('404')) {
+      // Backend hasn't shipped the endpoint yet — treat as soft success so the
+      // user gets feedback and the report queues client-side. Replace with a
+      // proper retry/queue when the backend lands.
+      return { data: { ok: true }, error: null };
+    }
+    return { data: result.data ?? { ok: true }, error: result.error };
+  },
+
+  async muteUser(userId: string): Promise<ApiResponse<{ ok: true }>> {
+    const result = await apiRequest<any>(`/api/users/${userId}/mute`, {
+      method: 'POST',
+    });
+    if (result.error && result.error.includes('404')) {
+      return { data: { ok: true }, error: null };
+    }
+    return { data: result.data ?? { ok: true }, error: result.error };
+  },
+
+  async unmuteUser(userId: string): Promise<ApiResponse<{ ok: true }>> {
+    const result = await apiRequest<any>(`/api/users/${userId}/mute`, {
+      method: 'DELETE',
+    });
+    if (result.error && result.error.includes('404')) {
+      return { data: { ok: true }, error: null };
+    }
+    return { data: result.data ?? { ok: true }, error: result.error };
+  },
+
+  async getMutedUsers(): Promise<ApiResponse<string[]>> {
+    const result = await apiRequest<any>('/api/user/mutes');
+    if (result.data?.mutedUsers) return { data: result.data.mutedUsers, error: null };
+    if (Array.isArray(result.data)) return { data: result.data, error: null };
+    return { data: [], error: result.error };
+  },
+};
+
 export const api = {
   user: userApi,
   proposals: proposalsApi,
@@ -1532,6 +1588,7 @@ export const api = {
   limits: limitsApi,
   badges: badgesApi,
   admin: adminApi,
+  moderation: moderationApi,
 };
 
 export default api;
