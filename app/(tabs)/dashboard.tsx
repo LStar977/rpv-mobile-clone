@@ -9,7 +9,7 @@ import Svg, { Circle, Line, Path, Defs, LinearGradient as SvgLinearGradient, Sto
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { SPACING, useTheme } from '../../lib/theme';
 import { useAuthStore } from '../../lib/auth';
-import { proposalsApi, userApi, organizationsApi, type Proposal, type Organization, type OrganizationProposal } from '../../lib/api';
+import { proposalsApi, userApi, organizationsApi, veriffApi, type Proposal, type Organization, type OrganizationProposal } from '../../lib/api';
 import { useFocusEffect } from 'expo-router';
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -109,6 +109,24 @@ export default function DashboardScreen() {
     setRefreshing(false);
   }, [loadData]);
 
+  const handleStartKyc = useCallback(async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    try {
+      const response = await veriffApi.createSession();
+      if (response.data?.sessionUrl && response.data?.verificationId) {
+        router.push({
+          pathname: '/modals/veriff',
+          params: {
+            sessionUrl: response.data.sessionUrl,
+            verificationId: response.data.verificationId,
+          },
+        });
+      }
+    } catch {
+      // Errors are surfaced via the WebView screen's no-session state on retry.
+    }
+  }, [router]);
+
   const navigateToProposals = () => router.push('/(tabs)/proposals');
 
   // Derived data
@@ -116,7 +134,13 @@ export default function DashboardScreen() {
   // Org proposals are surfaced in their own section below; the civic inbox
   // (Hero, breakdown, featured, digest) only counts non-org proposals so
   // that org-scoped proposals don't get bucketed as federal/provincial/etc.
-  const civicProposals = proposals.filter(p => !(p as any).organizationId);
+  // Unverified users can only act on global proposals (geoRestrictions empty),
+  // so filter geo-restricted ones out for them — see proposals.tsx:626.
+  const civicProposals = proposals.filter(p => {
+    if ((p as any).organizationId) return false;
+    if (isVerified) return true;
+    return ((p as any).geoRestrictions || []).length === 0;
+  });
   const activeProposals = civicProposals.filter(p => {
     if (!p.deadline) return true;
     return new Date(p.deadline).getTime() > now;
@@ -157,8 +181,12 @@ export default function DashboardScreen() {
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={dc.GOLD} />}
       >
-        <TopBar name={displayName} city={userCity} state={userState} verified={isVerified} onAvatarPress={() => router.push('/(tabs)/profile')} />
-        <Hero pendingCount={pendingCount} breakdown={breakdown} onBeginVoting={navigateToProposals} />
+        <TopBar name={displayName} city={userCity} state={userState} verified={isVerified} onAvatarPress={() => router.push('/(tabs)/profile')} onVerifyPress={handleStartKyc} />
+        {isVerified ? (
+          <Hero pendingCount={pendingCount} breakdown={breakdown} onBeginVoting={navigateToProposals} />
+        ) : (
+          <UnverifiedHero globalCount={pendingCount} onVerify={handleStartKyc} onViewProposals={navigateToProposals} />
+        )}
         <Featured
           proposal={featured}
           onPress={() => {
@@ -201,19 +229,23 @@ export default function DashboardScreen() {
 // ═══════════════════════════════════════════════════════════════════════════
 // PLACEHOLDER COMPONENTS (filled in via subsequent edits)
 // ═══════════════════════════════════════════════════════════════════════════
-function TopBar({ name, city, state, verified, onAvatarPress }: { name: string; city: string; state: string; verified: boolean; onAvatarPress: () => void }) {
+function TopBar({ name, city, state, verified, onAvatarPress, onVerifyPress }: { name: string; city: string; state: string; verified: boolean; onAvatarPress: () => void; onVerifyPress?: () => void }) {
   const dc = useDashboardColors();
   const dateStr = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
   const locationText = city && state ? ` · ${city}, ${state}` : '';
-  const statusText = verified ? `Verified${locationText}` : 'Unverified';
+  const statusText = verified ? `Verified${locationText}` : 'Unverified · tap to verify';
   const dotColor = verified ? dc.GREEN : dc.FG_FAINT;
+  const StatusContainer: any = verified || !onVerifyPress ? View : TouchableOpacity;
+  const statusContainerProps = verified || !onVerifyPress ? {} : { onPress: onVerifyPress, activeOpacity: 0.7, hitSlop: { top: 10, bottom: 10, left: 10, right: 10 } };
   return (
     <Animated.View entering={FadeInDown.duration(500)} style={styles.topBar}>
       <View>
-        <View style={styles.topBarLeftRow}>
-          <View style={[styles.greenDot, { backgroundColor: dotColor }]} />
-          <Text style={[styles.topBarStatus, { color: dc.FG_MUTED }]}>{statusText}</Text>
-        </View>
+        <StatusContainer {...statusContainerProps}>
+          <View style={styles.topBarLeftRow}>
+            <View style={[styles.greenDot, { backgroundColor: dotColor }]} />
+            <Text style={[styles.topBarStatus, { color: verified ? dc.FG_MUTED : dc.GOLD }]}>{statusText}</Text>
+          </View>
+        </StatusContainer>
         <Text style={[styles.topBarDate, { color: dc.FG_FAINT }]}>{dateStr}</Text>
       </View>
       <TouchableOpacity onPress={onAvatarPress} activeOpacity={0.8}>
@@ -282,6 +314,50 @@ function Hero({ pendingCount, breakdown, onBeginVoting }: { pendingCount: number
     </Animated.View>
   );
 }
+function UnverifiedHero({ globalCount, onVerify, onViewProposals }: { globalCount: number; onVerify: () => void; onViewProposals: () => void }) {
+  const dc = useDashboardColors();
+  return (
+    <Animated.View entering={FadeInUp.duration(500).delay(100)} style={[styles.hero, { backgroundColor: dc.BG_CARD, borderColor: dc.LINE }]}>
+      <View style={styles.heroInner}>
+        <View style={styles.heroHeader}>
+          <Text style={[styles.eyebrow, { color: dc.GOLD }]}>Verify Your Identity</Text>
+        </View>
+
+        <Text style={[styles.unverifiedHeadline, { color: dc.GOLD }]}>Unlock your civic voice</Text>
+        <Text style={[styles.unverifiedSubhead, { color: dc.FG_MUTED }]}>
+          Verify once to vote on proposals in your country, province, and city. Free and takes about 2 minutes.
+        </Text>
+
+        <TouchableOpacity onPress={onVerify} activeOpacity={0.9}>
+          <LinearGradient
+            colors={[dc.GOLD, dc.GOLD_DARK]}
+            style={styles.ctaBtn}
+            start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }}
+          >
+            <Text style={styles.ctaBtnText}>Get Verified</Text>
+            <View style={styles.ctaArrowCircle}>
+              <Svg width={14} height={14} viewBox="0 0 24 24">
+                <Path d="M5 12 L19 12 M12 5 L19 12 L12 19" stroke="#1A1206" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" fill="none" />
+              </Svg>
+            </View>
+          </LinearGradient>
+        </TouchableOpacity>
+
+        {globalCount > 0 && (
+          <TouchableOpacity onPress={onViewProposals} activeOpacity={0.7} style={[styles.unverifiedTease, { borderTopColor: dc.LINE }]}>
+            <Text style={[styles.unverifiedTeaseText, { color: dc.FG_MUTED }]}>
+              {globalCount} global {globalCount === 1 ? 'proposal' : 'proposals'} you can vote on now
+            </Text>
+            <Svg width={7} height={12} viewBox="0 0 7 12">
+              <Path d="M1 1 L6 6 L1 11" stroke={dc.GOLD} strokeWidth={1.5} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+            </Svg>
+          </TouchableOpacity>
+        )}
+      </View>
+    </Animated.View>
+  );
+}
+
 function Featured({ proposal, onPress }: { proposal?: Proposal; onPress: () => void }) {
   const dc = useDashboardColors();
   if (!proposal) return null;
@@ -801,6 +877,20 @@ const styles = StyleSheet.create({
     fontStyle: 'italic', lineHeight: 24,
   },
   heroNumberLabelSub: { fontFamily: SANS, fontSize: 13, color: FG_FAINT, marginTop: 2 },
+  unverifiedHeadline: {
+    fontFamily: SERIF, fontSize: 32, lineHeight: 38,
+    marginTop: 12, marginBottom: 10, fontWeight: '500',
+  },
+  unverifiedSubhead: {
+    fontFamily: SANS, fontSize: 14, lineHeight: 20,
+    marginBottom: 22,
+  },
+  unverifiedTease: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    marginTop: 14, paddingTop: 14,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  unverifiedTeaseText: { fontFamily: SANS, fontSize: 12, fontWeight: '500' },
   breakdownBarTrack: {
     flexDirection: 'row', height: 4, borderRadius: 2, overflow: 'hidden',
     backgroundColor: LINE, marginTop: 22,
