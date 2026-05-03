@@ -1084,10 +1084,27 @@ export const organizationsApi = {
     }
 
     // For regular accounts, call the backend API
-    return apiRequest(`/api/organizations/${orgId}/proposals/${proposalId}/vote`, {
-      method: 'POST',
-      body: JSON.stringify({ vote }),
-    });
+    const result = await apiRequest<{ success: boolean; supportVotes: number; opposeVotes: number }>(
+      `/api/organizations/${orgId}/proposals/${proposalId}/vote`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ vote }),
+      }
+    );
+
+    // On success, persist the vote locally so userVote is restored when the
+    // modal is reopened or the proposal list is refetched. The proposal-list
+    // merge step (mergeUserVotes above) reads from this same key.
+    if (!result.error) {
+      try {
+        const stored = await AsyncStorage.getItem(ORG_VOTES_STORAGE_KEY);
+        const votes: Record<string, 'support' | 'oppose'> = stored ? JSON.parse(stored) : {};
+        votes[`${orgId}:${proposalId}`] = vote;
+        await AsyncStorage.setItem(ORG_VOTES_STORAGE_KEY, JSON.stringify(votes));
+      } catch {}
+    }
+
+    return result;
   },
 
   async getUserOrgVotes(): Promise<Record<string, 'support' | 'oppose'>> {
