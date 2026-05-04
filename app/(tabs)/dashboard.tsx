@@ -278,7 +278,7 @@ function TopBar({ name, city, state, verified, onAvatarPress, onVerifyPress }: {
 function Hero({ pendingCount, breakdown, onBeginVoting }: { pendingCount: number; breakdown: { global: number; federal: number; provincial: number; municipal: number }; onBeginVoting: () => void }) {
   const dc = useDashboardColors();
   const dateStr = new Date().toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' }).replace(/\//g, ' · ');
-  const total = Math.max(breakdown.global + breakdown.federal + breakdown.provincial + breakdown.municipal, 1);
+  const total = Math.max(breakdown.federal + breakdown.provincial + breakdown.municipal, 1);
   const isPlural = pendingCount !== 1;
   return (
     <Animated.View entering={FadeInUp.duration(500).delay(100)} style={[styles.hero, { backgroundColor: dc.BG_CARD, borderColor: dc.LINE }]}>
@@ -297,14 +297,12 @@ function Hero({ pendingCount, breakdown, onBeginVoting }: { pendingCount: number
         </View>
 
         <View style={[styles.breakdownBarTrack, { backgroundColor: dc.LINE }]}>
-          {breakdown.global > 0 && <View style={{ flex: breakdown.global, backgroundColor: dc.GREEN }} />}
           {breakdown.federal > 0 && <View style={{ flex: breakdown.federal, backgroundColor: dc.GOLD }} />}
           {breakdown.provincial > 0 && <View style={{ flex: breakdown.provincial, backgroundColor: dc.GOLD_LIGHT, opacity: 0.6 }} />}
           {breakdown.municipal > 0 && <View style={{ flex: breakdown.municipal, backgroundColor: dc.GOLD_DARK, opacity: 0.7 }} />}
           {total === 0 && <View style={{ flex: 1, backgroundColor: dc.LINE }} />}
         </View>
         <View style={styles.breakdownLegend}>
-          {breakdown.global > 0 && <Text style={[styles.breakdownLegendItem, { color: dc.FG_FAINT }]}><Text style={{ color: dc.GREEN }}>● </Text>{breakdown.global} global</Text>}
           <Text style={[styles.breakdownLegendItem, { color: dc.FG_FAINT }]}><Text style={{ color: dc.GOLD }}>● </Text>{breakdown.federal} federal</Text>
           <Text style={[styles.breakdownLegendItem, { color: dc.FG_FAINT }]}><Text style={{ color: dc.GOLD_LIGHT }}>● </Text>{breakdown.provincial} provincial</Text>
           <Text style={[styles.breakdownLegendItem, { color: dc.FG_FAINT }]}><Text style={{ color: dc.GOLD_DARK }}>● </Text>{breakdown.municipal} municipal</Text>
