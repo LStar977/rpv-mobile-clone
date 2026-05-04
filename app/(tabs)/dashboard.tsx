@@ -787,6 +787,7 @@ function SentinelDigest({ items }: { items: Proposal[] }) {
   const rows = items.map(p => {
     const totalVotes = p.supportVotes + p.opposeVotes;
     return {
+      id: String(p.id),
       time: totalVotes > 0 ? compact(totalVotes) : '·',
       tag: tagFor(p),
       headline: p.title,
@@ -802,7 +803,7 @@ function SentinelDigest({ items }: { items: Proposal[] }) {
       </View>
       <View style={[styles.communityCard, { backgroundColor: dc.BG_CARD, borderColor: dc.LINE }]}>
         {rows.map((r, i) => (
-          <View key={r.time}>
+          <View key={r.id}>
             <DigestRow {...r} />
             {i < rows.length - 1 && <View style={[styles.hairline, { backgroundColor: dc.LINE }]} />}
           </View>
