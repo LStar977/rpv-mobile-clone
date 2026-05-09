@@ -580,6 +580,14 @@ export class DatabaseStorage implements IStorage {
     return result;
   }
 
+  async getOrganizationMemberCount(organizationId: string): Promise<number> {
+    const result = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(organizationMembers)
+      .where(eq(organizationMembers.organizationId, organizationId));
+    return Number(result[0]?.count ?? 0);
+  }
+
   async getOrganizationByInviteCode(inviteCode: string): Promise<any> {
     const result = await db.select().from(organizations).where(
       eq(organizations.inviteCode, inviteCode)

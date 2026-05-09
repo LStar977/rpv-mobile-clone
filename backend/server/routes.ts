@@ -6,6 +6,7 @@ import { log } from "./app";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { setupBadgeRoutes } from "./badge-routes";
 import { passportNFTs, activatedRidings, electoralRidingQRCodes, proposals, votes, voteTokenClaims, organizations, transactions } from "@shared/schema";
+import { getMemberLimit, isFeatureEnabled, tierDisplayName, type OrgTier } from "@shared/tier-limits";
 import { eq, count, and, sql } from "drizzle-orm";
 import { db } from "./db";
 import { savePushToken, notifyNewProposal, notifyTokenClaimed, notifyProposalVote } from "./notifications";
@@ -224,6 +225,38 @@ async function grantInitialBallotsIfNeeded(userId: string): Promise<void> {
 }
 
 const DAILY_BALLOT_CAP = 20;
+
+// Tier enforcement helper. Returns null if the org has room for one more
+// member; returns a 402-shaped error payload (with structured upgrade hint)
+// if at cap. The `additional` param lets the CSV importer pre-flight a batch.
+async function checkMemberCap(
+  orgId: string,
+  additional: number = 1,
+): Promise<{ ok: true } | { ok: false; status: number; body: any }> {
+  const org = await storage.getOrganization(orgId);
+  if (!org) return { ok: false, status: 404, body: { error: "Organization not found" } };
+
+  const limit = getMemberLimit(org.tier);
+  if (!Number.isFinite(limit)) return { ok: true };
+
+  const current = await storage.getOrganizationMemberCount(orgId);
+  if (current + additional > limit) {
+    return {
+      ok: false,
+      status: 402, // Payment Required — signals upgrade path
+      body: {
+        error: "Member limit reached",
+        message: `${tierDisplayName(org.tier)} plan allows up to ${limit} members. This org has ${current}; adding ${additional} would exceed the cap.`,
+        code: "MEMBER_LIMIT_EXCEEDED",
+        currentMembers: current,
+        limit,
+        tier: org.tier ?? 'starter',
+        upgradeRequired: true,
+      },
+    };
+  }
+  return { ok: true };
+}
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Setup OAuth authentication (Google, Apple, GitHub)
@@ -3405,9 +3438,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         { apiVersion: '2025-11-17.clover' as any },
       );
 
+      // Persist tier on the org row immediately so member-cap enforcement
+      // takes effect as soon as the customer confirms payment. The Stripe
+      // webhook (out of scope for Stage 1) will later flip subscriptionStatus
+      // to 'active' on invoice.payment_succeeded; until then 'pending' is
+      // correct and the cap still applies.
       await db.update(organizations).set({
         stripeSubscriptionId: subscription.id,
         stripeCustomerId: customerId,
+        tier,
+        subscriptionStatus: 'pending',
+        updatedAt: new Date(),
       }).where(eq(organizations.id, organizationId));
 
       log(`Organization payment intent created: org=${organizationId}, tier=${tier}, sub=${subscription.id}`);
@@ -3462,6 +3503,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const isMember = await storage.isOrganizationMember(org.id, userId);
       if (isMember) return res.status(400).json({ error: "You are already a member of this organization" });
+
+      const cap = await checkMemberCap(org.id, 1);
+      if (!cap.ok) return res.status(cap.status).json(cap.body);
 
       await storage.addOrganizationMember(org.id, userId, 'member');
 
@@ -3559,6 +3603,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      const cap = await checkMemberCap(orgId, 1);
+      if (!cap.ok) return res.status(cap.status).json(cap.body);
+
       await storage.addOrganizationMember(orgId, userId, 'member');
       log(`✅ User ${userId} joined organization ${orgId}`);
       res.json({ success: true, message: "Successfully joined organization" });
@@ -3586,6 +3633,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (isMember) {
         return res.status(400).json({ error: "You are already a member of this organization" });
       }
+
+      const cap = await checkMemberCap(org.id, 1);
+      if (!cap.ok) return res.status(cap.status).json(cap.body);
 
       await storage.addOrganizationMember(org.id, userId, 'member');
       log(`✅ User ${userId} joined organization ${org.id} via invite code`);
@@ -4143,6 +4193,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const isAdmin = members.some((m: any) => m.userId === userId && m.role === 'admin');
       if (!isAdmin) return res.status(403).json({ error: "Only admins can import members" });
 
+      // Tier gate: CSV bulk import is a Professional+ feature. Starter orgs
+      // must use single-invite or invite-code flows. Marketing-aligned.
+      if (!isFeatureEnabled(org.tier, 'csvImport')) {
+        return res.status(402).json({
+          error: "CSV roster import requires Professional plan or higher",
+          code: "FEATURE_NOT_AVAILABLE_ON_TIER",
+          feature: "csvImport",
+          tier: org.tier ?? 'starter',
+          upgradeRequired: true,
+        });
+      }
+
+      // Pre-flight member cap. Worst-case headroom — if every row is unique
+      // and accepts, the org would gain `rows.length` members. Use that
+      // upper bound for the check; under-estimates of headroom are fine
+      // (we'd allow it when we shouldn't). Over-estimates of need would
+      // wrongly block, but the validate/dedupe stages below shrink the
+      // batch only — never grow it — so this is safe.
+      const cap = await checkMemberCap(orgId, rows.length);
+      if (!cap.ok) return res.status(cap.status).json(cap.body);
+
       // Stage 1: validate + dedupe
       type Row = { email: string; firstName?: string; lastName?: string; role?: string; metadata?: any };
       const valid: Row[] = [];
@@ -4357,6 +4428,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Already a member? Silently mark accepted and succeed (idempotent).
       const alreadyMember = await storage.isOrganizationMember(invite.organizationId, userId);
       if (!alreadyMember) {
+        const cap = await checkMemberCap(invite.organizationId, 1);
+        if (!cap.ok) return res.status(cap.status).json(cap.body);
         await storage.addOrganizationMember(invite.organizationId, userId, invite.role || 'member');
       }
       await storage.markInviteAccepted(invite.id);

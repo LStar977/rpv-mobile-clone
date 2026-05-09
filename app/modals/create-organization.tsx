@@ -78,7 +78,7 @@ const ORG_TIERS: Record<OrgTier, {
     features: [
       'Up to 2,500 members',
       'Everything in Professional',
-      'Verified voting + audit log export',
+      'Sub-organization hierarchy (district → school)',
       'Roster import (CSV)',
       'Dedicated onboarding',
       'SLA + 24h response time',

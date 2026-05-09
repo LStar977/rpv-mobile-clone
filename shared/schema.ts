@@ -110,6 +110,20 @@ export const organizations = pgTable("organizations", {
   stripeCustomerId: varchar("stripe_customer_id"),
   subscriptionStatus: varchar("subscription_status").default('pending'),
 
+  // Subscription tier — drives member caps and feature gating.
+  // Values: 'starter' | 'professional' | 'premium' | 'enterprise' | 'legacy'.
+  // Existing rows pre-enforcement should be migrated to 'legacy' (uncapped) to
+  // grandfather customers; new rows default to 'starter' (100-member cap).
+  // See shared/tier-limits.ts for the authoritative limits.
+  tier: varchar("tier").default('starter'),
+
+  // Per-month verification counter for overage protection. The reset
+  // timestamp lets us amortize across calendar months without a cron job —
+  // any handler can call resetIfStale() and the counter zeroes if the month
+  // has rolled over since verificationCountResetAt.
+  verificationCountThisMonth: integer("verification_count_this_month").default(0),
+  verificationCountResetAt: timestamp("verification_count_reset_at").defaultNow(),
+
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
