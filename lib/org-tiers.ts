@@ -26,7 +26,6 @@ export const ORG_TIERS: Record<OrgTier, OrgTierMeta> = {
     icon: 'people-circle-outline',
     features: [
       'Up to 25 members',
-      '25 identity verifications/month',
       'Yes/No, multiple-choice, and ranked-choice voting',
       'Invite codes',
       'Community support',
@@ -40,7 +39,7 @@ export const ORG_TIERS: Record<OrgTier, OrgTierMeta> = {
     icon: 'people-outline',
     features: [
       'Up to 250 members',
-      '250 verifications/month',
+      '25 verifications/mo included, then $2.99 each',
       'Everything in Free',
       'CSV roster import',
       'Advanced analytics',
@@ -57,7 +56,7 @@ export const ORG_TIERS: Record<OrgTier, OrgTierMeta> = {
     popular: true,
     features: [
       'Up to 1,000 members',
-      '1,000 verifications/month',
+      '100 verifications/mo included, then $2.49 each',
       'Everything in Pro',
       'Sub-organization hierarchy',
       'OAuth/SSO (MyAUPE, OPSEU, custom)',
@@ -73,7 +72,7 @@ export const ORG_TIERS: Record<OrgTier, OrgTierMeta> = {
     icon: 'shield-checkmark-outline',
     features: [
       'Up to 5,000 members',
-      '5,000 verifications/month',
+      '500 verifications/mo included, then $1.99 each',
       'Everything in Plus',
       'White-label & custom domain',
       'Dedicated onboarding',
@@ -92,7 +91,7 @@ export const ORG_TIERS: Record<OrgTier, OrgTierMeta> = {
     contactOnly: true,
     features: [
       'Unlimited members',
-      'Unlimited verifications',
+      'Unlimited verifications (custom rate)',
       'Annual contracts only',
       'SOC 2 Type II + custom DPA',
       'Custom integrations',

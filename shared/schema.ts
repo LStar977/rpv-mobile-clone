@@ -133,16 +133,25 @@ export const organizations = pgTable("organizations", {
   // (25-member cap). See shared/tier-limits.ts for authoritative limits.
   tier: varchar("tier").default('free'),
 
-  // Per-month verification counter for overage protection. The reset
-  // timestamp lets us amortize across calendar months without a cron job —
-  // any handler can call resetIfStale() and the counter zeroes if the month
-  // has rolled over since verificationCountResetAt.
-  // TODO(stage-2): wire incrementing into Veriff/Didit success webhooks
-  // (backend/server/routes.ts:1769, 1836, 2229). Requires plumbing an
-  // originatingOrgId through verification session creation
-  // (POST /api/didit/create-session ~line 2191) and parsing it out of
-  // vendor_data on the webhook side. Counter is currently dead — limits
-  // in shared/tier-limits.ts are advertised but not enforced for verifications.
+  // When true, members must complete Veriff/Didit before voting on
+  // proposals in this org. Pro+ feature, gated by `requireVerification`
+  // in shared/tier-limits.ts. The verification flow is org-paid: members
+  // never see a payment prompt, the org's saved card is charged via
+  // Stripe metered usage above the included monthly quota.
+  requireMemberVerification: boolean("require_member_verification").default(false),
+
+  // Optional monthly cap on org-paid verification overage spend, in cents.
+  // Null = unlimited. When the cap is reached, verification-session-create
+  // returns ORG_VERIFICATION_BUDGET_EXHAUSTED and members see admin-contact
+  // copy. Enforced at session-create only — verifications already in flight
+  // complete and are billed.
+  verificationBudgetMonthlyCents: integer("verification_budget_monthly_cents"),
+
+  // Per-month verification counter, attributed to the org via vendor_data
+  // ("userId|orgId") on Veriff/Didit session create. Incremented in the
+  // success webhook. Lazy monthly reset: incrementOrgVerificationCount
+  // zeroes this and bumps verificationCountResetAt if the stored timestamp
+  // is in a previous calendar month.
   verificationCountThisMonth: integer("verification_count_this_month").default(0),
   verificationCountResetAt: timestamp("verification_count_reset_at").defaultNow(),
 

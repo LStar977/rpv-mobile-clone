@@ -83,12 +83,42 @@ export default function ProposalDetailScreen() {
     fetchResults();
   }, [fetchResults]);
 
+  // UPDATE 24: org-mandated verification can fire even on global proposals
+  // — when a user navigates to a proposal that lives inside a verify-required
+  // org. (Org proposals normally surface via org-proposal-detail.tsx, but
+  // shared links / push notifications can land here too.) Mirror the
+  // VERIFICATION_REQUIRED_BY_ORG handling from org-proposal-detail.tsx.
+  const handleVerificationRequiredByOrg = useCallback((result: { errorCode?: string; errorDetails?: any }): boolean => {
+    if (result.errorCode !== 'VERIFICATION_REQUIRED_BY_ORG') return false;
+    const orgName = result.errorDetails?.orgName ?? 'This organization';
+    const orgIdParam = result.errorDetails?.orgId;
+    Alert.alert(
+      'Verification required',
+      `${orgName} requires identity verification before voting. Verification is covered by your organization.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Verify now',
+          onPress: () => router.push({
+            pathname: '/modals/verification-payment',
+            params: {
+              ...(orgIdParam ? { originatingOrgId: orgIdParam } : {}),
+              originatingOrgName: orgName,
+            },
+          }),
+        },
+      ],
+    );
+    return true;
+  }, []);
+
   const handleRcvVote = useCallback(async (rankings: string[]) => {
     if (rcvSubmitted || isEnded || voting) return;
     setVoting(true);
     try {
       const result = await proposalsApi.submitVote(proposalId, 'ranked-choice', { rankings });
       if (result.error) {
+        if (handleVerificationRequiredByOrg(result)) return;
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
         Alert.alert('Vote failed', result.error);
         return;
@@ -99,7 +129,7 @@ export default function ProposalDetailScreen() {
     } finally {
       setVoting(false);
     }
-  }, [proposalId, rcvSubmitted, isEnded, voting, fetchResults]);
+  }, [proposalId, rcvSubmitted, isEnded, voting, fetchResults, handleVerificationRequiredByOrg]);
 
   const handleMcVote = useCallback(async (selectedOption: string) => {
     if (mcSubmitted || isEnded || voting) return;
@@ -107,6 +137,7 @@ export default function ProposalDetailScreen() {
     try {
       const result = await proposalsApi.submitVote(proposalId, 'multiple-choice', { selectedOption });
       if (result.error) {
+        if (handleVerificationRequiredByOrg(result)) return;
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
         Alert.alert('Vote failed', result.error);
         return;
@@ -117,7 +148,7 @@ export default function ProposalDetailScreen() {
     } finally {
       setVoting(false);
     }
-  }, [proposalId, mcSubmitted, isEnded, voting, fetchResults]);
+  }, [proposalId, mcSubmitted, isEnded, voting, fetchResults, handleVerificationRequiredByOrg]);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>

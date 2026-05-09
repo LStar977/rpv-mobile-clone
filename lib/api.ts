@@ -36,6 +36,13 @@ export interface Organization {
   verified: boolean;
   createdAt: string;
   role?: 'admin' | 'member';
+  // UPDATE 24: when true, members must complete Veriff/Didit before
+  // voting in this org. Pro+ feature; toggled by admin in org settings.
+  requireMemberVerification?: boolean;
+  // Optional monthly cap on org-paid verification spend (cents). Null =
+  // unlimited. When the next verification would exceed the cap,
+  // session-create returns ORG_VERIFICATION_BUDGET_EXHAUSTED.
+  verificationBudgetMonthlyCents?: number | null;
 }
 
 export interface OrganizationProposal extends Proposal {
@@ -704,9 +711,14 @@ export const proposalsApi = {
 // Provider-neutral KYC client. Backend routes were renamed from /api/veriff/*
 // to /api/didit/* during the Veriff → Didit migration. The veriffApi alias is
 // kept so any stale imports still compile.
+//
+// originatingOrgId: when supplied, the backend treats this as an org-paid
+// verification — skips the Stripe checkout gate and bills the org via
+// metered usage. The user is verified normally; the org pays.
 export const kycApi = {
-  async createSession(): Promise<ApiResponse<{ sessionUrl: string; sessionId: string; verificationId?: string }>> {
-    return apiRequest('/api/didit/create-session', { method: 'POST' });
+  async createSession(originatingOrgId?: string): Promise<ApiResponse<{ sessionUrl: string; sessionId: string; verificationId?: string }>> {
+    const body = originatingOrgId ? JSON.stringify({ originatingOrgId }) : undefined;
+    return apiRequest('/api/didit/create-session', { method: 'POST', body });
   },
   async checkDecision(verificationId: string): Promise<ApiResponse<{ status: string; decision?: string }>> {
     return apiRequest(`/api/didit/check-decision?verificationId=${verificationId}`);
@@ -718,7 +730,23 @@ export interface OrgUsage {
   tier: 'free' | 'pro' | 'plus' | 'business' | 'government' | 'legacy';
   subscriptionStatus: 'active' | 'pending' | 'past_due' | 'canceled' | 'free' | string;
   members: { current: number; limit: number | null };
-  verifications: { current: number; limit: number | null };
+  // UPDATE 24 (Model A+): verification billing.
+  // current = total verifications attributed to this org this month.
+  // included = free monthly quota baked into the tier price (null = unlimited on Government).
+  // overageCount = how many of `current` are over the included quota.
+  // overageRateCents = per-verification overage rate at this tier.
+  // overageSpendCents = overageCount × overageRateCents (what the org owes on the next invoice).
+  // budgetMonthlyCents = optional admin-set cap; when set, session-create
+  //   returns ORG_VERIFICATION_BUDGET_EXHAUSTED at the cap.
+  verifications: {
+    current: number;
+    included: number | null;
+    overageCount: number;
+    overageRateCents: number | null;
+    overageSpendCents: number;
+    budgetMonthlyCents: number | null;
+  };
+  requireMemberVerification: boolean;
   nextBillingDate: string | null;
   paymentProvider: 'stripe' | 'iap' | null;
   isAdmin: boolean;
@@ -727,6 +755,31 @@ export interface OrgUsage {
 export const organizationsApi = {
   async getUsage(orgId: string): Promise<ApiResponse<OrgUsage>> {
     return apiRequest<OrgUsage>(`/api/organizations/${orgId}/usage`);
+  },
+
+  // UPDATE 24: toggle org-mandated member verification. Pro+ feature.
+  // 402 with errorCode 'FEATURE_NOT_AVAILABLE_ON_TIER' means the caller
+  // is on Free and should see the UpgradeModal.
+  async setRequireVerification(
+    orgId: string,
+    require: boolean,
+  ): Promise<ApiResponse<{ requireMemberVerification: boolean }>> {
+    return apiRequest<{ requireMemberVerification: boolean }>(
+      `/api/organizations/${orgId}/require-verification`,
+      { method: 'PUT', body: JSON.stringify({ require }) },
+    );
+  },
+
+  // UPDATE 24: set the org's monthly verification spend cap (cents).
+  // null = unlimited. Enforced at verification-session-create only.
+  async setVerificationBudget(
+    orgId: string,
+    budgetCents: number | null,
+  ): Promise<ApiResponse<{ verificationBudgetMonthlyCents: number | null }>> {
+    return apiRequest<{ verificationBudgetMonthlyCents: number | null }>(
+      `/api/organizations/${orgId}/verification-budget`,
+      { method: 'PUT', body: JSON.stringify({ budgetCents }) },
+    );
   },
 
   async cancelSubscription(orgId: string): Promise<ApiResponse<{ canceled: boolean; effectiveAt: string }>> {

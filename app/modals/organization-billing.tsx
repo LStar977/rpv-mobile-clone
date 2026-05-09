@@ -236,6 +236,40 @@ export default function OrganizationBillingScreen() {
                 />
               </View>
             )}
+            {/* UPDATE 24 (Model A+) — verification billing row.
+                Visible only when the org has require-verification enabled.
+                Shows current/included quota and accumulated overage spend
+                this month. Stripe metered usage rolls these into the next
+                invoice automatically. */}
+            {usage.requireMemberVerification && (
+              <>
+                <View style={styles.summaryRow}>
+                  <Text style={[styles.summaryLabel, { color: colors.textSecondary }]}>Verifications</Text>
+                  <Text style={[styles.summaryValue, { color: colors.text }]}>
+                    {usage.verifications.current}
+                    {usage.verifications.included !== null
+                      ? ` / ${usage.verifications.included} included`
+                      : ' (unlimited)'}
+                  </Text>
+                </View>
+                {usage.verifications.overageCount > 0 && (
+                  <View style={styles.summaryRow}>
+                    <Text style={[styles.summaryLabel, { color: colors.textSecondary }]}>Overage this month</Text>
+                    <Text style={[styles.summaryValue, { color: colors.text }]}>
+                      {`${usage.verifications.overageCount} × $${((usage.verifications.overageRateCents ?? 0) / 100).toFixed(2)} = $${(usage.verifications.overageSpendCents / 100).toFixed(2)}`}
+                    </Text>
+                  </View>
+                )}
+                {usage.verifications.budgetMonthlyCents !== null && (
+                  <View style={styles.summaryRow}>
+                    <Text style={[styles.summaryLabel, { color: colors.textSecondary }]}>Monthly cap</Text>
+                    <Text style={[styles.summaryValue, { color: colors.text }]}>
+                      {`$${(usage.verifications.budgetMonthlyCents / 100).toFixed(0)}`}
+                    </Text>
+                  </View>
+                )}
+              </>
+            )}
             <View style={styles.summaryRow}>
               <Text style={[styles.summaryLabel, { color: colors.textSecondary }]}>Next billing</Text>
               <Text style={[styles.summaryValue, { color: colors.text }]}>

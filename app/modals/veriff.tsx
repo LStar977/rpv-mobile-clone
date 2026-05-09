@@ -11,7 +11,14 @@ type ErrorState = null | 'no-session' | 'webview-error' | 'cancelled';
 
 export default function VeriffScreen() {
   const { colors } = useTheme();
-  const params = useLocalSearchParams<{ sessionUrl: string; verificationId: string }>();
+  // originatingOrgId: when present, this verification is org-paid (the
+  // user's org has requireMemberVerification=true). Threaded through to
+  // the session-create call so the backend packs it into vendor_data and
+  // the org gets billed via Stripe metered usage on success.
+  const params = useLocalSearchParams<{ sessionUrl?: string; verificationId?: string; originatingOrgId?: string }>();
+  const originatingOrgId = typeof params.originatingOrgId === 'string' && params.originatingOrgId.length > 0
+    ? params.originatingOrgId
+    : undefined;
 
   const [sessionUrl, setSessionUrl] = useState<string | undefined>(params.sessionUrl);
   const [verificationId, setVerificationId] = useState<string | undefined>(params.verificationId);
@@ -25,7 +32,7 @@ export default function VeriffScreen() {
   const handleRetry = useCallback(async () => {
     setRetrying(true);
     try {
-      const response = await veriffApi.createSession();
+      const response = await veriffApi.createSession(originatingOrgId);
       if (response.data?.sessionUrl && response.data?.verificationId) {
         setSessionUrl(response.data.sessionUrl);
         setVerificationId(response.data.verificationId);
@@ -38,7 +45,7 @@ export default function VeriffScreen() {
     } finally {
       setRetrying(false);
     }
-  }, []);
+  }, [originatingOrgId]);
 
   const handleNavigationStateChange = (navState: any) => {
     const url = navState.url || '';

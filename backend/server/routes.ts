@@ -7,6 +7,7 @@ import { setupAuth, isAuthenticated } from "./replitAuth";
 import { setupBadgeRoutes } from "./badge-routes";
 import { passportNFTs, activatedRidings, electoralRidingQRCodes, proposals, votes, voteTokenClaims, organizations, transactions } from "@shared/schema";
 import { getMemberLimit, getTierLimits, isFeatureEnabled, tierDisplayName, type OrgTier } from "@shared/tier-limits";
+import { chargeOrgForVerification, hasVerificationBudgetRoom, packVendorData, parseVendorData } from "./verificationBilling";
 import { eq, count, and, sql } from "drizzle-orm";
 import { db } from "./db";
 import { savePushToken, notifyNewProposal, notifyTokenClaimed, notifyProposalVote } from "./notifications";
@@ -104,7 +105,12 @@ function verifyDiditSignature(req: any): boolean {
 // Create a Didit verification session via their REST API. Returns the hosted
 // verification URL the mobile WebView loads, plus the session_id we persist
 // on the user record for later decision lookups.
-async function createDiditSession(userId: string, firstName?: string, lastName?: string): Promise<{ sessionId: string; sessionUrl: string }> {
+async function createDiditSession(
+  userId: string,
+  firstName?: string,
+  lastName?: string,
+  originatingOrgId?: string | null,
+): Promise<{ sessionId: string; sessionUrl: string }> {
   const apiKey = process.env.DIDIT_API_KEY;
   const workflowId = process.env.DIDIT_WORKFLOW_ID;
   if (!apiKey || !workflowId) {
@@ -115,7 +121,7 @@ async function createDiditSession(userId: string, firstName?: string, lastName?:
   const body: any = {
     workflow_id: workflowId,
     callback: callbackUrl,
-    vendor_data: userId,
+    vendor_data: packVendorData(userId, originatingOrgId ?? null),
   };
   if (firstName && lastName) {
     body.expected_details = { first_name: firstName.trim(), last_name: lastName.trim() };
@@ -484,6 +490,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (!isMember) {
             return res.status(403).json({ error: "You must be a member of this organization to vote" });
           }
+          const proposalOrg = await storage.getOrganization(proposal.organizationId);
+          if (proposalOrg?.requireMemberVerification && !user?.verified) {
+            return res.status(403).json({
+              error: "This organization requires identity verification before voting",
+              code: "VERIFICATION_REQUIRED_BY_ORG",
+              orgId: proposal.organizationId,
+              orgName: proposalOrg.name,
+              requiresVerification: true,
+            });
+          }
         }
         await storage.recordVote(userId, proposalId, 'ranked-choice', undefined, null as any, JSON.stringify(rankings));
         log(`✅ RCV ballot recorded: user=${userId}, proposal=${proposalId}, rankings=${rankings.length}`);
@@ -506,6 +522,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const isMember = await storage.isOrganizationMember(proposal.organizationId, userId);
         if (!isMember) {
           return res.status(403).json({ error: "You must be a member of this organization to vote on this proposal" });
+        }
+        const proposalOrg = await storage.getOrganization(proposal.organizationId);
+        if (proposalOrg?.requireMemberVerification && !user?.verified) {
+          return res.status(403).json({
+            error: "This organization requires identity verification before voting",
+            code: "VERIFICATION_REQUIRED_BY_ORG",
+            orgId: proposal.organizationId,
+            orgName: proposalOrg.name,
+            requiresVerification: true,
+          });
         }
       } else if (!user?.verified) {
         return res.status(403).json({ error: "You must complete identity verification before voting." });
@@ -2024,11 +2050,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(200).json({ received: true });
       }
 
-      const userId = verification.vendorData;
+      const { userId, originatingOrgId } = parseVendorData(verification.vendorData);
       const verificationId = verification.id;
       const status = verification.status;
 
-      log(`Veriff webhook: userId=${rid(userId)}, status=${status}, verificationId=${rid(verificationId)}`);
+      log(`Veriff webhook: userId=${rid(userId)}, originatingOrgId=${rid(originatingOrgId)}, status=${status}, verificationId=${rid(verificationId)}`);
 
       if (status === 'approved') {
         const person = verification.person || {};
@@ -2060,6 +2086,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         log(`Veriff webhook data: document.country=${document.country}, address.country=${address.country}`);
         await storage.updateUserVerification(userId, updateData);
         await grantInitialBallotsIfNeeded(userId);
+        if (originatingOrgId) {
+          await chargeOrgForVerification(originatingOrgId, userId);
+        }
         log(`User verified via /api/veriff/webhook: user=${rid(userId)}, verificationId=${rid(verificationId)}, country=${country}`);
       }
 
@@ -2301,7 +2330,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Create Veriff verification session
+  // Create Veriff verification session.
+  //
+  // Two flows merge here:
+  //   - Self-paid (no originatingOrgId): user previously paid via the Stripe
+  //     verification checkout; we trust the upstream gate.
+  //   - Org-paid (originatingOrgId supplied + the org has requireMemberVerification=true
+  //     + the user is a member + the org has budget room): no payment prompt,
+  //     org's saved card is charged via Stripe metered usage when the webhook
+  //     fires. vendor_data is packed as "userId|orgId" for attribution.
   app.post("/api/veriff/create-session", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims?.sub;
@@ -2319,6 +2356,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(500).json({ error: "Veriff not configured" });
       }
 
+      const originatingOrgId: string | undefined = typeof req.body?.originatingOrgId === 'string' ? req.body.originatingOrgId : undefined;
+      let attributedOrgId: string | null = null;
+      if (originatingOrgId) {
+        const org = await storage.getOrganization(originatingOrgId);
+        if (!org || !org.requireMemberVerification) {
+          return res.status(400).json({ error: "Org-paid verification not active for this organization" });
+        }
+        const isMember = await storage.isOrganizationMember(originatingOrgId, userId);
+        if (!isMember) {
+          return res.status(403).json({ error: "Not a member of this organization" });
+        }
+        if (!hasVerificationBudgetRoom(org)) {
+          return res.status(403).json({
+            error: "This organization has paused verification this month. Contact your administrator.",
+            code: "ORG_VERIFICATION_BUDGET_EXHAUSTED",
+            orgId: originatingOrgId,
+            orgName: org.name,
+          });
+        }
+        attributedOrgId = originatingOrgId;
+      }
+
       const verificationId = `verify_${userId}_${Date.now()}`;
 
       const response = await fetch('https://stationapi.veriff.com/v1/sessions', {
@@ -2334,7 +2393,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               firstName: user.firstName || user.name?.split(' ')[0] || 'User',
               lastName: user.lastName || user.name?.split(' ').slice(1).join(' ') || 'Citizen',
             },
-            vendorData: userId,
+            vendorData: packVendorData(userId, attributedOrgId),
           },
         }),
       });
@@ -2378,10 +2437,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "User already verified" });
       }
 
+      // Org-paid verification branch (mirror of /api/veriff/create-session above).
+      // When originatingOrgId is supplied, the user is verifying because their
+      // org has requireMemberVerification=true. Skip the upstream payment gate
+      // (the org pays via Stripe metered usage), enforce membership + budget,
+      // and pack the orgId into vendor_data so the webhook can attribute.
+      const originatingOrgId: string | undefined = typeof req.body?.originatingOrgId === 'string' ? req.body.originatingOrgId : undefined;
+      let attributedOrgId: string | null = null;
+      if (originatingOrgId) {
+        const org = await storage.getOrganization(originatingOrgId);
+        if (!org || !org.requireMemberVerification) {
+          return res.status(400).json({ error: "Org-paid verification not active for this organization" });
+        }
+        const isMember = await storage.isOrganizationMember(originatingOrgId, userId);
+        if (!isMember) {
+          return res.status(403).json({ error: "Not a member of this organization" });
+        }
+        if (!hasVerificationBudgetRoom(org)) {
+          return res.status(403).json({
+            error: "This organization has paused verification this month. Contact your administrator.",
+            code: "ORG_VERIFICATION_BUDGET_EXHAUSTED",
+            orgId: originatingOrgId,
+            orgName: org.name,
+          });
+        }
+        attributedOrgId = originatingOrgId;
+      }
+
       const { sessionId, sessionUrl } = await createDiditSession(
         userId,
         user.firstName || (user.name?.split(" ")[0]),
         user.lastName || (user.name?.split(" ").slice(1).join(" ")),
+        attributedOrgId,
       );
 
       // Persist session id so check-decision and sync-location can look it up
@@ -2411,9 +2498,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
     try {
       const { session_id, status, vendor_data, decision } = req.body || {};
-      log(`Didit webhook: userId=${rid(vendor_data)}, status=${status}, sessionId=${rid(session_id)}`);
+      const { userId, originatingOrgId } = parseVendorData(vendor_data);
+      log(`Didit webhook: userId=${rid(userId)}, originatingOrgId=${rid(originatingOrgId)}, status=${status}, sessionId=${rid(session_id)}`);
 
-      if (!session_id || !vendor_data) {
+      if (!session_id || !userId) {
         return res.status(200).json({ received: true });
       }
 
@@ -2434,9 +2522,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (fields.firstName) updateData.firstName = fields.firstName;
         if (fields.lastName) updateData.lastName = fields.lastName;
 
-        await storage.updateUserVerification(vendor_data, updateData);
-        await grantInitialBallotsIfNeeded(vendor_data);
-        log(`User verified via Didit webhook: user=${rid(vendor_data)}, country=${fields.country}`);
+        await storage.updateUserVerification(userId, updateData);
+        await grantInitialBallotsIfNeeded(userId);
+        if (originatingOrgId) {
+          await chargeOrgForVerification(originatingOrgId, userId);
+        }
+        log(`User verified via Didit webhook: user=${rid(userId)}, country=${fields.country}`);
       }
 
       res.status(200).json({ received: true });
@@ -3796,17 +3887,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      // Verification billing (UPDATE 24, Model A+).
+      // current = total verifications this month; included = free quota
+      // baked into the tier price; overageCount/Spend = how much the org
+      // owes via Stripe metered usage on the next invoice; budgetMonthlyCents
+      // = optional admin-set cap. When toggled OFF, current is still
+      // exposed for analytics but billing is dormant.
+      const verifCurrent = org.verificationCountThisMonth ?? 0;
+      const verifIncluded = Number.isFinite(limits.verificationsIncluded) ? limits.verificationsIncluded : null;
+      const verifIncludedNumeric = verifIncluded ?? 0;
+      const overageCount = Math.max(0, verifCurrent - verifIncludedNumeric);
+      const overageRate = limits.verificationOverageRateCents;
+      const overageSpendCents = overageRate ? overageCount * overageRate : 0;
+
       res.json({
-        tier: org.tier ?? 'starter',
+        tier: org.tier ?? 'free',
         subscriptionStatus: org.subscriptionStatus ?? 'free',
         members: {
           current: memberCount,
           limit: Number.isFinite(limits.members) ? limits.members : null,
         },
         verifications: {
-          current: org.verificationCountThisMonth ?? 0,
-          limit: Number.isFinite(limits.verificationsPerMonth) ? limits.verificationsPerMonth : null,
+          current: verifCurrent,
+          included: verifIncluded,
+          overageCount,
+          overageRateCents: overageRate,
+          overageSpendCents,
+          budgetMonthlyCents: org.verificationBudgetMonthlyCents ?? null,
         },
+        requireMemberVerification: !!org.requireMemberVerification,
         nextBillingDate,
         paymentProvider,
         isAdmin: true,
@@ -3814,6 +3923,76 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       log(`Get usage error: ${error?.message ?? error}`);
       res.status(500).json({ error: "Failed to fetch usage" });
+    }
+  });
+
+  // Toggle the org-mandated verification flag. Admin-only, Pro+ gated.
+  // When ON, members must complete Veriff/Didit before voting. The flow
+  // is org-paid (Stripe metered usage) — members never see a payment
+  // prompt. Free orgs flipping it ON get a 402 + UpgradeModal.
+  app.put("/api/organizations/:orgId/require-verification", isAuthenticated, async (req: any, res: any) => {
+    try {
+      const userId = req.user.claims?.sub;
+      const { orgId } = req.params;
+      const { require: requireFlag } = req.body;
+      if (typeof requireFlag !== 'boolean') {
+        return res.status(400).json({ error: "require must be a boolean" });
+      }
+      const org = await storage.getOrganization(orgId);
+      if (!org) return res.status(404).json({ error: "Organization not found" });
+      const members = await storage.getOrganizationMembers(orgId);
+      const isAdmin = members.some((m: any) => m.userId === userId && m.role === 'admin');
+      if (!isAdmin && org.creatorId !== userId) {
+        return res.status(403).json({ error: "Only admins can change verification settings" });
+      }
+      if (requireFlag && !isFeatureEnabled(org.tier, 'requireVerification')) {
+        return res.status(402).json({
+          error: "Required-verification mode requires Pro plan or higher",
+          code: "FEATURE_NOT_AVAILABLE_ON_TIER",
+          feature: "requireVerification",
+          tier: org.tier ?? 'free',
+          upgradeRequired: true,
+        });
+      }
+      await db.update(organizations).set({
+        requireMemberVerification: requireFlag,
+        updatedAt: new Date(),
+      }).where(eq(organizations.id, orgId));
+      log(`Org ${orgId} requireMemberVerification → ${requireFlag}`);
+      res.json({ requireMemberVerification: requireFlag });
+    } catch (error: any) {
+      log(`Toggle require-verification error: ${error?.message ?? error}`);
+      res.status(500).json({ error: "Failed to update setting" });
+    }
+  });
+
+  // Set the org's monthly verification spend cap in cents. Null = unlimited
+  // (default). Enforced at session-create only; verifications already in
+  // flight when the cap is hit complete and are billed.
+  app.put("/api/organizations/:orgId/verification-budget", isAuthenticated, async (req: any, res: any) => {
+    try {
+      const userId = req.user.claims?.sub;
+      const { orgId } = req.params;
+      const { budgetCents } = req.body;
+      if (budgetCents !== null && (typeof budgetCents !== 'number' || budgetCents < 0 || !Number.isFinite(budgetCents))) {
+        return res.status(400).json({ error: "budgetCents must be a non-negative number or null" });
+      }
+      const org = await storage.getOrganization(orgId);
+      if (!org) return res.status(404).json({ error: "Organization not found" });
+      const members = await storage.getOrganizationMembers(orgId);
+      const isAdmin = members.some((m: any) => m.userId === userId && m.role === 'admin');
+      if (!isAdmin && org.creatorId !== userId) {
+        return res.status(403).json({ error: "Only admins can change billing settings" });
+      }
+      await db.update(organizations).set({
+        verificationBudgetMonthlyCents: budgetCents,
+        updatedAt: new Date(),
+      }).where(eq(organizations.id, orgId));
+      log(`Org ${orgId} verificationBudgetMonthlyCents → ${budgetCents}`);
+      res.json({ verificationBudgetMonthlyCents: budgetCents });
+    } catch (error: any) {
+      log(`Set verification-budget error: ${error?.message ?? error}`);
+      res.status(500).json({ error: "Failed to update budget" });
     }
   });
 
