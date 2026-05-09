@@ -947,6 +947,7 @@ export default function AuthScreen() {
   const [name, setName] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [appleLoading, setAppleLoading] = useState(false);
   const [appleAvailable, setAppleAvailable] = useState(false);
@@ -1105,6 +1106,11 @@ export default function AuthScreen() {
   const handleEmailAuth = async () => {
     if (!email || !password || (view === 'signup' && !name)) {
       setError('Please fill in all fields');
+      haptics.warning();
+      return;
+    }
+    if (view === 'signup' && !acceptedTerms) {
+      setError('Please accept the Terms and Privacy Policy to continue.');
       haptics.warning();
       return;
     }
@@ -1391,6 +1397,48 @@ export default function AuthScreen() {
             leftIcon="lock-closed-outline"
           />
 
+          {!isLogin && (
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => {
+                haptics.selection();
+                setAcceptedTerms((v) => !v);
+              }}
+              style={styles.termsRow}
+            >
+              <View
+                style={[
+                  styles.termsCheckbox,
+                  {
+                    borderColor: acceptedTerms ? colors.gold : colors.border,
+                    backgroundColor: acceptedTerms ? colors.gold : 'transparent',
+                  },
+                ]}
+              >
+                {acceptedTerms && (
+                  <Ionicons name="checkmark" size={13} color={colors.background} />
+                )}
+              </View>
+              <Text style={[styles.termsText, { color: colors.textSecondary }]}>
+                I agree to the{' '}
+                <Text
+                  style={[styles.termsLink, { color: colors.text }]}
+                  onPress={() => Linking.openURL('https://representportal.com/terms')}
+                >
+                  Terms
+                </Text>
+                {' and '}
+                <Text
+                  style={[styles.termsLink, { color: colors.text }]}
+                  onPress={() => Linking.openURL('https://representportal.com/privacy')}
+                >
+                  Privacy Policy
+                </Text>
+                .
+              </Text>
+            </TouchableOpacity>
+          )}
+
           <Button
             title={isLogin ? 'Sign In' : 'Create Account'}
             onPress={handleEmailAuth}
@@ -1398,6 +1446,7 @@ export default function AuthScreen() {
             size="lg"
             fullWidth
             loading={isLoading}
+            disabled={!isLogin && !acceptedTerms}
             style={{ marginTop: SPACING.sm }}
           />
         </Animated.View>
@@ -1733,6 +1782,28 @@ const styles = StyleSheet.create({
   errorText: {
     ...TYPOGRAPHY.bodySmall,
     flex: 1,
+  },
+  termsRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    paddingHorizontal: 4,
+    paddingVertical: SPACING.sm,
+    marginTop: SPACING.xs,
+  },
+  termsCheckbox: {
+    width: 20,
+    height: 20,
+    borderRadius: 5,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 2,
+  },
+  termsText: {
+    ...TYPOGRAPHY.bodySmall,
+    flex: 1,
+    lineHeight: 19,
   },
   switchAuth: {
     flexDirection: 'row',

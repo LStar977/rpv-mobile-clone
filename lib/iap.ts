@@ -7,8 +7,10 @@ const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://representportal.com'
 // The App Store SKU was registered as "community" originally; we kept the
 // existing string here so existing subscribers + App Store Connect stay
 // aligned. Only the JS-side identifier was renamed.
+//
+// Verification is FREE for everyone now, so there's no verification SKU.
+// All remaining products are auto-renewable subscriptions.
 export const IAP_PRODUCTS = {
-  verification: 'com.representwallet.app.verification',
   premium: 'com.representwallet.app.premium',
   orgStarter: 'com.representwallet.app.org.community',
   orgProfessional: 'com.representwallet.app.org.professional',
@@ -124,7 +126,8 @@ export function endIAP() {
 }
 
 /**
- * Get available products from the App Store
+ * Get available products from the App Store. All remaining products are
+ * auto-renewable subscriptions.
  */
 export async function getProducts(skus?: string[]): Promise<IAPProduct[]> {
   if (!iapAvailable || !RNIap || Platform.OS !== 'ios') return [];
@@ -132,15 +135,9 @@ export async function getProducts(skus?: string[]): Promise<IAPProduct[]> {
   const productIds = skus || Object.values(IAP_PRODUCTS);
 
   try {
-    // Get both regular products and subscriptions
-    const [products, subscriptions] = await Promise.all([
-      RNIap.getProducts({ skus: [IAP_PRODUCTS.verification] }).catch(() => []),
-      RNIap.getSubscriptions({ skus: productIds.filter(id => id !== IAP_PRODUCTS.verification) }).catch(() => []),
-    ]);
+    const subscriptions = await RNIap.getSubscriptions({ skus: productIds }).catch(() => []);
 
-    const allProducts = [...products, ...subscriptions];
-
-    return allProducts.map((p: any) => ({
+    return subscriptions.map((p: any) => ({
       productId: p.productId,
       title: p.title || p.name || '',
       description: p.description || '',
@@ -154,15 +151,8 @@ export async function getProducts(skus?: string[]): Promise<IAPProduct[]> {
   }
 }
 
-// Check if a product is a subscription. Ballot packs were consumables but
-// have been retired in favor of the daily-allowance system; the only one-time
-// product left is verification.
-function isSubscription(sku: string): boolean {
-  return sku !== IAP_PRODUCTS.verification;
-}
-
 /**
- * Purchase a product
+ * Purchase a subscription. (All remaining IAP products are subscriptions.)
  */
 export async function purchaseProduct(sku: string): Promise<IAPPurchaseResult> {
   if (!iapAvailable || !RNIap || Platform.OS !== 'ios') {
@@ -172,32 +162,17 @@ export async function purchaseProduct(sku: string): Promise<IAPPurchaseResult> {
   return new Promise((resolve) => {
     pendingPurchaseResolve = resolve;
 
-    if (isSubscription(sku)) {
-      RNIap.requestSubscription({ sku }).catch((error: any) => {
-        if (pendingPurchaseResolve) {
-          const cancelled = error.code === 'E_USER_CANCELLED';
-          pendingPurchaseResolve({
-            success: false,
-            cancelled,
-            error: cancelled ? undefined : error.message,
-          });
-          pendingPurchaseResolve = null;
-        }
-      });
-    } else {
-      // One-time purchase or consumable
-      RNIap.requestPurchase({ sku }).catch((error: any) => {
-        if (pendingPurchaseResolve) {
-          const cancelled = error.code === 'E_USER_CANCELLED';
-          pendingPurchaseResolve({
-            success: false,
-            cancelled,
-            error: cancelled ? undefined : error.message,
-          });
-          pendingPurchaseResolve = null;
-        }
-      });
-    }
+    RNIap.requestSubscription({ sku }).catch((error: any) => {
+      if (pendingPurchaseResolve) {
+        const cancelled = error.code === 'E_USER_CANCELLED';
+        pendingPurchaseResolve({
+          success: false,
+          cancelled,
+          error: cancelled ? undefined : error.message,
+        });
+        pendingPurchaseResolve = null;
+      }
+    });
   });
 }
 

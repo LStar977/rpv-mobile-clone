@@ -406,6 +406,28 @@ export default function SubscriptionScreen() {
           </Animated.View>
         )}
 
+        {/* Legal disclosure — required on the purchase screen by Apple
+            (Guideline 3.1.2) and good practice on Android. */}
+        <Animated.View entering={FadeInUp.delay(475).duration(400)} style={styles.legalFooter}>
+          <Text style={[styles.legalFooterText, { color: colors.textTertiary }]}>
+            Subscriptions auto-renew until canceled in {Platform.OS === 'ios' ? 'App Store settings' : 'Google Play settings'}. By subscribing you agree to our{' '}
+            <Text
+              style={[styles.legalLink, { color: colors.text }]}
+              onPress={() => Linking.openURL('https://representportal.com/terms')}
+            >
+              Terms
+            </Text>
+            {' and '}
+            <Text
+              style={[styles.legalLink, { color: colors.text }]}
+              onPress={() => Linking.openURL('https://representportal.com/privacy')}
+            >
+              Privacy Policy
+            </Text>
+            .
+          </Text>
+        </Animated.View>
+
         {/* FAQ Section */}
         <Animated.View
           entering={FadeInUp.delay(500).duration(400)}
@@ -436,7 +458,7 @@ export default function SubscriptionScreen() {
               What payment methods do you accept?
             </Text>
             <Text style={[styles.faqAnswer, { color: colors.textSecondary }]}>
-              We accept all major credit cards, Apple Pay, and Google Pay via Stripe. Payment is processed securely in-app using native payment sheets.
+              On iOS, subscriptions are processed through Apple In-App Purchase. On Android, through Stripe (cards, Apple Pay, Google Pay). All transactions complete inside the app — no redirects to external websites.
             </Text>
           </View>
 
@@ -625,6 +647,20 @@ const styles = StyleSheet.create({
   },
   restoreText: {
     ...TYPOGRAPHY.labelMedium,
+    fontWeight: '500',
+  },
+  legalFooter: {
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    marginBottom: SPACING.md,
+  },
+  legalFooterText: {
+    fontSize: 11.5,
+    lineHeight: 17,
+    textAlign: 'center',
+  },
+  legalLink: {
+    textDecorationLine: 'underline',
     fontWeight: '500',
   },
   faqSection: {
