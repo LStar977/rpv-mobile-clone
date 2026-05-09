@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -15,8 +15,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeInDown, FadeInUp, useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
-import { organizationsApi } from '../../lib/api';
+import { organizationsApi, proposalsApi } from '../../lib/api';
 import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS } from '../../lib/theme';
+import { RCVBallotInput } from '../../components/ui/RCVBallotInput';
+import { RCVResults } from '../../components/ui/RCVResults';
+import { MultipleChoiceBallot } from '../../components/ui/MultipleChoiceBallot';
+import { MultipleChoiceResults } from '../../components/ui/MultipleChoiceResults';
 
 const SERIF_FONT = Platform.OS === 'ios' ? 'Georgia' : 'serif';
 
@@ -47,7 +51,20 @@ export default function OrgProposalDetailScreen() {
     userVote: string;
     isOfficial: string;
     orgName: string;
+    voteType: string;
+    // options is JSON-encoded array of strings (URL params can't carry arrays)
+    options: string;
   }>();
+  const voteType: 'yes-no' | 'multiple-choice' | 'ranked-choice' =
+    (params.voteType as any) || 'yes-no';
+  const proposalOptions: string[] = (() => {
+    try {
+      const parsed = JSON.parse(params.options || '[]');
+      return Array.isArray(parsed) ? parsed.filter((p) => typeof p === 'string') : [];
+    } catch {
+      return [];
+    }
+  })();
 
   const orgId = params.orgId || '';
   const proposalId = params.proposalId || '';
@@ -65,10 +82,106 @@ export default function OrgProposalDetailScreen() {
   );
   const [voting, setVoting] = useState(false);
 
+  // RCV / multi-choice state. results is the unified payload from
+  // /api/proposals/:id/results; for ranked-choice it contains the IRV walk,
+  // for multiple-choice it contains per-option counts. *Submitted tracks
+  // whether the local user has cast their ballot (for swapping input → results).
+  const [rcvResults, setRcvResults] = useState<any | null>(null);
+  const [rcvSubmitted, setRcvSubmitted] = useState(false);
+  const [mcResults, setMcResults] = useState<{ options: string[]; counts: Record<string, number> } | null>(null);
+  const [mcSubmitted, setMcSubmitted] = useState(false);
+
   const timeInfo = getTimeRemaining(deadline);
   const isEnded = timeInfo.text === 'Voting ended';
   const total = supportVotes + opposeVotes;
   const supportPct = total > 0 ? (supportVotes / total) * 100 : 50;
+
+  // Fetch results for non-yes-no proposals on mount and after the user votes.
+  // The /results endpoint runs IRV server-side for RCV and counts-per-option
+  // for multi-choice; mobile is purely a renderer.
+  const fetchRichResults = useCallback(async () => {
+    if (voteType === 'yes-no') return;
+    const result = await proposalsApi.getResults(proposalId);
+    if (!result.data) return;
+    if (result.data.type === 'ranked-choice') {
+      setRcvResults(result.data);
+    } else if (result.data.type === 'multiple-choice') {
+      setMcResults({ options: result.data.options ?? [], counts: result.data.counts ?? {} });
+    }
+  }, [voteType, proposalId]);
+
+  useEffect(() => {
+    fetchRichResults();
+  }, [fetchRichResults]);
+
+  // UPDATE 26: org-mandated verification error handling. The org has paid
+  // a one-time unlock fee, so member verifications are platform-absorbed —
+  // members never see a payment prompt. Returns true if the error was
+  // handled (caller should bail out); false otherwise so normal error
+  // paths continue.
+  const handleOrgVerificationError = useCallback((result: { errorCode?: string; errorDetails?: any }): boolean => {
+    if (result.errorCode === 'VERIFICATION_REQUIRED_BY_ORG') {
+      const orgName = result.errorDetails?.orgName ?? 'This organization';
+      const orgIdParam = result.errorDetails?.orgId ?? orgId;
+      Alert.alert(
+        'Verification required',
+        `${orgName} requires identity verification before voting. Verification is covered by your organization.`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Verify now',
+            onPress: () => router.push({
+              pathname: '/modals/verification-payment',
+              params: {
+                originatingOrgId: orgIdParam,
+                originatingOrgName: orgName,
+              },
+            }),
+          },
+        ],
+      );
+      return true;
+    }
+    return false;
+  }, [orgId]);
+
+  const handleRcvVote = useCallback(async (rankings: string[]) => {
+    if (rcvSubmitted || isEnded || voting) return;
+    setVoting(true);
+    try {
+      const result = await proposalsApi.submitVote(proposalId, 'ranked-choice', { rankings });
+      if (result.error) {
+        if (handleOrgVerificationError(result)) return;
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        Alert.alert('Vote failed', result.error);
+        return;
+      }
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setRcvSubmitted(true);
+      await fetchRichResults();
+    } finally {
+      setVoting(false);
+    }
+  }, [proposalId, rcvSubmitted, isEnded, voting, fetchRichResults, handleOrgVerificationError]);
+
+  const handleMcVote = useCallback(async (selectedOption: string) => {
+    if (mcSubmitted || isEnded || voting) return;
+    setVoting(true);
+    try {
+      const result = await proposalsApi.submitVote(proposalId, 'multiple-choice', { selectedOption });
+      if (result.error) {
+        if (handleOrgVerificationError(result)) return;
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        Alert.alert('Vote failed', result.error);
+        return;
+      }
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setMcSubmitted(true);
+      await fetchRichResults();
+    } finally {
+      setVoting(false);
+    }
+  }, [proposalId, mcSubmitted, isEnded, voting, fetchRichResults, handleOrgVerificationError]);
 
   const supportScale = useSharedValue(1);
   const opposeScale = useSharedValue(1);
@@ -100,26 +213,35 @@ export default function OrgProposalDetailScreen() {
 
     try {
       const result = await organizationsApi.voteOnProposal(orgId, proposalId, vote);
+      console.log('[voteOnProposal] response:', JSON.stringify(result));
 
       if (result.error) {
+        if (handleOrgVerificationError(result)) return;
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
         Alert.alert('Vote Failed', result.error);
         return;
       }
 
-      if (result.data) {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        setUserVote(vote);
-        setSupportVotes(result.data.supportVotes);
-        setOpposeVotes(result.data.opposeVotes);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setUserVote(vote);
+      // Optimistic local update — increment our side by 1. Server may also
+      // return updated totals; if so, prefer them, but only when they're
+      // actually numbers (deployed backend response shape varies).
+      if (vote === 'support') {
+        setSupportVotes((v) => (v ?? 0) + 1);
+      } else {
+        setOpposeVotes((v) => (v ?? 0) + 1);
       }
+      const d: any = result.data;
+      if (d && typeof d.supportVotes === 'number') setSupportVotes(d.supportVotes);
+      if (d && typeof d.opposeVotes === 'number') setOpposeVotes(d.opposeVotes);
     } catch (error) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       Alert.alert('Error', 'Failed to submit vote. Please try again.');
     } finally {
       setVoting(false);
     }
-  }, [orgId, proposalId, userVote, isEnded, voting, supportScale, opposeScale]);
+  }, [orgId, proposalId, userVote, isEnded, voting, supportScale, opposeScale, handleOrgVerificationError]);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -237,7 +359,7 @@ export default function OrgProposalDetailScreen() {
             <View style={styles.voteCount}>
               <Ionicons name="thumbs-up" size={20} color={colors.success} />
               <Text style={[styles.voteCountNumber, { color: colors.success }]}>
-                {supportVotes.toLocaleString()}
+                {(supportVotes ?? 0).toLocaleString()}
               </Text>
               <Text style={[styles.voteCountLabel, { color: colors.textSecondary }]}>
                 Support ({total > 0 ? Math.round(supportPct) : 0}%)
@@ -246,7 +368,7 @@ export default function OrgProposalDetailScreen() {
             <View style={styles.voteCount}>
               <Ionicons name="thumbs-down" size={20} color={colors.error} />
               <Text style={[styles.voteCountNumber, { color: colors.error }]}>
-                {opposeVotes.toLocaleString()}
+                {(opposeVotes ?? 0).toLocaleString()}
               </Text>
               <Text style={[styles.voteCountLabel, { color: colors.textSecondary }]}>
                 Oppose ({total > 0 ? Math.round(100 - supportPct) : 0}%)
@@ -277,7 +399,42 @@ export default function OrgProposalDetailScreen() {
           },
         ]}
       >
-        {userVote ? (
+        {/* Ranked-choice path: show ballot input or live results. */}
+        {voteType === 'ranked-choice' ? (
+          rcvSubmitted || isEnded ? (
+            rcvResults ? (
+              <RCVResults
+                totalBallots={rcvResults.totalBallots ?? 0}
+                exhaustedBallots={rcvResults.exhaustedBallots ?? 0}
+                rounds={rcvResults.rounds ?? []}
+                winner={rcvResults.winner ?? null}
+                winningRound={rcvResults.winningRound ?? null}
+              />
+            ) : (
+              <ActivityIndicator color={colors.gold} />
+            )
+          ) : (
+            <RCVBallotInput
+              options={proposalOptions}
+              onSubmit={handleRcvVote}
+              submitting={voting}
+            />
+          )
+        ) : voteType === 'multiple-choice' ? (
+          mcSubmitted || isEnded ? (
+            mcResults ? (
+              <MultipleChoiceResults options={mcResults.options} counts={mcResults.counts} />
+            ) : (
+              <ActivityIndicator color={colors.gold} />
+            )
+          ) : (
+            <MultipleChoiceBallot
+              options={proposalOptions}
+              onSubmit={handleMcVote}
+              submitting={voting}
+            />
+          )
+        ) : userVote ? (
           <View style={[styles.votedMessage, { backgroundColor: `${colors.success}15` }]}>
             <Ionicons name="checkmark-circle" size={24} color={colors.success} />
             <Text style={[styles.votedText, { color: colors.success }]}>

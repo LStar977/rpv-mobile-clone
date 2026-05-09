@@ -5,7 +5,18 @@ import { baseNetwork } from "./base-network";
 import { log } from "./app";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { setupBadgeRoutes } from "./badge-routes";
-import { passportNFTs, activatedRidings, electoralRidingQRCodes, proposals, votes, voteTokenClaims, organizations, transactions } from "@shared/schema";
+import { passportNFTs, activatedRidings, electoralRidingQRCodes, proposals, votes, voteTokenClaims, organizations, transactions, proposalReports, userMutes } from "@shared/schema";
+import { getMemberLimit, getTierLimits, isFeatureEnabled, tierDisplayName, type OrgTier } from "@shared/tier-limits";
+import {
+  ORG_VERIFICATION_UNLOCK_PRICE_IDS,
+  ORG_VERIFICATION_UNLOCK_IAP_PRODUCT_IDS,
+  getUnlockPriceCents,
+  isOrgUnlocked,
+  markOrgUnlocked,
+  packVendorData,
+  parseVendorData,
+} from "./verificationUnlock";
+import { checkContent } from "./profanityFilter";
 import { eq, count, and, sql } from "drizzle-orm";
 import { db } from "./db";
 import { savePushToken, notifyNewProposal, notifyTokenClaimed, notifyProposalVote } from "./notifications";
@@ -103,7 +114,12 @@ function verifyDiditSignature(req: any): boolean {
 // Create a Didit verification session via their REST API. Returns the hosted
 // verification URL the mobile WebView loads, plus the session_id we persist
 // on the user record for later decision lookups.
-async function createDiditSession(userId: string, firstName?: string, lastName?: string): Promise<{ sessionId: string; sessionUrl: string }> {
+async function createDiditSession(
+  userId: string,
+  firstName?: string,
+  lastName?: string,
+  originatingOrgId?: string | null,
+): Promise<{ sessionId: string; sessionUrl: string }> {
   const apiKey = process.env.DIDIT_API_KEY;
   const workflowId = process.env.DIDIT_WORKFLOW_ID;
   if (!apiKey || !workflowId) {
@@ -114,7 +130,7 @@ async function createDiditSession(userId: string, firstName?: string, lastName?:
   const body: any = {
     workflow_id: workflowId,
     callback: callbackUrl,
-    vendor_data: userId,
+    vendor_data: packVendorData(userId, originatingOrgId ?? null),
   };
   if (firstName && lastName) {
     body.expected_details = { first_name: firstName.trim(), last_name: lastName.trim() };
@@ -225,6 +241,38 @@ async function grantInitialBallotsIfNeeded(userId: string): Promise<void> {
 
 const DAILY_BALLOT_CAP = 20;
 
+// Tier enforcement helper. Returns null if the org has room for one more
+// member; returns a 402-shaped error payload (with structured upgrade hint)
+// if at cap. The `additional` param lets the CSV importer pre-flight a batch.
+async function checkMemberCap(
+  orgId: string,
+  additional: number = 1,
+): Promise<{ ok: true } | { ok: false; status: number; body: any }> {
+  const org = await storage.getOrganization(orgId);
+  if (!org) return { ok: false, status: 404, body: { error: "Organization not found" } };
+
+  const limit = getMemberLimit(org.tier);
+  if (!Number.isFinite(limit)) return { ok: true };
+
+  const current = await storage.getOrganizationMemberCount(orgId);
+  if (current + additional > limit) {
+    return {
+      ok: false,
+      status: 402, // Payment Required — signals upgrade path
+      body: {
+        error: "Member limit reached",
+        message: `${tierDisplayName(org.tier)} plan allows up to ${limit} members. This org has ${current}; adding ${additional} would exceed the cap.`,
+        code: "MEMBER_LIMIT_EXCEEDED",
+        currentMembers: current,
+        limit,
+        tier: org.tier ?? 'starter',
+        upgradeRequired: true,
+      },
+    };
+  }
+  return { ok: true };
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // Setup OAuth authentication (Google, Apple, GitHub)
   await setupAuth(app);
@@ -234,6 +282,63 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Setup object storage routes for image uploads
   registerObjectStorageRoutes(app);
+
+  // Stripe webhook — must be reachable at https://representportal.com/api/stripe/webhook
+  // with events: invoice.paid, invoice.payment_failed, customer.subscription.updated,
+  // customer.subscription.deleted, checkout.session.completed.
+  // Raw body capture is set up in app.ts via express.json({ verify }) so req.rawBody
+  // is a Buffer of the original payload — required by stripe-replit-sync's
+  // processWebhook for HMAC verification.
+  app.post("/api/stripe/webhook", async (req: any, res: any) => {
+    try {
+      const signature = req.headers['stripe-signature'] as string | undefined;
+      if (!signature) {
+        log(`Stripe webhook rejected: missing stripe-signature header`);
+        return res.status(400).send('Missing stripe-signature header');
+      }
+      if (!req.rawBody || !Buffer.isBuffer(req.rawBody)) {
+        log(`Stripe webhook rejected: rawBody missing or not a Buffer (middleware misconfigured)`);
+        return res.status(400).send('Missing raw body');
+      }
+
+      const { WebhookHandlers } = await import('./webhookHandlers');
+      // The third arg is a de-duplication key for stripe-replit-sync. The
+      // signature is unique per delivery and known-good after verification,
+      // so it works as the dedup key without leaking anything sensitive.
+      await WebhookHandlers.processWebhook(req.rawBody, signature, signature);
+      res.json({ received: true });
+    } catch (error: any) {
+      log(`Stripe webhook error: ${error?.message || error}`);
+      res.status(400).send(`Webhook Error: ${error?.message ?? 'unknown'}`);
+    }
+  });
+
+  // App Store Server Notifications V2 — IAP analogue of the Stripe webhook
+  // above. Configure App Store Connect to point at
+  // https://representportal.com/api/iap/notifications (Production +
+  // Sandbox URLs, Version V2). Authentication is via JWS signature on the
+  // signedPayload — no shared secret header.
+  //
+  // We always return 200 (even on internal failure) because Apple retries
+  // up to 5 times over 5 days on any non-2xx response; a buggy handler
+  // would flood the system. Errors are logged for investigation.
+  app.post("/api/iap/notifications", async (req: any, res: any) => {
+    try {
+      const { signedPayload } = req.body || {};
+      if (!signedPayload || typeof signedPayload !== 'string') {
+        log(`IAP notification rejected: missing or invalid signedPayload`);
+        return res.status(400).send('Missing signedPayload');
+      }
+
+      const { IAPWebhookHandlers } = await import('./iapWebhookHandlers');
+      await IAPWebhookHandlers.processNotification(signedPayload);
+      res.status(200).send('OK');
+    } catch (error: any) {
+      log(`IAP notification error: ${error?.message ?? error}`);
+      // 200 instead of 5xx — see comment above.
+      res.status(200).send('Logged');
+    }
+  });
 
   // Push notification token registration
   app.post("/api/push-token", isAuthenticated, async (req: any, res) => {
@@ -347,7 +452,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(401).json({ error: "Unauthorized" });
     }
 
-    const { proposalId, position, selectedOption } = req.body;
+    const { proposalId, position, selectedOption, rankings } = req.body;
     if (!proposalId || !position) {
       return res.status(400).json({ error: "Missing required fields" });
     }
@@ -362,6 +467,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const user = await storage.getUser(userId);
       const proposal = await storage.getProposal(proposalId);
       const wallet = await storage.getUserWallet(userId);
+
+      // Ranked-choice voting branch. Validates the rankings against the
+      // proposal's options, stores the array as JSON in `selectedOption`,
+      // and skips the on-chain transfer + tally-counter increment paths
+      // (those are yes/no specific). The /results endpoint computes IRV
+      // at read time from the stored ballots.
+      if (position === 'ranked-choice') {
+        if (!proposal) return res.status(404).json({ error: "Proposal not found" });
+        if (proposal.voteType !== 'ranked-choice') {
+          return res.status(400).json({ error: "This proposal is not ranked-choice" });
+        }
+        if (!Array.isArray(rankings) || rankings.length === 0) {
+          return res.status(400).json({ error: "rankings must be a non-empty array" });
+        }
+        if (new Set(rankings).size !== rankings.length) {
+          return res.status(400).json({ error: "rankings must not contain duplicates" });
+        }
+        const validOptions = new Set((proposal.options ?? []) as string[]);
+        if (!rankings.every((r: any) => typeof r === 'string' && validOptions.has(r))) {
+          return res.status(400).json({ error: "rankings contains options not on this proposal" });
+        }
+        // Identity / org-membership / deadline checks are below in the
+        // shared path — call into them by short-circuiting after the
+        // rankings-specific validation.
+        if (proposal.deadline && new Date(proposal.deadline).getTime() < Date.now()) {
+          return res.status(400).json({ error: "Voting has closed for this proposal" });
+        }
+        if (proposal.organizationId) {
+          const isMember = await storage.isOrganizationMember(proposal.organizationId, userId);
+          if (!isMember) {
+            return res.status(403).json({ error: "You must be a member of this organization to vote" });
+          }
+          const proposalOrg = await storage.getOrganization(proposal.organizationId);
+          if (proposalOrg?.requireMemberVerification && !user?.verified) {
+            return res.status(403).json({
+              error: "This organization requires identity verification before voting",
+              code: "VERIFICATION_REQUIRED_BY_ORG",
+              orgId: proposal.organizationId,
+              orgName: proposalOrg.name,
+              requiresVerification: true,
+            });
+          }
+          // UPDATE 26: no per-vote billing. The org pays the one-time
+          // unlock fee at toggle-on; subsequent votes are free for the org.
+        }
+        await storage.recordVote(userId, proposalId, 'ranked-choice', undefined, null as any, JSON.stringify(rankings));
+        log(`✅ RCV ballot recorded: user=${userId}, proposal=${proposalId}, rankings=${rankings.length}`);
+        return res.json({ success: true });
+      }
 
       if (!proposal) {
         return res.status(404).json({ error: "Proposal not found" });
@@ -380,6 +534,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (!isMember) {
           return res.status(403).json({ error: "You must be a member of this organization to vote on this proposal" });
         }
+        const proposalOrg = await storage.getOrganization(proposal.organizationId);
+        if (proposalOrg?.requireMemberVerification && !user?.verified) {
+          return res.status(403).json({
+            error: "This organization requires identity verification before voting",
+            code: "VERIFICATION_REQUIRED_BY_ORG",
+            orgId: proposal.organizationId,
+            orgName: proposalOrg.name,
+            requiresVerification: true,
+          });
+        }
+        // UPDATE 26: no per-vote billing. The org pays the one-time
+        // unlock fee at toggle-on; subsequent votes are free for the org.
       } else if (!user?.verified) {
         return res.status(403).json({ error: "You must complete identity verification before voting." });
       }
@@ -685,7 +851,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get proposals endpoint (supports filtering by organizationId)
-  app.get("/api/proposals", async (req, res) => {
+  app.get("/api/proposals", async (req: any, res) => {
     try {
       const { orgId } = req.query;
       let proposals = await storage.getAllProposals();
@@ -695,9 +861,93 @@ export async function registerRoutes(app: Express): Promise<Server> {
         proposals = proposals.filter((p: any) => p.organizationId === orgId);
       }
 
+      // UPDATE 27 — UGC moderation. Hide proposals auto-flagged by the
+      // report system (hiddenAt non-null) from every requester.
+      proposals = proposals.filter((p: any) => !p.hiddenAt);
+
+      // UPDATE 27 — apply requester's mute set so muted creators' proposals
+      // disappear from the feed for that user only. Skipped for unauth'd
+      // requests (no userId, no mute set).
+      const requesterId = req.user?.claims?.sub as string | undefined;
+      if (requesterId) {
+        try {
+          const mutedRows = await db
+            .select({ mutedId: userMutes.mutedId })
+            .from(userMutes)
+            .where(eq(userMutes.muterId, requesterId));
+          if (mutedRows.length > 0) {
+            const mutedSet = new Set(mutedRows.map((r) => r.mutedId));
+            proposals = proposals.filter((p: any) => !mutedSet.has(p.userId));
+          }
+        } catch {
+          // Fail open — better to show all proposals than 5xx the feed.
+        }
+      }
+
       res.json({ proposals });
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch proposals" });
+    }
+  });
+
+  // Unified results endpoint. Branches on proposal.voteType:
+  //   yes-no          → { type, supportVotes, opposeVotes }
+  //   multiple-choice → { type, options, counts }
+  //   ranked-choice   → { type, ...RCVTally }  (computed in-process via IRV)
+  //
+  // For org-scoped proposals, requires the caller to be a member.
+  app.get("/api/proposals/:proposalId/results", isAuthenticated, async (req: any, res: any) => {
+    try {
+      const userId = req.user.claims?.sub;
+      const { proposalId } = req.params;
+      const proposal = await storage.getProposal(proposalId);
+      if (!proposal) return res.status(404).json({ error: "Proposal not found" });
+
+      if (proposal.organizationId) {
+        const isMember = await storage.isOrganizationMember(proposal.organizationId, userId);
+        if (!isMember) {
+          return res.status(403).json({ error: "You must be a member to view results" });
+        }
+      }
+
+      if (proposal.voteType === 'multiple-choice') {
+        const counts = await storage.countVotesPerOption(proposalId);
+        // Ensure every option appears in counts (even 0) so the UI can
+        // render a stable list without conditional fallbacks.
+        const options = (proposal.options ?? []) as string[];
+        const fullCounts: Record<string, number> = {};
+        for (const opt of options) fullCounts[opt] = counts[opt] ?? 0;
+        return res.json({ type: 'multiple-choice', options, counts: fullCounts });
+      }
+
+      if (proposal.voteType === 'ranked-choice') {
+        const { computeIRV } = await import('./rcvTally');
+        const rawBallots = await storage.getRankedBallots(proposalId);
+        const ballots: string[][] = [];
+        for (const raw of rawBallots) {
+          try {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed) && parsed.every(p => typeof p === 'string')) {
+              ballots.push(parsed);
+            }
+          } catch {
+            // Malformed ballot — skip. Should not happen since the submit
+            // endpoint validates JSON.stringify roundtrip, but defensive.
+          }
+        }
+        const tally = computeIRV(ballots, (proposal.options ?? []) as string[]);
+        return res.json({ type: 'ranked-choice', ...tally });
+      }
+
+      // Default: yes-no.
+      return res.json({
+        type: 'yes-no',
+        supportVotes: proposal.supportVotes ?? 0,
+        opposeVotes: proposal.opposeVotes ?? 0,
+      });
+    } catch (error: any) {
+      log(`Get proposal results error: ${error?.message ?? error}`);
+      res.status(500).json({ error: "Failed to fetch results" });
     }
   });
 
@@ -1153,6 +1403,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const { title, description, category, geoRestrictions, riding, demographicRestrictions, voteType, options, organizationId, imageUrl } = req.body;
 
+      // UPDATE 27 — UGC profanity gate (Apple Guideline 1.2). Cheap
+      // pre-publish filter; layered moderation (managed APIs, user
+      // reports, admin review) is handled separately.
+      const profanity = checkContent({ title, description });
+      if (!profanity.ok) {
+        return res.status(400).json({
+          error: "Your proposal contains language that isn't allowed. Please revise and try again.",
+          code: "CONTENT_REJECTED",
+          field: profanity.field,
+        });
+      }
+
       // Validate organization membership if creating org-restricted proposal
       if (organizationId) {
         const isMember = await storage.isOrganizationMember(organizationId, userId);
@@ -1190,6 +1452,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      // voteType validation. Defaults to yes-no for backward compatibility
+      // (existing clients don't send voteType). Mirrors the org-proposal
+      // create endpoint validation from UPDATE 20.
+      const resolvedVoteType: string = voteType || 'yes-no';
+      if (!['yes-no', 'multiple-choice', 'ranked-choice'].includes(resolvedVoteType)) {
+        return res.status(400).json({ error: "voteType must be 'yes-no', 'multiple-choice', or 'ranked-choice'" });
+      }
+      if (resolvedVoteType !== 'yes-no') {
+        if (!Array.isArray(options) || options.length < 2) {
+          return res.status(400).json({ error: `${resolvedVoteType} proposals require at least 2 options` });
+        }
+        if (options.some((o: any) => typeof o !== 'string' || o.trim().length === 0)) {
+          return res.status(400).json({ error: "options must be non-empty strings" });
+        }
+        if (new Set(options).size !== options.length) {
+          return res.status(400).json({ error: "options must be unique" });
+        }
+      }
+
       const proposal = await storage.createProposal(userId, title, description, category, geoRestrictions, undefined, riding, demographicRestrictions);
 
       // Update proposal with organization and image if provided
@@ -1201,9 +1482,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         updateData.imageUrl = imageUrl;
       }
 
-      // Update proposal with vote type and options if multiple-choice
-      if (voteType === 'multiple-choice' && options && options.length > 0) {
-        // Generate unique blockchain address for each option
+      // Persist voteType + options. Only multiple-choice gets on-chain
+      // optionAddresses (yes/no uses deterministic per-position addresses
+      // generated at vote time; ranked-choice is off-chain per UPDATE 20).
+      if (resolvedVoteType === 'multiple-choice') {
         const optionAddresses = [];
         for (let i = 0; i < options.length; i++) {
           const optionAddress = await baseNetwork.generateDeterministicAddress(proposal.id, i);
@@ -1212,6 +1494,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         updateData.voteType = 'multiple-choice';
         updateData.options = options;
         updateData.optionAddresses = optionAddresses;
+      } else if (resolvedVoteType === 'ranked-choice') {
+        updateData.voteType = 'ranked-choice';
+        updateData.options = options;
       }
 
       if (Object.keys(updateData).length > 0) {
@@ -1813,11 +2098,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(200).json({ received: true });
       }
 
-      const userId = verification.vendorData;
+      const { userId, originatingOrgId } = parseVendorData(verification.vendorData);
       const verificationId = verification.id;
       const status = verification.status;
 
-      log(`Veriff webhook: userId=${rid(userId)}, status=${status}, verificationId=${rid(verificationId)}`);
+      log(`Veriff webhook: userId=${rid(userId)}, originatingOrgId=${rid(originatingOrgId)}, status=${status}, verificationId=${rid(verificationId)}`);
 
       if (status === 'approved') {
         const person = verification.person || {};
@@ -1849,6 +2134,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         log(`Veriff webhook data: document.country=${document.country}, address.country=${address.country}`);
         await storage.updateUserVerification(userId, updateData);
         await grantInitialBallotsIfNeeded(userId);
+        // UPDATE 25: org billing has moved to vote-time. The originatingOrgId
+        // is logged above for diagnostic correlation but no longer drives
+        // a Stripe charge here.
         log(`User verified via /api/veriff/webhook: user=${rid(userId)}, verificationId=${rid(verificationId)}, country=${country}`);
       }
 
@@ -2090,7 +2378,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Create Veriff verification session
+  // Create Veriff verification session.
+  //
+  // Two flows merge here:
+  //   - Self-paid (no originatingOrgId): user previously paid via the Stripe
+  //     verification checkout; we trust the upstream gate.
+  //   - Org-paid (originatingOrgId supplied + the org has requireMemberVerification=true
+  //     + the user is a member + the org has budget room): no payment prompt,
+  //     org's saved card is charged via Stripe metered usage when the webhook
+  //     fires. vendor_data is packed as "userId|orgId" for attribution.
   app.post("/api/veriff/create-session", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims?.sub;
@@ -2108,6 +2404,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(500).json({ error: "Veriff not configured" });
       }
 
+      const originatingOrgId: string | undefined = typeof req.body?.originatingOrgId === 'string' ? req.body.originatingOrgId : undefined;
+      let attributedOrgId: string | null = null;
+      if (originatingOrgId) {
+        const org = await storage.getOrganization(originatingOrgId);
+        if (!org || !org.requireMemberVerification) {
+          return res.status(400).json({ error: "Org-paid verification not active for this organization" });
+        }
+        const isMember = await storage.isOrganizationMember(originatingOrgId, userId);
+        if (!isMember) {
+          return res.status(403).json({ error: "Not a member of this organization" });
+        }
+        attributedOrgId = originatingOrgId;
+      }
+
       const verificationId = `verify_${userId}_${Date.now()}`;
 
       const response = await fetch('https://stationapi.veriff.com/v1/sessions', {
@@ -2123,7 +2433,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               firstName: user.firstName || user.name?.split(' ')[0] || 'User',
               lastName: user.lastName || user.name?.split(' ').slice(1).join(' ') || 'Citizen',
             },
-            vendorData: userId,
+            vendorData: packVendorData(userId, attributedOrgId),
           },
         }),
       });
@@ -2167,10 +2477,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "User already verified" });
       }
 
+      // Org-paid verification branch (mirror of /api/veriff/create-session above).
+      // When originatingOrgId is supplied, the user is verifying because their
+      // org has requireMemberVerification=true. Skip the upstream payment gate
+      // (the org has paid the one-time unlock fee at toggle-on, so all
+      // member verifications are platform-absorbed), enforce membership, and
+      // pack the orgId into vendor_data for log correlation.
+      const originatingOrgId: string | undefined = typeof req.body?.originatingOrgId === 'string' ? req.body.originatingOrgId : undefined;
+      let attributedOrgId: string | null = null;
+      if (originatingOrgId) {
+        const org = await storage.getOrganization(originatingOrgId);
+        if (!org || !org.requireMemberVerification) {
+          return res.status(400).json({ error: "Org-paid verification not active for this organization" });
+        }
+        const isMember = await storage.isOrganizationMember(originatingOrgId, userId);
+        if (!isMember) {
+          return res.status(403).json({ error: "Not a member of this organization" });
+        }
+        attributedOrgId = originatingOrgId;
+      }
+
       const { sessionId, sessionUrl } = await createDiditSession(
         userId,
         user.firstName || (user.name?.split(" ")[0]),
         user.lastName || (user.name?.split(" ").slice(1).join(" ")),
+        attributedOrgId,
       );
 
       // Persist session id so check-decision and sync-location can look it up
@@ -2200,9 +2531,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
     try {
       const { session_id, status, vendor_data, decision } = req.body || {};
-      log(`Didit webhook: userId=${rid(vendor_data)}, status=${status}, sessionId=${rid(session_id)}`);
+      const { userId, originatingOrgId } = parseVendorData(vendor_data);
+      log(`Didit webhook: userId=${rid(userId)}, originatingOrgId=${rid(originatingOrgId)}, status=${status}, sessionId=${rid(session_id)}`);
 
-      if (!session_id || !vendor_data) {
+      if (!session_id || !userId) {
         return res.status(200).json({ received: true });
       }
 
@@ -2223,9 +2555,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (fields.firstName) updateData.firstName = fields.firstName;
         if (fields.lastName) updateData.lastName = fields.lastName;
 
-        await storage.updateUserVerification(vendor_data, updateData);
-        await grantInitialBallotsIfNeeded(vendor_data);
-        log(`User verified via Didit webhook: user=${rid(vendor_data)}, country=${fields.country}`);
+        await storage.updateUserVerification(userId, updateData);
+        await grantInitialBallotsIfNeeded(userId);
+        // UPDATE 25: org billing has moved to vote-time (see comment in
+        // /api/veriff/webhook above). originatingOrgId is logged for
+        // diagnostic correlation only.
+        log(`User verified via Didit webhook: user=${rid(userId)}, country=${fields.country}`);
       }
 
       res.status(200).json({ received: true });
@@ -3278,25 +3613,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Organization subscription payment intent (for mobile native payment sheet)
-  // STRIPE_PRICE_ORG_COMMUNITY is the legacy name for the Starter price ID;
-  // it stays wired as a fallback so any in-flight purchases (or
-  // grandfathered subscribers paying through old webhook events) keep
-  // resolving correctly while operators migrate to STRIPE_PRICE_ORG_STARTER.
+  // Stage 3 (UPDATE 23) tier price IDs. New customers go through these.
+  // Legacy customers (tier='legacy') keep their original Stripe
+  // subscriptions billing at the old prices — webhookHandlers.ts retains
+  // the old price ID mappings as fallback so renewal webhooks continue
+  // to validate.
   const ORG_PRICE_IDS: Record<string, string> = {
-    starter: process.env.STRIPE_PRICE_ORG_STARTER
-      || process.env.STRIPE_PRICE_ORG_COMMUNITY
-      || 'price_1SwhrED2jsTroGJyAvU4bZ4r',
-    professional: process.env.STRIPE_PRICE_ORG_PROFESSIONAL || 'price_1SwhsSD2jsTroGJyps2LHaah',
-    premium: process.env.STRIPE_PRICE_ORG_PREMIUM || '',
-    enterprise: process.env.STRIPE_PRICE_ORG_ENTERPRISE || 'price_1SwhtFD2jsTroGJylQOkB8tu',
+    pro: process.env.STRIPE_PRICE_ORG_PRO || '',
+    plus: process.env.STRIPE_PRICE_ORG_PLUS || '',
+    business: process.env.STRIPE_PRICE_ORG_BUSINESS || '',
   };
 
   const ORG_EXPECTED_AMOUNTS: Record<string, number> = {
-    starter: 2900,
-    professional: 9900,
-    premium: 29900,
-    enterprise: 9900,
+    pro: 5900,        // $59/mo
+    plus: 17900,      // $179/mo
+    business: 49900,  // $499/mo
   };
 
   app.post("/api/stripe/organization-payment-intent", isAuthenticated, async (req: any, res) => {
@@ -3308,9 +3639,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Missing tier or organizationId" });
       }
 
-      const validTiers = ['starter', 'professional', 'premium', 'enterprise'];
+      // Free is created without Stripe; Government is set by sales.
+      // Only paid self-serve tiers go through this endpoint.
+      if (tier === 'free') {
+        return res.status(400).json({ error: "Free tier doesn't require payment" });
+      }
+      if (tier === 'government') {
+        return res.status(400).json({ error: "Government tier is set by sales — contact sales@representvote.com" });
+      }
+      const validTiers = ['pro', 'plus', 'business'];
       if (!validTiers.includes(tier)) {
-        return res.status(400).json({ error: "Invalid tier" });
+        return res.status(400).json({ error: "Invalid tier. Valid: pro, plus, business" });
       }
 
       const org = await storage.getOrganization(organizationId);
@@ -3342,6 +3681,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const priceId = ORG_PRICE_IDS[tier];
+
+      // Tier-change path: org already has an active Stripe subscription.
+      // Call subscriptions.update with the new price + proration. Existing
+      // payment method on file is reused — no Payment Sheet needed.
+      // IAP-paid subs (stripeSubscriptionId starting with 'iap:') don't
+      // hit this endpoint at all; tier changes for those go through
+      // requestSubscription on the iOS side.
+      const hasActiveStripeSub =
+        org.stripeSubscriptionId &&
+        !org.stripeSubscriptionId.startsWith('iap:') &&
+        (org.subscriptionStatus === 'active' || org.subscriptionStatus === 'past_due');
+
+      if (hasActiveStripeSub) {
+        log(`Updating existing org subscription: ${org.stripeSubscriptionId} → tier=${tier}`);
+        try {
+          const existing = await stripe.subscriptions.retrieve(org.stripeSubscriptionId);
+          const itemId = existing.items.data[0]?.id;
+          if (!itemId) {
+            return res.status(500).json({ error: "Existing subscription has no items to update" });
+          }
+          const updated = await stripe.subscriptions.update(org.stripeSubscriptionId, {
+            items: [{ id: itemId, price: priceId }],
+            proration_behavior: 'create_prorations',
+            metadata: {
+              userId,
+              organizationId,
+              tier,
+              type: 'organization',
+            },
+          });
+          // Tier persists on the org row immediately so cap enforcement
+          // tracks the new tier. subscriptionStatus stays 'active' (no
+          // payment confirmation needed; existing card on file).
+          await db.update(organizations).set({
+            tier,
+            updatedAt: new Date(),
+          }).where(eq(organizations.id, organizationId));
+
+          log(`Org subscription updated: org=${organizationId}, tier=${tier}, sub=${updated.id}`);
+          return res.json({
+            updated: true,
+            tier,
+            subscriptionId: updated.id,
+          });
+        } catch (err: any) {
+          log(`Failed to update org subscription ${org.stripeSubscriptionId}: ${err?.message ?? err}`);
+          return res.status(500).json({ error: err?.message || 'Failed to update subscription' });
+        }
+      }
+
       log(`Creating org subscription: customer=${customerId}, price=${priceId}, tier=${tier}, org=${organizationId}`);
 
       const subscription = await stripe.subscriptions.create({
@@ -3405,9 +3794,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         { apiVersion: '2025-11-17.clover' as any },
       );
 
+      // Persist tier on the org row immediately so member-cap enforcement
+      // takes effect as soon as the customer confirms payment. The Stripe
+      // webhook (out of scope for Stage 1) will later flip subscriptionStatus
+      // to 'active' on invoice.payment_succeeded; until then 'pending' is
+      // correct and the cap still applies.
       await db.update(organizations).set({
         stripeSubscriptionId: subscription.id,
         stripeCustomerId: customerId,
+        tier,
+        subscriptionStatus: 'pending',
+        updatedAt: new Date(),
       }).where(eq(organizations.id, organizationId));
 
       log(`Organization payment intent created: org=${organizationId}, tier=${tier}, sub=${subscription.id}`);
@@ -3423,6 +3820,485 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const stripeParam = error.param || '';
       log(`Organization payment intent error [${stripeCode}${stripeParam ? '/' + stripeParam : ''}]: ${error.message}`);
       res.status(500).json({ error: error.message || "Failed to create organization payment intent" });
+    }
+  });
+
+  // Cancel an org's subscription. Stripe-paid subs are scheduled to end at
+  // current_period_end (user keeps access through paid period); the
+  // existing customer.subscription.deleted webhook handles the actual
+  // status flip when Stripe ends the sub. IAP-paid subs cannot be canceled
+  // server-side — Apple requires users to cancel via iOS Settings, so we
+  // return 400 with a code the client uses to deep-link Settings.
+  app.post("/api/organizations/:orgId/cancel-subscription", isAuthenticated, async (req: any, res: any) => {
+    try {
+      const userId = req.user.claims?.sub;
+      const { orgId } = req.params;
+
+      const org = await storage.getOrganization(orgId);
+      if (!org) return res.status(404).json({ error: "Organization not found" });
+
+      const members = await storage.getOrganizationMembers(orgId);
+      const isAdmin = members.some((m: any) => m.userId === userId && m.role === 'admin');
+      if (org.creatorId !== userId && !isAdmin) {
+        return res.status(403).json({ error: "Only org admins can manage billing" });
+      }
+
+      if (!org.stripeSubscriptionId || org.subscriptionStatus === 'canceled' || org.subscriptionStatus === 'free') {
+        return res.status(400).json({ error: "No active subscription to cancel" });
+      }
+
+      // IAP path — client must deep-link iOS Settings.
+      if (org.stripeSubscriptionId.startsWith('iap:')) {
+        return res.status(400).json({
+          error: "IAP subscriptions must be canceled in iOS Settings",
+          code: "IAP_CANCEL_VIA_SETTINGS",
+          settingsUrl: "https://apps.apple.com/account/subscriptions",
+        });
+      }
+
+      const { getUncachableStripeClient } = await import("./stripeClient");
+      const stripe = await getUncachableStripeClient();
+      const updated = await stripe.subscriptions.update(org.stripeSubscriptionId, {
+        cancel_at_period_end: true,
+      });
+      const effectiveAt = new Date(((updated as any).current_period_end || updated.cancel_at || 0) * 1000);
+      log(`Org subscription scheduled for cancellation: org=${orgId}, sub=${org.stripeSubscriptionId}, effectiveAt=${effectiveAt.toISOString()}`);
+      res.json({
+        canceled: true,
+        effectiveAt: effectiveAt.toISOString(),
+      });
+    } catch (error: any) {
+      log(`Cancel subscription error: ${error?.message ?? error}`);
+      res.status(500).json({ error: error?.message || "Failed to cancel subscription" });
+    }
+  });
+
+  // Returns everything the org-billing screen needs in one round trip.
+  // Members are read from the existing storage helper (Stage 1 added the
+  // count helper); verifications come from the column added in UPDATE 15
+  // (currently always 0 since incrementing isn't wired — Stage 2 work).
+  app.get("/api/organizations/:orgId/usage", isAuthenticated, async (req: any, res: any) => {
+    try {
+      const userId = req.user.claims?.sub;
+      const { orgId } = req.params;
+
+      const org = await storage.getOrganization(orgId);
+      if (!org) return res.status(404).json({ error: "Organization not found" });
+
+      const members = await storage.getOrganizationMembers(orgId);
+      const isAdmin = members.some((m: any) => m.userId === userId && m.role === 'admin');
+      if (!isAdmin && org.creatorId !== userId) {
+        return res.status(403).json({ error: "Only admins can view billing details" });
+      }
+
+      const memberCount = await storage.getOrganizationMemberCount(orgId);
+      const limits = getTierLimits(org.tier);
+
+      // Prefer the column for next-billing-date. If it's stale or missing
+      // and we have a Stripe sub, fall back to fetching from Stripe.
+      let nextBillingDate: string | null = org.subscriptionEndDate
+        ? new Date(org.subscriptionEndDate).toISOString()
+        : null;
+      let paymentProvider: 'stripe' | 'iap' | null = null;
+
+      if (org.stripeSubscriptionId?.startsWith('iap:')) {
+        paymentProvider = 'iap';
+      } else if (org.stripeSubscriptionId) {
+        paymentProvider = 'stripe';
+        if (!nextBillingDate) {
+          try {
+            const { getUncachableStripeClient } = await import("./stripeClient");
+            const stripe = await getUncachableStripeClient();
+            const sub: any = await stripe.subscriptions.retrieve(org.stripeSubscriptionId);
+            if (sub.current_period_end) {
+              nextBillingDate = new Date(sub.current_period_end * 1000).toISOString();
+            }
+          } catch (err: any) {
+            log(`getUsage: failed to fetch Stripe subscription ${org.stripeSubscriptionId}: ${err?.message ?? err}`);
+            // Non-fatal — UI will just show no date.
+          }
+        }
+      }
+
+      // Verification unlock (UPDATE 26). Binary: org has paid the one-time
+      // unlock fee, or it hasn't. No monthly counters, no overage, no budget.
+      // unlockFeeCents is the price the org would pay to unlock at the
+      // current tier (null = feature unavailable on this tier).
+      res.json({
+        tier: org.tier ?? 'free',
+        subscriptionStatus: org.subscriptionStatus ?? 'free',
+        members: {
+          current: memberCount,
+          limit: Number.isFinite(limits.members) ? limits.members : null,
+        },
+        verification: {
+          unlocked: isOrgUnlocked(org),
+          unlockedAt: org.verificationUnlockedAt ?? null,
+          unlockFeeCents: getUnlockPriceCents(org.tier),
+        },
+        requireMemberVerification: !!org.requireMemberVerification,
+        nextBillingDate,
+        paymentProvider,
+        isAdmin: true,
+      });
+    } catch (error: any) {
+      log(`Get usage error: ${error?.message ?? error}`);
+      res.status(500).json({ error: "Failed to fetch usage" });
+    }
+  });
+
+  // Toggle the org-mandated verification flag. Admin-only, Pro+ gated, and
+  // requires the one-time unlock fee to have been paid (UPDATE 26). Free
+  // tiers flipping it ON get 402/FEATURE_NOT_AVAILABLE_ON_TIER. Pro+ tiers
+  // that haven't paid the unlock get 402/VERIFICATION_UNLOCK_REQUIRED with
+  // priceCents — the mobile client routes to verification-unlock-checkout.
+  app.put("/api/organizations/:orgId/require-verification", isAuthenticated, async (req: any, res: any) => {
+    try {
+      const userId = req.user.claims?.sub;
+      const { orgId } = req.params;
+      const { require: requireFlag } = req.body;
+      if (typeof requireFlag !== 'boolean') {
+        return res.status(400).json({ error: "require must be a boolean" });
+      }
+      const org = await storage.getOrganization(orgId);
+      if (!org) return res.status(404).json({ error: "Organization not found" });
+      const members = await storage.getOrganizationMembers(orgId);
+      const isAdmin = members.some((m: any) => m.userId === userId && m.role === 'admin');
+      if (!isAdmin && org.creatorId !== userId) {
+        return res.status(403).json({ error: "Only admins can change verification settings" });
+      }
+      if (requireFlag && !isFeatureEnabled(org.tier, 'requireVerification')) {
+        return res.status(402).json({
+          error: "Required-verification mode requires Pro plan or higher",
+          code: "FEATURE_NOT_AVAILABLE_ON_TIER",
+          feature: "requireVerification",
+          tier: org.tier ?? 'free',
+          upgradeRequired: true,
+        });
+      }
+      // Government runs on a custom annual contract; ops sets unlocked
+      // status manually. All other tiers must pay the self-serve unlock.
+      const isGovernment = (org.tier ?? '') === 'government';
+      if (requireFlag && !isOrgUnlocked(org) && !isGovernment) {
+        const priceCents = getUnlockPriceCents(org.tier);
+        return res.status(402).json({
+          error: "Identity verification requires a one-time unlock fee",
+          code: "VERIFICATION_UNLOCK_REQUIRED",
+          tier: org.tier ?? 'free',
+          priceCents,
+        });
+      }
+      await db.update(organizations).set({
+        requireMemberVerification: requireFlag,
+        updatedAt: new Date(),
+      }).where(eq(organizations.id, orgId));
+      log(`Org ${orgId} requireMemberVerification → ${requireFlag}`);
+      res.json({ requireMemberVerification: requireFlag });
+    } catch (error: any) {
+      log(`Toggle require-verification error: ${error?.message ?? error}`);
+      res.status(500).json({ error: "Failed to update setting" });
+    }
+  });
+
+  // Create a Stripe Checkout session for the one-time verification unlock
+  // fee. Stripe-billed orgs only — IAP-billed orgs use the iap-receipt
+  // endpoint below. Webhook (checkout.session.completed) stamps the org
+  // unlocked when the customer completes the flow.
+  app.post("/api/organizations/:orgId/verification-unlock/checkout", isAuthenticated, async (req: any, res: any) => {
+    try {
+      const userId = req.user.claims?.sub;
+      const { orgId } = req.params;
+      const org = await storage.getOrganization(orgId);
+      if (!org) return res.status(404).json({ error: "Organization not found" });
+      const members = await storage.getOrganizationMembers(orgId);
+      const isAdmin = members.some((m: any) => m.userId === userId && m.role === 'admin');
+      if (!isAdmin && org.creatorId !== userId) {
+        return res.status(403).json({ error: "Only admins can purchase the unlock" });
+      }
+      if (isOrgUnlocked(org)) {
+        return res.status(409).json({ error: "Organization already has verification unlocked", code: "ALREADY_UNLOCKED" });
+      }
+      const tier = org.tier ?? 'free';
+      const priceCents = getUnlockPriceCents(tier);
+      const priceId = ORG_VERIFICATION_UNLOCK_PRICE_IDS[tier];
+      if (priceCents == null || !priceId) {
+        return res.status(402).json({
+          error: "Verification unlock not available on this tier (upgrade or contact sales)",
+          code: "VERIFICATION_UNLOCK_NOT_AVAILABLE",
+          tier,
+        });
+      }
+      if (!org.stripeCustomerId) {
+        return res.status(409).json({
+          error: "Organization is not on Stripe billing — use IAP receipt endpoint instead",
+          code: "ORG_NOT_ON_STRIPE",
+        });
+      }
+      const { getUncachableStripeClient } = await import("./stripeClient");
+      const stripe = await getUncachableStripeClient();
+      const baseUrl = process.env.PUBLIC_BASE_URL ?? 'https://representportal.com';
+      const session = await stripe.checkout.sessions.create({
+        mode: 'payment',
+        customer: org.stripeCustomerId,
+        payment_method_types: ['card'],
+        line_items: [{ price: priceId, quantity: 1 }],
+        success_url: `${baseUrl}/orgs/${orgId}/verification-unlock/success?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${baseUrl}/orgs/${orgId}/verification-unlock/cancel`,
+        metadata: { type: 'verification_unlock', orgId, tier },
+      });
+      log(`Verification unlock checkout created: org=${orgId} tier=${tier} session=${session.id}`);
+      res.json({ checkoutUrl: session.url, sessionId: session.id });
+    } catch (error: any) {
+      log(`Verification unlock checkout error: ${error?.message ?? error}`);
+      res.status(500).json({ error: "Failed to create checkout session" });
+    }
+  });
+
+  // Submit an Apple IAP receipt for the one-time verification unlock.
+  // The mobile client purchases the consumable IAP product, then posts the
+  // receipt + transactionId here. Server validates with Apple and stamps
+  // the org unlocked. Receipt validation reuses the existing IAP webhook
+  // path (see iapWebhookHandlers.ts) when present; otherwise we stub a
+  // minimal verifyReceipt call.
+  app.post("/api/organizations/:orgId/verification-unlock/iap-receipt", isAuthenticated, async (req: any, res: any) => {
+    try {
+      const userId = req.user.claims?.sub;
+      const { orgId } = req.params;
+      const { receiptData, productId, transactionId } = req.body ?? {};
+      if (typeof receiptData !== 'string' || typeof productId !== 'string' || typeof transactionId !== 'string') {
+        return res.status(400).json({ error: "receiptData, productId, transactionId required" });
+      }
+      const org = await storage.getOrganization(orgId);
+      if (!org) return res.status(404).json({ error: "Organization not found" });
+      const members = await storage.getOrganizationMembers(orgId);
+      const isAdmin = members.some((m: any) => m.userId === userId && m.role === 'admin');
+      if (!isAdmin && org.creatorId !== userId) {
+        return res.status(403).json({ error: "Only admins can purchase the unlock" });
+      }
+      if (isOrgUnlocked(org)) {
+        return res.status(409).json({ error: "Organization already has verification unlocked", code: "ALREADY_UNLOCKED" });
+      }
+      const tier = org.tier ?? 'free';
+      const expectedSku = ORG_VERIFICATION_UNLOCK_IAP_PRODUCT_IDS[tier];
+      if (!expectedSku) {
+        return res.status(402).json({ error: "Verification unlock not available on this tier", code: "VERIFICATION_UNLOCK_NOT_AVAILABLE", tier });
+      }
+      if (productId !== expectedSku) {
+        return res.status(400).json({
+          error: `Receipt productId mismatch (expected ${expectedSku} for ${tier}, got ${productId})`,
+          code: "PRODUCT_TIER_MISMATCH",
+        });
+      }
+      const sharedSecret = process.env.APPLE_SHARED_SECRET;
+      if (!sharedSecret) {
+        log("APPLE_SHARED_SECRET not configured; cannot validate IAP receipt");
+        return res.status(500).json({ error: "IAP receipt validation not configured" });
+      }
+      // Validate against Apple. Try production first; if status=21007, retry
+      // against sandbox (Apple's documented sandbox-fallback pattern).
+      const validate = async (url: string) => {
+        const r = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 'receipt-data': receiptData, password: sharedSecret, 'exclude-old-transactions': true }),
+        });
+        return r.json() as Promise<any>;
+      };
+      let body = await validate('https://buy.itunes.apple.com/verifyReceipt');
+      if (body?.status === 21007) {
+        body = await validate('https://sandbox.itunes.apple.com/verifyReceipt');
+      }
+      if (body?.status !== 0) {
+        log(`IAP receipt validation failed for org=${orgId}: status=${body?.status}`);
+        return res.status(400).json({ error: "Receipt validation failed", appleStatus: body?.status });
+      }
+      // Confirm the receipt actually contains a transaction for the
+      // expected product + transactionId. in_app holds the latest
+      // transactions for consumables.
+      const inApp: any[] = body?.receipt?.in_app ?? body?.latest_receipt_info ?? [];
+      const match = inApp.find((tx: any) => tx.product_id === expectedSku && tx.transaction_id === transactionId);
+      if (!match) {
+        log(`IAP receipt validated but no matching transaction for org=${orgId} sku=${expectedSku} txn=${transactionId}`);
+        return res.status(400).json({ error: "Receipt does not contain the expected transaction" });
+      }
+      await markOrgUnlocked(orgId, tier, transactionId, 'apple_iap');
+      const refreshed = await storage.getOrganization(orgId);
+      res.json({ verificationUnlockedAt: refreshed?.verificationUnlockedAt ?? null });
+    } catch (error: any) {
+      log(`Verification unlock IAP receipt error: ${error?.message ?? error}`);
+      res.status(500).json({ error: "Failed to validate IAP receipt" });
+    }
+  });
+
+  // GET /api/organizations/:orgId/audit-log — tamper-evident export of every
+  // vote on every proposal in the org. Each row carries an HMAC signature
+  // over a canonical serialization; the bundle as a whole carries a
+  // bundle signature. Premium+ feature.
+  //
+  // Verification flow (manual): an external auditor recomputes
+  //   HMAC-SHA256(AUDIT_SIGNING_SECRET, canonicalRow)
+  // for any row and confirms it matches the rowSignature column. If yes,
+  // the row hasn't been altered since export.
+  //
+  // Query params:
+  //   format = 'csv' (default) | 'json'
+  //   include_voter_identity = 'false' (default) | 'true'
+  app.get("/api/organizations/:orgId/audit-log", isAuthenticated, async (req: any, res: any) => {
+    try {
+      const userId = req.user.claims?.sub;
+      const { orgId } = req.params;
+      const format = (req.query.format === 'json' ? 'json' : 'csv') as 'csv' | 'json';
+      const includeVoterIdentity = req.query.include_voter_identity === 'true';
+
+      const org = await storage.getOrganization(orgId);
+      if (!org) return res.status(404).json({ error: "Organization not found" });
+
+      const members = await storage.getOrganizationMembers(orgId);
+      const isAdmin = members.some((m: any) => m.userId === userId && m.role === 'admin');
+      if (!isAdmin && org.creatorId !== userId) {
+        return res.status(403).json({ error: "Only admins can export the audit log" });
+      }
+
+      if (!isFeatureEnabled(org.tier, 'auditLogExport')) {
+        return res.status(402).json({
+          error: "Audit log export requires Premium plan or higher",
+          code: "FEATURE_NOT_AVAILABLE_ON_TIER",
+          feature: "auditLogExport",
+          tier: org.tier ?? 'starter',
+          upgradeRequired: true,
+        });
+      }
+
+      const auditSecret = process.env.AUDIT_SIGNING_SECRET;
+      if (!auditSecret) {
+        log(`AUDIT_SIGNING_SECRET not set; cannot sign export for org=${orgId}`);
+        return res.status(500).json({ error: "Audit signing not configured on server" });
+      }
+      const voterSalt = process.env.AUDIT_VOTER_SALT || 'represent-default-voter-salt-rotate-me';
+
+      const rows = await storage.getOrgAuditLog(orgId);
+
+      // Hash voter IDs when identity not requested. Same input always
+      // produces the same hash so an admin can correlate one voter
+      // across multiple proposals without seeing email/name.
+      const hashVoterId = (voterId: string) =>
+        createHmac('sha256', voterSalt).update(voterId).digest('hex').slice(0, 16);
+
+      const exportId = randomUUID();
+      const exportedAt = new Date().toISOString();
+      const rowCount = rows.length;
+
+      // Canonical serialization for per-row signing. Pipe-delimited so
+      // empty fields are unambiguous. ISO timestamps for stable sort.
+      const canonicalRow = (r: any) => [
+        r.voteId,
+        r.proposalId,
+        r.voterId, // already hashed if includeVoterIdentity=false
+        r.position,
+        r.selectedOption ?? '',
+        r.castAt ? r.castAt.toISOString() : '',
+        r.voteTokenId ?? '',
+        r.txHash ?? '',
+      ].join('|');
+
+      const signedRows = rows.map((r) => {
+        const displayVoterId = includeVoterIdentity ? r.voterId : hashVoterId(r.voterId);
+        const rowForSig = { ...r, voterId: displayVoterId };
+        const rowSignature = createHmac('sha256', auditSecret)
+          .update(canonicalRow(rowForSig))
+          .digest('hex');
+        return {
+          voteId: r.voteId,
+          proposalId: r.proposalId,
+          proposalTitle: r.proposalTitle,
+          proposalCreatedAt: r.proposalCreatedAt ? r.proposalCreatedAt.toISOString() : null,
+          proposalDeadline: r.proposalDeadline ? r.proposalDeadline.toISOString() : null,
+          voterId: displayVoterId,
+          voterEmail: includeVoterIdentity ? r.voterEmail : null,
+          voterName: includeVoterIdentity ? r.voterName : null,
+          voterVerified: r.voterVerified,
+          position: r.position,
+          selectedOption: r.selectedOption,
+          voteTokenId: r.voteTokenId,
+          txHash: r.txHash,
+          castAt: r.castAt ? r.castAt.toISOString() : null,
+          rowSignature,
+        };
+      });
+
+      // Bundle signature covers the header context + concatenated row sigs.
+      // Tampering with row order or inserting/removing rows breaks this.
+      const headerCanonical = `${exportId}|${exportedAt}|${userId}|${orgId}|${rowCount}`;
+      const sigsConcat = signedRows.map((r: any) => r.rowSignature).join('');
+      const bundleSignature = createHmac('sha256', auditSecret)
+        .update(headerCanonical + sigsConcat)
+        .digest('hex');
+
+      res.setHeader('X-Audit-Export-Id', exportId);
+      res.setHeader('X-Audit-Bundle-Signature', bundleSignature);
+
+      if (format === 'json') {
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        res.setHeader('Content-Disposition', `attachment; filename="audit-log-${orgId}-${exportedAt}.json"`);
+        return res.json({
+          exportId,
+          exportedAt,
+          exportedBy: userId,
+          orgId,
+          orgName: org.name,
+          rowCount,
+          includeVoterIdentity,
+          bundleSignature,
+          rows: signedRows,
+        });
+      }
+
+      // CSV path. Hand-roll to avoid pulling in a CSV library on the
+      // backend; values are escaped with the standard double-quote rule.
+      const csvEscape = (v: any): string => {
+        if (v === null || v === undefined) return '';
+        const s = String(v);
+        if (/[",\n\r]/.test(s)) {
+          return `"${s.replace(/"/g, '""')}"`;
+        }
+        return s;
+      };
+      const headerCols = [
+        'vote_id', 'proposal_id', 'proposal_title', 'proposal_created_at',
+        'proposal_deadline', 'voter_id', 'voter_email', 'voter_name',
+        'voter_verified', 'position', 'selected_option', 'vote_token_id',
+        'tx_hash', 'cast_at', 'row_signature',
+      ];
+      const dataLines = signedRows.map((r: any) => [
+        r.voteId, r.proposalId, r.proposalTitle, r.proposalCreatedAt,
+        r.proposalDeadline, r.voterId, r.voterEmail ?? '', r.voterName ?? '',
+        r.voterVerified ? 'true' : 'false',
+        r.position, r.selectedOption ?? '', r.voteTokenId ?? '',
+        r.txHash ?? '', r.castAt, r.rowSignature,
+      ].map(csvEscape).join(','));
+
+      // Footer carries the bundle metadata so the file is self-contained
+      // even without the response headers (e.g. if email-forwarded).
+      const footerComment = [
+        `# audit-log export`,
+        `# export_id=${exportId}`,
+        `# exported_at=${exportedAt}`,
+        `# exported_by=${userId}`,
+        `# org_id=${orgId}`,
+        `# row_count=${rowCount}`,
+        `# include_voter_identity=${includeVoterIdentity}`,
+        `# bundle_signature=${bundleSignature}`,
+      ].join('\n');
+
+      const csv = [headerCols.join(','), ...dataLines, footerComment].join('\n');
+
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename="audit-log-${orgId}-${exportedAt}.csv"`);
+      res.send(csv);
+      log(`Audit log exported: org=${orgId}, admin=${userId}, format=${format}, rows=${rowCount}, identity=${includeVoterIdentity}`);
+    } catch (error: any) {
+      log(`Audit log export error: ${error?.message ?? error}`);
+      res.status(500).json({ error: "Failed to export audit log" });
     }
   });
 
@@ -3462,6 +4338,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const isMember = await storage.isOrganizationMember(org.id, userId);
       if (isMember) return res.status(400).json({ error: "You are already a member of this organization" });
+
+      const cap = await checkMemberCap(org.id, 1);
+      if (!cap.ok) return res.status(cap.status).json(cap.body);
 
       await storage.addOrganizationMember(org.id, userId, 'member');
 
@@ -3559,6 +4438,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      const cap = await checkMemberCap(orgId, 1);
+      if (!cap.ok) return res.status(cap.status).json(cap.body);
+
       await storage.addOrganizationMember(orgId, userId, 'member');
       log(`✅ User ${userId} joined organization ${orgId}`);
       res.json({ success: true, message: "Successfully joined organization" });
@@ -3586,6 +4468,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (isMember) {
         return res.status(400).json({ error: "You are already a member of this organization" });
       }
+
+      const cap = await checkMemberCap(org.id, 1);
+      if (!cap.ok) return res.status(cap.status).json(cap.body);
 
       await storage.addOrganizationMember(org.id, userId, 'member');
       log(`✅ User ${userId} joined organization ${org.id} via invite code`);
@@ -3923,10 +4808,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.claims?.sub;
       const { orgId } = req.params;
-      const { title, description, category, isOfficial } = req.body;
+      const { title, description, category, isOfficial, voteType, options } = req.body;
 
       if (!title || !description || !category) {
         return res.status(400).json({ error: "title, description, and category are required" });
+      }
+
+      // voteType validation. Defaults to yes-no for backward compatibility
+      // (existing clients don't send voteType).
+      const resolvedVoteType: string = voteType || 'yes-no';
+      if (!['yes-no', 'multiple-choice', 'ranked-choice'].includes(resolvedVoteType)) {
+        return res.status(400).json({ error: "voteType must be 'yes-no', 'multiple-choice', or 'ranked-choice'" });
+      }
+      if (resolvedVoteType !== 'yes-no') {
+        if (!Array.isArray(options) || options.length < 2) {
+          return res.status(400).json({ error: `${resolvedVoteType} proposals require at least 2 options` });
+        }
+        if (options.some((o: any) => typeof o !== 'string' || o.trim().length === 0)) {
+          return res.status(400).json({ error: "options must be non-empty strings" });
+        }
+        if (new Set(options).size !== options.length) {
+          return res.status(400).json({ error: "options must be unique" });
+        }
       }
 
       const org = await storage.getOrganization(orgId);
@@ -3942,13 +4845,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const proposal = await storage.createProposal(userId, title, description, category, [], undefined, undefined, {});
-      const updateData: any = { organizationId: orgId };
+      const updateData: any = {
+        organizationId: orgId,
+        voteType: resolvedVoteType,
+      };
+      if (resolvedVoteType !== 'yes-no') updateData.options = options;
       if (isOfficial && isAdmin) updateData.isOfficial = true;
       await storage.updateProposal(proposal.id, updateData);
 
       const updated = await storage.getProposal(proposal.id);
-      log(`✅ Org proposal created: ${proposal.id} in org ${orgId}`);
-      // Return proposal object directly (not wrapped) to match mobile ApiResponse<OrganizationProposal>
+      log(`✅ Org proposal created: ${proposal.id} in org ${orgId}, voteType=${resolvedVoteType}`);
       res.status(201).json(updated);
     } catch (error: any) {
       log(`Error creating org proposal: ${error.message}`);
@@ -4142,6 +5048,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const members = await storage.getOrganizationMembers(orgId);
       const isAdmin = members.some((m: any) => m.userId === userId && m.role === 'admin');
       if (!isAdmin) return res.status(403).json({ error: "Only admins can import members" });
+
+      // Tier gate: CSV bulk import is a Professional+ feature. Starter orgs
+      // must use single-invite or invite-code flows. Marketing-aligned.
+      if (!isFeatureEnabled(org.tier, 'csvImport')) {
+        return res.status(402).json({
+          error: "CSV roster import requires Professional plan or higher",
+          code: "FEATURE_NOT_AVAILABLE_ON_TIER",
+          feature: "csvImport",
+          tier: org.tier ?? 'starter',
+          upgradeRequired: true,
+        });
+      }
+
+      // Pre-flight member cap. Worst-case headroom — if every row is unique
+      // and accepts, the org would gain `rows.length` members. Use that
+      // upper bound for the check; under-estimates of headroom are fine
+      // (we'd allow it when we shouldn't). Over-estimates of need would
+      // wrongly block, but the validate/dedupe stages below shrink the
+      // batch only — never grow it — so this is safe.
+      const cap = await checkMemberCap(orgId, rows.length);
+      if (!cap.ok) return res.status(cap.status).json(cap.body);
 
       // Stage 1: validate + dedupe
       type Row = { email: string; firstName?: string; lastName?: string; role?: string; metadata?: any };
@@ -4357,6 +5284,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Already a member? Silently mark accepted and succeed (idempotent).
       const alreadyMember = await storage.isOrganizationMember(invite.organizationId, userId);
       if (!alreadyMember) {
+        const cap = await checkMemberCap(invite.organizationId, 1);
+        if (!cap.ok) return res.status(cap.status).json(cap.body);
         await storage.addOrganizationMember(invite.organizationId, userId, invite.role || 'member');
       }
       await storage.markInviteAccepted(invite.id);
@@ -4443,6 +5372,146 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ─── Apple In-App Purchase (IAP) receipt validation ─────────────────────────
   // Mobile (lib/iap.ts) POSTs { receipt, productId, organizationId? } here
   // after a successful App Store purchase. We verify the receipt with Apple,
+  // ─── UPDATE 27 — UGC moderation (Apple Guideline 1.2) ────────────────
+  //
+  // Five endpoints + a server-side report counter + auto-hide threshold.
+  // Mobile UI shipped earlier in components/moderation/ProposalModerationMenu
+  // and lib/moderation.ts; the API client lives at lib/api.ts moderationApi.
+  // Until these endpoints landed, the client swallowed 404s and showed
+  // soft-success — those stubs are removed in lib/api.ts.
+
+  // Fixed reason enum. Mirror in lib/api.ts ReportReason.
+  const REPORT_REASONS = new Set([
+    "spam", "hate_speech", "threat", "sexual", "illegal", "misinformation", "other",
+  ]);
+  // Auto-hide threshold. Once reportCount >= AUTO_HIDE_AT and hiddenAt is
+  // null, stamp hiddenAt = now() so the proposal disappears from listings.
+  // Admin review can clear hiddenAt to restore.
+  const AUTO_HIDE_AT = 3;
+
+  // POST /api/proposals/:proposalId/report — submit a report against a
+  // proposal. One row per submission; reporter can submit multiple times
+  // but each fires admin email + counter increment (let admin dedupe).
+  app.post("/api/proposals/:proposalId/report", isAuthenticated, async (req: any, res) => {
+    try {
+      const reporterId = req.user.claims?.sub;
+      if (!reporterId) return res.status(401).json({ error: "Unauthorized" });
+      const { proposalId } = req.params;
+      const { reason, note } = req.body ?? {};
+      if (typeof reason !== "string" || !REPORT_REASONS.has(reason)) {
+        return res.status(400).json({ error: "Invalid reason" });
+      }
+      const trimmedNote = typeof note === "string" ? note.slice(0, 500) : null;
+
+      const proposal = await storage.getProposal(proposalId);
+      if (!proposal) return res.status(404).json({ error: "Proposal not found" });
+
+      await db.insert(proposalReports).values({
+        proposalId,
+        reporterId,
+        reason,
+        note: trimmedNote,
+      });
+
+      // Increment counter; auto-hide once threshold hits.
+      const newCount = (proposal.reportCount ?? 0) + 1;
+      const shouldHide = newCount >= AUTO_HIDE_AT && !proposal.hiddenAt;
+      await db.update(proposals).set({
+        reportCount: newCount,
+        ...(shouldHide ? { hiddenAt: new Date() } : {}),
+      }).where(eq(proposals.id, proposalId));
+
+      // Best-effort admin email. Don't fail the request if email is down.
+      try {
+        const adminEmail = process.env.MODERATION_ADMIN_EMAIL;
+        if (adminEmail) {
+          const text =
+            `Proposal: ${proposalId} — ${proposal.title}\n` +
+            `Reporter: ${reporterId}\n` +
+            `Reason: ${reason}\n` +
+            `Reports total: ${newCount}\n` +
+            `Auto-hidden: ${shouldHide ? "yes" : "no"}\n\n` +
+            `Note:\n${trimmedNote ?? "(none)"}\n`;
+          await sendEmail({
+            to: adminEmail,
+            subject: `[Represent] Proposal report: ${reason}${shouldHide ? " (auto-hidden)" : ""}`,
+            html: `<pre style="font-family:monospace;font-size:13px;">${text.replace(/[<>&]/g, (c) => ({"<":"&lt;",">":"&gt;","&":"&amp;"}[c]!))}</pre>`,
+            text,
+          });
+        }
+      } catch (e: any) {
+        log(`moderation report email failed: ${e?.message ?? e}`);
+      }
+
+      log(`Proposal report: proposal=${proposalId} reporter=${reporterId} reason=${reason} count=${newCount} hidden=${shouldHide}`);
+      res.json({ ok: true, hidden: shouldHide });
+    } catch (error: any) {
+      log(`Proposal report error: ${error?.message ?? error}`);
+      res.status(500).json({ error: "Failed to submit report" });
+    }
+  });
+
+  // POST /api/users/:userId/mute — server-side mute. Survives reinstall,
+  // syncs across devices. Idempotent — second mute is a no-op via the
+  // (muterId, mutedId) unique constraint.
+  app.post("/api/users/:userId/mute", isAuthenticated, async (req: any, res) => {
+    try {
+      const muterId = req.user.claims?.sub;
+      if (!muterId) return res.status(401).json({ error: "Unauthorized" });
+      const { userId: mutedId } = req.params;
+      if (mutedId === muterId) {
+        return res.status(400).json({ error: "Cannot mute yourself" });
+      }
+      try {
+        await db.insert(userMutes).values({ muterId, mutedId });
+      } catch (e: any) {
+        // Unique constraint hit on (muterId, mutedId) — already muted.
+        // Accept idempotently.
+        if (!String(e?.message ?? "").toLowerCase().includes("unique")) throw e;
+      }
+      res.json({ ok: true });
+    } catch (error: any) {
+      log(`Mute error: ${error?.message ?? error}`);
+      res.status(500).json({ error: "Failed to mute user" });
+    }
+  });
+
+  // DELETE /api/users/:userId/mute — unmute. Idempotent — deleting a
+  // non-existent edge succeeds silently.
+  app.delete("/api/users/:userId/mute", isAuthenticated, async (req: any, res) => {
+    try {
+      const muterId = req.user.claims?.sub;
+      if (!muterId) return res.status(401).json({ error: "Unauthorized" });
+      const { userId: mutedId } = req.params;
+      await db.delete(userMutes).where(
+        and(eq(userMutes.muterId, muterId), eq(userMutes.mutedId, mutedId)),
+      );
+      res.json({ ok: true });
+    } catch (error: any) {
+      log(`Unmute error: ${error?.message ?? error}`);
+      res.status(500).json({ error: "Failed to unmute user" });
+    }
+  });
+
+  // GET /api/user/mutes — return the requester's mute list as an array of
+  // muted user IDs. Mobile lib/moderation.ts calls this on auth and caches.
+  app.get("/api/user/mutes", isAuthenticated, async (req: any, res) => {
+    try {
+      const muterId = req.user.claims?.sub;
+      if (!muterId) return res.status(401).json({ error: "Unauthorized" });
+      const rows = await db
+        .select({ mutedId: userMutes.mutedId })
+        .from(userMutes)
+        .where(eq(userMutes.muterId, muterId));
+      res.json({ mutedUsers: rows.map((r) => r.mutedId) });
+    } catch (error: any) {
+      log(`Get mutes error: ${error?.message ?? error}`);
+      res.status(500).json({ error: "Failed to fetch mute list" });
+    }
+  });
+
+  // ───────────────────────────────────────────────────────────────────
+
   // map the productId to a feature, and update the user/org subscription
   // state. Idempotent on Apple's transaction_id.
   //
@@ -4525,10 +5594,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await storage.updateUser(userId, { verificationPaid: true } as any);
       } else if (productId === 'com.representwallet.app.premium') {
         productType = 'premium';
+        // Write iapOriginalTransactionId to the dedicated column so the
+        // App Store Server Notifications V2 webhook can find this user
+        // by Apple's originalTransactionId on renewal/refund/cancel events.
+        // The legacy stripeSubscriptionId 'iap:' prefix is kept for now
+        // for backward compatibility with any existing readers — both
+        // columns track the same value until the prefix is fully retired.
         await storage.updateUser(userId, {
           subscriptionStatus: 'active',
           subscriptionEndDate: expiresAt,
           stripeSubscriptionId: `iap:${originalTxId}`,
+          iapOriginalTransactionId: originalTxId,
+          iapEnvironment: appleResponse.environment,
         } as any);
       } else if (productId.startsWith('com.representwallet.app.org.')) {
         productType = 'organization';
@@ -4543,6 +5620,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await db.update(organizations).set({
           subscriptionStatus: 'active',
           stripeSubscriptionId: `iap:${originalTxId}`,
+          iapOriginalTransactionId: originalTxId,
+          iapEnvironment: appleResponse.environment,
         }).where(eq(organizations.id, organizationId));
       } else if (productId.startsWith('com.representwallet.app.ballots.')) {
         // Ballot packs were retired in favor of the daily-allowance model.

@@ -91,7 +91,7 @@ export async function fetchPremiumPaymentIntent(token: string | null): Promise<P
  */
 export async function fetchOrganizationPaymentIntent(
   token: string | null,
-  tier: 'starter' | 'professional' | 'premium' | 'enterprise',
+  tier: 'pro' | 'plus' | 'business',
   organizationId: string
 ): Promise<PaymentIntentResponse & { paymentIntentId?: string; subscriptionId?: string }> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };

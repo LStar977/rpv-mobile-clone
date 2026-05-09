@@ -1,6 +1,6 @@
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
@@ -17,9 +17,23 @@ const VERIFICATION_BENEFITS = [
 export default function VerificationPaymentScreen() {
   const { colors } = useTheme();
 
+  // UPDATE 24: when navigated from a verify-required org, the route carries
+  // originatingOrgId + (optional) originatingOrgName. The screen swaps the
+  // self-pay copy for an org-paid banner and threads orgId through to the
+  // /modals/veriff session-create call.
+  const params = useLocalSearchParams<{ originatingOrgId?: string; originatingOrgName?: string }>();
+  const originatingOrgId = typeof params.originatingOrgId === 'string' && params.originatingOrgId.length > 0
+    ? params.originatingOrgId : undefined;
+  const originatingOrgName = typeof params.originatingOrgName === 'string' && params.originatingOrgName.length > 0
+    ? params.originatingOrgName : undefined;
+  const isOrgPaid = !!originatingOrgId;
+
   const handleStartVerification = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    router.replace('/modals/veriff');
+    router.replace({
+      pathname: '/modals/veriff',
+      params: originatingOrgId ? { originatingOrgId } : {},
+    });
   };
 
   const handleViewPremium = () => {
@@ -41,15 +55,21 @@ export default function VerificationPaymentScreen() {
         {/* Hero Section */}
         <Animated.View entering={FadeInDown.duration(400)} style={styles.heroSection}>
           <View style={[styles.priceContainer, { backgroundColor: `${colors.success}15` }]}>
-            <Text style={[styles.priceAmount, { color: colors.success }]}>Free</Text>
-            <Text style={[styles.priceLabel, { color: colors.textSecondary }]}>forever</Text>
+            <Text style={[styles.priceAmount, { color: colors.success }]}>
+              {isOrgPaid ? 'Covered' : 'Free'}
+            </Text>
+            <Text style={[styles.priceLabel, { color: colors.textSecondary }]}>
+              {isOrgPaid ? `by ${originatingOrgName ?? 'your organization'}` : 'forever'}
+            </Text>
           </View>
 
           <Text style={[styles.heroTitle, { color: colors.text }]}>
-            Unlock Full Voting Access
+            {isOrgPaid ? 'Verify to vote in this organization' : 'Unlock Full Voting Access'}
           </Text>
           <Text style={[styles.heroSubtitle, { color: colors.textSecondary }]}>
-            Verify your identity once to participate in all proposals in your region.
+            {isOrgPaid
+              ? `${originatingOrgName ?? 'Your organization'} requires identity verification before voting. Your verification is covered — no payment needed.`
+              : 'Verify your identity once to participate in all proposals in your region.'}
           </Text>
         </Animated.View>
 
@@ -82,7 +102,9 @@ export default function VerificationPaymentScreen() {
           </Text>
         </Animated.View>
 
-        {/* Premium Upsell */}
+        {/* Premium Upsell — hidden in the org-paid flow (the user isn't
+            paying, the org is, so the cross-sell would just confuse). */}
+        {!isOrgPaid && (
         <Animated.View
           entering={FadeInUp.delay(450).duration(400)}
           style={[styles.upsellCard, { backgroundColor: colors.surface, borderColor: colors.gold }]}
@@ -111,6 +133,7 @@ export default function VerificationPaymentScreen() {
             <Ionicons name="chevron-forward" size={16} color={colors.gold} />
           </TouchableOpacity>
         </Animated.View>
+        )}
 
         <View style={{ height: 140 }} />
       </ScrollView>

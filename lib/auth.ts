@@ -282,7 +282,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
               country: data.user.country || null,
               state: data.user.state || null,
               city: data.user.city || null,
-              verified: data.user.verified || false,
+              verified: !!(data.user.verified || data.user.isVerified || data.user.is_verified || data.user.kycVerified || data.user.kyc_verified || data.user.passport_verified),
             };
             
             // Update cached user with fresh data

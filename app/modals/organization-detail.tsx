@@ -10,6 +10,7 @@ import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuthStore } from '../../lib/auth';
 import { organizationsApi, Organization, OrganizationProposal } from '../../lib/api';
+import { UpgradeModal } from '../../components/ui/UpgradeModal';
 
 // ─── design tokens (matches PassportCard / Groups dossier) ────────────
 const O_GOLD = '#EABA58';
@@ -138,7 +139,9 @@ function VerifiedTick({ size = 14 }: { size?: number }) {
 }
 
 function TierSeal({ tier, size = 36 }: { tier: Organization['tier']; size?: number }) {
-  const isCommunity = tier !== 'professional';
+  // 'plus' is the new ladder position that was 'professional' before
+  // Stage 3 — gold seal goes to plus or business (sophisticated tiers).
+  const isCommunity = tier !== 'plus' && tier !== 'business';
   const ring = isCommunity ? O_LINE_STRONG : O_GOLD_D;
   const inner = isCommunity ? '#16191D' : '#1A1612';
   const glyph = isCommunity ? O_FG_MUTED : O_GOLD_L;
@@ -255,8 +258,11 @@ function TopBar({ title, isAdmin, onBack, onOverflow, insetTop }: { title: strin
 }
 
 // ─── hero ─────────────────────────────────────────────────────────────
-function Hero({ org, proposalCount }: { org: Organization; proposalCount: number }) {
-  const memberCount = org.memberCount ?? 0;
+function Hero({ org, proposalCount, actualMemberCount }: { org: Organization; proposalCount: number; actualMemberCount: number }) {
+  // The deployed backend doesn't always increment org.memberCount when a
+  // user accepts an invite, so prefer the larger of the two when we've
+  // actually loaded the members list.
+  const memberCount = Math.max(org.memberCount ?? 0, actualMemberCount);
   const memberLabel = `${memberCount.toLocaleString()} ${memberCount === 1 ? 'member' : 'members'}`;
   const isAdmin = org.role === 'admin';
 
@@ -463,8 +469,99 @@ function SettingsRow({ label, value, mono, gold, onPress, action }: {
   );
 }
 
+// UPDATE 26 — admin-only verification settings card.
+// Toggle controls whether members must complete Veriff/Didit before voting
+// in this org. Toggling ON requires the org to have paid the one-time
+// tier-priced unlock fee ($199/$499/$999). If unpaid, we route to the
+// verification-unlock-checkout modal; if paid, the toggle just flips.
+// Free orgs flipping it ON get the existing UpgradeModal (Pro+ only).
+function VerificationSettingsCard({ org, onUpgradePrompt, onOrgUpdated }: {
+  org: Organization;
+  onUpgradePrompt: () => void;
+  onOrgUpdated: (patch: Partial<Organization>) => void;
+}) {
+  const [enabled, setEnabled] = useState<boolean>(!!org.requireMemberVerification);
+  const [savingToggle, setSavingToggle] = useState(false);
+  const isUnlocked = !!org.verificationUnlockedAt;
+
+  // Re-sync local state when org prop changes (e.g., after refresh / unlock).
+  useEffect(() => {
+    setEnabled(!!org.requireMemberVerification);
+  }, [org.requireMemberVerification]);
+
+  const handleToggle = async (next: boolean) => {
+    setEnabled(next); // optimistic
+    setSavingToggle(true);
+    try {
+      const result = await organizationsApi.setRequireVerification(org.id, next);
+      if (result.error) {
+        setEnabled(!next); // revert
+        if (result.errorCode === 'FEATURE_NOT_AVAILABLE_ON_TIER') {
+          onUpgradePrompt();
+          return;
+        }
+        if (result.errorCode === 'VERIFICATION_UNLOCK_REQUIRED') {
+          // Admin tried to flip ON but hasn't paid the unlock. Route to the
+          // unlock-checkout modal; on successful unlock the modal flips
+          // requireMemberVerification ON itself before dismissing.
+          router.push({
+            pathname: '/modals/verification-unlock-checkout',
+            params: { orgId: org.id },
+          });
+          return;
+        }
+        Alert.alert('Error', result.error);
+        return;
+      }
+      onOrgUpdated({ requireMemberVerification: next });
+    } finally {
+      setSavingToggle(false);
+    }
+  };
+
+  const unlockedCaption = isUnlocked && org.verificationUnlockedAt
+    ? `Unlocked ${formatRomanDate(org.verificationUnlockedAt)}`
+    : null;
+
+  return (
+    <View style={{ backgroundColor: O_BG_CARD, borderWidth: 1, borderColor: O_LINE, borderRadius: 12, overflow: 'hidden', marginBottom: 14 }}>
+      <View style={{ paddingHorizontal: 14, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: O_LINE, backgroundColor: O_BG_RAISED }}>
+        <Text style={{ fontSize: 11, color: O_FG_MUTED, letterSpacing: -0.05, fontWeight: '600' }}>Verification</Text>
+      </View>
+      <View style={{
+        paddingHorizontal: 14, paddingVertical: 13,
+        flexDirection: 'row', alignItems: 'center', gap: 12,
+      }}>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text style={{ fontSize: 8.5, fontWeight: '600', letterSpacing: 2, textTransform: 'uppercase', color: O_FG_FAINT, marginBottom: 3 }}>
+            Require verification
+          </Text>
+          <Text style={{ fontSize: 13, color: O_FG, lineHeight: 18 }}>
+            Members must complete identity check before voting.
+          </Text>
+          <Text style={{ fontSize: 11, color: O_FG_FAINT, marginTop: 4, lineHeight: 15 }}>
+            {isUnlocked
+              ? 'Verification covered for your members at no per-vote cost.'
+              : 'Pro plan or higher · One-time unlock fee.'}
+          </Text>
+          {unlockedCaption && (
+            <Text style={{ fontSize: 11, color: O_GOLD, marginTop: 4, fontFamily: MONO, letterSpacing: 0.3 }}>
+              {unlockedCaption}
+            </Text>
+          )}
+        </View>
+        {savingToggle ? (
+          <ActivityIndicator size="small" color={O_FG_MUTED} />
+        ) : (
+          <Switch value={enabled} onValueChange={handleToggle} />
+        )}
+      </View>
+    </View>
+  );
+}
+
 function SettingsSection({
-  org, inviteCodes, generating, onCopy, onGenerate, onRevoke, onLeave, canDelete, onDelete,
+  org, inviteCodes, generating, onCopy, onGenerate, onRevoke, onLeave, canDelete, onDelete, actualMemberCount, onUpgradePrompt, onOrgUpdated,
 }: {
   org: Organization;
   inviteCodes: any[];
@@ -475,11 +572,21 @@ function SettingsSection({
   onLeave: () => void;
   canDelete: boolean;
   onDelete: () => void;
+  actualMemberCount: number;
+  onUpgradePrompt: () => void;
+  onOrgUpdated: (patch: Partial<Organization>) => void;
 }) {
   const activeCode = inviteCodes.find((c) => !c.revokedAt && (!c.expiresAt || new Date(c.expiresAt).getTime() > Date.now())) || inviteCodes[0];
   const codeText = activeCode?.code || activeCode?.inviteCode || 'NO·ACTIVE·CODE';
   const expRoman = activeCode?.expiresAt ? formatRomanDate(activeCode.expiresAt) : null;
-  const tierText = org.tier === 'professional' ? 'Professional · gold seal' : 'Community · hairline seal';
+  // Stage 3 names. Gold seal at Plus and above; Free/Pro show as Community.
+  const tierText =
+    org.tier === 'business' ? 'Business · gold seal' :
+    org.tier === 'plus' ? 'Plus · gold seal' :
+    org.tier === 'government' ? 'Government · gold seal' :
+    org.tier === 'legacy' ? 'Legacy · gold seal' :
+    org.tier === 'pro' ? 'Pro · hairline seal' :
+    'Community · hairline seal';
 
   return (
     <View style={{ paddingHorizontal: 14 }}>
@@ -555,7 +662,17 @@ function SettingsSection({
           value={org.verified ? `Verified ${formatRomanYM(org.createdAt)}` : 'Not verified'}
           gold={org.verified}
         />
-        <SettingsRow label="Plan" value={tierText} gold={org.tier === 'professional'} />
+        <SettingsRow
+          label="Plan"
+          value={tierText}
+          gold={org.tier === 'plus' || org.tier === 'business' || org.tier === 'government' || org.tier === 'legacy'}
+          // Only admins see the chevron and can navigate into billing.
+          // Non-admins keep the read-only display.
+          onPress={org.role === 'admin' ? () => router.push({
+            pathname: '/modals/organization-billing',
+            params: { orgId: org.id, orgName: org.name },
+          }) : undefined}
+        />
       </View>
 
       {/* Members & roles */}
@@ -563,9 +680,34 @@ function SettingsSection({
         <View style={{ paddingHorizontal: 14, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: O_LINE, backgroundColor: O_BG_RAISED }}>
           <Text style={{ fontSize: 11, color: O_FG_MUTED, letterSpacing: -0.05, fontWeight: '600' }}>Members & roles</Text>
         </View>
-        <SettingsRow label="Total members" value={(org.memberCount ?? 0).toLocaleString()} mono />
+        <SettingsRow label="Total members" value={Math.max(org.memberCount ?? 0, actualMemberCount).toLocaleString()} mono />
         <SettingsRow label="Active invite codes" value={`${inviteCodes.filter((c) => !c.revokedAt).length}`} mono />
       </View>
+
+      {/* Verification — admin only. Pro+ feature. The toggle ON requires a
+          Pro+ tier; backend returns 402 with FEATURE_NOT_AVAILABLE_ON_TIER
+          for Free orgs, which surfaces the UpgradeModal via onUpgradePrompt. */}
+      {org.role === 'admin' && (
+        <VerificationSettingsCard org={org} onUpgradePrompt={onUpgradePrompt} onOrgUpdated={onOrgUpdated} />
+      )}
+
+      {/* Reports & Exports — admin only. Tier-gated server-side; the screen
+          itself shows the Premium upgrade modal if the export is blocked. */}
+      {org.role === 'admin' && (
+        <View style={{ backgroundColor: O_BG_CARD, borderWidth: 1, borderColor: O_LINE, borderRadius: 12, overflow: 'hidden', marginBottom: 14 }}>
+          <View style={{ paddingHorizontal: 14, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: O_LINE, backgroundColor: O_BG_RAISED }}>
+            <Text style={{ fontSize: 11, color: O_FG_MUTED, letterSpacing: -0.05, fontWeight: '600' }}>Reports & exports</Text>
+          </View>
+          <SettingsRow
+            label="Audit log"
+            value="Tamper-evident vote record"
+            onPress={() => router.push({
+              pathname: '/modals/audit-export',
+              params: { orgId: org.id, orgName: org.name },
+            })}
+          />
+        </View>
+      )}
 
       {/* Manage */}
       <View style={{ backgroundColor: O_BG_CARD, borderWidth: 1, borderColor: O_LINE, borderRadius: 12, overflow: 'hidden', marginBottom: 14 }}>
@@ -905,12 +1047,16 @@ function MembersSection({ members, totalCount, search, onSearch, isAdmin, onMemb
     const q = search.trim().toLowerCase();
     return members.filter((m) => {
       const n = (m.name || m.userName || m.user?.name || '').toLowerCase();
+      if (n.includes(q)) return true;
+      // Email search is admin-only — prevents non-admins from enumerating
+      // emails by typing partial matches.
+      if (!isAdmin) return false;
       const e = (m.email || m.user?.email || '').toLowerCase();
-      return n.includes(q) || e.includes(q);
+      return e.includes(q);
     });
-  }, [members, search]);
+  }, [members, search, isAdmin]);
 
-  const showList = isAdmin && members.length > 0;
+  const showList = members.length > 0;
 
   return (
     <View>
@@ -963,7 +1109,7 @@ function MembersSection({ members, totalCount, search, onSearch, isAdmin, onMemb
       {!showList ? (
         <View style={{ paddingHorizontal: 14, paddingVertical: 24, alignItems: 'center' }}>
           <Text style={{ fontFamily: SERIF, fontSize: 15, fontStyle: 'italic', color: O_FG_MUTED, textAlign: 'center', marginBottom: 6 }}>
-            {isAdmin ? 'No members yet' : 'Member list visible to admins only'}
+            No members yet
           </Text>
           <Text style={{ fontSize: 12, color: O_FG_FAINT, textAlign: 'center' }}>
             {totalCount > 0 ? `${totalCount.toLocaleString()} ${totalCount === 1 ? 'member' : 'members'}` : ''}
@@ -986,7 +1132,8 @@ function MembersSection({ members, totalCount, search, onSearch, isAdmin, onMemb
               return (
                 <TouchableOpacity
                   key={m.id || m.userId || i}
-                  activeOpacity={0.7}
+                  activeOpacity={isAdmin ? 0.7 : 1}
+                  disabled={!isAdmin}
                   onPress={() => onMemberPress(m)}
                   style={{
                     paddingHorizontal: 14, paddingVertical: 11,
@@ -1514,7 +1661,14 @@ export default function OrganizationDetailScreen() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [creating, setCreating] = useState(false);
   const [proposalLimits, setProposalLimits] = useState<{ created: number; limit: number; period: 'month' | 'week'; resetDate: string } | null>(null);
-  const [newProposal, setNewProposal] = useState({ title: '', description: '', category: 'Other', isOfficial: false });
+  const [newProposal, setNewProposal] = useState<{
+    title: string;
+    description: string;
+    category: string;
+    isOfficial: boolean;
+    voteType: 'yes-no' | 'multiple-choice' | 'ranked-choice';
+    options: string[];
+  }>({ title: '', description: '', category: 'Other', isOfficial: false, voteType: 'yes-no', options: ['', ''] });
 
   const [members, setMembers] = useState<any[]>([]);
   const [inviteCodes, setInviteCodes] = useState<any[]>([]);
@@ -1536,6 +1690,9 @@ export default function OrganizationDetailScreen() {
   // New modal state for redesigned interactions
   const [showInviteCodeModal, setShowInviteCodeModal] = useState(false);
   const [showRoleModal, setShowRoleModal] = useState(false);
+  // UPDATE 24: surfaced when an admin toggles ON require-verification on a
+  // Free org (backend returns 402 + FEATURE_NOT_AVAILABLE_ON_TIER).
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [editingMember, setEditingMember] = useState<any | null>(null);
 
   // Search state for members tab
@@ -1563,7 +1720,7 @@ export default function OrganizationDetailScreen() {
           name: params.orgName as string,
           description: '',
           memberCount: 1,
-          tier: 'starter',
+          tier: 'free',
           verified: false,
           createdAt: new Date().toISOString(),
           role: isDemoUser ? 'admin' : ((params.orgRole as 'admin' | 'member') || 'member'),
@@ -1581,7 +1738,7 @@ export default function OrganizationDetailScreen() {
           name: params.orgName as string,
           description: '',
           memberCount: 1,
-          tier: 'starter',
+          tier: 'free',
           verified: false,
           createdAt: new Date().toISOString(),
           role: isDemoUser ? 'admin' : ((params.orgRole as 'admin' | 'member') || 'member'),
@@ -1777,6 +1934,17 @@ export default function OrganizationDetailScreen() {
       Alert.alert('Missing Fields', 'Please fill in both title and description.');
       return;
     }
+    if (newProposal.voteType !== 'yes-no') {
+      const cleaned = newProposal.options.map((o) => o.trim()).filter(Boolean);
+      if (cleaned.length < 2) {
+        Alert.alert('Need more options', 'Multiple-choice and ranked-choice proposals need at least 2 options.');
+        return;
+      }
+      if (new Set(cleaned).size !== cleaned.length) {
+        Alert.alert('Duplicate options', 'Each option must be unique.');
+        return;
+      }
+    }
     if (proposalLimits && proposalLimits.created >= proposalLimits.limit) {
       Alert.alert('Limit Reached', `You've reached your ${proposalLimits.period}ly proposal limit. Limits reset on ${new Date(proposalLimits.resetDate).toLocaleDateString()}.`);
       return;
@@ -1784,16 +1952,21 @@ export default function OrganizationDetailScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setCreating(true);
     try {
+      const cleanedOptions = newProposal.voteType === 'yes-no'
+        ? undefined
+        : newProposal.options.map((o) => o.trim()).filter(Boolean);
       const result = await organizationsApi.createProposal(params.orgId, {
         title: newProposal.title.trim(),
         description: newProposal.description.trim(),
         category: newProposal.category,
         isOfficial: newProposal.isOfficial,
+        voteType: newProposal.voteType,
+        options: cleanedOptions,
       });
       if (result.error) { Alert.alert('Error', result.error); return; }
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setShowCreateModal(false);
-      setNewProposal({ title: '', description: '', category: 'Other', isOfficial: false });
+      setNewProposal({ title: '', description: '', category: 'Other', isOfficial: false, voteType: 'yes-no', options: ['', ''] });
       fetchData();
     } catch (error) {
       Alert.alert('Error', 'Failed to create proposal. Please try again.');
@@ -1960,6 +2133,10 @@ export default function OrganizationDetailScreen() {
         userVote: (p as any).userVote || '',
         isOfficial: String((p as any).isOfficial ?? false),
         orgName: organization?.name || (params.orgName as string) || '',
+        // RCV/multi-choice metadata. Defaulted so existing yes-no proposals
+        // are unaffected. Options is JSON-encoded (URL params can't carry arrays).
+        voteType: ((p as any).voteType as string) || 'yes-no',
+        options: JSON.stringify((p as any).options ?? []),
       },
     });
   };
@@ -2008,7 +2185,7 @@ export default function OrganizationDetailScreen() {
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={O_GOLD} />}
       >
-        {organization && <Hero org={organization} proposalCount={proposals.length} />}
+        {organization && <Hero org={organization} proposalCount={proposals.length} actualMemberCount={members.length} />}
 
         <SectionTabs
           active={activeTab}
@@ -2022,7 +2199,7 @@ export default function OrganizationDetailScreen() {
         {activeTab === 'members' && (
           <MembersSection
             members={members}
-            totalCount={organization?.memberCount ?? members.length}
+            totalCount={Math.max(organization?.memberCount ?? 0, members.length)}
             search={memberSearch}
             onSearch={setMemberSearch}
             isAdmin={!!isAdmin}
@@ -2070,6 +2247,9 @@ export default function OrganizationDetailScreen() {
             onLeave={handleLeaveOrganization}
             canDelete={canDeleteOrganization()}
             onDelete={handleDeleteOrganization}
+            actualMemberCount={members.length}
+            onUpgradePrompt={() => setShowUpgradeModal(true)}
+            onOrgUpdated={(patch) => setOrganization((cur) => (cur ? { ...cur, ...patch } : cur))}
           />
         )}
       </ScrollView>
@@ -2189,6 +2369,82 @@ export default function OrganizationDetailScreen() {
                 ))}
               </ScrollView>
             </View>
+            {/* Vote type picker. Defaults to yes-no for backward compat. */}
+            <View style={styles.inputGroup}>
+              <Text style={[styles.inputLabel, { color: O_FG_FAINT }]}>Ballot type</Text>
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                {(['yes-no', 'multiple-choice', 'ranked-choice'] as const).map((vt) => {
+                  const active = newProposal.voteType === vt;
+                  const label = vt === 'yes-no' ? 'Yes / No' : vt === 'multiple-choice' ? 'Multiple choice' : 'Ranked choice';
+                  return (
+                    <TouchableOpacity
+                      key={vt}
+                      onPress={() => setNewProposal((p) => ({ ...p, voteType: vt }))}
+                      style={{
+                        flex: 1,
+                        paddingVertical: 10,
+                        paddingHorizontal: 8,
+                        backgroundColor: active ? O_GOLD : O_BG_CARD,
+                        borderColor: active ? O_GOLD : O_LINE_STRONG,
+                        borderWidth: 1,
+                        borderRadius: 8,
+                        alignItems: 'center',
+                      }}
+                    >
+                      <Text style={{ color: active ? '#000' : O_FG_MUTED, fontSize: 12, fontWeight: '600' }}>
+                        {label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+              {newProposal.voteType === 'ranked-choice' && (
+                <Text style={{ color: O_FG_FAINT, fontSize: 11, marginTop: 6, lineHeight: 16 }}>
+                  Voters rank options in order of preference. Winner determined by instant-runoff (IRV).
+                </Text>
+              )}
+            </View>
+
+            {/* Options list, shown for non-yes-no ballots. */}
+            {newProposal.voteType !== 'yes-no' && (
+              <View style={styles.inputGroup}>
+                <Text style={[styles.inputLabel, { color: O_FG_FAINT }]}>Options</Text>
+                {newProposal.options.map((opt, idx) => (
+                  <View key={idx} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                    <TextInput
+                      style={[styles.textInput, { backgroundColor: O_BG_CARD, borderColor: O_LINE_STRONG, color: O_FG, flex: 1 }]}
+                      placeholder={`Option ${idx + 1}`}
+                      placeholderTextColor={O_FG_FAINT}
+                      value={opt}
+                      onChangeText={(t) => setNewProposal((p) => {
+                        const next = [...p.options];
+                        next[idx] = t;
+                        return { ...p, options: next };
+                      })}
+                      maxLength={120}
+                    />
+                    {newProposal.options.length > 2 && (
+                      <TouchableOpacity
+                        onPress={() => setNewProposal((p) => ({ ...p, options: p.options.filter((_, i) => i !== idx) }))}
+                        style={{ padding: 8 }}
+                      >
+                        <Ionicons name="close-circle" size={20} color={O_FG_FAINT} />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                ))}
+                {newProposal.options.length < 10 && (
+                  <TouchableOpacity
+                    onPress={() => setNewProposal((p) => ({ ...p, options: [...p.options, ''] }))}
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 8 }}
+                  >
+                    <Ionicons name="add-circle-outline" size={16} color={O_GOLD} />
+                    <Text style={{ color: O_GOLD, fontSize: 12, fontWeight: '600' }}>Add option</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            )}
+
             {organization?.role === 'admin' && (
               <View style={[styles.officialToggleRow, { backgroundColor: O_BG_CARD, borderColor: O_LINE_STRONG }]}>
                 <View style={styles.officialToggleInfo}>
@@ -2343,6 +2599,23 @@ export default function OrganizationDetailScreen() {
           if (editingMember) handleSetMemberRole(editingMember.id || editingMember.userId, role);
           setShowRoleModal(false);
           setEditingMember(null);
+        }}
+      />
+      <UpgradeModal
+        visible={showUpgradeModal}
+        onClose={() => setShowUpgradeModal(false)}
+        type="orgTier"
+        title="Pro plan required"
+        message="Required-verification mode is a Pro plan feature. Upgrade this organization to enable identity-verified voting."
+        ctaLabel="Manage plan"
+        onCta={() => {
+          setShowUpgradeModal(false);
+          if (organization) {
+            router.push({
+              pathname: '/modals/organization-billing',
+              params: { orgId: organization.id, orgName: organization.name },
+            });
+          }
         }}
       />
     </View>

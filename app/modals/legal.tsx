@@ -6,6 +6,7 @@ import { useTheme } from '../../lib/theme';
 
 const TERMS_URL = 'https://representportal.com/terms';
 const PRIVACY_URL = 'https://representportal.com/privacy';
+const SUPPORT_EMAIL = 'support@representvote.com';
 
 export default function LegalScreen() {
   const { colors } = useTheme();
@@ -58,8 +59,23 @@ export default function LegalScreen() {
           <Ionicons name="open-outline" size={18} color={colors.textTertiary} />
         </TouchableOpacity>
 
+        <TouchableOpacity
+          style={[styles.row, { backgroundColor: colors.surface, borderColor: colors.border }]}
+          onPress={() => open(`mailto:${SUPPORT_EMAIL}`)}
+          activeOpacity={0.8}
+        >
+          <View style={[styles.iconWrap, { backgroundColor: `${colors.gold}15` }]}>
+            <Ionicons name="mail-outline" size={20} color={colors.gold} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.rowTitle, { color: colors.text }]}>Contact Support</Text>
+            <Text style={[styles.rowSub, { color: colors.textSecondary }]}>{SUPPORT_EMAIL}</Text>
+          </View>
+          <Ionicons name="open-outline" size={18} color={colors.textTertiary} />
+        </TouchableOpacity>
+
         <Text style={[styles.footer, { color: colors.textTertiary }]}>
-          Both documents open in your browser.
+          Documents open in your browser. Support opens in your mail app.
         </Text>
       </ScrollView>
     </View>

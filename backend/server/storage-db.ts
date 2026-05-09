@@ -580,6 +580,35 @@ export class DatabaseStorage implements IStorage {
     return result;
   }
 
+  async getOrganizationMemberCount(organizationId: string): Promise<number> {
+    const result = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(organizationMembers)
+      .where(eq(organizationMembers.organizationId, organizationId));
+    return Number(result[0]?.count ?? 0);
+  }
+
+  // IAP attribution lookups. Apple's App Store Server Notifications V2
+  // identify the subscription only by originalTransactionId; we need to
+  // find the right user or org row to update on renewal/refund/cancel.
+  async findUserByIapTxId(originalTransactionId: string): Promise<any | undefined> {
+    const result = await db
+      .select()
+      .from(users)
+      .where(eq(users.iapOriginalTransactionId, originalTransactionId))
+      .limit(1);
+    return result[0];
+  }
+
+  async findOrganizationByIapTxId(originalTransactionId: string): Promise<any | undefined> {
+    const result = await db
+      .select()
+      .from(organizations)
+      .where(eq(organizations.iapOriginalTransactionId, originalTransactionId))
+      .limit(1);
+    return result[0];
+  }
+
   async getOrganizationByInviteCode(inviteCode: string): Promise<any> {
     const result = await db.select().from(organizations).where(
       eq(organizations.inviteCode, inviteCode)
@@ -893,6 +922,106 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(proposals)
       .where(eq(proposals.organizationId, orgId))
       .orderBy(proposals.createdAt);
+  }
+
+  // Per-option vote counts for multiple-choice proposals.
+  // RCV uses getRankedBallots below — these helpers don't share code
+  // because the column semantics differ ('selected_option' is the chosen
+  // option string for multi-choice but a JSON-encoded rankings array for
+  // ranked-choice).
+  async countVotesPerOption(proposalId: string): Promise<Record<string, number>> {
+    const rows = await db
+      .select({ option: votes.selectedOption, count: sql<number>`count(*)::int` })
+      .from(votes)
+      .where(and(
+        eq(votes.proposalId, proposalId),
+        eq(votes.position, 'multiple-choice'),
+      ))
+      .groupBy(votes.selectedOption);
+    const result: Record<string, number> = {};
+    for (const r of rows as any[]) {
+      if (r.option) result[r.option] = Number(r.count ?? 0);
+    }
+    return result;
+  }
+
+  // Raw ballot strings for RCV proposals. Each entry is the JSON
+  // serialization of the voter's preference array. Caller (the /results
+  // endpoint) parses + feeds to computeIRV.
+  async getRankedBallots(proposalId: string): Promise<string[]> {
+    const rows = await db
+      .select({ rankings: votes.selectedOption })
+      .from(votes)
+      .where(and(
+        eq(votes.proposalId, proposalId),
+        eq(votes.position, 'ranked-choice'),
+      ));
+    return (rows as any[])
+      .map(r => r.rankings)
+      .filter((r): r is string => typeof r === 'string' && r.length > 0);
+  }
+
+  // Audit log: every vote on every proposal in this org. Joins through
+  // proposals (votes don't carry organizationId directly) and through users
+  // for verification status. Voter identity (email/name) is included only
+  // when the caller asked for it; the route handler hashes voter ids when
+  // includeVoterIdentity=false. Returned fields map 1:1 to AuditLogRow in
+  // the export endpoint.
+  async getOrgAuditLog(orgId: string): Promise<Array<{
+    voteId: string;
+    proposalId: string;
+    proposalTitle: string;
+    proposalCreatedAt: Date | null;
+    proposalDeadline: Date | null;
+    voterId: string;
+    voterEmail: string | null;
+    voterName: string | null;
+    voterVerified: boolean;
+    position: string;
+    selectedOption: string | null;
+    voteTokenId: string | null;
+    txHash: string | null;
+    castAt: Date | null;
+  }>> {
+    const rows = await db
+      .select({
+        voteId: votes.id,
+        proposalId: votes.proposalId,
+        proposalTitle: proposals.title,
+        proposalCreatedAt: proposals.createdAt,
+        proposalDeadline: proposals.deadline,
+        voterId: votes.userId,
+        voterEmail: users.email,
+        voterName: users.name,
+        voterVerified: users.verified,
+        position: votes.position,
+        selectedOption: votes.selectedOption,
+        voteTokenId: votes.voteTokenId,
+        txHash: votes.txHash,
+        castAt: votes.timestamp,
+      })
+      .from(votes)
+      .innerJoin(proposals, eq(votes.proposalId, proposals.id))
+      .leftJoin(users, eq(votes.userId, users.id))
+      .where(eq(proposals.organizationId, orgId))
+      .orderBy(votes.timestamp);
+
+    return rows.map((r: any) => ({
+      voteId: r.voteId,
+      proposalId: r.proposalId,
+      proposalTitle: r.proposalTitle ?? '',
+      proposalCreatedAt: r.proposalCreatedAt,
+      proposalDeadline: r.proposalDeadline,
+      voterId: r.voterId,
+      voterEmail: r.voterEmail ?? null,
+      voterName: r.voterName ?? null,
+      voterVerified: !!r.voterVerified,
+      position: r.position ?? '',
+      selectedOption: r.selectedOption ?? null,
+      voteTokenId: r.voteTokenId ?? null,
+      txHash: r.txHash ?? null,
+      castAt: r.castAt,
+    }));
   }
 
   async getOrgProposalLimits(orgId: string, userId: string): Promise<{ created: number; limit: number; period: string; resetDate: Date }> {

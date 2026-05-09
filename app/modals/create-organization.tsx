@@ -24,83 +24,10 @@ import { organizationsApi, uploadsApi } from '../../lib/api';
 import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS } from '../../lib/theme';
 import { showPaymentError, showPaymentSuccess } from '../../lib/stripe';
 import { processOrganizationPayment } from '../../lib/payment';
+import { ORG_TIERS, type OrgTier } from '../../lib/org-tiers';
+import { TierCard } from '../../components/ui/TierCard';
 
 type Step = 'details' | 'tier' | 'payment';
-
-type OrgTier = 'starter' | 'professional' | 'premium' | 'enterprise';
-
-const ORG_TIERS: Record<OrgTier, {
-  name: string;
-  price: string;
-  priceValue: number;
-  description: string;
-  features: string[];
-  icon: keyof typeof Ionicons.glyphMap;
-  popular?: boolean;
-  contactOnly?: boolean;
-}> = {
-  starter: {
-    name: 'Starter',
-    price: '$29',
-    priceValue: 29,
-    description: 'Perfect for small groups and local organizations',
-    icon: 'people-outline',
-    features: [
-      'Up to 100 members',
-      'Internal proposals & voting',
-      'Basic announcements',
-      'Invite code management',
-      'Community support',
-    ],
-  },
-  professional: {
-    name: 'Professional',
-    price: '$99',
-    priceValue: 99,
-    description: 'For growing organizations with advanced needs',
-    icon: 'business-outline',
-    popular: true,
-    features: [
-      'Up to 500 members',
-      'Everything in Starter',
-      'Advanced analytics',
-      'Custom branding',
-      'Priority support',
-      'API access',
-    ],
-  },
-  premium: {
-    name: 'Premium',
-    price: '$299',
-    priceValue: 299,
-    description: 'For large unions, parties, and federations',
-    icon: 'shield-checkmark-outline',
-    features: [
-      'Up to 2,500 members',
-      'Everything in Professional',
-      'Verified voting + audit log export',
-      'Roster import (CSV)',
-      'Dedicated onboarding',
-      'SLA + 24h response time',
-    ],
-  },
-  enterprise: {
-    name: 'Enterprise',
-    price: 'Contact Us',
-    priceValue: 0,
-    description: 'For 2,500+ member organizations',
-    icon: 'globe-outline',
-    contactOnly: true,
-    features: [
-      'Unlimited members',
-      'Everything in Premium',
-      'Dedicated account manager',
-      'Custom integrations',
-      'Custom SLA',
-      'White-label options',
-    ],
-  },
-};
 
 // Step Indicator Component
 function StepIndicator({ currentStep }: { currentStep: Step }) {
@@ -161,79 +88,6 @@ function StepIndicator({ currentStep }: { currentStep: Step }) {
   );
 }
 
-// Tier Card Component
-function TierCard({
-  tier,
-  tierKey,
-  selected,
-  onSelect,
-}: {
-  tier: typeof ORG_TIERS.starter;
-  tierKey: OrgTier;
-  selected: boolean;
-  onSelect: () => void;
-}) {
-  const { colors } = useTheme();
-  const isContactOnly = tier.contactOnly;
-
-  return (
-    <TouchableOpacity
-      style={[
-        styles.tierCard,
-        {
-          backgroundColor: colors.surface,
-          borderColor: selected ? colors.gold : colors.border,
-          borderWidth: selected ? 2 : 1,
-        },
-      ]}
-      onPress={onSelect}
-      activeOpacity={0.8}
-    >
-      {tier.popular && (
-        <View style={[styles.popularBadge, { backgroundColor: colors.gold }]}>
-          <Text style={styles.popularText}>MOST POPULAR</Text>
-        </View>
-      )}
-
-      <View style={styles.tierHeader}>
-        <View style={[styles.tierIcon, { backgroundColor: `${colors.gold}15` }]}>
-          <Ionicons name={tier.icon} size={24} color={colors.gold} />
-        </View>
-        <View style={styles.tierInfo}>
-          <Text style={[styles.tierName, { color: colors.text }]}>{tier.name}</Text>
-          <View style={styles.tierPriceRow}>
-            <Text style={[styles.tierPrice, { color: colors.gold }]}>{tier.price}</Text>
-            {!isContactOnly && (
-              <Text style={[styles.tierPeriod, { color: colors.textSecondary }]}>/month</Text>
-            )}
-          </View>
-        </View>
-        <View
-          style={[
-            styles.radioOuter,
-            { borderColor: selected ? colors.gold : colors.border },
-          ]}
-        >
-          {selected && <View style={[styles.radioInner, { backgroundColor: colors.gold }]} />}
-        </View>
-      </View>
-
-      <Text style={[styles.tierDescription, { color: colors.textSecondary }]}>
-        {tier.description}
-      </Text>
-
-      <View style={styles.tierFeatures}>
-        {tier.features.map((feature, index) => (
-          <View key={index} style={styles.featureRow}>
-            <Ionicons name="checkmark-circle" size={16} color={colors.success} />
-            <Text style={[styles.featureText, { color: colors.text }]}>{feature}</Text>
-          </View>
-        ))}
-      </View>
-    </TouchableOpacity>
-  );
-}
-
 export default function CreateOrganizationScreen() {
   const { colors } = useTheme();
   const { token, user } = useAuthStore();
@@ -248,7 +102,7 @@ export default function CreateOrganizationScreen() {
   const [uploadingLogo, setUploadingLogo] = useState(false);
 
   // Tier selection state
-  const [selectedTier, setSelectedTier] = useState<OrgTier>('professional');
+  const [selectedTier, setSelectedTier] = useState<OrgTier>('free');
 
   // Payment state
   const [processing, setProcessing] = useState(false);
@@ -307,11 +161,17 @@ export default function CreateOrganizationScreen() {
       }
       setCurrentStep('tier');
     } else if (currentStep === 'tier') {
-      // Enterprise tier opens email instead of payment
-      if (selectedTier === 'enterprise') {
-        const subject = encodeURIComponent(`Enterprise Inquiry: ${name.trim()}`);
-        const body = encodeURIComponent(`Hi,\n\nI'm interested in the Enterprise plan for my organization "${name.trim()}".\n\nPlease contact me to discuss pricing and features.\n\nThank you`);
-        Linking.openURL(`mailto:lance@representvote.com?subject=${subject}&body=${body}`);
+      // Government tier opens email instead of payment.
+      if (selectedTier === 'government') {
+        const subject = encodeURIComponent(`Government Inquiry: ${name.trim()}`);
+        const body = encodeURIComponent(`Hi,\n\nI'm interested in the Government plan for my organization "${name.trim()}".\n\nPlease contact me to discuss pricing and features.\n\nThank you`);
+        Linking.openURL(`mailto:sales@representvote.com?subject=${subject}&body=${body}`);
+        return;
+      }
+      // Free tier doesn't go through the payment step — create the org
+      // immediately at tier='free'. Upgrade later via the billing screen.
+      if (selectedTier === 'free') {
+        handleCreateOrganization();
         return;
       }
       setCurrentStep('payment');
@@ -480,18 +340,35 @@ export default function CreateOrganizationScreen() {
         Select the plan that fits your organization's needs
       </Text>
 
-      {(Object.entries(ORG_TIERS) as [OrgTier, typeof ORG_TIERS.starter][]).map(([key, tier]) => (
-        <TierCard
-          key={key}
-          tierKey={key}
-          tier={tier}
-          selected={selectedTier === key}
-          onSelect={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            setSelectedTier(key);
-          }}
-        />
-      ))}
+      {/* Hide Government tier from the public picker — it's set by sales
+          via direct DB update for cities, counties, and agencies. The
+          "Need more?" link below opens a sales email. */}
+      {(Object.entries(ORG_TIERS) as [OrgTier, typeof ORG_TIERS.free][])
+        .filter(([key]) => key !== 'government')
+        .map(([key, tier]) => (
+          <TierCard
+            key={key}
+            tierKey={key}
+            tier={tier}
+            selected={selectedTier === key}
+            onSelect={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              setSelectedTier(key);
+            }}
+          />
+        ))}
+
+      <TouchableOpacity
+        onPress={() => {
+          const subject = encodeURIComponent(`Government / Agency inquiry`);
+          Linking.openURL(`mailto:sales@representvote.com?subject=${subject}`);
+        }}
+        style={{ paddingVertical: SPACING.md, alignItems: 'center' }}
+      >
+        <Text style={{ color: colors.gold, ...TYPOGRAPHY.bodySmall, fontWeight: '600' }}>
+          Need more than Business? Contact sales →
+        </Text>
+      </TouchableOpacity>
     </Animated.View>
   );
 
@@ -637,10 +514,15 @@ export default function CreateOrganizationScreen() {
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
               >
-                {currentStep === 'tier' && selectedTier === 'enterprise' ? (
+                {currentStep === 'tier' && selectedTier === 'government' ? (
                   <>
                     <Ionicons name="mail-outline" size={20} color="#000" />
                     <Text style={styles.actionButtonText}>Contact Us</Text>
+                  </>
+                ) : currentStep === 'tier' && selectedTier === 'free' ? (
+                  <>
+                    <Ionicons name="checkmark-circle" size={20} color="#000" />
+                    <Text style={styles.actionButtonText}>Create free org</Text>
                   </>
                 ) : (
                   <>

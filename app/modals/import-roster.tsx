@@ -18,6 +18,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Papa from 'papaparse';
 import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY } from '../../lib/theme';
 import { organizationsApi } from '../../lib/api';
+import { UpgradeModal } from '../../components/ui/UpgradeModal';
 
 type Stage = 'pick' | 'preview' | 'importing' | 'done';
 
@@ -122,6 +123,14 @@ export default function ImportRosterScreen() {
   const [mapping, setMapping] = useState<Record<number, ReturnType<typeof classifyHeader>>>({});
   const [result, setResult] = useState<ImportResult | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  // Tier-related errors get a dedicated upgrade modal instead of inline text.
+  // The admin CAN fix these (member cap or CSV-import gating), so the modal
+  // shows an actionable CTA pointing at org billing.
+  const [tierUpgrade, setTierUpgrade] = useState<{
+    visible: boolean;
+    title: string;
+    message: string;
+  }>({ visible: false, title: '', message: '' });
 
   const { parsed, invalid } = useMemo(
     () => applyMapping(headers, rawRows, mapping),
@@ -208,16 +217,44 @@ export default function ImportRosterScreen() {
     setStage('importing');
     try {
       const apiResult = await organizationsApi.importRoster(orgId, parsed);
+      console.log('[importRoster] response:', JSON.stringify(apiResult));
       if (apiResult.error || !apiResult.data) {
+        // Tier-gated errors get the upgrade modal; everything else falls
+        // through to the inline error path.
+        if (apiResult.errorCode === 'MEMBER_LIMIT_EXCEEDED') {
+          const d = apiResult.errorDetails ?? {};
+          setTierUpgrade({
+            visible: true,
+            title: 'Member limit reached',
+            message: d.limit
+              ? `Adding ${parsed.length} ${parsed.length === 1 ? 'member' : 'members'} would exceed your ${d.tier ?? 'current'} plan limit of ${d.limit} (${d.currentMembers} currently). Upgrade to continue importing.`
+              : 'This import would exceed your organization\'s member limit. Upgrade your plan to continue.',
+          });
+          setStage('preview');
+          return;
+        }
+        if (apiResult.errorCode === 'FEATURE_NOT_AVAILABLE_ON_TIER') {
+          setTierUpgrade({
+            visible: true,
+            title: 'CSV import requires Professional',
+            message: 'Bulk roster import via CSV is available on the Professional plan and above. Upgrade your organization\'s plan, or invite members one at a time using invite codes.',
+          });
+          setStage('preview');
+          return;
+        }
         setErrorMsg(apiResult.error || 'Import failed');
         setStage('preview');
         return;
       }
       // Backend may have its own invalid list (server-side validation).
-      // Merge with our client-side invalid count.
+      // Merge with our client-side invalid count. Default array fields so
+      // the done screen renders even if the backend omits them.
+      const d: any = apiResult.data;
       const merged: ImportResult = {
-        ...apiResult.data,
-        invalid: [...invalid, ...(apiResult.data.invalid || [])],
+        created: typeof d.created === 'number' ? d.created : 0,
+        skippedExistingMembers: Array.isArray(d.skippedExistingMembers) ? d.skippedExistingMembers : [],
+        skippedAlreadyInvited: Array.isArray(d.skippedAlreadyInvited) ? d.skippedAlreadyInvited : [],
+        invalid: [...invalid, ...(Array.isArray(d.invalid) ? d.invalid : [])],
       };
       setResult(merged);
       setStage('done');
@@ -471,6 +508,21 @@ export default function ImportRosterScreen() {
       {stage === 'preview' && renderPreview()}
       {stage === 'importing' && renderImporting()}
       {stage === 'done' && renderDone()}
+
+      <UpgradeModal
+        visible={tierUpgrade.visible}
+        onClose={() => setTierUpgrade({ ...tierUpgrade, visible: false })}
+        type="orgTier"
+        title={tierUpgrade.title}
+        message={tierUpgrade.message}
+        ctaLabel="Manage plan"
+        onCta={() => {
+          router.push({
+            pathname: '/modals/organization-billing',
+            params: { orgId, orgName },
+          });
+        }}
+      />
     </View>
   );
 }

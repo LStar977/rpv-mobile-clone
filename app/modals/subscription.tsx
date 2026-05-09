@@ -29,12 +29,11 @@ const TIERS = {
     description: 'Get started with global proposals',
     icon: 'person-outline' as const,
     features: [
-      { text: 'Vote on global proposals', included: true },
-      { text: '5 votes per month', included: true },
-      { text: 'Create 1 global proposal/month', included: true },
-      { text: 'Basic profile', included: true },
-      { text: 'Sentinel AI analyzer', included: false },
+      { text: 'Unlimited voting on global proposals', included: true },
+      { text: 'Create 1 proposal/month', included: true },
+      { text: 'Basic analytics on your proposals', included: true },
       { text: 'Geo-restricted proposals', included: false },
+      { text: 'Sentinel AI analyzer', included: false },
     ],
   },
   verified: {
@@ -44,11 +43,11 @@ const TIERS = {
     description: 'Verify your identity to unlock all proposals',
     icon: 'shield-checkmark' as const,
     features: [
-      { text: 'Vote on ALL proposals', included: true },
-      { text: 'Unlimited voting', included: true },
-      { text: 'Create 1 proposal/week', included: true },
-      { text: 'Verified badge on profile', included: true },
+      { text: 'Unlimited voting on every proposal you can act on', included: true },
+      { text: 'Create 3 proposals/month', included: true },
       { text: 'Access geo-restricted proposals', included: true },
+      { text: 'Verified badge on profile', included: true },
+      { text: 'Basic analytics on your proposals', included: true },
       { text: 'Sentinel AI analyzer', included: false },
     ],
   },
@@ -60,11 +59,12 @@ const TIERS = {
     icon: 'star' as const,
     features: [
       { text: 'Everything in Verified', included: true },
-      { text: 'Sentinel AI governance analyzer', included: true },
-      { text: 'Verification fee INCLUDED', included: true },
       { text: 'Unlimited proposal creation', included: true },
-      { text: 'Analytics dashboard', included: true },
-      { text: 'Priority visibility in feeds', included: true },
+      { text: 'Sentinel AI governance analyzer', included: true },
+      { text: 'Advanced analytics (geo + demographic breakdowns)', included: true },
+      { text: 'Custom proposal alerts', included: true },
+      { text: 'Voting history export', included: true },
+      { text: 'Patron badge on profile', included: true },
     ],
   },
   organization: {
@@ -406,6 +406,28 @@ export default function SubscriptionScreen() {
           </Animated.View>
         )}
 
+        {/* Legal disclosure — required on the purchase screen by Apple
+            (Guideline 3.1.2) and good practice on Android. */}
+        <Animated.View entering={FadeInUp.delay(475).duration(400)} style={styles.legalFooter}>
+          <Text style={[styles.legalFooterText, { color: colors.textTertiary }]}>
+            Subscriptions auto-renew until canceled in {Platform.OS === 'ios' ? 'App Store settings' : 'Google Play settings'}. By subscribing you agree to our{' '}
+            <Text
+              style={[styles.legalLink, { color: colors.text }]}
+              onPress={() => Linking.openURL('https://representportal.com/terms')}
+            >
+              Terms
+            </Text>
+            {' and '}
+            <Text
+              style={[styles.legalLink, { color: colors.text }]}
+              onPress={() => Linking.openURL('https://representportal.com/privacy')}
+            >
+              Privacy Policy
+            </Text>
+            .
+          </Text>
+        </Animated.View>
+
         {/* FAQ Section */}
         <Animated.View
           entering={FadeInUp.delay(500).duration(400)}
@@ -436,7 +458,7 @@ export default function SubscriptionScreen() {
               What payment methods do you accept?
             </Text>
             <Text style={[styles.faqAnswer, { color: colors.textSecondary }]}>
-              We accept all major credit cards, Apple Pay, and Google Pay via Stripe. Payment is processed securely in-app using native payment sheets.
+              On iOS, subscriptions are processed through Apple In-App Purchase. On Android, through Stripe (cards, Apple Pay, Google Pay). All transactions complete inside the app — no redirects to external websites.
             </Text>
           </View>
 
@@ -625,6 +647,20 @@ const styles = StyleSheet.create({
   },
   restoreText: {
     ...TYPOGRAPHY.labelMedium,
+    fontWeight: '500',
+  },
+  legalFooter: {
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    marginBottom: SPACING.md,
+  },
+  legalFooterText: {
+    fontSize: 11.5,
+    lineHeight: 17,
+    textAlign: 'center',
+  },
+  legalLink: {
+    textDecorationLine: 'underline',
     fontWeight: '500',
   },
   faqSection: {

@@ -38,6 +38,12 @@ export const users = pgTable("users", {
   stripeSubscriptionId: varchar("stripe_subscription_id"),
   subscriptionStatus: varchar("subscription_status").default('free'), // 'free', 'active', 'canceled', 'past_due'
   subscriptionEndDate: timestamp("subscription_end_date"),
+  // IAP attribution. Apple notifications arrive identified only by the
+  // originalTransactionId, not by our user id. We need a queryable column
+  // to look up the right user when a renewal/refund/cancel notification
+  // comes in. Backfill from the legacy 'iap:' prefix on stripeSubscriptionId.
+  iapOriginalTransactionId: varchar("iap_original_transaction_id").unique(),
+  iapEnvironment: varchar("iap_environment"), // 'Sandbox' | 'Production'
   verificationPaid: boolean("verification_paid").default(false), // Legacy from $4.99 payment; verification is now free
   initialBallotsGranted: boolean("initial_ballots_granted").default(false), // True after one-time RPV token grant on verification
   ballotsUsedToday: integer("ballots_used_today").default(0), // Daily vote counter, capped at 20 for non-premium users
@@ -109,6 +115,45 @@ export const organizations = pgTable("organizations", {
   stripeSubscriptionId: varchar("stripe_subscription_id"),
   stripeCustomerId: varchar("stripe_customer_id"),
   subscriptionStatus: varchar("subscription_status").default('pending'),
+  // Renewal date tracking. Populated by Stripe webhook (current_period_end)
+  // and IAP webhook (DID_RENEW expiresDate). Read by the org-billing screen
+  // to display "Next billing date".
+  subscriptionEndDate: timestamp("subscription_end_date"),
+
+  // IAP attribution for org subscriptions purchased via Apple IAP. See the
+  // matching columns on `users` for the rationale — Apple's notifications
+  // identify the subscription by originalTransactionId only.
+  iapOriginalTransactionId: varchar("iap_original_transaction_id").unique(),
+  iapEnvironment: varchar("iap_environment"), // 'Sandbox' | 'Production'
+
+  // Subscription tier — drives member caps and feature gating.
+  // Values: 'free' | 'pro' | 'plus' | 'business' | 'government' | 'legacy'.
+  // Existing rows from the pre-Stage-3 pricing are migrated to 'legacy'
+  // (uncapped) to grandfather customers; new rows default to 'free'
+  // (25-member cap). See shared/tier-limits.ts for authoritative limits.
+  tier: varchar("tier").default('free'),
+
+  // When true, members must complete Veriff/Didit before voting on
+  // proposals in this org. Pro+ feature, gated by `requireVerification`
+  // in shared/tier-limits.ts. Requires the org to have paid the one-time
+  // verification unlock fee (verificationUnlockedAt is non-null).
+  requireMemberVerification: boolean("require_member_verification").default(false),
+
+  // UPDATE 26: one-time unlock fee receipt. Stamped when the org pays the
+  // tier-priced unlock fee ($199 Pro / $499 Plus / $999 Business). Once
+  // unlocked, requireMemberVerification can be toggled freely without
+  // re-charge. Cleared on Stripe refund or Apple IAP refund webhook.
+  verificationUnlockedAt: timestamp("verification_unlocked_at"),
+  verificationUnlockedTier: varchar("verification_unlocked_tier"),
+  verificationUnlockPaymentId: varchar("verification_unlock_payment_id"),
+  verificationUnlockSource: varchar("verification_unlock_source"),
+
+  // DEPRECATED (UPDATE 24/25 metered model — superseded by UPDATE 26):
+  // kept in DB for safety, no longer read or written. Migration drops
+  // these columns at the next schema breakdown.
+  verificationBudgetMonthlyCents: integer("verification_budget_monthly_cents"),
+  verificationCountThisMonth: integer("verification_count_this_month").default(0),
+  verificationCountResetAt: timestamp("verification_count_reset_at").defaultNow(),
 
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -120,6 +165,10 @@ export const organizationMembers = pgTable("organization_members", {
   userId: varchar("user_id").notNull().references(() => users.id),
   role: varchar("role").notNull().default('member'), // 'admin', 'member'
   joinedAt: timestamp("joined_at").defaultNow(),
+  // DEPRECATED (UPDATE 25 metered vote-time billing — superseded by
+  // UPDATE 26 unlock-fee model): kept in DB for safety, no longer read
+  // or written. Drop at next schema breakdown.
+  verificationBilledAt: timestamp("verification_billed_at"),
 }, (table) => ({
   uniqueOrgMember: unique().on(table.organizationId, table.userId),
 }));
@@ -186,12 +235,47 @@ export const proposals = pgTable("proposals", {
   demographicRestrictions: jsonb("demographic_restrictions").default(sql`'{}'::jsonb`), // {gender: 'female', ageMin: 25, ageMax: 30}
   organizationId: varchar("organization_id").references(() => organizations.id), // Org-restricted proposals
   isFeatured: boolean("is_featured").default(false),
-  voteType: varchar("vote_type").default('yes-no'), // 'yes-no' or 'multiple-choice'
+  voteType: varchar("vote_type").default('yes-no'),
+  // Accepts: 'yes-no' | 'multiple-choice' | 'ranked-choice'.
+  // For 'ranked-choice', votes.selectedOption is a JSON-encoded array of
+  // option strings in the voter's preference order (1st choice first).
+  // Tally is compute-on-read at GET /api/proposals/:id/results via IRV
+  // (see backend/server/rcvTally.ts).
   options: jsonb("options").default(sql`'[]'::jsonb`), // Array of option strings for multiple-choice
   optionAddresses: jsonb("option_addresses").default(sql`'[]'::jsonb`), // Array of addresses corresponding to each option
   imageUrl: varchar("image_url"), // URL to proposal image attachment from object storage
   isOfficial: boolean("is_official").default(false), // Org-official proposals (admin-only)
+  // UPDATE 27 — UGC moderation (Apple Guideline 1.2). Incremented when a
+  // user submits a report against this proposal; auto-hide threshold is
+  // enforced by the listing query (hiddenAt IS NOT NULL excluded).
+  reportCount: integer("report_count").default(0),
+  hiddenAt: timestamp("hidden_at"),
 });
+
+// UPDATE 27 — UGC moderation. One row per (reporter, proposal) report
+// submission. Reasons are restricted to a fixed enum at the API layer.
+// `note` is optional free text capped at 500 chars by the endpoint.
+// Admin auto-email fires on insert in the API layer, not here.
+export const proposalReports = pgTable("proposal_reports", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  proposalId: varchar("proposal_id").notNull().references(() => proposals.id),
+  reporterId: varchar("reporter_id").notNull().references(() => users.id),
+  reason: varchar("reason").notNull(),
+  note: text("note"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// UPDATE 27 — server-side mute/block edges. One row per (muter, muted)
+// pair. Listings filter out proposals whose creator is in the requester's
+// mute set. Replaces the prior client-only AsyncStorage mute store.
+export const userMutes = pgTable("user_mutes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  muterId: varchar("muter_id").notNull().references(() => users.id),
+  mutedId: varchar("muted_id").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => ({
+  uniqueMute: unique().on(table.muterId, table.mutedId),
+}));
 
 // Table to store option addresses for multiple-choice proposals
 export const proposalOptionAddresses = pgTable("proposal_option_addresses", {

@@ -10,3 +10,6 @@ android/.gradle/
 .env.local
 .DS_Store
 dist/
+
+# Local-only design preview files (not meant for the repo)
+_*-preview.html

@@ -48,6 +48,9 @@ import { useAuthStore } from '../../lib/auth';
 import { useBallotStore } from '../../lib/ballots';
 import { shareProposal } from '../../lib/share';
 import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS, ANIMATION, responsive } from '../../lib/theme';
+import { getTierLabel, getLocationLabel, canUserVoteOnProposal } from '../../lib/proposalGeo';
+import { useModerationStore, useSyncMutes } from '../../lib/moderation';
+import { ProposalModerationMenu } from '../../components/moderation/ProposalModerationMenu';
 import Svg, { Rect, Line, Ellipse, Path, Circle, G, Defs, LinearGradient as SvgLinearGradient, Stop } from 'react-native-svg';
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -300,13 +303,6 @@ function getSceneForCategory(category: string) {
   }
 }
 
-// Get tier label from geo restrictions
-function getTierLabel(geoRestrictions?: string[]): string {
-  if (!geoRestrictions || geoRestrictions.length === 0) return 'FEDERAL';
-  if (geoRestrictions.length === 1) return 'FEDERAL';
-  if (geoRestrictions.length === 2) return 'PROVINCIAL';
-  return 'MUNICIPAL';
-}
 
 // Generate dossier ref code from proposal
 function getDossierRef(proposal: Proposal): string {
@@ -613,31 +609,6 @@ function isProposalEnded(p: Proposal) {
   return getTimeRemaining(p.deadline) === 'Ended';
 }
 
-// Check if user can vote on a proposal based on geo restrictions
-// Global proposals (no geo): anyone can vote
-// Geo-restricted: only verified users with matching location
-const canUserVoteOnProposal = (
-  proposal: Proposal,
-  userCountry: string,
-  userState: string,
-  userCity: string,
-  isVerified: boolean
-): boolean => {
-  const proposalGeo = proposal.geoRestrictions || [];
-
-  // Global proposals: anyone can vote
-  if (proposalGeo.length === 0) return true;
-
-  // Geo-restricted proposals require verification
-  if (!isVerified) return false;
-
-  // Check hierarchical location match
-  const userLocation = [userCountry, userState, userCity].filter(Boolean);
-  return proposalGeo.every((restriction, index) => {
-    const userLevel = userLocation[index];
-    return userLevel && userLevel.toLowerCase() === restriction.toLowerCase();
-  });
-};
 
 // Premium Filter Chip
 function FilterChip({
@@ -834,9 +805,7 @@ function SwipeCard({ proposal, onSwipeLeft, onSwipeRight, onSwipeUp, onTap, isTo
 
   const tierLabel = getTierLabel(proposal.geoRestrictions);
   const categoryColor = getCategoryColor();
-  const location = proposal.geoRestrictions && proposal.geoRestrictions.length > 0
-    ? proposal.geoRestrictions[proposal.geoRestrictions.length - 1]
-    : 'Canada';
+  const location = getLocationLabel(proposal.geoRestrictions);
 
   return (
     <GestureDetector gesture={composedGesture}>
@@ -1665,6 +1634,11 @@ export default function ProposalsScreen() {
   const [showVerificationModal, setShowVerificationModal] = useState(false);
   const [verificationModalType, setVerificationModalType] = useState<'vote' | 'proposal' | 'limit'>('vote');
   const [pendingLimitTier, setPendingLimitTier] = useState<'free' | 'verified'>('free');
+  const [showModerationMenu, setShowModerationMenu] = useState(false);
+
+  // Pull the muted-user list (persistent, hydrates locally on mount).
+  const mutedUserIds = useModerationStore((s) => s.mutedUserIds);
+  useSyncMutes();
 
   // Vote confirmation overlay state
   const [showVoteOverlay, setShowVoteOverlay] = useState(false);
@@ -1693,6 +1667,8 @@ export default function ProposalsScreen() {
     ageGroup: 'All Ages',
     gender: 'All Genders',
     imageUri: '' as string,
+    voteType: 'yes-no' as 'yes-no' | 'multiple-choice' | 'ranked-choice',
+    options: ['', ''] as string[],
   });
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -1741,8 +1717,20 @@ export default function ProposalsScreen() {
   }, []);
 
   const filteredProposals = useMemo(() => {
+    const mutedSet = new Set(mutedUserIds);
     // Reverse to show most recent proposals first
     return [...proposals].reverse().filter((proposal) => {
+      // Hide proposals from muted creators. Backend should filter too once the
+      // mute endpoint is live; this is the client-side belt for offline + lag.
+      const creatorId = (proposal as any).creatorId || (proposal as any).userId;
+      if (creatorId && mutedSet.has(String(creatorId))) return false;
+
+      // Unverified users can only act on global proposals (geoRestrictions
+      // empty), so hide geo-restricted ones from the list to keep the view
+      // honest. canUserVoteOnProposal still gates the vote button as a
+      // belt-and-suspenders measure.
+      if (!isVerified && (proposal.geoRestrictions || []).length > 0) return false;
+
       const matchesSearch =
         searchQuery === '' ||
         proposal.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -1789,6 +1777,8 @@ export default function ProposalsScreen() {
     selectedFilterAge,
     selectedFilterGender,
     user?.id,
+    isVerified,
+    mutedUserIds,
   ]);
 
   const activeCount = useMemo(() => filteredProposals.filter((p) => !isProposalEnded(p)).length, [filteredProposals]);
@@ -2161,6 +2151,20 @@ export default function ProposalsScreen() {
         if (uploadedUrl) imageUrl = uploadedUrl;
       }
 
+      // Validate options when voteType is non-binary. Mirrors backend
+      // validation in POST /api/proposals.
+      if (newProposal.voteType !== 'yes-no') {
+        const cleanedOpts = newProposal.options.map((o) => o.trim()).filter(Boolean);
+        if (cleanedOpts.length < 2) {
+          Alert.alert('Need more options', `${newProposal.voteType === 'ranked-choice' ? 'Ranked-choice' : 'Multiple-choice'} proposals need at least 2 options.`);
+          return;
+        }
+        if (new Set(cleanedOpts).size !== cleanedOpts.length) {
+          Alert.alert('Duplicate options', 'Each option must be unique.');
+          return;
+        }
+      }
+
       const result = await proposalsApi.create({
         title: newProposal.title.trim(),
         description: newProposal.description.trim(),
@@ -2168,6 +2172,10 @@ export default function ProposalsScreen() {
         geoRestrictions: geoRestrictions.length > 0 ? geoRestrictions : undefined,
         demographicRestrictions: Object.keys(demographicRestrictions).length > 0 ? demographicRestrictions : undefined,
         imageUrl,
+        voteType: newProposal.voteType,
+        options: newProposal.voteType === 'yes-no'
+          ? undefined
+          : newProposal.options.map((o) => o.trim()).filter(Boolean),
       });
 
       if (result.error) {
@@ -2189,6 +2197,8 @@ export default function ProposalsScreen() {
         ageGroup: 'All Ages',
         gender: 'All Genders',
         imageUri: '',
+        voteType: 'yes-no',
+        options: ['', ''],
       });
       fetchData(true);
 
@@ -2221,6 +2231,25 @@ export default function ProposalsScreen() {
 
   const openProposal = (p: Proposal) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    // Non-yes-no proposals need a dedicated ballot screen — the in-screen
+    // detail modal only knows how to render support/oppose. Route to
+    // /modals/proposal-detail for RCV / multiple-choice.
+    const voteType = (p as any).voteType;
+    if (voteType && voteType !== 'yes-no') {
+      router.push({
+        pathname: '/modals/proposal-detail',
+        params: {
+          proposalId: String(p.id),
+          title: p.title || '',
+          description: p.description || '',
+          category: p.category || 'General',
+          deadline: p.deadline || '',
+          voteType,
+          options: JSON.stringify((p as any).options ?? []),
+        },
+      });
+      return;
+    }
     setSelectedProposal(p);
     setShowDetailModal(true);
   };
@@ -2376,15 +2405,29 @@ export default function ProposalsScreen() {
       ) : filteredProposals.length === 0 ? (
         <Animated.View entering={FadeIn.duration(400)} style={styles.emptyState}>
           <View style={[styles.emptyIcon, { backgroundColor: `${colors.gold}15` }]}>
-            <Ionicons name="document-text-outline" size={48} color={colors.gold} />
+            <Ionicons name={!isVerified && !hasActiveFilters ? 'shield-checkmark-outline' : 'document-text-outline'} size={48} color={colors.gold} />
           </View>
-          <Text style={[styles.emptyTitle, { color: colors.text }]}>No proposals found</Text>
+          <Text style={[styles.emptyTitle, { color: colors.text }]}>
+            {!isVerified && !hasActiveFilters ? 'No global proposals open' : 'No proposals found'}
+          </Text>
           <Text style={[styles.emptyDesc, { color: colors.textSecondary }]}>
-            {hasActiveFilters ? 'Try adjusting your filters' : 'Be the first to create one!'}
+            {hasActiveFilters
+              ? 'Try adjusting your filters'
+              : !isVerified
+                ? 'There are no global proposals open right now. Verify your identity to vote on proposals in your country, province, and city.'
+                : 'Be the first to create one!'}
           </Text>
           {!hasActiveFilters && (
             <TouchableOpacity
-              onPress={() => setShowCreateModal(true)}
+              onPress={() => {
+                if (!isVerified) {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                  setVerificationModalType('vote');
+                  setShowVerificationModal(true);
+                } else {
+                  setShowCreateModal(true);
+                }
+              }}
               style={styles.emptyBtn}
             >
               <LinearGradient
@@ -2393,8 +2436,8 @@ export default function ProposalsScreen() {
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
               >
-                <Ionicons name="add-circle-outline" size={20} color="#000" />
-                <Text style={styles.emptyBtnText}>Create Proposal</Text>
+                <Ionicons name={!isVerified ? 'shield-checkmark' : 'add-circle-outline'} size={20} color="#000" />
+                <Text style={styles.emptyBtnText}>{!isVerified ? 'Get Verified' : 'Create Proposal'}</Text>
               </LinearGradient>
             </TouchableOpacity>
           )}
@@ -2520,17 +2563,31 @@ export default function ProposalsScreen() {
             <TouchableOpacity onPress={closeProposal} style={detailStyles.headerBtn} activeOpacity={0.7}>
               <Ionicons name="chevron-down" size={20} color={FG} />
             </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => {
-                if (!detail) return;
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                shareProposal({ id: detail.id as number, title: detail.title, description: detail.description });
-              }}
-              style={detailStyles.headerBtn}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="share-outline" size={16} color={FG} />
-            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', gap: 6 }}>
+              <TouchableOpacity
+                onPress={() => {
+                  if (!detail) return;
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  shareProposal({ id: detail.id as number, title: detail.title, description: detail.description });
+                }}
+                style={detailStyles.headerBtn}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="share-outline" size={16} color={FG} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => {
+                  if (!detail) return;
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  setShowModerationMenu(true);
+                }}
+                style={detailStyles.headerBtn}
+                activeOpacity={0.7}
+                accessibilityLabel="Proposal options"
+              >
+                <Ionicons name="ellipsis-horizontal" size={18} color={FG} />
+              </TouchableOpacity>
+            </View>
           </View>
 
           {detail && (() => {
@@ -2538,9 +2595,7 @@ export default function ProposalsScreen() {
             const pct = total > 0 ? Math.round(((detail.supportVotes || 0) / total) * 100) : 0;
             const tierLabel = getTierLabel(detail.geoRestrictions);
             const category = detail.category || 'General';
-            const location = detail.geoRestrictions && detail.geoRestrictions.length > 0
-              ? detail.geoRestrictions[detail.geoRestrictions.length - 1]
-              : 'Canada';
+            const location = getLocationLabel(detail.geoRestrictions);
             const timeRemaining = getTimeRemaining(detail.deadline);
             const ended = isProposalEnded(detail);
             const cat = category.toLowerCase();
@@ -2687,6 +2742,18 @@ export default function ProposalsScreen() {
               </ScrollView>
             );
           })()}
+
+          <ProposalModerationMenu
+            visible={showModerationMenu}
+            onClose={() => setShowModerationMenu(false)}
+            proposalId={detail?.id ?? null}
+            creatorId={(detail as any)?.creatorId ?? (detail as any)?.userId ?? null}
+            creatorName={detail?.creatorName || 'Community Member'}
+            onMuted={() => {
+              // Close the detail view too — user just hid the creator
+              closeProposal();
+            }}
+          />
         </View>
       </Modal>
 
@@ -2821,6 +2888,90 @@ export default function ProposalsScreen() {
                 </TouchableOpacity>
               )}
             </View>
+
+            {/* Ballot type picker. Defaults to yes-no for backward compat. */}
+            <View style={styles.formSection}>
+              <Text style={[styles.formLabel, { color: colors.gold }]}>Ballot type</Text>
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                {(['yes-no', 'multiple-choice', 'ranked-choice'] as const).map((vt) => {
+                  const active = newProposal.voteType === vt;
+                  const label = vt === 'yes-no' ? 'Yes / No' : vt === 'multiple-choice' ? 'Multiple choice' : 'Ranked choice';
+                  return (
+                    <TouchableOpacity
+                      key={vt}
+                      onPress={() => setNewProposal((p) => ({ ...p, voteType: vt }))}
+                      style={{
+                        flex: 1,
+                        paddingVertical: 10,
+                        paddingHorizontal: 8,
+                        backgroundColor: active ? colors.gold : colors.surface,
+                        borderColor: active ? colors.gold : colors.border,
+                        borderWidth: 1,
+                        borderRadius: 8,
+                        alignItems: 'center',
+                      }}
+                    >
+                      <Text style={{ color: active ? '#000' : colors.textSecondary, fontSize: 12, fontWeight: '600' }}>
+                        {label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+              {newProposal.voteType === 'ranked-choice' && (
+                <Text style={{ color: colors.textSecondary, fontSize: 11, marginTop: 6, lineHeight: 16 }}>
+                  Voters rank options in order of preference. Winner determined by instant-runoff (IRV).
+                </Text>
+              )}
+            </View>
+
+            {/* Options list, shown for non-yes-no ballots. */}
+            {newProposal.voteType !== 'yes-no' && (
+              <View style={styles.formSection}>
+                <Text style={[styles.formLabel, { color: colors.gold }]}>Options</Text>
+                {newProposal.options.map((opt, idx) => (
+                  <View key={idx} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                    <TextInput
+                      style={{
+                        flex: 1,
+                        padding: 12,
+                        backgroundColor: colors.surface,
+                        borderColor: colors.border,
+                        borderWidth: 1,
+                        borderRadius: 8,
+                        color: colors.text,
+                      }}
+                      placeholder={`Option ${idx + 1}`}
+                      placeholderTextColor={colors.textTertiary}
+                      value={opt}
+                      onChangeText={(t) => setNewProposal((p) => {
+                        const next = [...p.options];
+                        next[idx] = t;
+                        return { ...p, options: next };
+                      })}
+                      maxLength={120}
+                    />
+                    {newProposal.options.length > 2 && (
+                      <TouchableOpacity
+                        onPress={() => setNewProposal((p) => ({ ...p, options: p.options.filter((_, i) => i !== idx) }))}
+                        style={{ padding: 8 }}
+                      >
+                        <Ionicons name="close-circle" size={20} color={colors.textTertiary} />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                ))}
+                {newProposal.options.length < 10 && (
+                  <TouchableOpacity
+                    onPress={() => setNewProposal((p) => ({ ...p, options: [...p.options, ''] }))}
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 8 }}
+                  >
+                    <Ionicons name="add-circle-outline" size={16} color={colors.gold} />
+                    <Text style={{ color: colors.gold, fontSize: 12, fontWeight: '600' }}>Add option</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            )}
 
             <View style={styles.formSection}>
               <Text style={[styles.formLabel, { color: colors.gold }]}>Category</Text>

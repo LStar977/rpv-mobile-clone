@@ -29,10 +29,21 @@ export interface Organization {
   description: string;
   logoUrl?: string;
   memberCount: number;
-  tier: 'starter' | 'professional' | 'premium' | 'enterprise';
+  // Stage 3 tier names + legacy grandfather. Old-name strings may still
+  // appear on grandfathered rows in DB until ops migrates them, but those
+  // rows are mapped to 'legacy' via the migration SQL in UPDATE 23.
+  tier: 'free' | 'pro' | 'plus' | 'business' | 'government' | 'legacy';
   verified: boolean;
   createdAt: string;
   role?: 'admin' | 'member';
+  // UPDATE 26: when true, members must complete Veriff/Didit before
+  // voting in this org. Pro+ feature; the org must have paid the one-time
+  // unlock fee before this can be toggled on.
+  requireMemberVerification?: boolean;
+  // Stamped when the org pays the verification unlock fee. Null = not yet
+  // unlocked. Cleared on Stripe / IAP refund.
+  verificationUnlockedAt?: string | null;
+  verificationUnlockedTier?: string | null;
 }
 
 export interface OrganizationProposal extends Proposal {
@@ -53,7 +64,7 @@ const SEED_ORGANIZATIONS: Organization[] = [
     description: 'A grassroots organization dedicated to amplifying community perspectives on local policy decisions. We bring together neighbors to discuss and vote on issues that matter most to our neighborhoods.',
     logoUrl: 'https://images.unsplash.com/photo-1529156069898-49953e39b3ac?w=200&h=200&fit=crop',
     memberCount: 847,
-    tier: 'professional',
+    tier: 'plus',
     verified: true,
     createdAt: '2024-06-15T10:00:00Z',
     role: 'admin',
@@ -64,7 +75,7 @@ const SEED_ORGANIZATIONS: Organization[] = [
     description: 'Westbrook University uses Represent to give every student and faculty member a direct voice in campus decisions. Sub-organizations let each department run its own polls while leadership sees the full picture.',
     logoUrl: 'https://images.unsplash.com/photo-1562774053-701939374585?w=200&h=200&fit=crop',
     memberCount: 3209,
-    tier: 'enterprise',
+    tier: 'business',
     verified: true,
     createdAt: '2024-08-22T10:00:00Z',
     role: 'admin',
@@ -430,6 +441,14 @@ interface ApiResponse<T> {
   data: T | null;
   error: string | null;
   requiresVerification?: boolean;
+  // Structured server error context. Populated for non-2xx responses when
+  // the server returns a JSON body. Additive — existing callers ignore them.
+  // Used by the org-tier UpgradePrompt to show specific copy and a CTA
+  // when the backend returns 402 with code MEMBER_LIMIT_EXCEEDED or
+  // FEATURE_NOT_AVAILABLE_ON_TIER (see backend/server/routes.ts).
+  errorCode?: string;
+  errorStatus?: number;
+  errorDetails?: Record<string, any>;
 }
 
 export interface Proposal {
@@ -510,7 +529,14 @@ async function apiRequest<T>(
         errorMessage.includes('verify') ||
         errorMessage.includes('identity') ||
         errorMessage.includes('Identity');
-      return { data: null, error: errorMessage, requiresVerification };
+      return {
+        data: null,
+        error: errorMessage,
+        requiresVerification,
+        errorCode: typeof errorData?.code === 'string' ? errorData.code : undefined,
+        errorStatus: response.status,
+        errorDetails: errorData && typeof errorData === 'object' ? errorData : undefined,
+      };
     }
 
     // For DELETE requests, treat any successful response as success
@@ -547,9 +573,27 @@ export const userApi = {
   },
   async getVotedProposals(): Promise<ApiResponse<(number | string)[]>> {
     const result = await apiRequest<any>('/api/user/voted-proposals');
-    if (result.data?.votedProposals) return { data: result.data.votedProposals, error: null };
-    if (Array.isArray(result.data)) return { data: result.data, error: null };
-    return { data: [], error: result.error };
+    let backendIds: (number | string)[] = [];
+    if (result.data?.votedProposals) backendIds = result.data.votedProposals;
+    else if (Array.isArray(result.data)) backendIds = result.data;
+
+    // Also include locally-recorded org-proposal votes so the dashboard
+    // pending counter decrements after voting on an org proposal. The
+    // deployed backend's /api/user/voted-proposals only tracks global
+    // proposal votes (via /api/voting/submit), not org-proposal votes
+    // (cast through /api/organizations/.../proposals/.../vote).
+    try {
+      const stored = await AsyncStorage.getItem(ORG_VOTES_STORAGE_KEY);
+      if (stored) {
+        const votes: Record<string, 'support' | 'oppose'> = JSON.parse(stored);
+        const orgProposalIds = Object.keys(votes)
+          .map((k) => k.split(':')[1])
+          .filter(Boolean);
+        backendIds = Array.from(new Set([...backendIds.map(String), ...orgProposalIds]));
+      }
+    } catch {}
+
+    return { data: backendIds, error: result.error };
   },
   async getProfile(): Promise<ApiResponse<any>> {
     const result = await apiRequest<any>('/api/auth/verify');
@@ -559,15 +603,18 @@ export const userApi = {
   async getVerificationStatus(): Promise<ApiResponse<{ verified: boolean; hasPassport: boolean; country?: string; state?: string; city?: string }>> {
     const result = await apiRequest<any>('/api/auth/verify');
     if (result.data?.user) {
-      return { 
-        data: { 
-          verified: result.data.user.verified || false,
-          hasPassport: result.data.user.hasPassport || false,
-          country: result.data.user.country,
-          state: result.data.user.state,
-          city: result.data.user.city,
-        }, 
-        error: null 
+      const u = result.data.user;
+      const verified = !!(u.verified || u.isVerified || u.is_verified || u.kycVerified || u.kyc_verified || u.passport_verified);
+      console.log('[verify] backend user keys:', Object.keys(u).join(','), '| derived verified:', verified);
+      return {
+        data: {
+          verified,
+          hasPassport: !!(u.hasPassport || u.has_passport),
+          country: u.country,
+          state: u.state,
+          city: u.city,
+        },
+        error: null
       };
     }
     return { data: { verified: false, hasPassport: false }, error: result.error };
@@ -610,15 +657,36 @@ export const proposalsApi = {
   async claimVoteToken(proposalId: number | string): Promise<ApiResponse<{ success: boolean; txHash?: string }>> {
     return apiRequest(`/api/proposals/${proposalId}/claim-vote-token`, { method: 'POST' });
   },
-  async submitVote(proposalId: number | string, position: 'support' | 'oppose'): Promise<ApiResponse<{ success: boolean; txHash?: string }>> {
+  async submitVote(
+    proposalId: number | string,
+    position: 'support' | 'oppose' | 'multiple-choice' | 'ranked-choice',
+    extras?: { selectedOption?: string; rankings?: string[] },
+  ): Promise<ApiResponse<{ success: boolean; txHash?: string }>> {
     const authState = useAuthStore.getState();
     const userId = authState.user?.id;
     if (!userId) return { data: null, error: 'Not authenticated', requiresVerification: false };
     return apiRequest('/api/voting/submit', {
       method: 'POST',
-      body: JSON.stringify({ userId, proposalId, position }),
+      body: JSON.stringify({
+        userId,
+        proposalId,
+        position,
+        selectedOption: extras?.selectedOption,
+        rankings: extras?.rankings,
+      }),
     });
   },
+
+  // Unified results endpoint. Branches on the proposal's voteType.
+  // Returns one of:
+  //   { type: 'yes-no', supportVotes, opposeVotes }
+  //   { type: 'multiple-choice', options, counts }
+  //   { type: 'ranked-choice', options, totalBallots, exhaustedBallots,
+  //       rounds, winner, winningRound, tieBreakRule }
+  async getResults(proposalId: number | string): Promise<ApiResponse<any>> {
+    return apiRequest<any>(`/api/proposals/${proposalId}/results`);
+  },
+
   async getFeatured(): Promise<ApiResponse<Proposal[]>> {
     return apiRequest<Proposal[]>('/api/proposals/featured');
   },
@@ -644,9 +712,14 @@ export const proposalsApi = {
 // Provider-neutral KYC client. Backend routes were renamed from /api/veriff/*
 // to /api/didit/* during the Veriff → Didit migration. The veriffApi alias is
 // kept so any stale imports still compile.
+//
+// originatingOrgId: when supplied, the backend treats this as an org-paid
+// verification — skips the Stripe checkout gate and bills the org via
+// metered usage. The user is verified normally; the org pays.
 export const kycApi = {
-  async createSession(): Promise<ApiResponse<{ sessionUrl: string; sessionId: string; verificationId?: string }>> {
-    return apiRequest('/api/didit/create-session', { method: 'POST' });
+  async createSession(originatingOrgId?: string): Promise<ApiResponse<{ sessionUrl: string; sessionId: string; verificationId?: string }>> {
+    const body = originatingOrgId ? JSON.stringify({ originatingOrgId }) : undefined;
+    return apiRequest('/api/didit/create-session', { method: 'POST', body });
   },
   async checkDecision(verificationId: string): Promise<ApiResponse<{ status: string; decision?: string }>> {
     return apiRequest(`/api/didit/check-decision?verificationId=${verificationId}`);
@@ -654,7 +727,133 @@ export const kycApi = {
 };
 export const veriffApi = kycApi;
 
+export interface OrgUsage {
+  tier: 'free' | 'pro' | 'plus' | 'business' | 'government' | 'legacy';
+  subscriptionStatus: 'active' | 'pending' | 'past_due' | 'canceled' | 'free' | string;
+  members: { current: number; limit: number | null };
+  // UPDATE 26: identity verification is unlocked once per org via a
+  // tier-priced one-time fee. unlockFeeCents is the price the admin would
+  // pay at the current tier (null = feature unavailable / custom contract).
+  verification: {
+    unlocked: boolean;
+    unlockedAt: string | null;
+    unlockFeeCents: number | null;
+  };
+  requireMemberVerification: boolean;
+  nextBillingDate: string | null;
+  paymentProvider: 'stripe' | 'iap' | null;
+  isAdmin: boolean;
+}
+
 export const organizationsApi = {
+  async getUsage(orgId: string): Promise<ApiResponse<OrgUsage>> {
+    return apiRequest<OrgUsage>(`/api/organizations/${orgId}/usage`);
+  },
+
+  // Toggle org-mandated member verification (UPDATE 26). Two failure modes:
+  //   402 FEATURE_NOT_AVAILABLE_ON_TIER  — caller is on Free, show UpgradeModal.
+  //   402 VERIFICATION_UNLOCK_REQUIRED   — caller hasn't paid the unlock fee;
+  //                                        route to verification-unlock-checkout.
+  async setRequireVerification(
+    orgId: string,
+    require: boolean,
+  ): Promise<ApiResponse<{ requireMemberVerification: boolean }>> {
+    return apiRequest<{ requireMemberVerification: boolean }>(
+      `/api/organizations/${orgId}/require-verification`,
+      { method: 'PUT', body: JSON.stringify({ require }) },
+    );
+  },
+
+  // UPDATE 26: kick off the one-time unlock-fee Stripe Checkout session.
+  // Stripe-billed orgs only — IAP-billed orgs use the IAP path below.
+  async createVerificationUnlockCheckout(
+    orgId: string,
+  ): Promise<ApiResponse<{ checkoutUrl: string; sessionId: string }>> {
+    return apiRequest<{ checkoutUrl: string; sessionId: string }>(
+      `/api/organizations/${orgId}/verification-unlock/checkout`,
+      { method: 'POST' },
+    );
+  },
+
+  // UPDATE 26: submit Apple IAP receipt for the one-time unlock fee.
+  // Server validates with Apple and stamps the org unlocked.
+  async submitVerificationUnlockIapReceipt(
+    orgId: string,
+    receiptData: string,
+    productId: string,
+    transactionId: string,
+  ): Promise<ApiResponse<{ verificationUnlockedAt: string | null }>> {
+    return apiRequest<{ verificationUnlockedAt: string | null }>(
+      `/api/organizations/${orgId}/verification-unlock/iap-receipt`,
+      { method: 'POST', body: JSON.stringify({ receiptData, productId, transactionId }) },
+    );
+  },
+
+  async cancelSubscription(orgId: string): Promise<ApiResponse<{ canceled: boolean; effectiveAt: string }>> {
+    return apiRequest<{ canceled: boolean; effectiveAt: string }>(
+      `/api/organizations/${orgId}/cancel-subscription`,
+      { method: 'POST' },
+    );
+  },
+
+  // Audit-log export uses FileSystem.downloadAsync (NOT apiRequest) so the
+  // raw CSV/JSON body lands in a file on disk instead of being parsed as
+  // JSON. Returns the local file URI plus the bundle signature header so
+  // the caller can pass them to the share sheet.
+  // On 402 (FEATURE_NOT_AVAILABLE_ON_TIER) returns errorCode for the
+  // upgrade-modal flow.
+  async exportAuditLog(
+    orgId: string,
+    opts: { format: 'csv' | 'json'; includeVoterIdentity: boolean },
+  ): Promise<{
+    success: boolean;
+    uri?: string;
+    exportId?: string | null;
+    bundleSignature?: string | null;
+    error?: string;
+    errorCode?: string;
+  }> {
+    try {
+      const FileSystem = require('expo-file-system');
+      const token = await getAuthToken();
+      const headers: Record<string, string> = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const ext = opts.format === 'json' ? 'json' : 'csv';
+      const filename = `audit-log-${orgId}-${Date.now()}.${ext}`;
+      const uri = `${FileSystem.documentDirectory}${filename}`;
+
+      const url = `${API_BASE_URL}/api/organizations/${orgId}/audit-log` +
+        `?format=${opts.format}&include_voter_identity=${opts.includeVoterIdentity}`;
+
+      const result = await FileSystem.downloadAsync(url, uri, { headers });
+
+      if (result.status === 402) {
+        // Read the body to extract the structured error code.
+        const body = await FileSystem.readAsStringAsync(result.uri).catch(() => '{}');
+        let parsed: any = {};
+        try { parsed = JSON.parse(body); } catch {}
+        return {
+          success: false,
+          error: parsed.error || 'Audit log export requires Premium plan',
+          errorCode: parsed.code || 'FEATURE_NOT_AVAILABLE_ON_TIER',
+        };
+      }
+      if (result.status >= 400) {
+        return { success: false, error: `HTTP ${result.status}` };
+      }
+
+      return {
+        success: true,
+        uri: result.uri,
+        exportId: (result.headers as any)?.['x-audit-export-id'] ?? null,
+        bundleSignature: (result.headers as any)?.['x-audit-bundle-signature'] ?? null,
+      };
+    } catch (error: any) {
+      return { success: false, error: error?.message || 'Export failed' };
+    }
+  },
+
   async getMyOrganizations(): Promise<ApiResponse<Organization[]>> {
     const result = await apiRequest<any>('/api/organizations');
     let backendOrgs: Organization[] = [];
@@ -1084,10 +1283,27 @@ export const organizationsApi = {
     }
 
     // For regular accounts, call the backend API
-    return apiRequest(`/api/organizations/${orgId}/proposals/${proposalId}/vote`, {
-      method: 'POST',
-      body: JSON.stringify({ vote }),
-    });
+    const result = await apiRequest<{ success: boolean; supportVotes: number; opposeVotes: number }>(
+      `/api/organizations/${orgId}/proposals/${proposalId}/vote`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ vote }),
+      }
+    );
+
+    // On success, persist the vote locally so userVote is restored when the
+    // modal is reopened or the proposal list is refetched. The proposal-list
+    // merge step (mergeUserVotes above) reads from this same key.
+    if (!result.error) {
+      try {
+        const stored = await AsyncStorage.getItem(ORG_VOTES_STORAGE_KEY);
+        const votes: Record<string, 'support' | 'oppose'> = stored ? JSON.parse(stored) : {};
+        votes[`${orgId}:${proposalId}`] = vote;
+        await AsyncStorage.setItem(ORG_VOTES_STORAGE_KEY, JSON.stringify(votes));
+      } catch {}
+    }
+
+    return result;
   },
 
   async getUserOrgVotes(): Promise<Record<string, 'support' | 'oppose'>> {
@@ -1174,7 +1390,7 @@ export const organizationsApi = {
   }>> {
     return apiRequest(`/api/organizations/${orgId}/invites/import`, {
       method: 'POST',
-      body: JSON.stringify({ rows }),
+      body: JSON.stringify({ invites: rows }),
     });
   },
 
@@ -1193,7 +1409,10 @@ export const organizationsApi = {
     name: string;
     description: string;
     logoUrl?: string;
-    type: 'starter' | 'professional' | 'premium' | 'enterprise';
+    // Stage 3 (UPDATE 23) tier names. Backend treats this as the initial
+    // org tier — Free is the no-payment default, paid tiers go through
+    // the Stripe / IAP flow afterward.
+    type: 'free' | 'pro' | 'plus' | 'business' | 'government';
   }): Promise<ApiResponse<Organization>> {
     const rawResult = await apiRequest<any>('/api/organizations', {
       method: 'POST',
@@ -1355,10 +1574,6 @@ export interface UsageLimits {
     period: 'month' | 'week';
     resetDate: string;
   };
-  votes: {
-    used: number;
-    limit: number | 'unlimited';
-  };
 }
 
 export const analyticsApi = {
@@ -1396,10 +1611,6 @@ export const limitsApi = {
           limit: 1,
           period: 'month',
           resetDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-        },
-        votes: {
-          used: 0,
-          limit: 5,
         },
       },
       error: result.error,
@@ -1491,6 +1702,43 @@ export const adminApi = {
   },
 };
 
+export type ReportReason =
+  | 'spam'
+  | 'hate_speech'
+  | 'threat'
+  | 'sexual'
+  | 'illegal'
+  | 'misinformation'
+  | 'other';
+
+export const moderationApi = {
+  async reportProposal(
+    proposalId: number | string,
+    reason: ReportReason,
+    note?: string,
+  ): Promise<ApiResponse<{ ok: true; hidden?: boolean }>> {
+    return apiRequest<{ ok: true; hidden?: boolean }>(`/api/proposals/${proposalId}/report`, {
+      method: 'POST',
+      body: JSON.stringify({ reason, note: note?.slice(0, 500) }),
+    });
+  },
+
+  async muteUser(userId: string): Promise<ApiResponse<{ ok: true }>> {
+    return apiRequest<{ ok: true }>(`/api/users/${userId}/mute`, { method: 'POST' });
+  },
+
+  async unmuteUser(userId: string): Promise<ApiResponse<{ ok: true }>> {
+    return apiRequest<{ ok: true }>(`/api/users/${userId}/mute`, { method: 'DELETE' });
+  },
+
+  async getMutedUsers(): Promise<ApiResponse<string[]>> {
+    const result = await apiRequest<any>('/api/user/mutes');
+    if (result.data?.mutedUsers) return { data: result.data.mutedUsers, error: null };
+    if (Array.isArray(result.data)) return { data: result.data, error: null };
+    return { data: [], error: result.error };
+  },
+};
+
 export const api = {
   user: userApi,
   proposals: proposalsApi,
@@ -1502,6 +1750,7 @@ export const api = {
   limits: limitsApi,
   badges: badgesApi,
   admin: adminApi,
+  moderation: moderationApi,
 };
 
 export default api;
