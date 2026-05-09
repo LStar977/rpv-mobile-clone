@@ -61,18 +61,36 @@ export async function processPremiumPayment(token: string | null): Promise<Payme
  * iOS: Apple IAP, never Stripe.
  * Android: Stripe Payment Sheet.
  */
-export type OrgTier = 'starter' | 'professional' | 'premium' | 'enterprise';
+// Stage 3 tier names. Free is no-payment (org just exists at tier='free').
+// Government is set by sales — no payment flow.
+export type OrgTier = 'free' | 'pro' | 'plus' | 'business' | 'government';
 
 export async function processOrganizationPayment(
   token: string | null,
   tier: OrgTier,
   organizationId: string,
 ): Promise<PaymentResult> {
-  const tierToProduct: Record<OrgTier, string> = {
-    starter: IAP_PRODUCTS.orgStarter,
-    professional: IAP_PRODUCTS.orgProfessional,
-    premium: IAP_PRODUCTS.orgPremium,
-    enterprise: IAP_PRODUCTS.orgEnterprise,
+  // Free tier doesn't go through any payment flow — the org just gets
+  // tier='free' in the DB and the user is done. The caller decides whether
+  // to create the org with this tier or upgrade an existing org.
+  if (tier === 'free') {
+    return { success: true };
+  }
+
+  if (tier === 'government') {
+    Alert.alert(
+      'Contact sales',
+      'Government plans are quoted individually. Email sales@representvote.com to get started.',
+    );
+    return { success: false, error: 'Government tier is set by sales' };
+  }
+
+  const tierToProduct: Record<'pro' | 'plus' | 'business', string> = {
+    // IAP product IDs follow the same .org.<tier> pattern as the legacy
+    // SKUs. Operators must register the new ones in App Store Connect.
+    pro: (IAP_PRODUCTS as any).orgPro || (IAP_PRODUCTS as any).orgProfessional || '',
+    plus: (IAP_PRODUCTS as any).orgPlus || (IAP_PRODUCTS as any).orgPremium || '',
+    business: (IAP_PRODUCTS as any).orgBusiness || (IAP_PRODUCTS as any).orgEnterprise || '',
   };
 
   if (Platform.OS === 'ios') {
@@ -88,7 +106,9 @@ export async function processOrganizationPayment(
     }
     return processIAPPurchase(tierToProduct[tier], token, organizationId);
   }
-  return processStripeOrganization(token, tier, organizationId);
+  // Free + Government short-circuited above; this branch only runs for
+  // paid self-serve tiers.
+  return processStripeOrganization(token, tier as 'pro' | 'plus' | 'business', organizationId);
 }
 
 // --- IAP flow (iOS only) ---
@@ -169,7 +189,11 @@ async function processStripePremium(token: string | null): Promise<PaymentResult
 
 async function processStripeOrganization(
   token: string | null,
-  tier: OrgTier,
+  // Stripe path is only reached for paid self-serve tiers — Free is
+  // short-circuited and Government goes through sales. Narrow the type
+  // accordingly so fetchOrganizationPaymentIntent's stricter signature
+  // is satisfied without a cast.
+  tier: 'pro' | 'plus' | 'business',
   organizationId: string,
 ): Promise<PaymentResult> {
   if (Platform.OS === 'ios') {

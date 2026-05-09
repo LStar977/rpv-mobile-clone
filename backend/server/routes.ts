@@ -3489,25 +3489,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Organization subscription payment intent (for mobile native payment sheet)
-  // STRIPE_PRICE_ORG_COMMUNITY is the legacy name for the Starter price ID;
-  // it stays wired as a fallback so any in-flight purchases (or
-  // grandfathered subscribers paying through old webhook events) keep
-  // resolving correctly while operators migrate to STRIPE_PRICE_ORG_STARTER.
+  // Stage 3 (UPDATE 23) tier price IDs. New customers go through these.
+  // Legacy customers (tier='legacy') keep their original Stripe
+  // subscriptions billing at the old prices — webhookHandlers.ts retains
+  // the old price ID mappings as fallback so renewal webhooks continue
+  // to validate.
   const ORG_PRICE_IDS: Record<string, string> = {
-    starter: process.env.STRIPE_PRICE_ORG_STARTER
-      || process.env.STRIPE_PRICE_ORG_COMMUNITY
-      || 'price_1SwhrED2jsTroGJyAvU4bZ4r',
-    professional: process.env.STRIPE_PRICE_ORG_PROFESSIONAL || 'price_1SwhsSD2jsTroGJyps2LHaah',
-    premium: process.env.STRIPE_PRICE_ORG_PREMIUM || '',
-    enterprise: process.env.STRIPE_PRICE_ORG_ENTERPRISE || 'price_1SwhtFD2jsTroGJylQOkB8tu',
+    pro: process.env.STRIPE_PRICE_ORG_PRO || '',
+    plus: process.env.STRIPE_PRICE_ORG_PLUS || '',
+    business: process.env.STRIPE_PRICE_ORG_BUSINESS || '',
   };
 
   const ORG_EXPECTED_AMOUNTS: Record<string, number> = {
-    starter: 2900,
-    professional: 9900,
-    premium: 29900,
-    enterprise: 9900,
+    pro: 5900,        // $59/mo
+    plus: 17900,      // $179/mo
+    business: 49900,  // $499/mo
   };
 
   app.post("/api/stripe/organization-payment-intent", isAuthenticated, async (req: any, res) => {
@@ -3519,9 +3515,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Missing tier or organizationId" });
       }
 
-      const validTiers = ['starter', 'professional', 'premium', 'enterprise'];
+      // Free is created without Stripe; Government is set by sales.
+      // Only paid self-serve tiers go through this endpoint.
+      if (tier === 'free') {
+        return res.status(400).json({ error: "Free tier doesn't require payment" });
+      }
+      if (tier === 'government') {
+        return res.status(400).json({ error: "Government tier is set by sales — contact sales@representvote.com" });
+      }
+      const validTiers = ['pro', 'plus', 'business'];
       if (!validTiers.includes(tier)) {
-        return res.status(400).json({ error: "Invalid tier" });
+        return res.status(400).json({ error: "Invalid tier. Valid: pro, plus, business" });
       }
 
       const org = await storage.getOrganization(organizationId);

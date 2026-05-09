@@ -4,7 +4,7 @@
 
 import type { Ionicons } from '@expo/vector-icons';
 
-export type OrgTier = 'starter' | 'professional' | 'premium' | 'enterprise';
+export type OrgTier = 'free' | 'pro' | 'plus' | 'business' | 'government';
 
 export interface OrgTierMeta {
   name: string;
@@ -18,65 +18,85 @@ export interface OrgTierMeta {
 }
 
 export const ORG_TIERS: Record<OrgTier, OrgTierMeta> = {
-  starter: {
-    name: 'Starter',
-    price: '$29',
-    priceValue: 29,
-    description: 'Perfect for small groups and local organizations',
-    icon: 'people-outline',
+  free: {
+    name: 'Free',
+    price: '$0',
+    priceValue: 0,
+    description: 'Get started with verified voting for small groups',
+    icon: 'people-circle-outline',
     features: [
-      'Up to 100 members',
-      'Internal proposals & voting',
-      'Basic announcements',
-      'Invite code management',
+      'Up to 25 members',
+      '25 identity verifications/month',
+      'Yes/No, multiple-choice, and ranked-choice voting',
+      'Invite codes',
       'Community support',
     ],
   },
-  professional: {
-    name: 'Professional',
-    price: '$99',
-    priceValue: 99,
-    description: 'For growing organizations with advanced needs',
+  pro: {
+    name: 'Pro',
+    price: '$59',
+    priceValue: 59,
+    description: 'For small unions, HOAs, and active community groups',
+    icon: 'people-outline',
+    features: [
+      'Up to 250 members',
+      '250 verifications/month',
+      'Everything in Free',
+      'CSV roster import',
+      'Advanced analytics',
+      'API access',
+      'Email support',
+    ],
+  },
+  plus: {
+    name: 'Plus',
+    price: '$179',
+    priceValue: 179,
+    description: 'For mid-size unions, school PTAs, and political parties',
     icon: 'business-outline',
     popular: true,
     features: [
-      'Up to 500 members',
-      'Everything in Starter',
-      'Advanced analytics',
-      'Custom branding',
+      'Up to 1,000 members',
+      '1,000 verifications/month',
+      'Everything in Pro',
+      'Sub-organization hierarchy',
+      'OAuth/SSO (MyAUPE, OPSEU, custom)',
+      'Audit log export with HMAC receipts',
       'Priority support',
-      'API access',
     ],
   },
-  premium: {
-    name: 'Premium',
-    price: '$299',
-    priceValue: 299,
-    description: 'For large unions, parties, and federations',
+  business: {
+    name: 'Business',
+    price: '$499',
+    priceValue: 499,
+    description: 'For federations, school districts, and large unions',
     icon: 'shield-checkmark-outline',
     features: [
-      'Up to 2,500 members',
-      'Everything in Professional',
-      'Sub-organization hierarchy (district → school)',
-      'Roster import (CSV)',
+      'Up to 5,000 members',
+      '5,000 verifications/month',
+      'Everything in Plus',
+      'White-label & custom domain',
       'Dedicated onboarding',
-      'SLA + 24h response time',
+      '99.9% SLA + 4h response',
     ],
   },
-  enterprise: {
-    name: 'Enterprise',
+  government: {
+    // Hidden from the public picker (UI filters this entry out). Set by
+    // sales via direct DB update or a future admin endpoint. Resolves
+    // correctly server-side (unlimited everything) for orgs that have it.
+    name: 'Government',
     price: 'Contact Us',
     priceValue: 0,
-    description: 'For 2,500+ member organizations',
+    description: 'For cities, counties, and government agencies',
     icon: 'globe-outline',
     contactOnly: true,
     features: [
       'Unlimited members',
-      'Everything in Premium',
-      'Dedicated account manager',
+      'Unlimited verifications',
+      'Annual contracts only',
+      'SOC 2 Type II + custom DPA',
       'Custom integrations',
-      'Custom SLA',
-      'White-label options',
+      'Dedicated CSM',
     ],
   },
 };

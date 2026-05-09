@@ -29,7 +29,10 @@ export interface Organization {
   description: string;
   logoUrl?: string;
   memberCount: number;
-  tier: 'starter' | 'professional' | 'premium' | 'enterprise';
+  // Stage 3 tier names + legacy grandfather. Old-name strings may still
+  // appear on grandfathered rows in DB until ops migrates them, but those
+  // rows are mapped to 'legacy' via the migration SQL in UPDATE 23.
+  tier: 'free' | 'pro' | 'plus' | 'business' | 'government' | 'legacy';
   verified: boolean;
   createdAt: string;
   role?: 'admin' | 'member';
@@ -53,7 +56,7 @@ const SEED_ORGANIZATIONS: Organization[] = [
     description: 'A grassroots organization dedicated to amplifying community perspectives on local policy decisions. We bring together neighbors to discuss and vote on issues that matter most to our neighborhoods.',
     logoUrl: 'https://images.unsplash.com/photo-1529156069898-49953e39b3ac?w=200&h=200&fit=crop',
     memberCount: 847,
-    tier: 'professional',
+    tier: 'plus',
     verified: true,
     createdAt: '2024-06-15T10:00:00Z',
     role: 'admin',
@@ -64,7 +67,7 @@ const SEED_ORGANIZATIONS: Organization[] = [
     description: 'Westbrook University uses Represent to give every student and faculty member a direct voice in campus decisions. Sub-organizations let each department run its own polls while leadership sees the full picture.',
     logoUrl: 'https://images.unsplash.com/photo-1562774053-701939374585?w=200&h=200&fit=crop',
     memberCount: 3209,
-    tier: 'enterprise',
+    tier: 'business',
     verified: true,
     createdAt: '2024-08-22T10:00:00Z',
     role: 'admin',
@@ -712,7 +715,7 @@ export const kycApi = {
 export const veriffApi = kycApi;
 
 export interface OrgUsage {
-  tier: 'starter' | 'professional' | 'premium' | 'enterprise' | 'legacy';
+  tier: 'free' | 'pro' | 'plus' | 'business' | 'government' | 'legacy';
   subscriptionStatus: 'active' | 'pending' | 'past_due' | 'canceled' | 'free' | string;
   members: { current: number; limit: number | null };
   verifications: { current: number; limit: number | null };
@@ -1346,7 +1349,10 @@ export const organizationsApi = {
     name: string;
     description: string;
     logoUrl?: string;
-    type: 'starter' | 'professional' | 'premium' | 'enterprise';
+    // Stage 3 (UPDATE 23) tier names. Backend treats this as the initial
+    // org tier — Free is the no-payment default, paid tiers go through
+    // the Stripe / IAP flow afterward.
+    type: 'free' | 'pro' | 'plus' | 'business' | 'government';
   }): Promise<ApiResponse<Organization>> {
     const rawResult = await apiRequest<any>('/api/organizations', {
       method: 'POST',

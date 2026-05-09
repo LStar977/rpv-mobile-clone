@@ -127,11 +127,11 @@ export const organizations = pgTable("organizations", {
   iapEnvironment: varchar("iap_environment"), // 'Sandbox' | 'Production'
 
   // Subscription tier — drives member caps and feature gating.
-  // Values: 'starter' | 'professional' | 'premium' | 'enterprise' | 'legacy'.
-  // Existing rows pre-enforcement should be migrated to 'legacy' (uncapped) to
-  // grandfather customers; new rows default to 'starter' (100-member cap).
-  // See shared/tier-limits.ts for the authoritative limits.
-  tier: varchar("tier").default('starter'),
+  // Values: 'free' | 'pro' | 'plus' | 'business' | 'government' | 'legacy'.
+  // Existing rows from the pre-Stage-3 pricing are migrated to 'legacy'
+  // (uncapped) to grandfather customers; new rows default to 'free'
+  // (25-member cap). See shared/tier-limits.ts for authoritative limits.
+  tier: varchar("tier").default('free'),
 
   // Per-month verification counter for overage protection. The reset
   // timestamp lets us amortize across calendar months without a cron job —

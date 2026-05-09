@@ -182,10 +182,15 @@ export class WebhookHandlers {
         const subType = subscription.metadata?.type;
 
         if (subType === 'organization' && orgId) {
-          // STRIPE_PRICE_ORG_COMMUNITY is the legacy name for the Starter
-          // price ID; kept as a fallback so renewals on grandfathered subs
-          // continue to validate while operators migrate to the new env var.
+          // Stage 3 (UPDATE 23) introduced new tier names + prices. The
+          // legacy names (starter/professional/premium/enterprise) stay
+          // in the validation map so renewals on grandfathered subs
+          // continue to succeed without manual migration.
           const ORG_PRICE_IDS: Record<string, string> = {
+            pro: process.env.STRIPE_PRICE_ORG_PRO || '',
+            plus: process.env.STRIPE_PRICE_ORG_PLUS || '',
+            business: process.env.STRIPE_PRICE_ORG_BUSINESS || '',
+            // Grandfathered (Stage 1 / pre-Stage-3) — keep so old subs validate.
             starter: process.env.STRIPE_PRICE_ORG_STARTER
               || process.env.STRIPE_PRICE_ORG_COMMUNITY
               || 'price_1SwhrED2jsTroGJyAvU4bZ4r',
@@ -194,6 +199,7 @@ export class WebhookHandlers {
             enterprise: process.env.STRIPE_PRICE_ORG_ENTERPRISE || 'price_1SwhtFD2jsTroGJylQOkB8tu',
           };
           const ORG_EXPECTED_AMOUNTS: Record<string, number> = {
+            pro: 5900, plus: 17900, business: 49900,
             starter: 2900, professional: 9900, premium: 29900, enterprise: 9900,
           };
 

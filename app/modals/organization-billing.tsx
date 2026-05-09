@@ -192,12 +192,25 @@ export default function OrganizationBillingScreen() {
 
       <ScrollView contentContainerStyle={{ padding: SPACING.lg, paddingBottom: insets.bottom + SPACING['3xl'] }}>
         <Animated.View entering={FadeIn.duration(300)}>
+          {/* Legacy banner: pre-Stage-3 customers grandfathered to uncapped
+              everything. Surfaces the migration nudge without forcing them. */}
+          {usage.tier === 'legacy' && (
+            <View style={[styles.legacyBanner, { backgroundColor: `${colors.gold}10`, borderColor: colors.gold }]}>
+              <Ionicons name="information-circle-outline" size={18} color={colors.gold} />
+              <Text style={[styles.legacyBannerText, { color: colors.text }]}>
+                You're on a legacy plan from before our new pricing. Your features and caps stay unchanged. Contact <Text style={{ color: colors.gold, fontWeight: '600' }}>support@representvote.com</Text> when you'd like to migrate to a current plan.
+              </Text>
+            </View>
+          )}
+
           {/* Status + usage summary */}
           <View style={[styles.summaryCard, { backgroundColor: colors.surface, borderColor: colors.border, ...SHADOWS.sm }]}>
             <View style={styles.summaryRow}>
               <Text style={[styles.summaryLabel, { color: colors.textSecondary }]}>Current plan</Text>
               <Text style={[styles.summaryValue, { color: colors.gold }]}>
-                {ORG_TIERS[usage.tier as OrgTier]?.name ?? usage.tier}
+                {usage.tier === 'legacy'
+                  ? 'Legacy'
+                  : (ORG_TIERS[usage.tier as OrgTier]?.name ?? usage.tier)}
               </Text>
             </View>
             <View style={styles.summaryRow}>
@@ -239,18 +252,20 @@ export default function OrganizationBillingScreen() {
             )}
           </View>
 
-          {/* Plan picker */}
+          {/* Plan picker — Government is hidden (sales-set tier). */}
           <Text style={[styles.sectionTitle, { color: colors.text }]}>Change plan</Text>
-          {(Object.entries(ORG_TIERS) as [OrgTier, typeof ORG_TIERS.starter][]).map(([key, tier]) => (
-            <TierCard
-              key={key}
-              tier={tier}
-              tierKey={key}
-              selected={selectedTier === key}
-              onSelect={() => handleSelectTier(key)}
-              currentTier={key === usage.tier}
-            />
-          ))}
+          {(Object.entries(ORG_TIERS) as [OrgTier, typeof ORG_TIERS.free][])
+            .filter(([key]) => key !== 'government')
+            .map(([key, tier]) => (
+              <TierCard
+                key={key}
+                tier={tier}
+                tierKey={key}
+                selected={selectedTier === key}
+                onSelect={() => handleSelectTier(key)}
+                currentTier={key === usage.tier}
+              />
+            ))}
 
           {selectedTier && selectedTier !== usage.tier && (
             <TouchableOpacity
@@ -349,6 +364,20 @@ const styles = StyleSheet.create({
     padding: SPACING.lg,
     marginBottom: SPACING.lg,
     gap: SPACING.sm,
+  },
+  legacyBanner: {
+    flexDirection: 'row',
+    gap: SPACING.sm,
+    borderRadius: BORDER_RADIUS.lg,
+    borderWidth: 1,
+    padding: SPACING.md,
+    marginBottom: SPACING.md,
+    alignItems: 'flex-start',
+  },
+  legacyBannerText: {
+    ...TYPOGRAPHY.bodySmall,
+    flex: 1,
+    lineHeight: 18,
   },
   summaryRow: {
     flexDirection: 'row',

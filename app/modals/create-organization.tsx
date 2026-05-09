@@ -102,7 +102,7 @@ export default function CreateOrganizationScreen() {
   const [uploadingLogo, setUploadingLogo] = useState(false);
 
   // Tier selection state
-  const [selectedTier, setSelectedTier] = useState<OrgTier>('professional');
+  const [selectedTier, setSelectedTier] = useState<OrgTier>('free');
 
   // Payment state
   const [processing, setProcessing] = useState(false);
@@ -161,11 +161,17 @@ export default function CreateOrganizationScreen() {
       }
       setCurrentStep('tier');
     } else if (currentStep === 'tier') {
-      // Enterprise tier opens email instead of payment
-      if (selectedTier === 'enterprise') {
-        const subject = encodeURIComponent(`Enterprise Inquiry: ${name.trim()}`);
-        const body = encodeURIComponent(`Hi,\n\nI'm interested in the Enterprise plan for my organization "${name.trim()}".\n\nPlease contact me to discuss pricing and features.\n\nThank you`);
-        Linking.openURL(`mailto:lance@representvote.com?subject=${subject}&body=${body}`);
+      // Government tier opens email instead of payment.
+      if (selectedTier === 'government') {
+        const subject = encodeURIComponent(`Government Inquiry: ${name.trim()}`);
+        const body = encodeURIComponent(`Hi,\n\nI'm interested in the Government plan for my organization "${name.trim()}".\n\nPlease contact me to discuss pricing and features.\n\nThank you`);
+        Linking.openURL(`mailto:sales@representvote.com?subject=${subject}&body=${body}`);
+        return;
+      }
+      // Free tier doesn't go through the payment step — create the org
+      // immediately at tier='free'. Upgrade later via the billing screen.
+      if (selectedTier === 'free') {
+        handleCreateOrganization();
         return;
       }
       setCurrentStep('payment');
@@ -334,18 +340,35 @@ export default function CreateOrganizationScreen() {
         Select the plan that fits your organization's needs
       </Text>
 
-      {(Object.entries(ORG_TIERS) as [OrgTier, typeof ORG_TIERS.starter][]).map(([key, tier]) => (
-        <TierCard
-          key={key}
-          tierKey={key}
-          tier={tier}
-          selected={selectedTier === key}
-          onSelect={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            setSelectedTier(key);
-          }}
-        />
-      ))}
+      {/* Hide Government tier from the public picker — it's set by sales
+          via direct DB update for cities, counties, and agencies. The
+          "Need more?" link below opens a sales email. */}
+      {(Object.entries(ORG_TIERS) as [OrgTier, typeof ORG_TIERS.free][])
+        .filter(([key]) => key !== 'government')
+        .map(([key, tier]) => (
+          <TierCard
+            key={key}
+            tierKey={key}
+            tier={tier}
+            selected={selectedTier === key}
+            onSelect={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              setSelectedTier(key);
+            }}
+          />
+        ))}
+
+      <TouchableOpacity
+        onPress={() => {
+          const subject = encodeURIComponent(`Government / Agency inquiry`);
+          Linking.openURL(`mailto:sales@representvote.com?subject=${subject}`);
+        }}
+        style={{ paddingVertical: SPACING.md, alignItems: 'center' }}
+      >
+        <Text style={{ color: colors.gold, ...TYPOGRAPHY.bodySmall, fontWeight: '600' }}>
+          Need more than Business? Contact sales →
+        </Text>
+      </TouchableOpacity>
     </Animated.View>
   );
 
@@ -491,10 +514,15 @@ export default function CreateOrganizationScreen() {
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
               >
-                {currentStep === 'tier' && selectedTier === 'enterprise' ? (
+                {currentStep === 'tier' && selectedTier === 'government' ? (
                   <>
                     <Ionicons name="mail-outline" size={20} color="#000" />
                     <Text style={styles.actionButtonText}>Contact Us</Text>
+                  </>
+                ) : currentStep === 'tier' && selectedTier === 'free' ? (
+                  <>
+                    <Ionicons name="checkmark-circle" size={20} color="#000" />
+                    <Text style={styles.actionButtonText}>Create free org</Text>
                   </>
                 ) : (
                   <>

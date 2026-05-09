@@ -138,7 +138,9 @@ function VerifiedTick({ size = 14 }: { size?: number }) {
 }
 
 function TierSeal({ tier, size = 36 }: { tier: Organization['tier']; size?: number }) {
-  const isCommunity = tier !== 'professional';
+  // 'plus' is the new ladder position that was 'professional' before
+  // Stage 3 — gold seal goes to plus or business (sophisticated tiers).
+  const isCommunity = tier !== 'plus' && tier !== 'business';
   const ring = isCommunity ? O_LINE_STRONG : O_GOLD_D;
   const inner = isCommunity ? '#16191D' : '#1A1612';
   const glyph = isCommunity ? O_FG_MUTED : O_GOLD_L;
@@ -483,7 +485,14 @@ function SettingsSection({
   const activeCode = inviteCodes.find((c) => !c.revokedAt && (!c.expiresAt || new Date(c.expiresAt).getTime() > Date.now())) || inviteCodes[0];
   const codeText = activeCode?.code || activeCode?.inviteCode || 'NO·ACTIVE·CODE';
   const expRoman = activeCode?.expiresAt ? formatRomanDate(activeCode.expiresAt) : null;
-  const tierText = org.tier === 'professional' ? 'Professional · gold seal' : 'Community · hairline seal';
+  // Stage 3 names. Gold seal at Plus and above; Free/Pro show as Community.
+  const tierText =
+    org.tier === 'business' ? 'Business · gold seal' :
+    org.tier === 'plus' ? 'Plus · gold seal' :
+    org.tier === 'government' ? 'Government · gold seal' :
+    org.tier === 'legacy' ? 'Legacy · gold seal' :
+    org.tier === 'pro' ? 'Pro · hairline seal' :
+    'Community · hairline seal';
 
   return (
     <View style={{ paddingHorizontal: 14 }}>
@@ -562,7 +571,7 @@ function SettingsSection({
         <SettingsRow
           label="Plan"
           value={tierText}
-          gold={org.tier === 'professional'}
+          gold={org.tier === 'plus' || org.tier === 'business' || org.tier === 'government' || org.tier === 'legacy'}
           // Only admins see the chevron and can navigate into billing.
           // Non-admins keep the read-only display.
           onPress={org.role === 'admin' ? () => router.push({
@@ -1607,7 +1616,7 @@ export default function OrganizationDetailScreen() {
           name: params.orgName as string,
           description: '',
           memberCount: 1,
-          tier: 'starter',
+          tier: 'free',
           verified: false,
           createdAt: new Date().toISOString(),
           role: isDemoUser ? 'admin' : ((params.orgRole as 'admin' | 'member') || 'member'),
@@ -1625,7 +1634,7 @@ export default function OrganizationDetailScreen() {
           name: params.orgName as string,
           description: '',
           memberCount: 1,
-          tier: 'starter',
+          tier: 'free',
           verified: false,
           createdAt: new Date().toISOString(),
           role: isDemoUser ? 'admin' : ((params.orgRole as 'admin' | 'member') || 'member'),
