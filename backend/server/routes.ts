@@ -298,6 +298,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // App Store Server Notifications V2 — IAP analogue of the Stripe webhook
+  // above. Configure App Store Connect to point at
+  // https://representportal.com/api/iap/notifications (Production +
+  // Sandbox URLs, Version V2). Authentication is via JWS signature on the
+  // signedPayload — no shared secret header.
+  //
+  // We always return 200 (even on internal failure) because Apple retries
+  // up to 5 times over 5 days on any non-2xx response; a buggy handler
+  // would flood the system. Errors are logged for investigation.
+  app.post("/api/iap/notifications", async (req: any, res: any) => {
+    try {
+      const { signedPayload } = req.body || {};
+      if (!signedPayload || typeof signedPayload !== 'string') {
+        log(`IAP notification rejected: missing or invalid signedPayload`);
+        return res.status(400).send('Missing signedPayload');
+      }
+
+      const { IAPWebhookHandlers } = await import('./iapWebhookHandlers');
+      await IAPWebhookHandlers.processNotification(signedPayload);
+      res.status(200).send('OK');
+    } catch (error: any) {
+      log(`IAP notification error: ${error?.message ?? error}`);
+      // 200 instead of 5xx — see comment above.
+      res.status(200).send('Logged');
+    }
+  });
+
   // Push notification token registration
   app.post("/api/push-token", isAuthenticated, async (req: any, res) => {
     try {
@@ -4628,10 +4655,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await storage.updateUser(userId, { verificationPaid: true } as any);
       } else if (productId === 'com.representwallet.app.premium') {
         productType = 'premium';
+        // Write iapOriginalTransactionId to the dedicated column so the
+        // App Store Server Notifications V2 webhook can find this user
+        // by Apple's originalTransactionId on renewal/refund/cancel events.
+        // The legacy stripeSubscriptionId 'iap:' prefix is kept for now
+        // for backward compatibility with any existing readers — both
+        // columns track the same value until the prefix is fully retired.
         await storage.updateUser(userId, {
           subscriptionStatus: 'active',
           subscriptionEndDate: expiresAt,
           stripeSubscriptionId: `iap:${originalTxId}`,
+          iapOriginalTransactionId: originalTxId,
+          iapEnvironment: appleResponse.environment,
         } as any);
       } else if (productId.startsWith('com.representwallet.app.org.')) {
         productType = 'organization';
@@ -4646,6 +4681,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await db.update(organizations).set({
           subscriptionStatus: 'active',
           stripeSubscriptionId: `iap:${originalTxId}`,
+          iapOriginalTransactionId: originalTxId,
+          iapEnvironment: appleResponse.environment,
         }).where(eq(organizations.id, organizationId));
       } else if (productId.startsWith('com.representwallet.app.ballots.')) {
         // Ballot packs were retired in favor of the daily-allowance model.

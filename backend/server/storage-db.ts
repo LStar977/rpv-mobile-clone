@@ -588,6 +588,27 @@ export class DatabaseStorage implements IStorage {
     return Number(result[0]?.count ?? 0);
   }
 
+  // IAP attribution lookups. Apple's App Store Server Notifications V2
+  // identify the subscription only by originalTransactionId; we need to
+  // find the right user or org row to update on renewal/refund/cancel.
+  async findUserByIapTxId(originalTransactionId: string): Promise<any | undefined> {
+    const result = await db
+      .select()
+      .from(users)
+      .where(eq(users.iapOriginalTransactionId, originalTransactionId))
+      .limit(1);
+    return result[0];
+  }
+
+  async findOrganizationByIapTxId(originalTransactionId: string): Promise<any | undefined> {
+    const result = await db
+      .select()
+      .from(organizations)
+      .where(eq(organizations.iapOriginalTransactionId, originalTransactionId))
+      .limit(1);
+    return result[0];
+  }
+
   async getOrganizationByInviteCode(inviteCode: string): Promise<any> {
     const result = await db.select().from(organizations).where(
       eq(organizations.inviteCode, inviteCode)

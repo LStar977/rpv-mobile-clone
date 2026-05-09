@@ -38,6 +38,12 @@ export const users = pgTable("users", {
   stripeSubscriptionId: varchar("stripe_subscription_id"),
   subscriptionStatus: varchar("subscription_status").default('free'), // 'free', 'active', 'canceled', 'past_due'
   subscriptionEndDate: timestamp("subscription_end_date"),
+  // IAP attribution. Apple notifications arrive identified only by the
+  // originalTransactionId, not by our user id. We need a queryable column
+  // to look up the right user when a renewal/refund/cancel notification
+  // comes in. Backfill from the legacy 'iap:' prefix on stripeSubscriptionId.
+  iapOriginalTransactionId: varchar("iap_original_transaction_id").unique(),
+  iapEnvironment: varchar("iap_environment"), // 'Sandbox' | 'Production'
   verificationPaid: boolean("verification_paid").default(false), // Legacy from $4.99 payment; verification is now free
   initialBallotsGranted: boolean("initial_ballots_granted").default(false), // True after one-time RPV token grant on verification
   ballotsUsedToday: integer("ballots_used_today").default(0), // Daily vote counter, capped at 20 for non-premium users
@@ -109,6 +115,12 @@ export const organizations = pgTable("organizations", {
   stripeSubscriptionId: varchar("stripe_subscription_id"),
   stripeCustomerId: varchar("stripe_customer_id"),
   subscriptionStatus: varchar("subscription_status").default('pending'),
+
+  // IAP attribution for org subscriptions purchased via Apple IAP. See the
+  // matching columns on `users` for the rationale — Apple's notifications
+  // identify the subscription by originalTransactionId only.
+  iapOriginalTransactionId: varchar("iap_original_transaction_id").unique(),
+  iapEnvironment: varchar("iap_environment"), // 'Sandbox' | 'Production'
 
   // Subscription tier — drives member caps and feature gating.
   // Values: 'starter' | 'professional' | 'premium' | 'enterprise' | 'legacy'.
