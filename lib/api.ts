@@ -1130,6 +1130,11 @@ export const organizationsApi = {
         organizationId: orgId,
         organizationName: orgName,
         isOfficial: data.isOfficial ?? false,
+        // RCV / multi-choice metadata. Without these, the detail modal
+        // falls back to yes/no voting because it reads voteType from the
+        // proposal object and there's no API hydration on the demo path.
+        voteType: data.voteType ?? 'yes-no',
+        options: data.options ?? [],
       };
 
       try {

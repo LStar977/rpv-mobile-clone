@@ -370,6 +370,8 @@ function VoteHeader({
   selectedFilter,
   onFilterChange,
   insetTop,
+  onCreate,
+  onToggleView,
 }: {
   index: number;
   total: number;
@@ -378,21 +380,60 @@ function VoteHeader({
   selectedFilter: string;
   onFilterChange: (filter: string) => void;
   insetTop: number;
+  onCreate: () => void;
+  onToggleView: () => void;
 }) {
   const pc = useProposalColors();
   const filters = ['All', 'Federal', 'Provincial', 'Municipal', 'Closing'];
 
   return (
     <View style={{ paddingTop: insetTop + 8, backgroundColor: pc.BG }}>
-      {/* Title block */}
+      {/* Title block + actions */}
       <View style={voteHeaderStyles.titleBlock}>
-        <View>
+        <View style={{ flex: 1 }}>
           <Text style={[voteHeaderStyles.serifTitle, { color: pc.FG }]}>Proposals</Text>
           <View style={voteHeaderStyles.subtitleRow}>
             <Text style={[voteHeaderStyles.subtitleText, { color: pc.FG_MUTED }]}>{activeCount} active</Text>
             <View style={[voteHeaderStyles.dotSeparator, { backgroundColor: pc.LINE_STRONG }]} />
             <Text style={[voteHeaderStyles.subtitleText, { color: pc.FG_MUTED }]}>{closingSoon} closing soon</Text>
           </View>
+        </View>
+        {/* Swipe-mode actions: list-view toggle + create button. */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <TouchableOpacity
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              onToggleView();
+            }}
+            style={{
+              width: 38, height: 38, borderRadius: 10,
+              borderWidth: 1, borderColor: pc.LINE_STRONG,
+              alignItems: 'center', justifyContent: 'center',
+              backgroundColor: 'transparent',
+            }}
+            accessibilityLabel="Switch to list view"
+          >
+            <Ionicons name="list-outline" size={18} color={pc.FG} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              onCreate();
+            }}
+            accessibilityLabel="Create proposal"
+          >
+            <LinearGradient
+              colors={[pc.GOLD, pc.GOLD_DARK]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={{
+                width: 38, height: 38, borderRadius: 10,
+                alignItems: 'center', justifyContent: 'center',
+              }}
+            >
+              <Ionicons name="add" size={22} color="#000" />
+            </LinearGradient>
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -2292,6 +2333,20 @@ export default function ProposalsScreen() {
               <TouchableOpacity
                 style={[
                   styles.filterBtn,
+                  { backgroundColor: colors.surface, borderColor: colors.border },
+                ]}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  setViewMode('swipe');
+                }}
+                accessibilityLabel="Switch to swipe view"
+              >
+                <Ionicons name="layers-outline" size={18} color={colors.text} />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.filterBtn,
                   {
                     backgroundColor: hasActiveFilters ? colors.gold : colors.surface,
                     borderColor: hasActiveFilters ? colors.gold : colors.border,
@@ -2493,6 +2548,8 @@ export default function ProposalsScreen() {
                   if (filter === 'Closing') setSelectedStatus('Active');
                 }}
                 insetTop={insets.top}
+                onCreate={() => setShowCreateModal(true)}
+                onToggleView={() => setViewMode('list')}
               />
 
               {/* Card stack */}
