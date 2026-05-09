@@ -5,7 +5,7 @@ import { baseNetwork } from "./base-network";
 import { log } from "./app";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { setupBadgeRoutes } from "./badge-routes";
-import { passportNFTs, activatedRidings, electoralRidingQRCodes, proposals, votes, voteTokenClaims, organizations, transactions } from "@shared/schema";
+import { passportNFTs, activatedRidings, electoralRidingQRCodes, proposals, votes, voteTokenClaims, organizations, transactions, proposalReports, userMutes } from "@shared/schema";
 import { getMemberLimit, getTierLimits, isFeatureEnabled, tierDisplayName, type OrgTier } from "@shared/tier-limits";
 import {
   ORG_VERIFICATION_UNLOCK_PRICE_IDS,
@@ -16,6 +16,7 @@ import {
   packVendorData,
   parseVendorData,
 } from "./verificationUnlock";
+import { checkContent } from "./profanityFilter";
 import { eq, count, and, sql } from "drizzle-orm";
 import { db } from "./db";
 import { savePushToken, notifyNewProposal, notifyTokenClaimed, notifyProposalVote } from "./notifications";
@@ -850,7 +851,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get proposals endpoint (supports filtering by organizationId)
-  app.get("/api/proposals", async (req, res) => {
+  app.get("/api/proposals", async (req: any, res) => {
     try {
       const { orgId } = req.query;
       let proposals = await storage.getAllProposals();
@@ -858,6 +859,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Filter by organization if specified
       if (orgId) {
         proposals = proposals.filter((p: any) => p.organizationId === orgId);
+      }
+
+      // UPDATE 27 — UGC moderation. Hide proposals auto-flagged by the
+      // report system (hiddenAt non-null) from every requester.
+      proposals = proposals.filter((p: any) => !p.hiddenAt);
+
+      // UPDATE 27 — apply requester's mute set so muted creators' proposals
+      // disappear from the feed for that user only. Skipped for unauth'd
+      // requests (no userId, no mute set).
+      const requesterId = req.user?.claims?.sub as string | undefined;
+      if (requesterId) {
+        try {
+          const mutedRows = await db
+            .select({ mutedId: userMutes.mutedId })
+            .from(userMutes)
+            .where(eq(userMutes.muterId, requesterId));
+          if (mutedRows.length > 0) {
+            const mutedSet = new Set(mutedRows.map((r) => r.mutedId));
+            proposals = proposals.filter((p: any) => !mutedSet.has(p.userId));
+          }
+        } catch {
+          // Fail open — better to show all proposals than 5xx the feed.
+        }
       }
 
       res.json({ proposals });
@@ -1378,6 +1402,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const { title, description, category, geoRestrictions, riding, demographicRestrictions, voteType, options, organizationId, imageUrl } = req.body;
+
+      // UPDATE 27 — UGC profanity gate (Apple Guideline 1.2). Cheap
+      // pre-publish filter; layered moderation (managed APIs, user
+      // reports, admin review) is handled separately.
+      const profanity = checkContent({ title, description });
+      if (!profanity.ok) {
+        return res.status(400).json({
+          error: "Your proposal contains language that isn't allowed. Please revise and try again.",
+          code: "CONTENT_REJECTED",
+          field: profanity.field,
+        });
+      }
 
       // Validate organization membership if creating org-restricted proposal
       if (organizationId) {
@@ -5336,6 +5372,146 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ─── Apple In-App Purchase (IAP) receipt validation ─────────────────────────
   // Mobile (lib/iap.ts) POSTs { receipt, productId, organizationId? } here
   // after a successful App Store purchase. We verify the receipt with Apple,
+  // ─── UPDATE 27 — UGC moderation (Apple Guideline 1.2) ────────────────
+  //
+  // Five endpoints + a server-side report counter + auto-hide threshold.
+  // Mobile UI shipped earlier in components/moderation/ProposalModerationMenu
+  // and lib/moderation.ts; the API client lives at lib/api.ts moderationApi.
+  // Until these endpoints landed, the client swallowed 404s and showed
+  // soft-success — those stubs are removed in lib/api.ts.
+
+  // Fixed reason enum. Mirror in lib/api.ts ReportReason.
+  const REPORT_REASONS = new Set([
+    "spam", "hate_speech", "threat", "sexual", "illegal", "misinformation", "other",
+  ]);
+  // Auto-hide threshold. Once reportCount >= AUTO_HIDE_AT and hiddenAt is
+  // null, stamp hiddenAt = now() so the proposal disappears from listings.
+  // Admin review can clear hiddenAt to restore.
+  const AUTO_HIDE_AT = 3;
+
+  // POST /api/proposals/:proposalId/report — submit a report against a
+  // proposal. One row per submission; reporter can submit multiple times
+  // but each fires admin email + counter increment (let admin dedupe).
+  app.post("/api/proposals/:proposalId/report", isAuthenticated, async (req: any, res) => {
+    try {
+      const reporterId = req.user.claims?.sub;
+      if (!reporterId) return res.status(401).json({ error: "Unauthorized" });
+      const { proposalId } = req.params;
+      const { reason, note } = req.body ?? {};
+      if (typeof reason !== "string" || !REPORT_REASONS.has(reason)) {
+        return res.status(400).json({ error: "Invalid reason" });
+      }
+      const trimmedNote = typeof note === "string" ? note.slice(0, 500) : null;
+
+      const proposal = await storage.getProposal(proposalId);
+      if (!proposal) return res.status(404).json({ error: "Proposal not found" });
+
+      await db.insert(proposalReports).values({
+        proposalId,
+        reporterId,
+        reason,
+        note: trimmedNote,
+      });
+
+      // Increment counter; auto-hide once threshold hits.
+      const newCount = (proposal.reportCount ?? 0) + 1;
+      const shouldHide = newCount >= AUTO_HIDE_AT && !proposal.hiddenAt;
+      await db.update(proposals).set({
+        reportCount: newCount,
+        ...(shouldHide ? { hiddenAt: new Date() } : {}),
+      }).where(eq(proposals.id, proposalId));
+
+      // Best-effort admin email. Don't fail the request if email is down.
+      try {
+        const adminEmail = process.env.MODERATION_ADMIN_EMAIL;
+        if (adminEmail) {
+          const text =
+            `Proposal: ${proposalId} — ${proposal.title}\n` +
+            `Reporter: ${reporterId}\n` +
+            `Reason: ${reason}\n` +
+            `Reports total: ${newCount}\n` +
+            `Auto-hidden: ${shouldHide ? "yes" : "no"}\n\n` +
+            `Note:\n${trimmedNote ?? "(none)"}\n`;
+          await sendEmail({
+            to: adminEmail,
+            subject: `[Represent] Proposal report: ${reason}${shouldHide ? " (auto-hidden)" : ""}`,
+            html: `<pre style="font-family:monospace;font-size:13px;">${text.replace(/[<>&]/g, (c) => ({"<":"&lt;",">":"&gt;","&":"&amp;"}[c]!))}</pre>`,
+            text,
+          });
+        }
+      } catch (e: any) {
+        log(`moderation report email failed: ${e?.message ?? e}`);
+      }
+
+      log(`Proposal report: proposal=${proposalId} reporter=${reporterId} reason=${reason} count=${newCount} hidden=${shouldHide}`);
+      res.json({ ok: true, hidden: shouldHide });
+    } catch (error: any) {
+      log(`Proposal report error: ${error?.message ?? error}`);
+      res.status(500).json({ error: "Failed to submit report" });
+    }
+  });
+
+  // POST /api/users/:userId/mute — server-side mute. Survives reinstall,
+  // syncs across devices. Idempotent — second mute is a no-op via the
+  // (muterId, mutedId) unique constraint.
+  app.post("/api/users/:userId/mute", isAuthenticated, async (req: any, res) => {
+    try {
+      const muterId = req.user.claims?.sub;
+      if (!muterId) return res.status(401).json({ error: "Unauthorized" });
+      const { userId: mutedId } = req.params;
+      if (mutedId === muterId) {
+        return res.status(400).json({ error: "Cannot mute yourself" });
+      }
+      try {
+        await db.insert(userMutes).values({ muterId, mutedId });
+      } catch (e: any) {
+        // Unique constraint hit on (muterId, mutedId) — already muted.
+        // Accept idempotently.
+        if (!String(e?.message ?? "").toLowerCase().includes("unique")) throw e;
+      }
+      res.json({ ok: true });
+    } catch (error: any) {
+      log(`Mute error: ${error?.message ?? error}`);
+      res.status(500).json({ error: "Failed to mute user" });
+    }
+  });
+
+  // DELETE /api/users/:userId/mute — unmute. Idempotent — deleting a
+  // non-existent edge succeeds silently.
+  app.delete("/api/users/:userId/mute", isAuthenticated, async (req: any, res) => {
+    try {
+      const muterId = req.user.claims?.sub;
+      if (!muterId) return res.status(401).json({ error: "Unauthorized" });
+      const { userId: mutedId } = req.params;
+      await db.delete(userMutes).where(
+        and(eq(userMutes.muterId, muterId), eq(userMutes.mutedId, mutedId)),
+      );
+      res.json({ ok: true });
+    } catch (error: any) {
+      log(`Unmute error: ${error?.message ?? error}`);
+      res.status(500).json({ error: "Failed to unmute user" });
+    }
+  });
+
+  // GET /api/user/mutes — return the requester's mute list as an array of
+  // muted user IDs. Mobile lib/moderation.ts calls this on auth and caches.
+  app.get("/api/user/mutes", isAuthenticated, async (req: any, res) => {
+    try {
+      const muterId = req.user.claims?.sub;
+      if (!muterId) return res.status(401).json({ error: "Unauthorized" });
+      const rows = await db
+        .select({ mutedId: userMutes.mutedId })
+        .from(userMutes)
+        .where(eq(userMutes.muterId, muterId));
+      res.json({ mutedUsers: rows.map((r) => r.mutedId) });
+    } catch (error: any) {
+      log(`Get mutes error: ${error?.message ?? error}`);
+      res.status(500).json({ error: "Failed to fetch mute list" });
+    }
+  });
+
+  // ───────────────────────────────────────────────────────────────────
+
   // map the productId to a feature, and update the user/org subscription
   // state. Idempotent on Apple's transaction_id.
   //

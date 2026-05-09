@@ -245,7 +245,37 @@ export const proposals = pgTable("proposals", {
   optionAddresses: jsonb("option_addresses").default(sql`'[]'::jsonb`), // Array of addresses corresponding to each option
   imageUrl: varchar("image_url"), // URL to proposal image attachment from object storage
   isOfficial: boolean("is_official").default(false), // Org-official proposals (admin-only)
+  // UPDATE 27 — UGC moderation (Apple Guideline 1.2). Incremented when a
+  // user submits a report against this proposal; auto-hide threshold is
+  // enforced by the listing query (hiddenAt IS NOT NULL excluded).
+  reportCount: integer("report_count").default(0),
+  hiddenAt: timestamp("hidden_at"),
 });
+
+// UPDATE 27 — UGC moderation. One row per (reporter, proposal) report
+// submission. Reasons are restricted to a fixed enum at the API layer.
+// `note` is optional free text capped at 500 chars by the endpoint.
+// Admin auto-email fires on insert in the API layer, not here.
+export const proposalReports = pgTable("proposal_reports", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  proposalId: varchar("proposal_id").notNull().references(() => proposals.id),
+  reporterId: varchar("reporter_id").notNull().references(() => users.id),
+  reason: varchar("reason").notNull(),
+  note: text("note"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// UPDATE 27 — server-side mute/block edges. One row per (muter, muted)
+// pair. Listings filter out proposals whose creator is in the requester's
+// mute set. Replaces the prior client-only AsyncStorage mute store.
+export const userMutes = pgTable("user_mutes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  muterId: varchar("muter_id").notNull().references(() => users.id),
+  mutedId: varchar("muted_id").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => ({
+  uniqueMute: unique().on(table.muterId, table.mutedId),
+}));
 
 // Table to store option addresses for multiple-choice proposals
 export const proposalOptionAddresses = pgTable("proposal_option_addresses", {
