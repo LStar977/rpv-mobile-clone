@@ -437,7 +437,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(401).json({ error: "Unauthorized" });
     }
 
-    const { proposalId, position, selectedOption } = req.body;
+    const { proposalId, position, selectedOption, rankings } = req.body;
     if (!proposalId || !position) {
       return res.status(400).json({ error: "Missing required fields" });
     }
@@ -452,6 +452,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const user = await storage.getUser(userId);
       const proposal = await storage.getProposal(proposalId);
       const wallet = await storage.getUserWallet(userId);
+
+      // Ranked-choice voting branch. Validates the rankings against the
+      // proposal's options, stores the array as JSON in `selectedOption`,
+      // and skips the on-chain transfer + tally-counter increment paths
+      // (those are yes/no specific). The /results endpoint computes IRV
+      // at read time from the stored ballots.
+      if (position === 'ranked-choice') {
+        if (!proposal) return res.status(404).json({ error: "Proposal not found" });
+        if (proposal.voteType !== 'ranked-choice') {
+          return res.status(400).json({ error: "This proposal is not ranked-choice" });
+        }
+        if (!Array.isArray(rankings) || rankings.length === 0) {
+          return res.status(400).json({ error: "rankings must be a non-empty array" });
+        }
+        if (new Set(rankings).size !== rankings.length) {
+          return res.status(400).json({ error: "rankings must not contain duplicates" });
+        }
+        const validOptions = new Set((proposal.options ?? []) as string[]);
+        if (!rankings.every((r: any) => typeof r === 'string' && validOptions.has(r))) {
+          return res.status(400).json({ error: "rankings contains options not on this proposal" });
+        }
+        // Identity / org-membership / deadline checks are below in the
+        // shared path — call into them by short-circuiting after the
+        // rankings-specific validation.
+        if (proposal.deadline && new Date(proposal.deadline).getTime() < Date.now()) {
+          return res.status(400).json({ error: "Voting has closed for this proposal" });
+        }
+        if (proposal.organizationId) {
+          const isMember = await storage.isOrganizationMember(proposal.organizationId, userId);
+          if (!isMember) {
+            return res.status(403).json({ error: "You must be a member of this organization to vote" });
+          }
+        }
+        await storage.recordVote(userId, proposalId, 'ranked-choice', undefined, null as any, JSON.stringify(rankings));
+        log(`✅ RCV ballot recorded: user=${userId}, proposal=${proposalId}, rankings=${rankings.length}`);
+        return res.json({ success: true });
+      }
 
       if (!proposal) {
         return res.status(404).json({ error: "Proposal not found" });
@@ -788,6 +825,67 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ proposals });
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch proposals" });
+    }
+  });
+
+  // Unified results endpoint. Branches on proposal.voteType:
+  //   yes-no          → { type, supportVotes, opposeVotes }
+  //   multiple-choice → { type, options, counts }
+  //   ranked-choice   → { type, ...RCVTally }  (computed in-process via IRV)
+  //
+  // For org-scoped proposals, requires the caller to be a member.
+  app.get("/api/proposals/:proposalId/results", isAuthenticated, async (req: any, res: any) => {
+    try {
+      const userId = req.user.claims?.sub;
+      const { proposalId } = req.params;
+      const proposal = await storage.getProposal(proposalId);
+      if (!proposal) return res.status(404).json({ error: "Proposal not found" });
+
+      if (proposal.organizationId) {
+        const isMember = await storage.isOrganizationMember(proposal.organizationId, userId);
+        if (!isMember) {
+          return res.status(403).json({ error: "You must be a member to view results" });
+        }
+      }
+
+      if (proposal.voteType === 'multiple-choice') {
+        const counts = await storage.countVotesPerOption(proposalId);
+        // Ensure every option appears in counts (even 0) so the UI can
+        // render a stable list without conditional fallbacks.
+        const options = (proposal.options ?? []) as string[];
+        const fullCounts: Record<string, number> = {};
+        for (const opt of options) fullCounts[opt] = counts[opt] ?? 0;
+        return res.json({ type: 'multiple-choice', options, counts: fullCounts });
+      }
+
+      if (proposal.voteType === 'ranked-choice') {
+        const { computeIRV } = await import('./rcvTally');
+        const rawBallots = await storage.getRankedBallots(proposalId);
+        const ballots: string[][] = [];
+        for (const raw of rawBallots) {
+          try {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed) && parsed.every(p => typeof p === 'string')) {
+              ballots.push(parsed);
+            }
+          } catch {
+            // Malformed ballot — skip. Should not happen since the submit
+            // endpoint validates JSON.stringify roundtrip, but defensive.
+          }
+        }
+        const tally = computeIRV(ballots, (proposal.options ?? []) as string[]);
+        return res.json({ type: 'ranked-choice', ...tally });
+      }
+
+      // Default: yes-no.
+      return res.json({
+        type: 'yes-no',
+        supportVotes: proposal.supportVotes ?? 0,
+        opposeVotes: proposal.opposeVotes ?? 0,
+      });
+    } catch (error: any) {
+      log(`Get proposal results error: ${error?.message ?? error}`);
+      res.status(500).json({ error: "Failed to fetch results" });
     }
   });
 
@@ -4370,10 +4468,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.claims?.sub;
       const { orgId } = req.params;
-      const { title, description, category, isOfficial } = req.body;
+      const { title, description, category, isOfficial, voteType, options } = req.body;
 
       if (!title || !description || !category) {
         return res.status(400).json({ error: "title, description, and category are required" });
+      }
+
+      // voteType validation. Defaults to yes-no for backward compatibility
+      // (existing clients don't send voteType).
+      const resolvedVoteType: string = voteType || 'yes-no';
+      if (!['yes-no', 'multiple-choice', 'ranked-choice'].includes(resolvedVoteType)) {
+        return res.status(400).json({ error: "voteType must be 'yes-no', 'multiple-choice', or 'ranked-choice'" });
+      }
+      if (resolvedVoteType !== 'yes-no') {
+        if (!Array.isArray(options) || options.length < 2) {
+          return res.status(400).json({ error: `${resolvedVoteType} proposals require at least 2 options` });
+        }
+        if (options.some((o: any) => typeof o !== 'string' || o.trim().length === 0)) {
+          return res.status(400).json({ error: "options must be non-empty strings" });
+        }
+        if (new Set(options).size !== options.length) {
+          return res.status(400).json({ error: "options must be unique" });
+        }
       }
 
       const org = await storage.getOrganization(orgId);
@@ -4389,13 +4505,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const proposal = await storage.createProposal(userId, title, description, category, [], undefined, undefined, {});
-      const updateData: any = { organizationId: orgId };
+      const updateData: any = {
+        organizationId: orgId,
+        voteType: resolvedVoteType,
+      };
+      if (resolvedVoteType !== 'yes-no') updateData.options = options;
       if (isOfficial && isAdmin) updateData.isOfficial = true;
       await storage.updateProposal(proposal.id, updateData);
 
       const updated = await storage.getProposal(proposal.id);
-      log(`✅ Org proposal created: ${proposal.id} in org ${orgId}`);
-      // Return proposal object directly (not wrapped) to match mobile ApiResponse<OrganizationProposal>
+      log(`✅ Org proposal created: ${proposal.id} in org ${orgId}, voteType=${resolvedVoteType}`);
       res.status(201).json(updated);
     } catch (error: any) {
       log(`Error creating org proposal: ${error.message}`);

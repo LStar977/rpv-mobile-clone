@@ -646,15 +646,36 @@ export const proposalsApi = {
   async claimVoteToken(proposalId: number | string): Promise<ApiResponse<{ success: boolean; txHash?: string }>> {
     return apiRequest(`/api/proposals/${proposalId}/claim-vote-token`, { method: 'POST' });
   },
-  async submitVote(proposalId: number | string, position: 'support' | 'oppose'): Promise<ApiResponse<{ success: boolean; txHash?: string }>> {
+  async submitVote(
+    proposalId: number | string,
+    position: 'support' | 'oppose' | 'multiple-choice' | 'ranked-choice',
+    extras?: { selectedOption?: string; rankings?: string[] },
+  ): Promise<ApiResponse<{ success: boolean; txHash?: string }>> {
     const authState = useAuthStore.getState();
     const userId = authState.user?.id;
     if (!userId) return { data: null, error: 'Not authenticated', requiresVerification: false };
     return apiRequest('/api/voting/submit', {
       method: 'POST',
-      body: JSON.stringify({ userId, proposalId, position }),
+      body: JSON.stringify({
+        userId,
+        proposalId,
+        position,
+        selectedOption: extras?.selectedOption,
+        rankings: extras?.rankings,
+      }),
     });
   },
+
+  // Unified results endpoint. Branches on the proposal's voteType.
+  // Returns one of:
+  //   { type: 'yes-no', supportVotes, opposeVotes }
+  //   { type: 'multiple-choice', options, counts }
+  //   { type: 'ranked-choice', options, totalBallots, exhaustedBallots,
+  //       rounds, winner, winningRound, tieBreakRule }
+  async getResults(proposalId: number | string): Promise<ApiResponse<any>> {
+    return apiRequest<any>(`/api/proposals/${proposalId}/results`);
+  },
+
   async getFeatured(): Promise<ApiResponse<Proposal[]>> {
     return apiRequest<Proposal[]>('/api/proposals/featured');
   },

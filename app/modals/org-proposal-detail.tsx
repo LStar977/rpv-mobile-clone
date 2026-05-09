@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -15,8 +15,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeInDown, FadeInUp, useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
-import { organizationsApi } from '../../lib/api';
+import { organizationsApi, proposalsApi } from '../../lib/api';
 import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS } from '../../lib/theme';
+import { RCVBallotInput } from '../../components/ui/RCVBallotInput';
+import { RCVResults } from '../../components/ui/RCVResults';
 
 const SERIF_FONT = Platform.OS === 'ios' ? 'Georgia' : 'serif';
 
@@ -47,7 +49,20 @@ export default function OrgProposalDetailScreen() {
     userVote: string;
     isOfficial: string;
     orgName: string;
+    voteType: string;
+    // options is JSON-encoded array of strings (URL params can't carry arrays)
+    options: string;
   }>();
+  const voteType: 'yes-no' | 'multiple-choice' | 'ranked-choice' =
+    (params.voteType as any) || 'yes-no';
+  const proposalOptions: string[] = (() => {
+    try {
+      const parsed = JSON.parse(params.options || '[]');
+      return Array.isArray(parsed) ? parsed.filter((p) => typeof p === 'string') : [];
+    } catch {
+      return [];
+    }
+  })();
 
   const orgId = params.orgId || '';
   const proposalId = params.proposalId || '';
@@ -65,10 +80,47 @@ export default function OrgProposalDetailScreen() {
   );
   const [voting, setVoting] = useState(false);
 
+  // RCV state. results is the unified payload from /api/proposals/:id/results;
+  // for ranked-choice it contains the IRV walk. rcvSubmitted tracks whether
+  // the local user has cast their ballot (for hiding the input afterward).
+  const [rcvResults, setRcvResults] = useState<any | null>(null);
+  const [rcvSubmitted, setRcvSubmitted] = useState(false);
+
   const timeInfo = getTimeRemaining(deadline);
   const isEnded = timeInfo.text === 'Voting ended';
   const total = supportVotes + opposeVotes;
   const supportPct = total > 0 ? (supportVotes / total) * 100 : 50;
+
+  // Fetch results for non-yes-no proposals on mount and after the user votes.
+  // The /results endpoint runs IRV server-side for RCV; mobile is purely a
+  // renderer.
+  const fetchRcvResults = useCallback(async () => {
+    if (voteType !== 'ranked-choice') return;
+    const result = await proposalsApi.getResults(proposalId);
+    if (result.data) setRcvResults(result.data);
+  }, [voteType, proposalId]);
+
+  useEffect(() => {
+    fetchRcvResults();
+  }, [fetchRcvResults]);
+
+  const handleRcvVote = useCallback(async (rankings: string[]) => {
+    if (rcvSubmitted || isEnded || voting) return;
+    setVoting(true);
+    try {
+      const result = await proposalsApi.submitVote(proposalId, 'ranked-choice', { rankings });
+      if (result.error) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        Alert.alert('Vote failed', result.error);
+        return;
+      }
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setRcvSubmitted(true);
+      await fetchRcvResults();
+    } finally {
+      setVoting(false);
+    }
+  }, [proposalId, rcvSubmitted, isEnded, voting, fetchRcvResults]);
 
   const supportScale = useSharedValue(1);
   const opposeScale = useSharedValue(1);
@@ -285,7 +337,28 @@ export default function OrgProposalDetailScreen() {
           },
         ]}
       >
-        {userVote ? (
+        {/* Ranked-choice path: show ballot input or live results. */}
+        {voteType === 'ranked-choice' ? (
+          rcvSubmitted || isEnded ? (
+            rcvResults ? (
+              <RCVResults
+                totalBallots={rcvResults.totalBallots ?? 0}
+                exhaustedBallots={rcvResults.exhaustedBallots ?? 0}
+                rounds={rcvResults.rounds ?? []}
+                winner={rcvResults.winner ?? null}
+                winningRound={rcvResults.winningRound ?? null}
+              />
+            ) : (
+              <ActivityIndicator color={colors.gold} />
+            )
+          ) : (
+            <RCVBallotInput
+              options={proposalOptions}
+              onSubmit={handleRcvVote}
+              submitting={voting}
+            />
+          )
+        ) : userVote ? (
           <View style={[styles.votedMessage, { backgroundColor: `${colors.success}15` }]}>
             <Ionicons name="checkmark-circle" size={24} color={colors.success} />
             <Text style={[styles.votedText, { color: colors.success }]}>

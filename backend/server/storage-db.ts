@@ -924,6 +924,43 @@ export class DatabaseStorage implements IStorage {
       .orderBy(proposals.createdAt);
   }
 
+  // Per-option vote counts for multiple-choice proposals.
+  // RCV uses getRankedBallots below — these helpers don't share code
+  // because the column semantics differ ('selected_option' is the chosen
+  // option string for multi-choice but a JSON-encoded rankings array for
+  // ranked-choice).
+  async countVotesPerOption(proposalId: string): Promise<Record<string, number>> {
+    const rows = await db
+      .select({ option: votes.selectedOption, count: sql<number>`count(*)::int` })
+      .from(votes)
+      .where(and(
+        eq(votes.proposalId, proposalId),
+        eq(votes.position, 'multiple-choice'),
+      ))
+      .groupBy(votes.selectedOption);
+    const result: Record<string, number> = {};
+    for (const r of rows as any[]) {
+      if (r.option) result[r.option] = Number(r.count ?? 0);
+    }
+    return result;
+  }
+
+  // Raw ballot strings for RCV proposals. Each entry is the JSON
+  // serialization of the voter's preference array. Caller (the /results
+  // endpoint) parses + feeds to computeIRV.
+  async getRankedBallots(proposalId: string): Promise<string[]> {
+    const rows = await db
+      .select({ rankings: votes.selectedOption })
+      .from(votes)
+      .where(and(
+        eq(votes.proposalId, proposalId),
+        eq(votes.position, 'ranked-choice'),
+      ));
+    return (rows as any[])
+      .map(r => r.rankings)
+      .filter((r): r is string => typeof r === 'string' && r.length > 0);
+  }
+
   // Audit log: every vote on every proposal in this org. Joins through
   // proposals (votes don't carry organizationId directly) and through users
   // for verification status. Voter identity (email/name) is included only

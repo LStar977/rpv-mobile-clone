@@ -1551,7 +1551,14 @@ export default function OrganizationDetailScreen() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [creating, setCreating] = useState(false);
   const [proposalLimits, setProposalLimits] = useState<{ created: number; limit: number; period: 'month' | 'week'; resetDate: string } | null>(null);
-  const [newProposal, setNewProposal] = useState({ title: '', description: '', category: 'Other', isOfficial: false });
+  const [newProposal, setNewProposal] = useState<{
+    title: string;
+    description: string;
+    category: string;
+    isOfficial: boolean;
+    voteType: 'yes-no' | 'multiple-choice' | 'ranked-choice';
+    options: string[];
+  }>({ title: '', description: '', category: 'Other', isOfficial: false, voteType: 'yes-no', options: ['', ''] });
 
   const [members, setMembers] = useState<any[]>([]);
   const [inviteCodes, setInviteCodes] = useState<any[]>([]);
@@ -1814,6 +1821,17 @@ export default function OrganizationDetailScreen() {
       Alert.alert('Missing Fields', 'Please fill in both title and description.');
       return;
     }
+    if (newProposal.voteType !== 'yes-no') {
+      const cleaned = newProposal.options.map((o) => o.trim()).filter(Boolean);
+      if (cleaned.length < 2) {
+        Alert.alert('Need more options', 'Multiple-choice and ranked-choice proposals need at least 2 options.');
+        return;
+      }
+      if (new Set(cleaned).size !== cleaned.length) {
+        Alert.alert('Duplicate options', 'Each option must be unique.');
+        return;
+      }
+    }
     if (proposalLimits && proposalLimits.created >= proposalLimits.limit) {
       Alert.alert('Limit Reached', `You've reached your ${proposalLimits.period}ly proposal limit. Limits reset on ${new Date(proposalLimits.resetDate).toLocaleDateString()}.`);
       return;
@@ -1821,16 +1839,21 @@ export default function OrganizationDetailScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setCreating(true);
     try {
+      const cleanedOptions = newProposal.voteType === 'yes-no'
+        ? undefined
+        : newProposal.options.map((o) => o.trim()).filter(Boolean);
       const result = await organizationsApi.createProposal(params.orgId, {
         title: newProposal.title.trim(),
         description: newProposal.description.trim(),
         category: newProposal.category,
         isOfficial: newProposal.isOfficial,
+        voteType: newProposal.voteType,
+        options: cleanedOptions,
       });
       if (result.error) { Alert.alert('Error', result.error); return; }
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setShowCreateModal(false);
-      setNewProposal({ title: '', description: '', category: 'Other', isOfficial: false });
+      setNewProposal({ title: '', description: '', category: 'Other', isOfficial: false, voteType: 'yes-no', options: ['', ''] });
       fetchData();
     } catch (error) {
       Alert.alert('Error', 'Failed to create proposal. Please try again.');
@@ -1997,6 +2020,10 @@ export default function OrganizationDetailScreen() {
         userVote: (p as any).userVote || '',
         isOfficial: String((p as any).isOfficial ?? false),
         orgName: organization?.name || (params.orgName as string) || '',
+        // RCV/multi-choice metadata. Defaulted so existing yes-no proposals
+        // are unaffected. Options is JSON-encoded (URL params can't carry arrays).
+        voteType: ((p as any).voteType as string) || 'yes-no',
+        options: JSON.stringify((p as any).options ?? []),
       },
     });
   };
@@ -2227,6 +2254,82 @@ export default function OrganizationDetailScreen() {
                 ))}
               </ScrollView>
             </View>
+            {/* Vote type picker. Defaults to yes-no for backward compat. */}
+            <View style={styles.inputGroup}>
+              <Text style={[styles.inputLabel, { color: O_FG_FAINT }]}>Ballot type</Text>
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                {(['yes-no', 'multiple-choice', 'ranked-choice'] as const).map((vt) => {
+                  const active = newProposal.voteType === vt;
+                  const label = vt === 'yes-no' ? 'Yes / No' : vt === 'multiple-choice' ? 'Multiple choice' : 'Ranked choice';
+                  return (
+                    <TouchableOpacity
+                      key={vt}
+                      onPress={() => setNewProposal((p) => ({ ...p, voteType: vt }))}
+                      style={{
+                        flex: 1,
+                        paddingVertical: 10,
+                        paddingHorizontal: 8,
+                        backgroundColor: active ? O_GOLD : O_BG_CARD,
+                        borderColor: active ? O_GOLD : O_LINE_STRONG,
+                        borderWidth: 1,
+                        borderRadius: 8,
+                        alignItems: 'center',
+                      }}
+                    >
+                      <Text style={{ color: active ? '#000' : O_FG_MUTED, fontSize: 12, fontWeight: '600' }}>
+                        {label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+              {newProposal.voteType === 'ranked-choice' && (
+                <Text style={{ color: O_FG_FAINT, fontSize: 11, marginTop: 6, lineHeight: 16 }}>
+                  Voters rank options in order of preference. Winner determined by instant-runoff (IRV).
+                </Text>
+              )}
+            </View>
+
+            {/* Options list, shown for non-yes-no ballots. */}
+            {newProposal.voteType !== 'yes-no' && (
+              <View style={styles.inputGroup}>
+                <Text style={[styles.inputLabel, { color: O_FG_FAINT }]}>Options</Text>
+                {newProposal.options.map((opt, idx) => (
+                  <View key={idx} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                    <TextInput
+                      style={[styles.textInput, { backgroundColor: O_BG_CARD, borderColor: O_LINE_STRONG, color: O_FG, flex: 1 }]}
+                      placeholder={`Option ${idx + 1}`}
+                      placeholderTextColor={O_FG_FAINT}
+                      value={opt}
+                      onChangeText={(t) => setNewProposal((p) => {
+                        const next = [...p.options];
+                        next[idx] = t;
+                        return { ...p, options: next };
+                      })}
+                      maxLength={120}
+                    />
+                    {newProposal.options.length > 2 && (
+                      <TouchableOpacity
+                        onPress={() => setNewProposal((p) => ({ ...p, options: p.options.filter((_, i) => i !== idx) }))}
+                        style={{ padding: 8 }}
+                      >
+                        <Ionicons name="close-circle" size={20} color={O_FG_FAINT} />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                ))}
+                {newProposal.options.length < 10 && (
+                  <TouchableOpacity
+                    onPress={() => setNewProposal((p) => ({ ...p, options: [...p.options, ''] }))}
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 8 }}
+                  >
+                    <Ionicons name="add-circle-outline" size={16} color={O_GOLD} />
+                    <Text style={{ color: O_GOLD, fontSize: 12, fontWeight: '600' }}>Add option</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            )}
+
             {organization?.role === 'admin' && (
               <View style={[styles.officialToggleRow, { backgroundColor: O_BG_CARD, borderColor: O_LINE_STRONG }]}>
                 <View style={styles.officialToggleInfo}>

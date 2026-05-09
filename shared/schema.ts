@@ -222,7 +222,12 @@ export const proposals = pgTable("proposals", {
   demographicRestrictions: jsonb("demographic_restrictions").default(sql`'{}'::jsonb`), // {gender: 'female', ageMin: 25, ageMax: 30}
   organizationId: varchar("organization_id").references(() => organizations.id), // Org-restricted proposals
   isFeatured: boolean("is_featured").default(false),
-  voteType: varchar("vote_type").default('yes-no'), // 'yes-no' or 'multiple-choice'
+  voteType: varchar("vote_type").default('yes-no'),
+  // Accepts: 'yes-no' | 'multiple-choice' | 'ranked-choice'.
+  // For 'ranked-choice', votes.selectedOption is a JSON-encoded array of
+  // option strings in the voter's preference order (1st choice first).
+  // Tally is compute-on-read at GET /api/proposals/:id/results via IRV
+  // (see backend/server/rcvTally.ts).
   options: jsonb("options").default(sql`'[]'::jsonb`), // Array of option strings for multiple-choice
   optionAddresses: jsonb("option_addresses").default(sql`'[]'::jsonb`), // Array of addresses corresponding to each option
   imageUrl: varchar("image_url"), // URL to proposal image attachment from object storage
