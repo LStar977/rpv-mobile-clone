@@ -115,6 +115,10 @@ export const organizations = pgTable("organizations", {
   stripeSubscriptionId: varchar("stripe_subscription_id"),
   stripeCustomerId: varchar("stripe_customer_id"),
   subscriptionStatus: varchar("subscription_status").default('pending'),
+  // Renewal date tracking. Populated by Stripe webhook (current_period_end)
+  // and IAP webhook (DID_RENEW expiresDate). Read by the org-billing screen
+  // to display "Next billing date".
+  subscriptionEndDate: timestamp("subscription_end_date"),
 
   // IAP attribution for org subscriptions purchased via Apple IAP. See the
   // matching columns on `users` for the rationale — Apple's notifications

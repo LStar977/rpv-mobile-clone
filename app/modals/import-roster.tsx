@@ -515,12 +515,12 @@ export default function ImportRosterScreen() {
         type="orgTier"
         title={tierUpgrade.title}
         message={tierUpgrade.message}
-        ctaLabel="See plans"
+        ctaLabel="Manage plan"
         onCta={() => {
-          // Org billing UI doesn't exist yet — surface the create-organization
-          // tier picker as a stand-in so the admin can at least see the price
-          // ladder. Replace with proper org billing screen in Stage 2.
-          router.push('/modals/create-organization');
+          router.push({
+            pathname: '/modals/organization-billing',
+            params: { orgId, orgName },
+          });
         }}
       />
     </View>

@@ -6,7 +6,7 @@ import { log } from "./app";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { setupBadgeRoutes } from "./badge-routes";
 import { passportNFTs, activatedRidings, electoralRidingQRCodes, proposals, votes, voteTokenClaims, organizations, transactions } from "@shared/schema";
-import { getMemberLimit, isFeatureEnabled, tierDisplayName, type OrgTier } from "@shared/tier-limits";
+import { getMemberLimit, getTierLimits, isFeatureEnabled, tierDisplayName, type OrgTier } from "@shared/tier-limits";
 import { eq, count, and, sql } from "drizzle-orm";
 import { db } from "./db";
 import { savePushToken, notifyNewProposal, notifyTokenClaimed, notifyProposalVote } from "./notifications";
@@ -3432,6 +3432,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const priceId = ORG_PRICE_IDS[tier];
+
+      // Tier-change path: org already has an active Stripe subscription.
+      // Call subscriptions.update with the new price + proration. Existing
+      // payment method on file is reused — no Payment Sheet needed.
+      // IAP-paid subs (stripeSubscriptionId starting with 'iap:') don't
+      // hit this endpoint at all; tier changes for those go through
+      // requestSubscription on the iOS side.
+      const hasActiveStripeSub =
+        org.stripeSubscriptionId &&
+        !org.stripeSubscriptionId.startsWith('iap:') &&
+        (org.subscriptionStatus === 'active' || org.subscriptionStatus === 'past_due');
+
+      if (hasActiveStripeSub) {
+        log(`Updating existing org subscription: ${org.stripeSubscriptionId} → tier=${tier}`);
+        try {
+          const existing = await stripe.subscriptions.retrieve(org.stripeSubscriptionId);
+          const itemId = existing.items.data[0]?.id;
+          if (!itemId) {
+            return res.status(500).json({ error: "Existing subscription has no items to update" });
+          }
+          const updated = await stripe.subscriptions.update(org.stripeSubscriptionId, {
+            items: [{ id: itemId, price: priceId }],
+            proration_behavior: 'create_prorations',
+            metadata: {
+              userId,
+              organizationId,
+              tier,
+              type: 'organization',
+            },
+          });
+          // Tier persists on the org row immediately so cap enforcement
+          // tracks the new tier. subscriptionStatus stays 'active' (no
+          // payment confirmation needed; existing card on file).
+          await db.update(organizations).set({
+            tier,
+            updatedAt: new Date(),
+          }).where(eq(organizations.id, organizationId));
+
+          log(`Org subscription updated: org=${organizationId}, tier=${tier}, sub=${updated.id}`);
+          return res.json({
+            updated: true,
+            tier,
+            subscriptionId: updated.id,
+          });
+        } catch (err: any) {
+          log(`Failed to update org subscription ${org.stripeSubscriptionId}: ${err?.message ?? err}`);
+          return res.status(500).json({ error: err?.message || 'Failed to update subscription' });
+        }
+      }
+
       log(`Creating org subscription: customer=${customerId}, price=${priceId}, tier=${tier}, org=${organizationId}`);
 
       const subscription = await stripe.subscriptions.create({
@@ -3521,6 +3571,124 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const stripeParam = error.param || '';
       log(`Organization payment intent error [${stripeCode}${stripeParam ? '/' + stripeParam : ''}]: ${error.message}`);
       res.status(500).json({ error: error.message || "Failed to create organization payment intent" });
+    }
+  });
+
+  // Cancel an org's subscription. Stripe-paid subs are scheduled to end at
+  // current_period_end (user keeps access through paid period); the
+  // existing customer.subscription.deleted webhook handles the actual
+  // status flip when Stripe ends the sub. IAP-paid subs cannot be canceled
+  // server-side — Apple requires users to cancel via iOS Settings, so we
+  // return 400 with a code the client uses to deep-link Settings.
+  app.post("/api/organizations/:orgId/cancel-subscription", isAuthenticated, async (req: any, res: any) => {
+    try {
+      const userId = req.user.claims?.sub;
+      const { orgId } = req.params;
+
+      const org = await storage.getOrganization(orgId);
+      if (!org) return res.status(404).json({ error: "Organization not found" });
+
+      const members = await storage.getOrganizationMembers(orgId);
+      const isAdmin = members.some((m: any) => m.userId === userId && m.role === 'admin');
+      if (org.creatorId !== userId && !isAdmin) {
+        return res.status(403).json({ error: "Only org admins can manage billing" });
+      }
+
+      if (!org.stripeSubscriptionId || org.subscriptionStatus === 'canceled' || org.subscriptionStatus === 'free') {
+        return res.status(400).json({ error: "No active subscription to cancel" });
+      }
+
+      // IAP path — client must deep-link iOS Settings.
+      if (org.stripeSubscriptionId.startsWith('iap:')) {
+        return res.status(400).json({
+          error: "IAP subscriptions must be canceled in iOS Settings",
+          code: "IAP_CANCEL_VIA_SETTINGS",
+          settingsUrl: "https://apps.apple.com/account/subscriptions",
+        });
+      }
+
+      const { getUncachableStripeClient } = await import("./stripeClient");
+      const stripe = await getUncachableStripeClient();
+      const updated = await stripe.subscriptions.update(org.stripeSubscriptionId, {
+        cancel_at_period_end: true,
+      });
+      const effectiveAt = new Date(((updated as any).current_period_end || updated.cancel_at || 0) * 1000);
+      log(`Org subscription scheduled for cancellation: org=${orgId}, sub=${org.stripeSubscriptionId}, effectiveAt=${effectiveAt.toISOString()}`);
+      res.json({
+        canceled: true,
+        effectiveAt: effectiveAt.toISOString(),
+      });
+    } catch (error: any) {
+      log(`Cancel subscription error: ${error?.message ?? error}`);
+      res.status(500).json({ error: error?.message || "Failed to cancel subscription" });
+    }
+  });
+
+  // Returns everything the org-billing screen needs in one round trip.
+  // Members are read from the existing storage helper (Stage 1 added the
+  // count helper); verifications come from the column added in UPDATE 15
+  // (currently always 0 since incrementing isn't wired — Stage 2 work).
+  app.get("/api/organizations/:orgId/usage", isAuthenticated, async (req: any, res: any) => {
+    try {
+      const userId = req.user.claims?.sub;
+      const { orgId } = req.params;
+
+      const org = await storage.getOrganization(orgId);
+      if (!org) return res.status(404).json({ error: "Organization not found" });
+
+      const members = await storage.getOrganizationMembers(orgId);
+      const isAdmin = members.some((m: any) => m.userId === userId && m.role === 'admin');
+      if (!isAdmin && org.creatorId !== userId) {
+        return res.status(403).json({ error: "Only admins can view billing details" });
+      }
+
+      const memberCount = await storage.getOrganizationMemberCount(orgId);
+      const limits = getTierLimits(org.tier);
+
+      // Prefer the column for next-billing-date. If it's stale or missing
+      // and we have a Stripe sub, fall back to fetching from Stripe.
+      let nextBillingDate: string | null = org.subscriptionEndDate
+        ? new Date(org.subscriptionEndDate).toISOString()
+        : null;
+      let paymentProvider: 'stripe' | 'iap' | null = null;
+
+      if (org.stripeSubscriptionId?.startsWith('iap:')) {
+        paymentProvider = 'iap';
+      } else if (org.stripeSubscriptionId) {
+        paymentProvider = 'stripe';
+        if (!nextBillingDate) {
+          try {
+            const { getUncachableStripeClient } = await import("./stripeClient");
+            const stripe = await getUncachableStripeClient();
+            const sub: any = await stripe.subscriptions.retrieve(org.stripeSubscriptionId);
+            if (sub.current_period_end) {
+              nextBillingDate = new Date(sub.current_period_end * 1000).toISOString();
+            }
+          } catch (err: any) {
+            log(`getUsage: failed to fetch Stripe subscription ${org.stripeSubscriptionId}: ${err?.message ?? err}`);
+            // Non-fatal — UI will just show no date.
+          }
+        }
+      }
+
+      res.json({
+        tier: org.tier ?? 'starter',
+        subscriptionStatus: org.subscriptionStatus ?? 'free',
+        members: {
+          current: memberCount,
+          limit: Number.isFinite(limits.members) ? limits.members : null,
+        },
+        verifications: {
+          current: org.verificationCountThisMonth ?? 0,
+          limit: Number.isFinite(limits.verificationsPerMonth) ? limits.verificationsPerMonth : null,
+        },
+        nextBillingDate,
+        paymentProvider,
+        isAdmin: true,
+      });
+    } catch (error: any) {
+      log(`Get usage error: ${error?.message ?? error}`);
+      res.status(500).json({ error: "Failed to fetch usage" });
     }
   });
 

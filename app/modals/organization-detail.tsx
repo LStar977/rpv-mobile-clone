@@ -559,7 +559,17 @@ function SettingsSection({
           value={org.verified ? `Verified ${formatRomanYM(org.createdAt)}` : 'Not verified'}
           gold={org.verified}
         />
-        <SettingsRow label="Plan" value={tierText} gold={org.tier === 'professional'} />
+        <SettingsRow
+          label="Plan"
+          value={tierText}
+          gold={org.tier === 'professional'}
+          // Only admins see the chevron and can navigate into billing.
+          // Non-admins keep the read-only display.
+          onPress={org.role === 'admin' ? () => router.push({
+            pathname: '/modals/organization-billing',
+            params: { orgId: org.id, orgName: org.name },
+          }) : undefined}
+        />
       </View>
 
       {/* Members & roles */}

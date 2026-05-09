@@ -690,7 +690,28 @@ export const kycApi = {
 };
 export const veriffApi = kycApi;
 
+export interface OrgUsage {
+  tier: 'starter' | 'professional' | 'premium' | 'enterprise' | 'legacy';
+  subscriptionStatus: 'active' | 'pending' | 'past_due' | 'canceled' | 'free' | string;
+  members: { current: number; limit: number | null };
+  verifications: { current: number; limit: number | null };
+  nextBillingDate: string | null;
+  paymentProvider: 'stripe' | 'iap' | null;
+  isAdmin: boolean;
+}
+
 export const organizationsApi = {
+  async getUsage(orgId: string): Promise<ApiResponse<OrgUsage>> {
+    return apiRequest<OrgUsage>(`/api/organizations/${orgId}/usage`);
+  },
+
+  async cancelSubscription(orgId: string): Promise<ApiResponse<{ canceled: boolean; effectiveAt: string }>> {
+    return apiRequest<{ canceled: boolean; effectiveAt: string }>(
+      `/api/organizations/${orgId}/cancel-subscription`,
+      { method: 'POST' },
+    );
+  },
+
   async getMyOrganizations(): Promise<ApiResponse<Organization[]>> {
     const result = await apiRequest<any>('/api/organizations');
     let backendOrgs: Organization[] = [];

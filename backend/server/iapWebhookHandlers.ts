@@ -284,9 +284,7 @@ async function applySubscriptionUpdate(
   } else {
     const update: Record<string, any> = {};
     if (patch.subscriptionStatus !== undefined) update.subscriptionStatus = patch.subscriptionStatus;
-    // organizations table doesn't have a subscriptionEndDate column today.
-    // The Stripe path also doesn't set one for orgs. If we want per-org
-    // expiry tracking, that's a separate schema change.
+    if (patch.subscriptionEndDate !== undefined) update.subscriptionEndDate = patch.subscriptionEndDate;
     if (Object.keys(update).length === 0) return;
     await db.update(organizations).set(update).where(eq(organizations.id, target.id));
     log(`Updated org ${target.id}: ${JSON.stringify(update)}`);

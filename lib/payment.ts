@@ -179,6 +179,18 @@ async function processStripeOrganization(
   try {
     const paymentIntent = await fetchOrganizationPaymentIntent(token, tier, organizationId);
 
+    // Tier-change response: server detected the org already has an active
+    // subscription and called subscriptions.update with the new price.
+    // No payment sheet needed (existing card on file). Refresh and succeed.
+    if ((paymentIntent as any).updated) {
+      try {
+        await useAuthStore.getState().checkAuth();
+      } catch {
+        // Non-fatal — UI will refresh on next route load.
+      }
+      return { success: true };
+    }
+
     if (paymentIntent.clientSecret) {
       const result = await stripeProcessPayment({
         clientSecret: paymentIntent.clientSecret,
@@ -195,5 +207,38 @@ async function processStripeOrganization(
     return { success: false, error: 'No payment method available' };
   } catch (error: any) {
     return { success: false, error: error.message || 'Payment failed' };
+  }
+}
+
+/**
+ * Cancel an org's Stripe subscription. Schedules cancel-at-period-end so
+ * the org keeps access through the paid period; the existing
+ * customer.subscription.deleted webhook flips the status when Stripe ends
+ * the sub. IAP-paid orgs cannot use this path — the caller must redirect
+ * to iOS Settings (the backend returns code IAP_CANCEL_VIA_SETTINGS in
+ * that case for the UI to detect).
+ */
+export async function cancelOrganizationStripe(
+  token: string | null,
+  organizationId: string,
+): Promise<{ success: boolean; effectiveAt?: string; error?: string; iapRedirect?: boolean }> {
+  try {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://representportal.com';
+    const response = await fetch(`${API_URL}/api/organizations/${organizationId}/cancel-subscription`, {
+      method: 'POST',
+      headers,
+    });
+    const body = await response.json();
+    if (!response.ok) {
+      if (body?.code === 'IAP_CANCEL_VIA_SETTINGS') {
+        return { success: false, iapRedirect: true, error: body.error };
+      }
+      return { success: false, error: body?.error || `HTTP ${response.status}` };
+    }
+    return { success: true, effectiveAt: body.effectiveAt };
+  } catch (error: any) {
+    return { success: false, error: error?.message || 'Cancel failed' };
   }
 }
