@@ -24,6 +24,11 @@ import { db } from './db';
 import { users, organizations } from '@shared/schema';
 import { storage } from './storage-db';
 import { eq } from 'drizzle-orm';
+import {
+  isUnlockSku,
+  findOrgByUnlockPaymentId,
+  markOrgUnlockRefunded,
+} from './verificationUnlock';
 
 function log(message: string) {
   console.log(`[IAPWebhook] ${message}`);
@@ -125,6 +130,38 @@ export class IAPWebhookHandlers {
 
     if (!originalTxId) {
       log(`Notification missing originalTransactionId; cannot attribute. Skipping.`);
+      return;
+    }
+
+    // UPDATE 26 verification-unlock consumable SKUs are not subscriptions —
+    // they have no renewal, expiration, or grace period, and they're stored
+    // against organizations.verificationUnlockPaymentId rather than the
+    // org's stripeSubscriptionId. Detect them up front and route through
+    // the unlock-specific lifecycle. Currently only REFUND and REVOKE
+    // (Family Sharing revocation, identical effect) need to do work; other
+    // notification types don't apply to consumables.
+    if (productId && isUnlockSku(productId)) {
+      const txId = (txInfo as any).transactionId ?? originalTxId;
+      const candidates = txId === originalTxId ? [originalTxId] : [originalTxId, txId];
+      let unlockOrg: { id: string } | null = null;
+      for (const id of candidates) {
+        unlockOrg = await findOrgByUnlockPaymentId(id);
+        if (unlockOrg) break;
+      }
+      if (!unlockOrg) {
+        log(`No org found for unlock SKU ${productId} (originalTxId=${originalTxId}). Receipt may not have been validated server-side.`);
+        return;
+      }
+      switch (notificationType) {
+        case NotificationTypeV2.REFUND:
+        case NotificationTypeV2.REVOKE:
+          log(`Unlock ${notificationType} for org=${unlockOrg.id} sku=${productId}`);
+          await markOrgUnlockRefunded(unlockOrg.id);
+          break;
+        default:
+          log(`Ignoring ${notificationType} for unlock SKU ${productId} (org=${unlockOrg.id}); consumable lifecycle has no applicable handler.`);
+          break;
+      }
       return;
     }
 

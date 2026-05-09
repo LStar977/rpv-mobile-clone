@@ -4053,9 +4053,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           code: "PRODUCT_TIER_MISMATCH",
         });
       }
-      const sharedSecret = process.env.APPLE_IAP_SHARED_SECRET;
+      const sharedSecret = process.env.APPLE_SHARED_SECRET;
       if (!sharedSecret) {
-        log("APPLE_IAP_SHARED_SECRET not configured; cannot validate IAP receipt");
+        log("APPLE_SHARED_SECRET not configured; cannot validate IAP receipt");
         return res.status(500).json({ error: "IAP receipt validation not configured" });
       }
       // Validate against Apple. Try production first; if status=21007, retry
