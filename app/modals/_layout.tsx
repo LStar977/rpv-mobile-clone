@@ -24,6 +24,7 @@ export default function ModalsLayout() {
       <Stack.Screen name="verification-payment" />
       <Stack.Screen name="create-organization" />
       <Stack.Screen name="organization-billing" />
+      <Stack.Screen name="audit-export" />
       <Stack.Screen name="import-roster" />
       <Stack.Screen name="admin" />
       <Stack.Screen name="my-proposals" />

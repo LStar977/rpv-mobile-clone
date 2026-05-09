@@ -3692,6 +3692,178 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // GET /api/organizations/:orgId/audit-log — tamper-evident export of every
+  // vote on every proposal in the org. Each row carries an HMAC signature
+  // over a canonical serialization; the bundle as a whole carries a
+  // bundle signature. Premium+ feature.
+  //
+  // Verification flow (manual): an external auditor recomputes
+  //   HMAC-SHA256(AUDIT_SIGNING_SECRET, canonicalRow)
+  // for any row and confirms it matches the rowSignature column. If yes,
+  // the row hasn't been altered since export.
+  //
+  // Query params:
+  //   format = 'csv' (default) | 'json'
+  //   include_voter_identity = 'false' (default) | 'true'
+  app.get("/api/organizations/:orgId/audit-log", isAuthenticated, async (req: any, res: any) => {
+    try {
+      const userId = req.user.claims?.sub;
+      const { orgId } = req.params;
+      const format = (req.query.format === 'json' ? 'json' : 'csv') as 'csv' | 'json';
+      const includeVoterIdentity = req.query.include_voter_identity === 'true';
+
+      const org = await storage.getOrganization(orgId);
+      if (!org) return res.status(404).json({ error: "Organization not found" });
+
+      const members = await storage.getOrganizationMembers(orgId);
+      const isAdmin = members.some((m: any) => m.userId === userId && m.role === 'admin');
+      if (!isAdmin && org.creatorId !== userId) {
+        return res.status(403).json({ error: "Only admins can export the audit log" });
+      }
+
+      if (!isFeatureEnabled(org.tier, 'auditLogExport')) {
+        return res.status(402).json({
+          error: "Audit log export requires Premium plan or higher",
+          code: "FEATURE_NOT_AVAILABLE_ON_TIER",
+          feature: "auditLogExport",
+          tier: org.tier ?? 'starter',
+          upgradeRequired: true,
+        });
+      }
+
+      const auditSecret = process.env.AUDIT_SIGNING_SECRET;
+      if (!auditSecret) {
+        log(`AUDIT_SIGNING_SECRET not set; cannot sign export for org=${orgId}`);
+        return res.status(500).json({ error: "Audit signing not configured on server" });
+      }
+      const voterSalt = process.env.AUDIT_VOTER_SALT || 'represent-default-voter-salt-rotate-me';
+
+      const rows = await storage.getOrgAuditLog(orgId);
+
+      // Hash voter IDs when identity not requested. Same input always
+      // produces the same hash so an admin can correlate one voter
+      // across multiple proposals without seeing email/name.
+      const hashVoterId = (voterId: string) =>
+        createHmac('sha256', voterSalt).update(voterId).digest('hex').slice(0, 16);
+
+      const exportId = randomUUID();
+      const exportedAt = new Date().toISOString();
+      const rowCount = rows.length;
+
+      // Canonical serialization for per-row signing. Pipe-delimited so
+      // empty fields are unambiguous. ISO timestamps for stable sort.
+      const canonicalRow = (r: any) => [
+        r.voteId,
+        r.proposalId,
+        r.voterId, // already hashed if includeVoterIdentity=false
+        r.position,
+        r.selectedOption ?? '',
+        r.castAt ? r.castAt.toISOString() : '',
+        r.voteTokenId ?? '',
+        r.txHash ?? '',
+      ].join('|');
+
+      const signedRows = rows.map((r) => {
+        const displayVoterId = includeVoterIdentity ? r.voterId : hashVoterId(r.voterId);
+        const rowForSig = { ...r, voterId: displayVoterId };
+        const rowSignature = createHmac('sha256', auditSecret)
+          .update(canonicalRow(rowForSig))
+          .digest('hex');
+        return {
+          voteId: r.voteId,
+          proposalId: r.proposalId,
+          proposalTitle: r.proposalTitle,
+          proposalCreatedAt: r.proposalCreatedAt ? r.proposalCreatedAt.toISOString() : null,
+          proposalDeadline: r.proposalDeadline ? r.proposalDeadline.toISOString() : null,
+          voterId: displayVoterId,
+          voterEmail: includeVoterIdentity ? r.voterEmail : null,
+          voterName: includeVoterIdentity ? r.voterName : null,
+          voterVerified: r.voterVerified,
+          position: r.position,
+          selectedOption: r.selectedOption,
+          voteTokenId: r.voteTokenId,
+          txHash: r.txHash,
+          castAt: r.castAt ? r.castAt.toISOString() : null,
+          rowSignature,
+        };
+      });
+
+      // Bundle signature covers the header context + concatenated row sigs.
+      // Tampering with row order or inserting/removing rows breaks this.
+      const headerCanonical = `${exportId}|${exportedAt}|${userId}|${orgId}|${rowCount}`;
+      const sigsConcat = signedRows.map((r: any) => r.rowSignature).join('');
+      const bundleSignature = createHmac('sha256', auditSecret)
+        .update(headerCanonical + sigsConcat)
+        .digest('hex');
+
+      res.setHeader('X-Audit-Export-Id', exportId);
+      res.setHeader('X-Audit-Bundle-Signature', bundleSignature);
+
+      if (format === 'json') {
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        res.setHeader('Content-Disposition', `attachment; filename="audit-log-${orgId}-${exportedAt}.json"`);
+        return res.json({
+          exportId,
+          exportedAt,
+          exportedBy: userId,
+          orgId,
+          orgName: org.name,
+          rowCount,
+          includeVoterIdentity,
+          bundleSignature,
+          rows: signedRows,
+        });
+      }
+
+      // CSV path. Hand-roll to avoid pulling in a CSV library on the
+      // backend; values are escaped with the standard double-quote rule.
+      const csvEscape = (v: any): string => {
+        if (v === null || v === undefined) return '';
+        const s = String(v);
+        if (/[",\n\r]/.test(s)) {
+          return `"${s.replace(/"/g, '""')}"`;
+        }
+        return s;
+      };
+      const headerCols = [
+        'vote_id', 'proposal_id', 'proposal_title', 'proposal_created_at',
+        'proposal_deadline', 'voter_id', 'voter_email', 'voter_name',
+        'voter_verified', 'position', 'selected_option', 'vote_token_id',
+        'tx_hash', 'cast_at', 'row_signature',
+      ];
+      const dataLines = signedRows.map((r: any) => [
+        r.voteId, r.proposalId, r.proposalTitle, r.proposalCreatedAt,
+        r.proposalDeadline, r.voterId, r.voterEmail ?? '', r.voterName ?? '',
+        r.voterVerified ? 'true' : 'false',
+        r.position, r.selectedOption ?? '', r.voteTokenId ?? '',
+        r.txHash ?? '', r.castAt, r.rowSignature,
+      ].map(csvEscape).join(','));
+
+      // Footer carries the bundle metadata so the file is self-contained
+      // even without the response headers (e.g. if email-forwarded).
+      const footerComment = [
+        `# audit-log export`,
+        `# export_id=${exportId}`,
+        `# exported_at=${exportedAt}`,
+        `# exported_by=${userId}`,
+        `# org_id=${orgId}`,
+        `# row_count=${rowCount}`,
+        `# include_voter_identity=${includeVoterIdentity}`,
+        `# bundle_signature=${bundleSignature}`,
+      ].join('\n');
+
+      const csv = [headerCols.join(','), ...dataLines, footerComment].join('\n');
+
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename="audit-log-${orgId}-${exportedAt}.csv"`);
+      res.send(csv);
+      log(`Audit log exported: org=${orgId}, admin=${userId}, format=${format}, rows=${rowCount}, identity=${includeVoterIdentity}`);
+    } catch (error: any) {
+      log(`Audit log export error: ${error?.message ?? error}`);
+      res.status(500).json({ error: "Failed to export audit log" });
+    }
+  });
+
   // GET /api/organizations — return current user's organizations as an array with role attached
   // NOTE: Must be registered before /:orgId to avoid Express wildcard capture
   app.get("/api/organizations", isAuthenticated, async (req: any, res) => {

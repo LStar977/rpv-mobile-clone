@@ -581,6 +581,24 @@ function SettingsSection({
         <SettingsRow label="Active invite codes" value={`${inviteCodes.filter((c) => !c.revokedAt).length}`} mono />
       </View>
 
+      {/* Reports & Exports — admin only. Tier-gated server-side; the screen
+          itself shows the Premium upgrade modal if the export is blocked. */}
+      {org.role === 'admin' && (
+        <View style={{ backgroundColor: O_BG_CARD, borderWidth: 1, borderColor: O_LINE, borderRadius: 12, overflow: 'hidden', marginBottom: 14 }}>
+          <View style={{ paddingHorizontal: 14, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: O_LINE, backgroundColor: O_BG_RAISED }}>
+            <Text style={{ fontSize: 11, color: O_FG_MUTED, letterSpacing: -0.05, fontWeight: '600' }}>Reports & exports</Text>
+          </View>
+          <SettingsRow
+            label="Audit log"
+            value="Tamper-evident vote record"
+            onPress={() => router.push({
+              pathname: '/modals/audit-export',
+              params: { orgId: org.id, orgName: org.name },
+            })}
+          />
+        </View>
+      )}
+
       {/* Manage */}
       <View style={{ backgroundColor: O_BG_CARD, borderWidth: 1, borderColor: O_LINE, borderRadius: 12, overflow: 'hidden', marginBottom: 14 }}>
         <View style={{ paddingHorizontal: 14, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: O_LINE, backgroundColor: O_BG_RAISED }}>

@@ -924,6 +924,69 @@ export class DatabaseStorage implements IStorage {
       .orderBy(proposals.createdAt);
   }
 
+  // Audit log: every vote on every proposal in this org. Joins through
+  // proposals (votes don't carry organizationId directly) and through users
+  // for verification status. Voter identity (email/name) is included only
+  // when the caller asked for it; the route handler hashes voter ids when
+  // includeVoterIdentity=false. Returned fields map 1:1 to AuditLogRow in
+  // the export endpoint.
+  async getOrgAuditLog(orgId: string): Promise<Array<{
+    voteId: string;
+    proposalId: string;
+    proposalTitle: string;
+    proposalCreatedAt: Date | null;
+    proposalDeadline: Date | null;
+    voterId: string;
+    voterEmail: string | null;
+    voterName: string | null;
+    voterVerified: boolean;
+    position: string;
+    selectedOption: string | null;
+    voteTokenId: string | null;
+    txHash: string | null;
+    castAt: Date | null;
+  }>> {
+    const rows = await db
+      .select({
+        voteId: votes.id,
+        proposalId: votes.proposalId,
+        proposalTitle: proposals.title,
+        proposalCreatedAt: proposals.createdAt,
+        proposalDeadline: proposals.deadline,
+        voterId: votes.userId,
+        voterEmail: users.email,
+        voterName: users.name,
+        voterVerified: users.verified,
+        position: votes.position,
+        selectedOption: votes.selectedOption,
+        voteTokenId: votes.voteTokenId,
+        txHash: votes.txHash,
+        castAt: votes.timestamp,
+      })
+      .from(votes)
+      .innerJoin(proposals, eq(votes.proposalId, proposals.id))
+      .leftJoin(users, eq(votes.userId, users.id))
+      .where(eq(proposals.organizationId, orgId))
+      .orderBy(votes.timestamp);
+
+    return rows.map((r: any) => ({
+      voteId: r.voteId,
+      proposalId: r.proposalId,
+      proposalTitle: r.proposalTitle ?? '',
+      proposalCreatedAt: r.proposalCreatedAt,
+      proposalDeadline: r.proposalDeadline,
+      voterId: r.voterId,
+      voterEmail: r.voterEmail ?? null,
+      voterName: r.voterName ?? null,
+      voterVerified: !!r.voterVerified,
+      position: r.position ?? '',
+      selectedOption: r.selectedOption ?? null,
+      voteTokenId: r.voteTokenId ?? null,
+      txHash: r.txHash ?? null,
+      castAt: r.castAt,
+    }));
+  }
+
   async getOrgProposalLimits(orgId: string, userId: string): Promise<{ created: number; limit: number; period: string; resetDate: Date }> {
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);

@@ -712,6 +712,64 @@ export const organizationsApi = {
     );
   },
 
+  // Audit-log export uses FileSystem.downloadAsync (NOT apiRequest) so the
+  // raw CSV/JSON body lands in a file on disk instead of being parsed as
+  // JSON. Returns the local file URI plus the bundle signature header so
+  // the caller can pass them to the share sheet.
+  // On 402 (FEATURE_NOT_AVAILABLE_ON_TIER) returns errorCode for the
+  // upgrade-modal flow.
+  async exportAuditLog(
+    orgId: string,
+    opts: { format: 'csv' | 'json'; includeVoterIdentity: boolean },
+  ): Promise<{
+    success: boolean;
+    uri?: string;
+    exportId?: string | null;
+    bundleSignature?: string | null;
+    error?: string;
+    errorCode?: string;
+  }> {
+    try {
+      const FileSystem = require('expo-file-system');
+      const token = await getAuthToken();
+      const headers: Record<string, string> = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const ext = opts.format === 'json' ? 'json' : 'csv';
+      const filename = `audit-log-${orgId}-${Date.now()}.${ext}`;
+      const uri = `${FileSystem.documentDirectory}${filename}`;
+
+      const url = `${API_BASE_URL}/api/organizations/${orgId}/audit-log` +
+        `?format=${opts.format}&include_voter_identity=${opts.includeVoterIdentity}`;
+
+      const result = await FileSystem.downloadAsync(url, uri, { headers });
+
+      if (result.status === 402) {
+        // Read the body to extract the structured error code.
+        const body = await FileSystem.readAsStringAsync(result.uri).catch(() => '{}');
+        let parsed: any = {};
+        try { parsed = JSON.parse(body); } catch {}
+        return {
+          success: false,
+          error: parsed.error || 'Audit log export requires Premium plan',
+          errorCode: parsed.code || 'FEATURE_NOT_AVAILABLE_ON_TIER',
+        };
+      }
+      if (result.status >= 400) {
+        return { success: false, error: `HTTP ${result.status}` };
+      }
+
+      return {
+        success: true,
+        uri: result.uri,
+        exportId: (result.headers as any)?.['x-audit-export-id'] ?? null,
+        bundleSignature: (result.headers as any)?.['x-audit-bundle-signature'] ?? null,
+      };
+    } catch (error: any) {
+      return { success: false, error: error?.message || 'Export failed' };
+    }
+  },
+
   async getMyOrganizations(): Promise<ApiResponse<Organization[]>> {
     const result = await apiRequest<any>('/api/organizations');
     let backendOrgs: Organization[] = [];

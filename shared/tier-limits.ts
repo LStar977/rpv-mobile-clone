@@ -25,6 +25,10 @@ export interface TierLimits {
   whiteLabel: boolean;
   oauthSso: boolean;
   subOrganizations: boolean;
+  // Tamper-evident export of every vote in the org with HMAC receipts.
+  // Premium+ feature — small orgs running yes/no votes don't need
+  // audit-grade receipts. See backend/server/routes.ts /audit-log endpoint.
+  auditLogExport: boolean;
 }
 
 export const TIER_LIMITS: Record<OrgTier, TierLimits> = {
@@ -37,6 +41,7 @@ export const TIER_LIMITS: Record<OrgTier, TierLimits> = {
     whiteLabel: false,
     oauthSso: false,
     subOrganizations: false,
+    auditLogExport: false,
   },
   professional: {
     members: 500,
@@ -47,6 +52,7 @@ export const TIER_LIMITS: Record<OrgTier, TierLimits> = {
     whiteLabel: false,
     oauthSso: false,
     subOrganizations: false,
+    auditLogExport: false,
   },
   premium: {
     members: 2500,
@@ -57,6 +63,7 @@ export const TIER_LIMITS: Record<OrgTier, TierLimits> = {
     whiteLabel: false,
     oauthSso: true,
     subOrganizations: true,
+    auditLogExport: true,
   },
   enterprise: {
     members: Infinity,
@@ -67,6 +74,7 @@ export const TIER_LIMITS: Record<OrgTier, TierLimits> = {
     whiteLabel: true,
     oauthSso: true,
     subOrganizations: true,
+    auditLogExport: true,
   },
   legacy: {
     // Pre-enforcement orgs are uncapped to avoid breaking existing customers.
@@ -79,6 +87,7 @@ export const TIER_LIMITS: Record<OrgTier, TierLimits> = {
     whiteLabel: true,
     oauthSso: true,
     subOrganizations: true,
+    auditLogExport: true,
   },
 };
 
