@@ -80,9 +80,14 @@ export default function VerificationUnlockCheckoutScreen() {
     setPhase('starting');
     setErrorMessage(null);
 
-    if (Platform.OS === 'ios' && paymentProvider === 'iap') {
-      // IAP path. The org's tier subscription was bought via IAP, so the
-      // unlock SKU lives in App Store Connect alongside it.
+    // iOS always uses IAP for digital goods, regardless of how the org's
+    // tier subscription is billed (Guideline 3.1.1 — no external payment
+    // for in-app digital purchases). The unlock IAP charges the admin's
+    // Apple ID and the receipt is server-validated and credited to the org.
+    // Android routes by paymentProvider: IAP-billed orgs use IAP, Stripe-
+    // billed orgs use Stripe Checkout.
+    const useIap = Platform.OS === 'ios' || paymentProvider === 'iap';
+    if (useIap) {
       if (!iapAvailable) {
         setErrorMessage('In-app purchases unavailable on this device.');
         setPhase('error');
@@ -309,9 +314,11 @@ export default function VerificationUnlockCheckoutScreen() {
         )}
 
         <Text style={{ fontSize: 11, color: colors.textSecondary, textAlign: 'center', marginTop: SPACING.lg, lineHeight: 16 }}>
-          {Platform.OS === 'ios' && paymentProvider === 'iap'
-            ? 'Charged through your Apple ID. Manage subscriptions and refunds in iOS Settings.'
-            : 'Charged through your organization\'s saved card. Manage refunds via Stripe.'}
+          {Platform.OS === 'ios'
+            ? 'Charged through your Apple ID and credited to your organization. Manage refunds in iOS Settings.'
+            : paymentProvider === 'iap'
+              ? 'Charged through your Apple ID. Manage refunds in iOS Settings.'
+              : 'Charged through your organization\'s saved card. Manage refunds via Stripe.'}
         </Text>
       </ScrollView>
     </View>

@@ -271,9 +271,13 @@ export async function restorePurchases(token: string | null): Promise<{
       return { restored: false, products: [] };
     }
 
-    // Validate each purchase with backend
+    // Validate each purchase with backend. Skip consumable SKUs
+    // (verification unlock) — Apple's getAvailablePurchases shouldn't
+    // return them anyway, but defense in depth: server is the source of
+    // truth for unlock state, restore-purchases must not re-credit one.
     const restoredProducts: string[] = [];
     for (const purchase of purchases) {
+      if (isConsumableSku(purchase.productId)) continue;
       if (purchase.transactionReceipt) {
         const result = await validateReceipt(purchase.transactionReceipt, token, purchase.productId);
         if (result.valid) {

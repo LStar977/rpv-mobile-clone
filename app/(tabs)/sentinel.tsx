@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   Alert,
   Dimensions,
+  Linking,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -1419,6 +1420,38 @@ function ReportCard({
           {analysis.analysis.summary}
         </Text>
       </View>
+
+      {/* AI-output report affordance. Sentinel analyses are AI-generated;
+          users can flag inaccurate or harmful output here. Apple's
+          generative-AI guidance expects user-reportable AI content. */}
+      <TouchableOpacity
+        onPress={() => {
+          const subject = encodeURIComponent('Sentinel analysis feedback');
+          const body = encodeURIComponent(
+            `I'd like to flag this Sentinel analysis as inaccurate or inappropriate.\n\n` +
+            `Issue type: ${analysis.issueType ?? '(unknown)'}\n` +
+            `Title: ${analysis.title ?? ''}\n` +
+            `Reason (please describe):\n\n`,
+          );
+          Linking.openURL(`mailto:support@representvote.com?subject=${subject}&body=${body}`).catch(() => {
+            Alert.alert(
+              'Could not open email',
+              'Email support@representvote.com to flag this analysis.',
+            );
+          });
+        }}
+        activeOpacity={0.7}
+        style={{
+          alignSelf: 'center',
+          paddingVertical: 8,
+          paddingHorizontal: 12,
+          marginTop: 4,
+        }}
+      >
+        <Text style={{ fontSize: 12, color: colors.textSecondary, textDecorationLine: 'underline' }}>
+          Flag this analysis
+        </Text>
+      </TouchableOpacity>
 
       {/* Actions */}
       <View style={styles.reportActions}>
