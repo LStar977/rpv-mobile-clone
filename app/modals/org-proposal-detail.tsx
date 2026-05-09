@@ -114,33 +114,48 @@ export default function OrgProposalDetailScreen() {
     fetchRichResults();
   }, [fetchRichResults]);
 
-  // UPDATE 24: when the backend returns VERIFICATION_REQUIRED_BY_ORG, route
-  // the user to the org-paid verification flow with the orgName threaded
-  // through so the screen shows "covered by [Org Name]" copy. Returns true
-  // if the error was handled (caller should bail out of the rest of the
-  // flow); false otherwise so normal error paths continue.
-  const handleVerificationRequiredByOrg = useCallback((result: { errorCode?: string; errorDetails?: any }): boolean => {
-    if (result.errorCode !== 'VERIFICATION_REQUIRED_BY_ORG') return false;
-    const orgName = result.errorDetails?.orgName ?? 'This organization';
-    const orgIdParam = result.errorDetails?.orgId ?? orgId;
-    Alert.alert(
-      'Verification required',
-      `${orgName} requires identity verification before voting. Verification is covered by your organization.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Verify now',
-          onPress: () => router.push({
-            pathname: '/modals/verification-payment',
-            params: {
-              originatingOrgId: orgIdParam,
-              originatingOrgName: orgName,
-            },
-          }),
-        },
-      ],
-    );
-    return true;
+  // UPDATE 24/25: org-mandated verification error handling. Two error codes
+  // can fire here:
+  //   VERIFICATION_REQUIRED_BY_ORG — member is unverified; route to the
+  //     org-paid verification flow with the orgName threaded through so
+  //     the screen shows "covered by [Org Name]" copy.
+  //   ORG_VERIFICATION_BUDGET_EXHAUSTED — org has hit its monthly cap (UPDATE 25);
+  //     show admin-contact alert. Vote will succeed once admin lifts the cap.
+  // Returns true if the error was handled (caller should bail out); false
+  // otherwise so normal error paths continue.
+  const handleOrgVerificationError = useCallback((result: { errorCode?: string; errorDetails?: any }): boolean => {
+    if (result.errorCode === 'VERIFICATION_REQUIRED_BY_ORG') {
+      const orgName = result.errorDetails?.orgName ?? 'This organization';
+      const orgIdParam = result.errorDetails?.orgId ?? orgId;
+      Alert.alert(
+        'Verification required',
+        `${orgName} requires identity verification before voting. Verification is covered by your organization.`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Verify now',
+            onPress: () => router.push({
+              pathname: '/modals/verification-payment',
+              params: {
+                originatingOrgId: orgIdParam,
+                originatingOrgName: orgName,
+              },
+            }),
+          },
+        ],
+      );
+      return true;
+    }
+    if (result.errorCode === 'ORG_VERIFICATION_BUDGET_EXHAUSTED') {
+      const orgName = result.errorDetails?.orgName ?? 'This organization';
+      Alert.alert(
+        'Organization billing limit reached',
+        `${orgName} has paused verified-member voting this month. Contact your administrator to lift the cap.`,
+        [{ text: 'OK', style: 'cancel' }],
+      );
+      return true;
+    }
+    return false;
   }, [orgId]);
 
   const handleRcvVote = useCallback(async (rankings: string[]) => {
@@ -149,7 +164,7 @@ export default function OrgProposalDetailScreen() {
     try {
       const result = await proposalsApi.submitVote(proposalId, 'ranked-choice', { rankings });
       if (result.error) {
-        if (handleVerificationRequiredByOrg(result)) return;
+        if (handleOrgVerificationError(result)) return;
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
         Alert.alert('Vote failed', result.error);
         return;
@@ -160,7 +175,7 @@ export default function OrgProposalDetailScreen() {
     } finally {
       setVoting(false);
     }
-  }, [proposalId, rcvSubmitted, isEnded, voting, fetchRichResults, handleVerificationRequiredByOrg]);
+  }, [proposalId, rcvSubmitted, isEnded, voting, fetchRichResults, handleOrgVerificationError]);
 
   const handleMcVote = useCallback(async (selectedOption: string) => {
     if (mcSubmitted || isEnded || voting) return;
@@ -168,7 +183,7 @@ export default function OrgProposalDetailScreen() {
     try {
       const result = await proposalsApi.submitVote(proposalId, 'multiple-choice', { selectedOption });
       if (result.error) {
-        if (handleVerificationRequiredByOrg(result)) return;
+        if (handleOrgVerificationError(result)) return;
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
         Alert.alert('Vote failed', result.error);
         return;
@@ -179,7 +194,7 @@ export default function OrgProposalDetailScreen() {
     } finally {
       setVoting(false);
     }
-  }, [proposalId, mcSubmitted, isEnded, voting, fetchRichResults, handleVerificationRequiredByOrg]);
+  }, [proposalId, mcSubmitted, isEnded, voting, fetchRichResults, handleOrgVerificationError]);
 
   const supportScale = useSharedValue(1);
   const opposeScale = useSharedValue(1);
@@ -214,7 +229,7 @@ export default function OrgProposalDetailScreen() {
       console.log('[voteOnProposal] response:', JSON.stringify(result));
 
       if (result.error) {
-        if (handleVerificationRequiredByOrg(result)) return;
+        if (handleOrgVerificationError(result)) return;
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
         Alert.alert('Vote Failed', result.error);
         return;
@@ -239,7 +254,7 @@ export default function OrgProposalDetailScreen() {
     } finally {
       setVoting(false);
     }
-  }, [orgId, proposalId, userVote, isEnded, voting, supportScale, opposeScale, handleVerificationRequiredByOrg]);
+  }, [orgId, proposalId, userVote, isEnded, voting, supportScale, opposeScale, handleOrgVerificationError]);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>

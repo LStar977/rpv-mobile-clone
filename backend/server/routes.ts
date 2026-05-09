@@ -7,7 +7,7 @@ import { setupAuth, isAuthenticated } from "./replitAuth";
 import { setupBadgeRoutes } from "./badge-routes";
 import { passportNFTs, activatedRidings, electoralRidingQRCodes, proposals, votes, voteTokenClaims, organizations, transactions } from "@shared/schema";
 import { getMemberLimit, getTierLimits, isFeatureEnabled, tierDisplayName, type OrgTier } from "@shared/tier-limits";
-import { chargeOrgForVerification, hasVerificationBudgetRoom, packVendorData, parseVendorData } from "./verificationBilling";
+import { billOrgForFirstVote, hasVerificationBudgetRoom, packVendorData, parseVendorData } from "./verificationBilling";
 import { eq, count, and, sql } from "drizzle-orm";
 import { db } from "./db";
 import { savePushToken, notifyNewProposal, notifyTokenClaimed, notifyProposalVote } from "./notifications";
@@ -500,6 +500,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
               requiresVerification: true,
             });
           }
+          // UPDATE 25: vote-time org billing for verified members.
+          if (proposalOrg?.requireMemberVerification && user?.verified) {
+            const billResult = await billOrgForFirstVote(proposalOrg.id, userId);
+            if (billResult.reason === 'budget-exhausted') {
+              return res.status(403).json({
+                error: "This organization has paused verified-member voting this month. Contact your administrator.",
+                code: "ORG_VERIFICATION_BUDGET_EXHAUSTED",
+                orgId: proposalOrg.id,
+                orgName: proposalOrg.name,
+              });
+            }
+          }
         }
         await storage.recordVote(userId, proposalId, 'ranked-choice', undefined, null as any, JSON.stringify(rankings));
         log(`✅ RCV ballot recorded: user=${userId}, proposal=${proposalId}, rankings=${rankings.length}`);
@@ -532,6 +544,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
             orgName: proposalOrg.name,
             requiresVerification: true,
           });
+        }
+        // UPDATE 25: vote-time org billing for verified members. First
+        // qualifying vote per org-member edge bills the org via Stripe
+        // metered usage (above included quota). Subsequent votes by the
+        // same member never re-bill. budget-exhausted blocks the vote.
+        if (proposalOrg?.requireMemberVerification && user?.verified) {
+          const billResult = await billOrgForFirstVote(proposalOrg.id, userId);
+          if (billResult.reason === 'budget-exhausted') {
+            return res.status(403).json({
+              error: "This organization has paused verified-member voting this month. Contact your administrator.",
+              code: "ORG_VERIFICATION_BUDGET_EXHAUSTED",
+              orgId: proposalOrg.id,
+              orgName: proposalOrg.name,
+            });
+          }
         }
       } else if (!user?.verified) {
         return res.status(403).json({ error: "You must complete identity verification before voting." });
@@ -2086,9 +2113,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         log(`Veriff webhook data: document.country=${document.country}, address.country=${address.country}`);
         await storage.updateUserVerification(userId, updateData);
         await grantInitialBallotsIfNeeded(userId);
-        if (originatingOrgId) {
-          await chargeOrgForVerification(originatingOrgId, userId);
-        }
+        // UPDATE 25: org billing has moved to vote-time. The originatingOrgId
+        // is logged above for diagnostic correlation but no longer drives
+        // a Stripe charge here.
         log(`User verified via /api/veriff/webhook: user=${rid(userId)}, verificationId=${rid(verificationId)}, country=${country}`);
       }
 
@@ -2524,9 +2551,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         await storage.updateUserVerification(userId, updateData);
         await grantInitialBallotsIfNeeded(userId);
-        if (originatingOrgId) {
-          await chargeOrgForVerification(originatingOrgId, userId);
-        }
+        // UPDATE 25: org billing has moved to vote-time (see comment in
+        // /api/veriff/webhook above). originatingOrgId is logged for
+        // diagnostic correlation only.
         log(`User verified via Didit webhook: user=${rid(userId)}, country=${fields.country}`);
       }
 

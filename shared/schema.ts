@@ -165,6 +165,12 @@ export const organizationMembers = pgTable("organization_members", {
   userId: varchar("user_id").notNull().references(() => users.id),
   role: varchar("role").notNull().default('member'), // 'admin', 'member'
   joinedAt: timestamp("joined_at").defaultNow(),
+  // UPDATE 25: stamped when the org has been billed for this member's
+  // first vote in a verify-required org. Null = not yet billed. On
+  // leave + rejoin the row is recreated, so the org gets billed again.
+  // Lifetime per-edge billing — once stamped, this member's votes are
+  // free forever (or until they leave + rejoin).
+  verificationBilledAt: timestamp("verification_billed_at"),
 }, (table) => ({
   uniqueOrgMember: unique().on(table.organizationId, table.userId),
 }));
