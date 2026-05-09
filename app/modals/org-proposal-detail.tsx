@@ -19,6 +19,8 @@ import { organizationsApi, proposalsApi } from '../../lib/api';
 import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS } from '../../lib/theme';
 import { RCVBallotInput } from '../../components/ui/RCVBallotInput';
 import { RCVResults } from '../../components/ui/RCVResults';
+import { MultipleChoiceBallot } from '../../components/ui/MultipleChoiceBallot';
+import { MultipleChoiceResults } from '../../components/ui/MultipleChoiceResults';
 
 const SERIF_FONT = Platform.OS === 'ios' ? 'Georgia' : 'serif';
 
@@ -80,11 +82,14 @@ export default function OrgProposalDetailScreen() {
   );
   const [voting, setVoting] = useState(false);
 
-  // RCV state. results is the unified payload from /api/proposals/:id/results;
-  // for ranked-choice it contains the IRV walk. rcvSubmitted tracks whether
-  // the local user has cast their ballot (for hiding the input afterward).
+  // RCV / multi-choice state. results is the unified payload from
+  // /api/proposals/:id/results; for ranked-choice it contains the IRV walk,
+  // for multiple-choice it contains per-option counts. *Submitted tracks
+  // whether the local user has cast their ballot (for swapping input → results).
   const [rcvResults, setRcvResults] = useState<any | null>(null);
   const [rcvSubmitted, setRcvSubmitted] = useState(false);
+  const [mcResults, setMcResults] = useState<{ options: string[]; counts: Record<string, number> } | null>(null);
+  const [mcSubmitted, setMcSubmitted] = useState(false);
 
   const timeInfo = getTimeRemaining(deadline);
   const isEnded = timeInfo.text === 'Voting ended';
@@ -92,17 +97,22 @@ export default function OrgProposalDetailScreen() {
   const supportPct = total > 0 ? (supportVotes / total) * 100 : 50;
 
   // Fetch results for non-yes-no proposals on mount and after the user votes.
-  // The /results endpoint runs IRV server-side for RCV; mobile is purely a
-  // renderer.
-  const fetchRcvResults = useCallback(async () => {
-    if (voteType !== 'ranked-choice') return;
+  // The /results endpoint runs IRV server-side for RCV and counts-per-option
+  // for multi-choice; mobile is purely a renderer.
+  const fetchRichResults = useCallback(async () => {
+    if (voteType === 'yes-no') return;
     const result = await proposalsApi.getResults(proposalId);
-    if (result.data) setRcvResults(result.data);
+    if (!result.data) return;
+    if (result.data.type === 'ranked-choice') {
+      setRcvResults(result.data);
+    } else if (result.data.type === 'multiple-choice') {
+      setMcResults({ options: result.data.options ?? [], counts: result.data.counts ?? {} });
+    }
   }, [voteType, proposalId]);
 
   useEffect(() => {
-    fetchRcvResults();
-  }, [fetchRcvResults]);
+    fetchRichResults();
+  }, [fetchRichResults]);
 
   const handleRcvVote = useCallback(async (rankings: string[]) => {
     if (rcvSubmitted || isEnded || voting) return;
@@ -116,11 +126,29 @@ export default function OrgProposalDetailScreen() {
       }
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setRcvSubmitted(true);
-      await fetchRcvResults();
+      await fetchRichResults();
     } finally {
       setVoting(false);
     }
-  }, [proposalId, rcvSubmitted, isEnded, voting, fetchRcvResults]);
+  }, [proposalId, rcvSubmitted, isEnded, voting, fetchRichResults]);
+
+  const handleMcVote = useCallback(async (selectedOption: string) => {
+    if (mcSubmitted || isEnded || voting) return;
+    setVoting(true);
+    try {
+      const result = await proposalsApi.submitVote(proposalId, 'multiple-choice', { selectedOption });
+      if (result.error) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        Alert.alert('Vote failed', result.error);
+        return;
+      }
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setMcSubmitted(true);
+      await fetchRichResults();
+    } finally {
+      setVoting(false);
+    }
+  }, [proposalId, mcSubmitted, isEnded, voting, fetchRichResults]);
 
   const supportScale = useSharedValue(1);
   const opposeScale = useSharedValue(1);
@@ -355,6 +383,20 @@ export default function OrgProposalDetailScreen() {
             <RCVBallotInput
               options={proposalOptions}
               onSubmit={handleRcvVote}
+              submitting={voting}
+            />
+          )
+        ) : voteType === 'multiple-choice' ? (
+          mcSubmitted || isEnded ? (
+            mcResults ? (
+              <MultipleChoiceResults options={mcResults.options} counts={mcResults.counts} />
+            ) : (
+              <ActivityIndicator color={colors.gold} />
+            )
+          ) : (
+            <MultipleChoiceBallot
+              options={proposalOptions}
+              onSubmit={handleMcVote}
               submitting={voting}
             />
           )
