@@ -1667,6 +1667,8 @@ export default function ProposalsScreen() {
     ageGroup: 'All Ages',
     gender: 'All Genders',
     imageUri: '' as string,
+    voteType: 'yes-no' as 'yes-no' | 'multiple-choice' | 'ranked-choice',
+    options: ['', ''] as string[],
   });
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -2149,6 +2151,20 @@ export default function ProposalsScreen() {
         if (uploadedUrl) imageUrl = uploadedUrl;
       }
 
+      // Validate options when voteType is non-binary. Mirrors backend
+      // validation in POST /api/proposals.
+      if (newProposal.voteType !== 'yes-no') {
+        const cleanedOpts = newProposal.options.map((o) => o.trim()).filter(Boolean);
+        if (cleanedOpts.length < 2) {
+          Alert.alert('Need more options', `${newProposal.voteType === 'ranked-choice' ? 'Ranked-choice' : 'Multiple-choice'} proposals need at least 2 options.`);
+          return;
+        }
+        if (new Set(cleanedOpts).size !== cleanedOpts.length) {
+          Alert.alert('Duplicate options', 'Each option must be unique.');
+          return;
+        }
+      }
+
       const result = await proposalsApi.create({
         title: newProposal.title.trim(),
         description: newProposal.description.trim(),
@@ -2156,6 +2172,10 @@ export default function ProposalsScreen() {
         geoRestrictions: geoRestrictions.length > 0 ? geoRestrictions : undefined,
         demographicRestrictions: Object.keys(demographicRestrictions).length > 0 ? demographicRestrictions : undefined,
         imageUrl,
+        voteType: newProposal.voteType,
+        options: newProposal.voteType === 'yes-no'
+          ? undefined
+          : newProposal.options.map((o) => o.trim()).filter(Boolean),
       });
 
       if (result.error) {
@@ -2177,6 +2197,8 @@ export default function ProposalsScreen() {
         ageGroup: 'All Ages',
         gender: 'All Genders',
         imageUri: '',
+        voteType: 'yes-no',
+        options: ['', ''],
       });
       fetchData(true);
 
@@ -2209,6 +2231,25 @@ export default function ProposalsScreen() {
 
   const openProposal = (p: Proposal) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    // Non-yes-no proposals need a dedicated ballot screen — the in-screen
+    // detail modal only knows how to render support/oppose. Route to
+    // /modals/proposal-detail for RCV / multiple-choice.
+    const voteType = (p as any).voteType;
+    if (voteType && voteType !== 'yes-no') {
+      router.push({
+        pathname: '/modals/proposal-detail',
+        params: {
+          proposalId: String(p.id),
+          title: p.title || '',
+          description: p.description || '',
+          category: p.category || 'General',
+          deadline: p.deadline || '',
+          voteType,
+          options: JSON.stringify((p as any).options ?? []),
+        },
+      });
+      return;
+    }
     setSelectedProposal(p);
     setShowDetailModal(true);
   };
@@ -2847,6 +2888,90 @@ export default function ProposalsScreen() {
                 </TouchableOpacity>
               )}
             </View>
+
+            {/* Ballot type picker. Defaults to yes-no for backward compat. */}
+            <View style={styles.formSection}>
+              <Text style={[styles.formLabel, { color: colors.gold }]}>Ballot type</Text>
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                {(['yes-no', 'multiple-choice', 'ranked-choice'] as const).map((vt) => {
+                  const active = newProposal.voteType === vt;
+                  const label = vt === 'yes-no' ? 'Yes / No' : vt === 'multiple-choice' ? 'Multiple choice' : 'Ranked choice';
+                  return (
+                    <TouchableOpacity
+                      key={vt}
+                      onPress={() => setNewProposal((p) => ({ ...p, voteType: vt }))}
+                      style={{
+                        flex: 1,
+                        paddingVertical: 10,
+                        paddingHorizontal: 8,
+                        backgroundColor: active ? colors.gold : colors.surface,
+                        borderColor: active ? colors.gold : colors.border,
+                        borderWidth: 1,
+                        borderRadius: 8,
+                        alignItems: 'center',
+                      }}
+                    >
+                      <Text style={{ color: active ? '#000' : colors.textSecondary, fontSize: 12, fontWeight: '600' }}>
+                        {label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+              {newProposal.voteType === 'ranked-choice' && (
+                <Text style={{ color: colors.textSecondary, fontSize: 11, marginTop: 6, lineHeight: 16 }}>
+                  Voters rank options in order of preference. Winner determined by instant-runoff (IRV).
+                </Text>
+              )}
+            </View>
+
+            {/* Options list, shown for non-yes-no ballots. */}
+            {newProposal.voteType !== 'yes-no' && (
+              <View style={styles.formSection}>
+                <Text style={[styles.formLabel, { color: colors.gold }]}>Options</Text>
+                {newProposal.options.map((opt, idx) => (
+                  <View key={idx} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                    <TextInput
+                      style={{
+                        flex: 1,
+                        padding: 12,
+                        backgroundColor: colors.surface,
+                        borderColor: colors.border,
+                        borderWidth: 1,
+                        borderRadius: 8,
+                        color: colors.text,
+                      }}
+                      placeholder={`Option ${idx + 1}`}
+                      placeholderTextColor={colors.textTertiary}
+                      value={opt}
+                      onChangeText={(t) => setNewProposal((p) => {
+                        const next = [...p.options];
+                        next[idx] = t;
+                        return { ...p, options: next };
+                      })}
+                      maxLength={120}
+                    />
+                    {newProposal.options.length > 2 && (
+                      <TouchableOpacity
+                        onPress={() => setNewProposal((p) => ({ ...p, options: p.options.filter((_, i) => i !== idx) }))}
+                        style={{ padding: 8 }}
+                      >
+                        <Ionicons name="close-circle" size={20} color={colors.textTertiary} />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                ))}
+                {newProposal.options.length < 10 && (
+                  <TouchableOpacity
+                    onPress={() => setNewProposal((p) => ({ ...p, options: [...p.options, ''] }))}
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 8 }}
+                  >
+                    <Ionicons name="add-circle-outline" size={16} color={colors.gold} />
+                    <Text style={{ color: colors.gold, fontSize: 12, fontWeight: '600' }}>Add option</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            )}
 
             <View style={styles.formSection}>
               <Text style={[styles.formLabel, { color: colors.gold }]}>Category</Text>

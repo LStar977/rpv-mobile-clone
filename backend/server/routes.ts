@@ -1378,6 +1378,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      // voteType validation. Defaults to yes-no for backward compatibility
+      // (existing clients don't send voteType). Mirrors the org-proposal
+      // create endpoint validation from UPDATE 20.
+      const resolvedVoteType: string = voteType || 'yes-no';
+      if (!['yes-no', 'multiple-choice', 'ranked-choice'].includes(resolvedVoteType)) {
+        return res.status(400).json({ error: "voteType must be 'yes-no', 'multiple-choice', or 'ranked-choice'" });
+      }
+      if (resolvedVoteType !== 'yes-no') {
+        if (!Array.isArray(options) || options.length < 2) {
+          return res.status(400).json({ error: `${resolvedVoteType} proposals require at least 2 options` });
+        }
+        if (options.some((o: any) => typeof o !== 'string' || o.trim().length === 0)) {
+          return res.status(400).json({ error: "options must be non-empty strings" });
+        }
+        if (new Set(options).size !== options.length) {
+          return res.status(400).json({ error: "options must be unique" });
+        }
+      }
+
       const proposal = await storage.createProposal(userId, title, description, category, geoRestrictions, undefined, riding, demographicRestrictions);
 
       // Update proposal with organization and image if provided
@@ -1389,9 +1408,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         updateData.imageUrl = imageUrl;
       }
 
-      // Update proposal with vote type and options if multiple-choice
-      if (voteType === 'multiple-choice' && options && options.length > 0) {
-        // Generate unique blockchain address for each option
+      // Persist voteType + options. Only multiple-choice gets on-chain
+      // optionAddresses (yes/no uses deterministic per-position addresses
+      // generated at vote time; ranked-choice is off-chain per UPDATE 20).
+      if (resolvedVoteType === 'multiple-choice') {
         const optionAddresses = [];
         for (let i = 0; i < options.length; i++) {
           const optionAddress = await baseNetwork.generateDeterministicAddress(proposal.id, i);
@@ -1400,6 +1420,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         updateData.voteType = 'multiple-choice';
         updateData.options = options;
         updateData.optionAddresses = optionAddresses;
+      } else if (resolvedVoteType === 'ranked-choice') {
+        updateData.voteType = 'ranked-choice';
+        updateData.options = options;
       }
 
       if (Object.keys(updateData).length > 0) {
