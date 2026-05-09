@@ -1563,6 +1563,20 @@ function ProposalCard({
           <Ionicons name="checkmark-circle" size={16} color={colors.success} />
           <Text style={[styles.statusText, { color: colors.success }]}>You have voted</Text>
         </View>
+      ) : !canVoteByLocation && proposalGeo.length > 0 && isUserVerified ? (
+        <View style={[styles.statusBanner, { backgroundColor: `${colors.error}10` }]}>
+          <Ionicons name="lock-closed" size={16} color={colors.error} />
+          <Text style={[styles.statusText, { color: colors.error }]}>
+            Voting open only to {proposalGeo[proposalGeo.length - 1]} residents
+          </Text>
+        </View>
+      ) : !isUserVerified && proposalGeo.length > 0 ? (
+        <View style={[styles.statusBanner, { backgroundColor: `${colors.warning}10` }]}>
+          <Ionicons name="lock-closed" size={16} color={colors.warning} />
+          <Text style={[styles.statusText, { color: colors.warning }]}>
+            Verify your identity to vote
+          </Text>
+        </View>
       ) : (
         <View style={styles.voteActions}>
           <TouchableOpacity
@@ -1929,6 +1943,27 @@ export default function ProposalsScreen() {
 
 
   const handleVote = async (proposalId: number | string, vote: 'support' | 'oppose') => {
+    // Geo / verification gate. Apply BEFORE the demo + seed bypass so the
+    // demo account (used by App Store reviewers) can't register votes on
+    // proposals that show the "Not in your region" badge — the gate badge
+    // and the actual behaviour have to agree. Server enforces this too,
+    // but the demo path skips the API entirely so client-side enforcement
+    // is the only thing standing in the way for that flow.
+    const target = proposals.find((p) => String(p.id) === String(proposalId));
+    if (target && !canUserVoteOnProposal(target, userCountry, userState, userCity, isVerified)) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      const geo = target.geoRestrictions ?? [];
+      const isUnverifiedGeo = geo.length > 0 && !isVerified;
+      Alert.alert(
+        isUnverifiedGeo ? 'Verification required' : 'Not eligible',
+        isUnverifiedGeo
+          ? 'Verify your identity to vote on geo-restricted proposals.'
+          : `This proposal is restricted to ${geo[geo.length - 1] ?? 'a specific region'}. Voting is only open to residents.`,
+        [{ text: 'OK', style: 'cancel' }],
+      );
+      return;
+    }
+
     // Seed proposals + demo account votes: local-only, never hit the API.
     // Demo account is sandboxed so App Store reviewers don't pollute real proposal counts.
     const isDemoAccount = user?.email === 'demo@represent.app';
