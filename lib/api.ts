@@ -36,13 +36,14 @@ export interface Organization {
   verified: boolean;
   createdAt: string;
   role?: 'admin' | 'member';
-  // UPDATE 24: when true, members must complete Veriff/Didit before
-  // voting in this org. Pro+ feature; toggled by admin in org settings.
+  // UPDATE 26: when true, members must complete Veriff/Didit before
+  // voting in this org. Pro+ feature; the org must have paid the one-time
+  // unlock fee before this can be toggled on.
   requireMemberVerification?: boolean;
-  // Optional monthly cap on org-paid verification spend (cents). Null =
-  // unlimited. When the next verification would exceed the cap,
-  // session-create returns ORG_VERIFICATION_BUDGET_EXHAUSTED.
-  verificationBudgetMonthlyCents?: number | null;
+  // Stamped when the org pays the verification unlock fee. Null = not yet
+  // unlocked. Cleared on Stripe / IAP refund.
+  verificationUnlockedAt?: string | null;
+  verificationUnlockedTier?: string | null;
 }
 
 export interface OrganizationProposal extends Proposal {
@@ -730,21 +731,13 @@ export interface OrgUsage {
   tier: 'free' | 'pro' | 'plus' | 'business' | 'government' | 'legacy';
   subscriptionStatus: 'active' | 'pending' | 'past_due' | 'canceled' | 'free' | string;
   members: { current: number; limit: number | null };
-  // UPDATE 24 (Model A+): verification billing.
-  // current = total verifications attributed to this org this month.
-  // included = free monthly quota baked into the tier price (null = unlimited on Government).
-  // overageCount = how many of `current` are over the included quota.
-  // overageRateCents = per-verification overage rate at this tier.
-  // overageSpendCents = overageCount × overageRateCents (what the org owes on the next invoice).
-  // budgetMonthlyCents = optional admin-set cap; when set, session-create
-  //   returns ORG_VERIFICATION_BUDGET_EXHAUSTED at the cap.
-  verifications: {
-    current: number;
-    included: number | null;
-    overageCount: number;
-    overageRateCents: number | null;
-    overageSpendCents: number;
-    budgetMonthlyCents: number | null;
+  // UPDATE 26: identity verification is unlocked once per org via a
+  // tier-priced one-time fee. unlockFeeCents is the price the admin would
+  // pay at the current tier (null = feature unavailable / custom contract).
+  verification: {
+    unlocked: boolean;
+    unlockedAt: string | null;
+    unlockFeeCents: number | null;
   };
   requireMemberVerification: boolean;
   nextBillingDate: string | null;
@@ -757,9 +750,10 @@ export const organizationsApi = {
     return apiRequest<OrgUsage>(`/api/organizations/${orgId}/usage`);
   },
 
-  // UPDATE 24: toggle org-mandated member verification. Pro+ feature.
-  // 402 with errorCode 'FEATURE_NOT_AVAILABLE_ON_TIER' means the caller
-  // is on Free and should see the UpgradeModal.
+  // Toggle org-mandated member verification (UPDATE 26). Two failure modes:
+  //   402 FEATURE_NOT_AVAILABLE_ON_TIER  — caller is on Free, show UpgradeModal.
+  //   402 VERIFICATION_UNLOCK_REQUIRED   — caller hasn't paid the unlock fee;
+  //                                        route to verification-unlock-checkout.
   async setRequireVerification(
     orgId: string,
     require: boolean,
@@ -770,15 +764,28 @@ export const organizationsApi = {
     );
   },
 
-  // UPDATE 24: set the org's monthly verification spend cap (cents).
-  // null = unlimited. Enforced at verification-session-create only.
-  async setVerificationBudget(
+  // UPDATE 26: kick off the one-time unlock-fee Stripe Checkout session.
+  // Stripe-billed orgs only — IAP-billed orgs use the IAP path below.
+  async createVerificationUnlockCheckout(
     orgId: string,
-    budgetCents: number | null,
-  ): Promise<ApiResponse<{ verificationBudgetMonthlyCents: number | null }>> {
-    return apiRequest<{ verificationBudgetMonthlyCents: number | null }>(
-      `/api/organizations/${orgId}/verification-budget`,
-      { method: 'PUT', body: JSON.stringify({ budgetCents }) },
+  ): Promise<ApiResponse<{ checkoutUrl: string; sessionId: string }>> {
+    return apiRequest<{ checkoutUrl: string; sessionId: string }>(
+      `/api/organizations/${orgId}/verification-unlock/checkout`,
+      { method: 'POST' },
+    );
+  },
+
+  // UPDATE 26: submit Apple IAP receipt for the one-time unlock fee.
+  // Server validates with Apple and stamps the org unlocked.
+  async submitVerificationUnlockIapReceipt(
+    orgId: string,
+    receiptData: string,
+    productId: string,
+    transactionId: string,
+  ): Promise<ApiResponse<{ verificationUnlockedAt: string | null }>> {
+    return apiRequest<{ verificationUnlockedAt: string | null }>(
+      `/api/organizations/${orgId}/verification-unlock/iap-receipt`,
+      { method: 'POST', body: JSON.stringify({ receiptData, productId, transactionId }) },
     );
   },
 

@@ -3,6 +3,13 @@ import { storage } from "./storage-db";
 import { db } from "./db";
 import { users, organizations } from "@shared/schema";
 import { eq } from "drizzle-orm";
+import {
+  ORG_VERIFICATION_UNLOCK_PRICE_IDS,
+  markOrgUnlocked,
+  markOrgUnlockRefunded,
+  findOrgByUnlockPaymentId,
+} from "./verificationUnlock";
+import { getVerificationUnlockFeeCents } from "@shared/tier-limits";
 
 function log(message: string) {
   console.log(`[Webhook] ${message}`);
@@ -42,6 +49,50 @@ export class WebhookHandlers {
             subscriptionEndDate: new Date(subscription.current_period_end * 1000),
           }).where(eq(users.id, subUserId));
         }
+      }
+
+      // Handle org verification unlock fee (UPDATE 26): one-time payment
+      // that unlocks identity verification for an organization.
+      if (session.mode === 'payment' && paymentType === 'verification_unlock') {
+        const orgId = session.metadata?.orgId as string | undefined;
+        const tier = session.metadata?.tier as string | undefined;
+        if (!orgId || !tier) {
+          log(`ERROR: verification_unlock checkout missing orgId/tier in metadata (session=${session.id})`);
+          return;
+        }
+
+        const stripe = await getUncachableStripeClient();
+        const expectedPriceId = ORG_VERIFICATION_UNLOCK_PRICE_IDS[tier];
+        const expectedAmount = getVerificationUnlockFeeCents(tier);
+        if (!expectedPriceId || expectedAmount == null) {
+          log(`ERROR: verification_unlock for tier=${tier} not configured (priceId or fee missing)`);
+          return;
+        }
+
+        const fullSession = await stripe.checkout.sessions.retrieve(session.id, {
+          expand: ['line_items.data.price'],
+        }) as any;
+        const lineItems = fullSession.line_items?.data || [];
+        const actualPriceId = lineItems[0]?.price?.id;
+        const actualAmount = fullSession.amount_total;
+        const currency = fullSession.currency;
+
+        if (actualPriceId !== expectedPriceId) {
+          log(`ERROR: verification_unlock price ID mismatch for org=${orgId}. Expected ${expectedPriceId}, got ${actualPriceId}.`);
+          return;
+        }
+        if (actualAmount !== expectedAmount) {
+          log(`ERROR: verification_unlock amount mismatch for org=${orgId}. Expected ${expectedAmount}, got ${actualAmount}.`);
+          return;
+        }
+        if (currency !== 'usd') {
+          log(`ERROR: verification_unlock currency mismatch for org=${orgId}. Expected usd, got ${currency}.`);
+          return;
+        }
+
+        const paymentId = (fullSession.payment_intent as string | null) ?? session.id;
+        await markOrgUnlocked(orgId, tier, paymentId, 'stripe');
+        return;
       }
 
       // Handle one-time verification payment
@@ -166,6 +217,24 @@ export class WebhookHandlers {
           await db.update(users).set({
             subscriptionStatus: 'past_due',
           }).where(eq(users.id, userId));
+        }
+      }
+    }
+
+    // Handle refund / dispute on a verification unlock payment (UPDATE 26).
+    // Stripe fires charge.refunded when a Refund object is created against
+    // a charge, and charge.dispute.created when a customer files a dispute.
+    // For either, look up whether the underlying payment_intent corresponds
+    // to an org's stored verificationUnlockPaymentId and clear the unlock.
+    if (event.type === 'charge.refunded' || event.type === 'charge.dispute.created') {
+      const charge = event.data.object as any;
+      const paymentIntentId: string | null =
+        (typeof charge.payment_intent === 'string' ? charge.payment_intent : charge.payment_intent?.id) ?? null;
+      if (paymentIntentId) {
+        const org = await findOrgByUnlockPaymentId(paymentIntentId);
+        if (org) {
+          log(`Verification unlock refund/dispute for org=${org.id} payment=${paymentIntentId}; clearing unlock`);
+          await markOrgUnlockRefunded(org.id);
         }
       }
     }

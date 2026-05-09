@@ -469,28 +469,25 @@ function SettingsRow({ label, value, mono, gold, onPress, action }: {
   );
 }
 
-// UPDATE 24 (Model A+) — admin-only verification settings card.
+// UPDATE 26 — admin-only verification settings card.
 // Toggle controls whether members must complete Veriff/Didit before voting
-// in this org; on ON, an optional monthly spend cap (cents) can be set.
-// Backend gates the toggle to Pro+ (402 → onUpgradePrompt opens the
-// UpgradeModal). Verification is org-paid via Stripe metered usage.
+// in this org. Toggling ON requires the org to have paid the one-time
+// tier-priced unlock fee ($199/$499/$999). If unpaid, we route to the
+// verification-unlock-checkout modal; if paid, the toggle just flips.
+// Free orgs flipping it ON get the existing UpgradeModal (Pro+ only).
 function VerificationSettingsCard({ org, onUpgradePrompt, onOrgUpdated }: {
   org: Organization;
   onUpgradePrompt: () => void;
   onOrgUpdated: (patch: Partial<Organization>) => void;
 }) {
   const [enabled, setEnabled] = useState<boolean>(!!org.requireMemberVerification);
-  const [budgetDollars, setBudgetDollars] = useState<string>(
-    org.verificationBudgetMonthlyCents != null ? (org.verificationBudgetMonthlyCents / 100).toFixed(0) : '',
-  );
   const [savingToggle, setSavingToggle] = useState(false);
-  const [savingBudget, setSavingBudget] = useState(false);
+  const isUnlocked = !!org.verificationUnlockedAt;
 
-  // Re-sync local state when org prop changes (e.g., after refresh).
+  // Re-sync local state when org prop changes (e.g., after refresh / unlock).
   useEffect(() => {
     setEnabled(!!org.requireMemberVerification);
-    setBudgetDollars(org.verificationBudgetMonthlyCents != null ? (org.verificationBudgetMonthlyCents / 100).toFixed(0) : '');
-  }, [org.requireMemberVerification, org.verificationBudgetMonthlyCents]);
+  }, [org.requireMemberVerification]);
 
   const handleToggle = async (next: boolean) => {
     setEnabled(next); // optimistic
@@ -503,6 +500,16 @@ function VerificationSettingsCard({ org, onUpgradePrompt, onOrgUpdated }: {
           onUpgradePrompt();
           return;
         }
+        if (result.errorCode === 'VERIFICATION_UNLOCK_REQUIRED') {
+          // Admin tried to flip ON but hasn't paid the unlock. Route to the
+          // unlock-checkout modal; on successful unlock the modal flips
+          // requireMemberVerification ON itself before dismissing.
+          router.push({
+            pathname: '/modals/verification-unlock-checkout',
+            params: { orgId: org.id },
+          });
+          return;
+        }
         Alert.alert('Error', result.error);
         return;
       }
@@ -512,35 +519,17 @@ function VerificationSettingsCard({ org, onUpgradePrompt, onOrgUpdated }: {
     }
   };
 
-  const handleSaveBudget = async () => {
-    const trimmed = budgetDollars.trim();
-    const cents = trimmed === '' ? null : Math.round(parseFloat(trimmed) * 100);
-    if (cents !== null && (!Number.isFinite(cents) || cents < 0)) {
-      Alert.alert('Invalid amount', 'Enter a positive dollar amount, or leave blank for unlimited.');
-      return;
-    }
-    setSavingBudget(true);
-    try {
-      const result = await organizationsApi.setVerificationBudget(org.id, cents);
-      if (result.error) {
-        Alert.alert('Error', result.error);
-        return;
-      }
-      onOrgUpdated({ verificationBudgetMonthlyCents: cents });
-    } finally {
-      setSavingBudget(false);
-    }
-  };
+  const unlockedCaption = isUnlocked && org.verificationUnlockedAt
+    ? `Unlocked ${formatRomanDate(org.verificationUnlockedAt)}`
+    : null;
 
   return (
     <View style={{ backgroundColor: O_BG_CARD, borderWidth: 1, borderColor: O_LINE, borderRadius: 12, overflow: 'hidden', marginBottom: 14 }}>
       <View style={{ paddingHorizontal: 14, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: O_LINE, backgroundColor: O_BG_RAISED }}>
         <Text style={{ fontSize: 11, color: O_FG_MUTED, letterSpacing: -0.05, fontWeight: '600' }}>Verification</Text>
       </View>
-      {/* Toggle row */}
       <View style={{
         paddingHorizontal: 14, paddingVertical: 13,
-        borderBottomWidth: 1, borderBottomColor: O_LINE,
         flexDirection: 'row', alignItems: 'center', gap: 12,
       }}>
         <View style={{ flex: 1, minWidth: 0 }}>
@@ -551,8 +540,15 @@ function VerificationSettingsCard({ org, onUpgradePrompt, onOrgUpdated }: {
             Members must complete identity check before voting.
           </Text>
           <Text style={{ fontSize: 11, color: O_FG_FAINT, marginTop: 4, lineHeight: 15 }}>
-            Pro plan or higher · Org pays per verification above the included quota
+            {isUnlocked
+              ? 'Verification covered for your members at no per-vote cost.'
+              : 'Pro plan or higher · One-time unlock fee.'}
           </Text>
+          {unlockedCaption && (
+            <Text style={{ fontSize: 11, color: O_GOLD, marginTop: 4, fontFamily: MONO, letterSpacing: 0.3 }}>
+              {unlockedCaption}
+            </Text>
+          )}
         </View>
         {savingToggle ? (
           <ActivityIndicator size="small" color={O_FG_MUTED} />
@@ -560,50 +556,6 @@ function VerificationSettingsCard({ org, onUpgradePrompt, onOrgUpdated }: {
           <Switch value={enabled} onValueChange={handleToggle} />
         )}
       </View>
-      {/* Budget row — only when toggle is ON */}
-      {enabled && (
-        <View style={{ paddingHorizontal: 14, paddingVertical: 13 }}>
-          <Text style={{ fontSize: 8.5, fontWeight: '600', letterSpacing: 2, textTransform: 'uppercase', color: O_FG_FAINT, marginBottom: 6 }}>
-            Monthly spend cap
-          </Text>
-          <Text style={{ fontSize: 12, color: O_FG_FAINT, marginBottom: 10, lineHeight: 16 }}>
-            Pause new verifications past this amount each month. Leave blank for unlimited.
-          </Text>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <Text style={{ fontFamily: MONO, fontSize: 14, color: O_FG_MUTED }}>$</Text>
-            <TextInput
-              value={budgetDollars}
-              onChangeText={setBudgetDollars}
-              keyboardType="numeric"
-              placeholder="Unlimited"
-              placeholderTextColor={O_FG_FAINT}
-              style={{
-                flex: 1,
-                fontFamily: MONO, fontSize: 14, color: O_FG,
-                paddingVertical: 8, paddingHorizontal: 10,
-                borderWidth: 1, borderColor: O_LINE_STRONG,
-                borderRadius: 6,
-                backgroundColor: O_BG_RAISED,
-              }}
-            />
-            <TouchableOpacity
-              onPress={handleSaveBudget}
-              disabled={savingBudget}
-              activeOpacity={0.7}
-              style={{
-                paddingVertical: 9, paddingHorizontal: 14,
-                borderWidth: 1, borderColor: O_GOLD_D,
-                borderRadius: 6,
-                opacity: savingBudget ? 0.6 : 1,
-              }}
-            >
-              {savingBudget
-                ? <ActivityIndicator size="small" color={O_GOLD} />
-                : <Text style={{ fontSize: 12, fontWeight: '600', color: O_GOLD, letterSpacing: 0.5 }}>Save</Text>}
-            </TouchableOpacity>
-          </View>
-        </View>
-      )}
     </View>
   );
 }

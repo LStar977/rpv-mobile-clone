@@ -7,12 +7,13 @@
 //   Business $499 (5,000) · Government custom (unlimited)
 // Pre-Stage-3 orgs are migrated to `legacy` (uncapped) by ops SQL.
 //
-// UPDATE 24 (Model A+) — verification billing.
-//   Verification is org-paid via Stripe metered usage above an included
-//   monthly quota. Members never see a payment prompt. Pro+ orgs can flip
-//   `requireMemberVerification` ON to require Veriff/Didit before voting.
-//   `verificationsIncluded` is the free monthly quota; overage is charged
-//   at `verificationOverageRateCents` per verification.
+// UPDATE 26 — verification unlock fee (supersedes UPDATE 24/25 metered).
+//   Pro+ orgs can flip `requireMemberVerification` ON after paying a
+//   one-time tier-priced unlock fee ($199 / $499 / $999). Once paid,
+//   identity verification is unlocked permanently for the org — platform
+//   absorbs per-verification cost. `verificationUnlockFeeCents` is the
+//   one-time price; null = feature unavailable on this tier (Free) or
+//   custom contract (Government).
 
 export type OrgTier =
   | 'free'
@@ -38,11 +39,10 @@ export interface TierLimits {
   auditLogExport: boolean;
   // Pro+: org admin can toggle `requireMemberVerification` ON.
   requireVerification: boolean;
-  // Free monthly verification quota included in the tier price.
-  verificationsIncluded: number;
-  // Per-verification overage rate above the included quota, in cents.
-  // Null on Free (the verification toggle is disabled there).
-  verificationOverageRateCents: number | null;
+  // One-time unlock fee in cents for the verification feature. Org pays
+  // once; verification is then unlocked forever. Null on Free (feature
+  // unavailable) and Government (custom annual contract).
+  verificationUnlockFeeCents: number | null;
 }
 
 export const TIER_LIMITS: Record<OrgTier, TierLimits> = {
@@ -56,8 +56,7 @@ export const TIER_LIMITS: Record<OrgTier, TierLimits> = {
     subOrganizations: false,
     auditLogExport: false,
     requireVerification: false,
-    verificationsIncluded: 0,
-    verificationOverageRateCents: null,
+    verificationUnlockFeeCents: null,
   },
   pro: {
     members: 250,
@@ -69,8 +68,7 @@ export const TIER_LIMITS: Record<OrgTier, TierLimits> = {
     subOrganizations: false,
     auditLogExport: false,
     requireVerification: true,
-    verificationsIncluded: 25,
-    verificationOverageRateCents: 299,
+    verificationUnlockFeeCents: 19900,
   },
   plus: {
     members: 1000,
@@ -82,8 +80,7 @@ export const TIER_LIMITS: Record<OrgTier, TierLimits> = {
     subOrganizations: true,
     auditLogExport: true,
     requireVerification: true,
-    verificationsIncluded: 100,
-    verificationOverageRateCents: 249,
+    verificationUnlockFeeCents: 49900,
   },
   business: {
     members: 5000,
@@ -95,8 +92,7 @@ export const TIER_LIMITS: Record<OrgTier, TierLimits> = {
     subOrganizations: true,
     auditLogExport: true,
     requireVerification: true,
-    verificationsIncluded: 500,
-    verificationOverageRateCents: 199,
+    verificationUnlockFeeCents: 99900,
   },
   government: {
     members: Infinity,
@@ -108,8 +104,8 @@ export const TIER_LIMITS: Record<OrgTier, TierLimits> = {
     subOrganizations: true,
     auditLogExport: true,
     requireVerification: true,
-    verificationsIncluded: Infinity,
-    verificationOverageRateCents: 150,
+    // Government runs on custom annual contracts; no self-serve unlock.
+    verificationUnlockFeeCents: null,
   },
   legacy: {
     // Pre-Stage-3 customers (paid the old $29/$99/$299 ladder before this
@@ -125,8 +121,9 @@ export const TIER_LIMITS: Record<OrgTier, TierLimits> = {
     subOrganizations: true,
     auditLogExport: true,
     requireVerification: true,
-    verificationsIncluded: 0,
-    verificationOverageRateCents: 299,
+    // Legacy customers priced at the Pro unlock — sales migrates them to
+    // a current tier on next renewal anyway.
+    verificationUnlockFeeCents: 19900,
   },
 };
 
@@ -159,4 +156,8 @@ export function isFeatureEnabled(tier: string | null | undefined, feature: Boole
 export function tierDisplayName(tier?: string | null): string {
   if (!tier) return 'Free';
   return tier.charAt(0).toUpperCase() + tier.slice(1);
+}
+
+export function getVerificationUnlockFeeCents(tier?: string | null): number | null {
+  return getTierLimits(tier).verificationUnlockFeeCents;
 }

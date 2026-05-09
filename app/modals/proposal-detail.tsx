@@ -83,12 +83,10 @@ export default function ProposalDetailScreen() {
     fetchResults();
   }, [fetchResults]);
 
-  // UPDATE 24/25: org-mandated verification errors can fire even on global
-  // proposals — when a user navigates to a proposal that lives inside a
-  // verify-required org via shared links / push notifications. Mirror the
-  // handler from org-proposal-detail.tsx. Two error codes:
-  //   VERIFICATION_REQUIRED_BY_ORG       — route to org-paid verification
-  //   ORG_VERIFICATION_BUDGET_EXHAUSTED  — org cap hit; admin-contact alert
+  // UPDATE 26: org-mandated verification can fire on shared/global proposals
+  // that live inside a verify-required org. Route the user to org-paid
+  // verification (the org has paid the one-time unlock fee, so members
+  // never see a payment prompt).
   const handleOrgVerificationError = useCallback((result: { errorCode?: string; errorDetails?: any }): boolean => {
     if (result.errorCode === 'VERIFICATION_REQUIRED_BY_ORG') {
       const orgName = result.errorDetails?.orgName ?? 'This organization';
@@ -109,15 +107,6 @@ export default function ProposalDetailScreen() {
             }),
           },
         ],
-      );
-      return true;
-    }
-    if (result.errorCode === 'ORG_VERIFICATION_BUDGET_EXHAUSTED') {
-      const orgName = result.errorDetails?.orgName ?? 'This organization';
-      Alert.alert(
-        'Organization billing limit reached',
-        `${orgName} has paused verified-member voting this month. Contact your administrator to lift the cap.`,
-        [{ text: 'OK', style: 'cancel' }],
       );
       return true;
     }

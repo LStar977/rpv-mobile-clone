@@ -135,23 +135,23 @@ export const organizations = pgTable("organizations", {
 
   // When true, members must complete Veriff/Didit before voting on
   // proposals in this org. Pro+ feature, gated by `requireVerification`
-  // in shared/tier-limits.ts. The verification flow is org-paid: members
-  // never see a payment prompt, the org's saved card is charged via
-  // Stripe metered usage above the included monthly quota.
+  // in shared/tier-limits.ts. Requires the org to have paid the one-time
+  // verification unlock fee (verificationUnlockedAt is non-null).
   requireMemberVerification: boolean("require_member_verification").default(false),
 
-  // Optional monthly cap on org-paid verification overage spend, in cents.
-  // Null = unlimited. When the cap is reached, verification-session-create
-  // returns ORG_VERIFICATION_BUDGET_EXHAUSTED and members see admin-contact
-  // copy. Enforced at session-create only — verifications already in flight
-  // complete and are billed.
-  verificationBudgetMonthlyCents: integer("verification_budget_monthly_cents"),
+  // UPDATE 26: one-time unlock fee receipt. Stamped when the org pays the
+  // tier-priced unlock fee ($199 Pro / $499 Plus / $999 Business). Once
+  // unlocked, requireMemberVerification can be toggled freely without
+  // re-charge. Cleared on Stripe refund or Apple IAP refund webhook.
+  verificationUnlockedAt: timestamp("verification_unlocked_at"),
+  verificationUnlockedTier: varchar("verification_unlocked_tier"),
+  verificationUnlockPaymentId: varchar("verification_unlock_payment_id"),
+  verificationUnlockSource: varchar("verification_unlock_source"),
 
-  // Per-month verification counter, attributed to the org via vendor_data
-  // ("userId|orgId") on Veriff/Didit session create. Incremented in the
-  // success webhook. Lazy monthly reset: incrementOrgVerificationCount
-  // zeroes this and bumps verificationCountResetAt if the stored timestamp
-  // is in a previous calendar month.
+  // DEPRECATED (UPDATE 24/25 metered model — superseded by UPDATE 26):
+  // kept in DB for safety, no longer read or written. Migration drops
+  // these columns at the next schema breakdown.
+  verificationBudgetMonthlyCents: integer("verification_budget_monthly_cents"),
   verificationCountThisMonth: integer("verification_count_this_month").default(0),
   verificationCountResetAt: timestamp("verification_count_reset_at").defaultNow(),
 
@@ -165,11 +165,9 @@ export const organizationMembers = pgTable("organization_members", {
   userId: varchar("user_id").notNull().references(() => users.id),
   role: varchar("role").notNull().default('member'), // 'admin', 'member'
   joinedAt: timestamp("joined_at").defaultNow(),
-  // UPDATE 25: stamped when the org has been billed for this member's
-  // first vote in a verify-required org. Null = not yet billed. On
-  // leave + rejoin the row is recreated, so the org gets billed again.
-  // Lifetime per-edge billing — once stamped, this member's votes are
-  // free forever (or until they leave + rejoin).
+  // DEPRECATED (UPDATE 25 metered vote-time billing — superseded by
+  // UPDATE 26 unlock-fee model): kept in DB for safety, no longer read
+  // or written. Drop at next schema breakdown.
   verificationBilledAt: timestamp("verification_billed_at"),
 }, (table) => ({
   uniqueOrgMember: unique().on(table.organizationId, table.userId),

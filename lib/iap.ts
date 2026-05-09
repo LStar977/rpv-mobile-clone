@@ -8,15 +8,48 @@ const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://representportal.com'
 // existing string here so existing subscribers + App Store Connect stay
 // aligned. Only the JS-side identifier was renamed.
 //
-// Verification is FREE for everyone now, so there's no verification SKU.
-// All remaining products are auto-renewable subscriptions.
+// Subscription products: premium + 4 org tiers. Auto-renewable.
+// Consumable products (UPDATE 26): one-time identity-verification unlock
+// fees per org tier. Server is the source of truth — receipt validation
+// stamps the org row, and Apple's restore-purchases path is intentionally
+// not honored for these (an admin moving orgs shouldn't carry the unlock).
 export const IAP_PRODUCTS = {
   premium: 'com.representwallet.app.premium',
   orgStarter: 'com.representwallet.app.org.community',
   orgProfessional: 'com.representwallet.app.org.professional',
   orgPremium: 'com.representwallet.app.org.premium',
   orgEnterprise: 'com.representwallet.app.org.enterprise',
+  verificationUnlockPro: 'verification_unlock_pro',
+  verificationUnlockPlus: 'verification_unlock_plus',
+  verificationUnlockBusiness: 'verification_unlock_business',
 } as const;
+
+// SKUs that should be finished as consumables (not non-consumables) and
+// purchased via requestPurchase / getProducts (not requestSubscription /
+// getSubscriptions). Keep this list in sync with the unlock entries above.
+const CONSUMABLE_SKUS = new Set<string>([
+  IAP_PRODUCTS.verificationUnlockPro,
+  IAP_PRODUCTS.verificationUnlockPlus,
+  IAP_PRODUCTS.verificationUnlockBusiness,
+]);
+
+export function isConsumableSku(sku: string): boolean {
+  return CONSUMABLE_SKUS.has(sku);
+}
+
+export function unlockSkuForTier(tier: string): string | null {
+  switch (tier) {
+    case 'pro':
+    case 'legacy':
+      return IAP_PRODUCTS.verificationUnlockPro;
+    case 'plus':
+      return IAP_PRODUCTS.verificationUnlockPlus;
+    case 'business':
+      return IAP_PRODUCTS.verificationUnlockBusiness;
+    default:
+      return null;
+  }
+}
 
 // Conditionally import react-native-iap to handle missing native module (e.g., in Expo Go)
 let RNIap: any = null;
@@ -44,6 +77,7 @@ export interface IAPPurchaseResult {
   success: boolean;
   receipt?: string;
   transactionId?: string;
+  productId?: string;
   error?: string;
   cancelled?: boolean;
 }
@@ -66,10 +100,11 @@ export async function initIAP(): Promise<boolean> {
       async (purchase: any) => {
         const receipt = purchase.transactionReceipt;
         if (receipt) {
-          // No more consumables — verification is one-time, premium/org are
-          // subscriptions. Always finish as non-consumable.
+          // Verification-unlock SKUs are consumables (server-side state
+          // is the source of truth). Subscriptions stay non-consumable.
+          const consumable = isConsumableSku(purchase.productId);
           try {
-            await RNIap.finishTransaction({ purchase, isConsumable: false });
+            await RNIap.finishTransaction({ purchase, isConsumable: consumable });
           } catch (e) {
             console.error('Error finishing transaction:', e);
           }
@@ -79,6 +114,7 @@ export async function initIAP(): Promise<boolean> {
               success: true,
               receipt,
               transactionId: purchase.transactionId,
+              productId: purchase.productId,
             });
             pendingPurchaseResolve = null;
           }
@@ -126,18 +162,23 @@ export function endIAP() {
 }
 
 /**
- * Get available products from the App Store. All remaining products are
- * auto-renewable subscriptions.
+ * Get available products from the App Store. Splits SKUs across the
+ * subscriptions and (consumable) products endpoints; merges the two lists.
  */
 export async function getProducts(skus?: string[]): Promise<IAPProduct[]> {
   if (!iapAvailable || !RNIap || Platform.OS !== 'ios') return [];
 
   const productIds = skus || Object.values(IAP_PRODUCTS);
+  const subscriptionSkus = productIds.filter((s) => !isConsumableSku(s));
+  const consumableSkus = productIds.filter((s) => isConsumableSku(s));
 
   try {
-    const subscriptions = await RNIap.getSubscriptions({ skus: productIds }).catch(() => []);
+    const [subs, prods] = await Promise.all([
+      subscriptionSkus.length ? RNIap.getSubscriptions({ skus: subscriptionSkus }).catch(() => []) : Promise.resolve([]),
+      consumableSkus.length ? RNIap.getProducts({ skus: consumableSkus }).catch(() => []) : Promise.resolve([]),
+    ]);
 
-    return subscriptions.map((p: any) => ({
+    return [...subs, ...prods].map((p: any) => ({
       productId: p.productId,
       title: p.title || p.name || '',
       description: p.description || '',
@@ -152,7 +193,8 @@ export async function getProducts(skus?: string[]): Promise<IAPProduct[]> {
 }
 
 /**
- * Purchase a subscription. (All remaining IAP products are subscriptions.)
+ * Purchase a product. Routes to requestSubscription for auto-renewable
+ * subscriptions and requestPurchase for consumables (verification unlock).
  */
 export async function purchaseProduct(sku: string): Promise<IAPPurchaseResult> {
   if (!iapAvailable || !RNIap || Platform.OS !== 'ios') {
@@ -162,7 +204,11 @@ export async function purchaseProduct(sku: string): Promise<IAPPurchaseResult> {
   return new Promise((resolve) => {
     pendingPurchaseResolve = resolve;
 
-    RNIap.requestSubscription({ sku }).catch((error: any) => {
+    const request = isConsumableSku(sku)
+      ? RNIap.requestPurchase({ sku })
+      : RNIap.requestSubscription({ sku });
+
+    request.catch((error: any) => {
       if (pendingPurchaseResolve) {
         const cancelled = error.code === 'E_USER_CANCELLED';
         pendingPurchaseResolve({

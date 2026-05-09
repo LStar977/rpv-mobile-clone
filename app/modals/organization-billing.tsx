@@ -236,40 +236,22 @@ export default function OrganizationBillingScreen() {
                 />
               </View>
             )}
-            {/* UPDATE 24 (Model A+) — verification billing row.
-                Visible only when the org has require-verification enabled.
-                Shows current/included quota and accumulated overage spend
-                this month. Stripe metered usage rolls these into the next
-                invoice automatically. */}
-            {usage.requireMemberVerification && (
-              <>
-                <View style={styles.summaryRow}>
-                  <Text style={[styles.summaryLabel, { color: colors.textSecondary }]}>Verifications</Text>
-                  <Text style={[styles.summaryValue, { color: colors.text }]}>
-                    {usage.verifications.current}
-                    {usage.verifications.included !== null
-                      ? ` / ${usage.verifications.included} included`
-                      : ' (unlimited)'}
-                  </Text>
-                </View>
-                {usage.verifications.overageCount > 0 && (
-                  <View style={styles.summaryRow}>
-                    <Text style={[styles.summaryLabel, { color: colors.textSecondary }]}>Overage this month</Text>
-                    <Text style={[styles.summaryValue, { color: colors.text }]}>
-                      {`${usage.verifications.overageCount} × $${((usage.verifications.overageRateCents ?? 0) / 100).toFixed(2)} = $${(usage.verifications.overageSpendCents / 100).toFixed(2)}`}
-                    </Text>
-                  </View>
-                )}
-                {usage.verifications.budgetMonthlyCents !== null && (
-                  <View style={styles.summaryRow}>
-                    <Text style={[styles.summaryLabel, { color: colors.textSecondary }]}>Monthly cap</Text>
-                    <Text style={[styles.summaryValue, { color: colors.text }]}>
-                      {`$${(usage.verifications.budgetMonthlyCents / 100).toFixed(0)}`}
-                    </Text>
-                  </View>
-                )}
-              </>
-            )}
+            {/* UPDATE 26 — verification unlock row. Three states:
+                - Active: org paid the unlock; show date.
+                - Inactive on Pro+: feature available, show price.
+                - Free: unavailable on this tier. */}
+            <View style={styles.summaryRow}>
+              <Text style={[styles.summaryLabel, { color: colors.textSecondary }]}>Identity verification</Text>
+              <Text style={[styles.summaryValue, { color: colors.text }]}>
+                {usage.verification.unlocked
+                  ? `Active${usage.verification.unlockedAt ? ` · unlocked ${formatDate(usage.verification.unlockedAt)}` : ''}`
+                  : usage.verification.unlockFeeCents != null
+                    ? `Inactive · enable in Settings ($${(usage.verification.unlockFeeCents / 100).toFixed(0)} one-time)`
+                    : usage.tier === 'government'
+                      ? 'Custom contract'
+                      : 'Pro plan or higher required'}
+              </Text>
+            </View>
             <View style={styles.summaryRow}>
               <Text style={[styles.summaryLabel, { color: colors.textSecondary }]}>Next billing</Text>
               <Text style={[styles.summaryValue, { color: colors.text }]}>

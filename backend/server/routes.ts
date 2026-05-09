@@ -7,7 +7,15 @@ import { setupAuth, isAuthenticated } from "./replitAuth";
 import { setupBadgeRoutes } from "./badge-routes";
 import { passportNFTs, activatedRidings, electoralRidingQRCodes, proposals, votes, voteTokenClaims, organizations, transactions } from "@shared/schema";
 import { getMemberLimit, getTierLimits, isFeatureEnabled, tierDisplayName, type OrgTier } from "@shared/tier-limits";
-import { billOrgForFirstVote, hasVerificationBudgetRoom, packVendorData, parseVendorData } from "./verificationBilling";
+import {
+  ORG_VERIFICATION_UNLOCK_PRICE_IDS,
+  ORG_VERIFICATION_UNLOCK_IAP_PRODUCT_IDS,
+  getUnlockPriceCents,
+  isOrgUnlocked,
+  markOrgUnlocked,
+  packVendorData,
+  parseVendorData,
+} from "./verificationUnlock";
 import { eq, count, and, sql } from "drizzle-orm";
 import { db } from "./db";
 import { savePushToken, notifyNewProposal, notifyTokenClaimed, notifyProposalVote } from "./notifications";
@@ -500,18 +508,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
               requiresVerification: true,
             });
           }
-          // UPDATE 25: vote-time org billing for verified members.
-          if (proposalOrg?.requireMemberVerification && user?.verified) {
-            const billResult = await billOrgForFirstVote(proposalOrg.id, userId);
-            if (billResult.reason === 'budget-exhausted') {
-              return res.status(403).json({
-                error: "This organization has paused verified-member voting this month. Contact your administrator.",
-                code: "ORG_VERIFICATION_BUDGET_EXHAUSTED",
-                orgId: proposalOrg.id,
-                orgName: proposalOrg.name,
-              });
-            }
-          }
+          // UPDATE 26: no per-vote billing. The org pays the one-time
+          // unlock fee at toggle-on; subsequent votes are free for the org.
         }
         await storage.recordVote(userId, proposalId, 'ranked-choice', undefined, null as any, JSON.stringify(rankings));
         log(`✅ RCV ballot recorded: user=${userId}, proposal=${proposalId}, rankings=${rankings.length}`);
@@ -545,21 +543,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             requiresVerification: true,
           });
         }
-        // UPDATE 25: vote-time org billing for verified members. First
-        // qualifying vote per org-member edge bills the org via Stripe
-        // metered usage (above included quota). Subsequent votes by the
-        // same member never re-bill. budget-exhausted blocks the vote.
-        if (proposalOrg?.requireMemberVerification && user?.verified) {
-          const billResult = await billOrgForFirstVote(proposalOrg.id, userId);
-          if (billResult.reason === 'budget-exhausted') {
-            return res.status(403).json({
-              error: "This organization has paused verified-member voting this month. Contact your administrator.",
-              code: "ORG_VERIFICATION_BUDGET_EXHAUSTED",
-              orgId: proposalOrg.id,
-              orgName: proposalOrg.name,
-            });
-          }
-        }
+        // UPDATE 26: no per-vote billing. The org pays the one-time
+        // unlock fee at toggle-on; subsequent votes are free for the org.
       } else if (!user?.verified) {
         return res.status(403).json({ error: "You must complete identity verification before voting." });
       }
@@ -2394,14 +2379,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (!isMember) {
           return res.status(403).json({ error: "Not a member of this organization" });
         }
-        if (!hasVerificationBudgetRoom(org)) {
-          return res.status(403).json({
-            error: "This organization has paused verification this month. Contact your administrator.",
-            code: "ORG_VERIFICATION_BUDGET_EXHAUSTED",
-            orgId: originatingOrgId,
-            orgName: org.name,
-          });
-        }
         attributedOrgId = originatingOrgId;
       }
 
@@ -2467,8 +2444,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Org-paid verification branch (mirror of /api/veriff/create-session above).
       // When originatingOrgId is supplied, the user is verifying because their
       // org has requireMemberVerification=true. Skip the upstream payment gate
-      // (the org pays via Stripe metered usage), enforce membership + budget,
-      // and pack the orgId into vendor_data so the webhook can attribute.
+      // (the org has paid the one-time unlock fee at toggle-on, so all
+      // member verifications are platform-absorbed), enforce membership, and
+      // pack the orgId into vendor_data for log correlation.
       const originatingOrgId: string | undefined = typeof req.body?.originatingOrgId === 'string' ? req.body.originatingOrgId : undefined;
       let attributedOrgId: string | null = null;
       if (originatingOrgId) {
@@ -2479,14 +2457,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const isMember = await storage.isOrganizationMember(originatingOrgId, userId);
         if (!isMember) {
           return res.status(403).json({ error: "Not a member of this organization" });
-        }
-        if (!hasVerificationBudgetRoom(org)) {
-          return res.status(403).json({
-            error: "This organization has paused verification this month. Contact your administrator.",
-            code: "ORG_VERIFICATION_BUDGET_EXHAUSTED",
-            orgId: originatingOrgId,
-            orgName: org.name,
-          });
         }
         attributedOrgId = originatingOrgId;
       }
@@ -3914,19 +3884,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      // Verification billing (UPDATE 24, Model A+).
-      // current = total verifications this month; included = free quota
-      // baked into the tier price; overageCount/Spend = how much the org
-      // owes via Stripe metered usage on the next invoice; budgetMonthlyCents
-      // = optional admin-set cap. When toggled OFF, current is still
-      // exposed for analytics but billing is dormant.
-      const verifCurrent = org.verificationCountThisMonth ?? 0;
-      const verifIncluded = Number.isFinite(limits.verificationsIncluded) ? limits.verificationsIncluded : null;
-      const verifIncludedNumeric = verifIncluded ?? 0;
-      const overageCount = Math.max(0, verifCurrent - verifIncludedNumeric);
-      const overageRate = limits.verificationOverageRateCents;
-      const overageSpendCents = overageRate ? overageCount * overageRate : 0;
-
+      // Verification unlock (UPDATE 26). Binary: org has paid the one-time
+      // unlock fee, or it hasn't. No monthly counters, no overage, no budget.
+      // unlockFeeCents is the price the org would pay to unlock at the
+      // current tier (null = feature unavailable on this tier).
       res.json({
         tier: org.tier ?? 'free',
         subscriptionStatus: org.subscriptionStatus ?? 'free',
@@ -3934,13 +3895,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           current: memberCount,
           limit: Number.isFinite(limits.members) ? limits.members : null,
         },
-        verifications: {
-          current: verifCurrent,
-          included: verifIncluded,
-          overageCount,
-          overageRateCents: overageRate,
-          overageSpendCents,
-          budgetMonthlyCents: org.verificationBudgetMonthlyCents ?? null,
+        verification: {
+          unlocked: isOrgUnlocked(org),
+          unlockedAt: org.verificationUnlockedAt ?? null,
+          unlockFeeCents: getUnlockPriceCents(org.tier),
         },
         requireMemberVerification: !!org.requireMemberVerification,
         nextBillingDate,
@@ -3953,10 +3911,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Toggle the org-mandated verification flag. Admin-only, Pro+ gated.
-  // When ON, members must complete Veriff/Didit before voting. The flow
-  // is org-paid (Stripe metered usage) — members never see a payment
-  // prompt. Free orgs flipping it ON get a 402 + UpgradeModal.
+  // Toggle the org-mandated verification flag. Admin-only, Pro+ gated, and
+  // requires the one-time unlock fee to have been paid (UPDATE 26). Free
+  // tiers flipping it ON get 402/FEATURE_NOT_AVAILABLE_ON_TIER. Pro+ tiers
+  // that haven't paid the unlock get 402/VERIFICATION_UNLOCK_REQUIRED with
+  // priceCents — the mobile client routes to verification-unlock-checkout.
   app.put("/api/organizations/:orgId/require-verification", isAuthenticated, async (req: any, res: any) => {
     try {
       const userId = req.user.claims?.sub;
@@ -3981,6 +3940,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
           upgradeRequired: true,
         });
       }
+      // Government runs on a custom annual contract; ops sets unlocked
+      // status manually. All other tiers must pay the self-serve unlock.
+      const isGovernment = (org.tier ?? '') === 'government';
+      if (requireFlag && !isOrgUnlocked(org) && !isGovernment) {
+        const priceCents = getUnlockPriceCents(org.tier);
+        return res.status(402).json({
+          error: "Identity verification requires a one-time unlock fee",
+          code: "VERIFICATION_UNLOCK_REQUIRED",
+          tier: org.tier ?? 'free',
+          priceCents,
+        });
+      }
       await db.update(organizations).set({
         requireMemberVerification: requireFlag,
         updatedAt: new Date(),
@@ -3993,33 +3964,133 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Set the org's monthly verification spend cap in cents. Null = unlimited
-  // (default). Enforced at session-create only; verifications already in
-  // flight when the cap is hit complete and are billed.
-  app.put("/api/organizations/:orgId/verification-budget", isAuthenticated, async (req: any, res: any) => {
+  // Create a Stripe Checkout session for the one-time verification unlock
+  // fee. Stripe-billed orgs only — IAP-billed orgs use the iap-receipt
+  // endpoint below. Webhook (checkout.session.completed) stamps the org
+  // unlocked when the customer completes the flow.
+  app.post("/api/organizations/:orgId/verification-unlock/checkout", isAuthenticated, async (req: any, res: any) => {
     try {
       const userId = req.user.claims?.sub;
       const { orgId } = req.params;
-      const { budgetCents } = req.body;
-      if (budgetCents !== null && (typeof budgetCents !== 'number' || budgetCents < 0 || !Number.isFinite(budgetCents))) {
-        return res.status(400).json({ error: "budgetCents must be a non-negative number or null" });
+      const org = await storage.getOrganization(orgId);
+      if (!org) return res.status(404).json({ error: "Organization not found" });
+      const members = await storage.getOrganizationMembers(orgId);
+      const isAdmin = members.some((m: any) => m.userId === userId && m.role === 'admin');
+      if (!isAdmin && org.creatorId !== userId) {
+        return res.status(403).json({ error: "Only admins can purchase the unlock" });
+      }
+      if (isOrgUnlocked(org)) {
+        return res.status(409).json({ error: "Organization already has verification unlocked", code: "ALREADY_UNLOCKED" });
+      }
+      const tier = org.tier ?? 'free';
+      const priceCents = getUnlockPriceCents(tier);
+      const priceId = ORG_VERIFICATION_UNLOCK_PRICE_IDS[tier];
+      if (priceCents == null || !priceId) {
+        return res.status(402).json({
+          error: "Verification unlock not available on this tier (upgrade or contact sales)",
+          code: "VERIFICATION_UNLOCK_NOT_AVAILABLE",
+          tier,
+        });
+      }
+      if (!org.stripeCustomerId) {
+        return res.status(409).json({
+          error: "Organization is not on Stripe billing — use IAP receipt endpoint instead",
+          code: "ORG_NOT_ON_STRIPE",
+        });
+      }
+      const { getUncachableStripeClient } = await import("./stripeClient");
+      const stripe = await getUncachableStripeClient();
+      const baseUrl = process.env.PUBLIC_BASE_URL ?? 'https://representportal.com';
+      const session = await stripe.checkout.sessions.create({
+        mode: 'payment',
+        customer: org.stripeCustomerId,
+        payment_method_types: ['card'],
+        line_items: [{ price: priceId, quantity: 1 }],
+        success_url: `${baseUrl}/orgs/${orgId}/verification-unlock/success?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${baseUrl}/orgs/${orgId}/verification-unlock/cancel`,
+        metadata: { type: 'verification_unlock', orgId, tier },
+      });
+      log(`Verification unlock checkout created: org=${orgId} tier=${tier} session=${session.id}`);
+      res.json({ checkoutUrl: session.url, sessionId: session.id });
+    } catch (error: any) {
+      log(`Verification unlock checkout error: ${error?.message ?? error}`);
+      res.status(500).json({ error: "Failed to create checkout session" });
+    }
+  });
+
+  // Submit an Apple IAP receipt for the one-time verification unlock.
+  // The mobile client purchases the consumable IAP product, then posts the
+  // receipt + transactionId here. Server validates with Apple and stamps
+  // the org unlocked. Receipt validation reuses the existing IAP webhook
+  // path (see iapWebhookHandlers.ts) when present; otherwise we stub a
+  // minimal verifyReceipt call.
+  app.post("/api/organizations/:orgId/verification-unlock/iap-receipt", isAuthenticated, async (req: any, res: any) => {
+    try {
+      const userId = req.user.claims?.sub;
+      const { orgId } = req.params;
+      const { receiptData, productId, transactionId } = req.body ?? {};
+      if (typeof receiptData !== 'string' || typeof productId !== 'string' || typeof transactionId !== 'string') {
+        return res.status(400).json({ error: "receiptData, productId, transactionId required" });
       }
       const org = await storage.getOrganization(orgId);
       if (!org) return res.status(404).json({ error: "Organization not found" });
       const members = await storage.getOrganizationMembers(orgId);
       const isAdmin = members.some((m: any) => m.userId === userId && m.role === 'admin');
       if (!isAdmin && org.creatorId !== userId) {
-        return res.status(403).json({ error: "Only admins can change billing settings" });
+        return res.status(403).json({ error: "Only admins can purchase the unlock" });
       }
-      await db.update(organizations).set({
-        verificationBudgetMonthlyCents: budgetCents,
-        updatedAt: new Date(),
-      }).where(eq(organizations.id, orgId));
-      log(`Org ${orgId} verificationBudgetMonthlyCents → ${budgetCents}`);
-      res.json({ verificationBudgetMonthlyCents: budgetCents });
+      if (isOrgUnlocked(org)) {
+        return res.status(409).json({ error: "Organization already has verification unlocked", code: "ALREADY_UNLOCKED" });
+      }
+      const tier = org.tier ?? 'free';
+      const expectedSku = ORG_VERIFICATION_UNLOCK_IAP_PRODUCT_IDS[tier];
+      if (!expectedSku) {
+        return res.status(402).json({ error: "Verification unlock not available on this tier", code: "VERIFICATION_UNLOCK_NOT_AVAILABLE", tier });
+      }
+      if (productId !== expectedSku) {
+        return res.status(400).json({
+          error: `Receipt productId mismatch (expected ${expectedSku} for ${tier}, got ${productId})`,
+          code: "PRODUCT_TIER_MISMATCH",
+        });
+      }
+      const sharedSecret = process.env.APPLE_IAP_SHARED_SECRET;
+      if (!sharedSecret) {
+        log("APPLE_IAP_SHARED_SECRET not configured; cannot validate IAP receipt");
+        return res.status(500).json({ error: "IAP receipt validation not configured" });
+      }
+      // Validate against Apple. Try production first; if status=21007, retry
+      // against sandbox (Apple's documented sandbox-fallback pattern).
+      const validate = async (url: string) => {
+        const r = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 'receipt-data': receiptData, password: sharedSecret, 'exclude-old-transactions': true }),
+        });
+        return r.json() as Promise<any>;
+      };
+      let body = await validate('https://buy.itunes.apple.com/verifyReceipt');
+      if (body?.status === 21007) {
+        body = await validate('https://sandbox.itunes.apple.com/verifyReceipt');
+      }
+      if (body?.status !== 0) {
+        log(`IAP receipt validation failed for org=${orgId}: status=${body?.status}`);
+        return res.status(400).json({ error: "Receipt validation failed", appleStatus: body?.status });
+      }
+      // Confirm the receipt actually contains a transaction for the
+      // expected product + transactionId. in_app holds the latest
+      // transactions for consumables.
+      const inApp: any[] = body?.receipt?.in_app ?? body?.latest_receipt_info ?? [];
+      const match = inApp.find((tx: any) => tx.product_id === expectedSku && tx.transaction_id === transactionId);
+      if (!match) {
+        log(`IAP receipt validated but no matching transaction for org=${orgId} sku=${expectedSku} txn=${transactionId}`);
+        return res.status(400).json({ error: "Receipt does not contain the expected transaction" });
+      }
+      await markOrgUnlocked(orgId, tier, transactionId, 'apple_iap');
+      const refreshed = await storage.getOrganization(orgId);
+      res.json({ verificationUnlockedAt: refreshed?.verificationUnlockedAt ?? null });
     } catch (error: any) {
-      log(`Set verification-budget error: ${error?.message ?? error}`);
-      res.status(500).json({ error: "Failed to update budget" });
+      log(`Verification unlock IAP receipt error: ${error?.message ?? error}`);
+      res.status(500).json({ error: "Failed to validate IAP receipt" });
     }
   });
 

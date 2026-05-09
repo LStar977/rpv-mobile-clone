@@ -114,15 +114,11 @@ export default function OrgProposalDetailScreen() {
     fetchRichResults();
   }, [fetchRichResults]);
 
-  // UPDATE 24/25: org-mandated verification error handling. Two error codes
-  // can fire here:
-  //   VERIFICATION_REQUIRED_BY_ORG — member is unverified; route to the
-  //     org-paid verification flow with the orgName threaded through so
-  //     the screen shows "covered by [Org Name]" copy.
-  //   ORG_VERIFICATION_BUDGET_EXHAUSTED — org has hit its monthly cap (UPDATE 25);
-  //     show admin-contact alert. Vote will succeed once admin lifts the cap.
-  // Returns true if the error was handled (caller should bail out); false
-  // otherwise so normal error paths continue.
+  // UPDATE 26: org-mandated verification error handling. The org has paid
+  // a one-time unlock fee, so member verifications are platform-absorbed —
+  // members never see a payment prompt. Returns true if the error was
+  // handled (caller should bail out); false otherwise so normal error
+  // paths continue.
   const handleOrgVerificationError = useCallback((result: { errorCode?: string; errorDetails?: any }): boolean => {
     if (result.errorCode === 'VERIFICATION_REQUIRED_BY_ORG') {
       const orgName = result.errorDetails?.orgName ?? 'This organization';
@@ -143,15 +139,6 @@ export default function OrgProposalDetailScreen() {
             }),
           },
         ],
-      );
-      return true;
-    }
-    if (result.errorCode === 'ORG_VERIFICATION_BUDGET_EXHAUSTED') {
-      const orgName = result.errorDetails?.orgName ?? 'This organization';
-      Alert.alert(
-        'Organization billing limit reached',
-        `${orgName} has paused verified-member voting this month. Contact your administrator to lift the cap.`,
-        [{ text: 'OK', style: 'cancel' }],
       );
       return true;
     }
