@@ -121,6 +121,12 @@ export const organizations = pgTable("organizations", {
   // timestamp lets us amortize across calendar months without a cron job —
   // any handler can call resetIfStale() and the counter zeroes if the month
   // has rolled over since verificationCountResetAt.
+  // TODO(stage-2): wire incrementing into Veriff/Didit success webhooks
+  // (backend/server/routes.ts:1769, 1836, 2229). Requires plumbing an
+  // originatingOrgId through verification session creation
+  // (POST /api/didit/create-session ~line 2191) and parsing it out of
+  // vendor_data on the webhook side. Counter is currently dead — limits
+  // in shared/tier-limits.ts are advertised but not enforced for verifications.
   verificationCountThisMonth: integer("verification_count_this_month").default(0),
   verificationCountResetAt: timestamp("verification_count_reset_at").defaultNow(),
 

@@ -268,6 +268,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Setup object storage routes for image uploads
   registerObjectStorageRoutes(app);
 
+  // Stripe webhook — must be reachable at https://representportal.com/api/stripe/webhook
+  // with events: invoice.paid, invoice.payment_failed, customer.subscription.updated,
+  // customer.subscription.deleted, checkout.session.completed.
+  // Raw body capture is set up in app.ts via express.json({ verify }) so req.rawBody
+  // is a Buffer of the original payload — required by stripe-replit-sync's
+  // processWebhook for HMAC verification.
+  app.post("/api/stripe/webhook", async (req: any, res: any) => {
+    try {
+      const signature = req.headers['stripe-signature'] as string | undefined;
+      if (!signature) {
+        log(`Stripe webhook rejected: missing stripe-signature header`);
+        return res.status(400).send('Missing stripe-signature header');
+      }
+      if (!req.rawBody || !Buffer.isBuffer(req.rawBody)) {
+        log(`Stripe webhook rejected: rawBody missing or not a Buffer (middleware misconfigured)`);
+        return res.status(400).send('Missing raw body');
+      }
+
+      const { WebhookHandlers } = await import('./webhookHandlers');
+      // The third arg is a de-duplication key for stripe-replit-sync. The
+      // signature is unique per delivery and known-good after verification,
+      // so it works as the dedup key without leaking anything sensitive.
+      await WebhookHandlers.processWebhook(req.rawBody, signature, signature);
+      res.json({ received: true });
+    } catch (error: any) {
+      log(`Stripe webhook error: ${error?.message || error}`);
+      res.status(400).send(`Webhook Error: ${error?.message ?? 'unknown'}`);
+    }
+  });
+
   // Push notification token registration
   app.post("/api/push-token", isAuthenticated, async (req: any, res) => {
     try {

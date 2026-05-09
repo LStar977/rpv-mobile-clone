@@ -430,6 +430,14 @@ interface ApiResponse<T> {
   data: T | null;
   error: string | null;
   requiresVerification?: boolean;
+  // Structured server error context. Populated for non-2xx responses when
+  // the server returns a JSON body. Additive — existing callers ignore them.
+  // Used by the org-tier UpgradePrompt to show specific copy and a CTA
+  // when the backend returns 402 with code MEMBER_LIMIT_EXCEEDED or
+  // FEATURE_NOT_AVAILABLE_ON_TIER (see backend/server/routes.ts).
+  errorCode?: string;
+  errorStatus?: number;
+  errorDetails?: Record<string, any>;
 }
 
 export interface Proposal {
@@ -510,7 +518,14 @@ async function apiRequest<T>(
         errorMessage.includes('verify') ||
         errorMessage.includes('identity') ||
         errorMessage.includes('Identity');
-      return { data: null, error: errorMessage, requiresVerification };
+      return {
+        data: null,
+        error: errorMessage,
+        requiresVerification,
+        errorCode: typeof errorData?.code === 'string' ? errorData.code : undefined,
+        errorStatus: response.status,
+        errorDetails: errorData && typeof errorData === 'object' ? errorData : undefined,
+      };
     }
 
     // For DELETE requests, treat any successful response as success

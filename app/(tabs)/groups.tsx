@@ -10,6 +10,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle, Line, Path, Rect, Defs, Pattern, G } from 'react-native-svg';
 import { useAuthStore } from '../../lib/auth';
 import { organizationsApi, Organization } from '../../lib/api';
+import { UpgradeModal } from '../../components/ui/UpgradeModal';
 
 // ─── design tokens (matches PassportCard / Identity surface) ──────────
 const G_GOLD = '#EABA58';
@@ -306,6 +307,9 @@ function InviteSheet({
 }) {
   const [inviteCode, setInviteCode] = useState('');
   const [joining, setJoining] = useState(false);
+  // The joiner can't fix a member-cap error themselves — only the org admin
+  // can upgrade. Show an explanatory modal instead of a generic Alert.
+  const [orgFullModal, setOrgFullModal] = useState<{ visible: boolean; details?: any }>({ visible: false });
   const insets = useSafeAreaInsets();
 
   const handleJoin = async () => {
@@ -319,6 +323,10 @@ function InviteSheet({
       const result = await organizationsApi.joinWithInviteCode(inviteCode.trim().toUpperCase());
       if (result.error) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        if (result.errorCode === 'MEMBER_LIMIT_EXCEEDED') {
+          setOrgFullModal({ visible: true, details: result.errorDetails });
+          return;
+        }
         Alert.alert('Error', result.error);
         return;
       }
@@ -470,6 +478,19 @@ function InviteSheet({
         </View>
       </View>
       </View>
+      <UpgradeModal
+        visible={orgFullModal.visible}
+        onClose={() => setOrgFullModal({ visible: false })}
+        type="orgTier"
+        title="Organization is full"
+        message={
+          orgFullModal.details?.limit
+            ? `This organization has reached its plan limit (${orgFullModal.details.currentMembers}/${orgFullModal.details.limit} members on the ${orgFullModal.details.tier ?? 'current'} plan). Contact the organization admin to upgrade.`
+            : 'This organization has reached its member limit. Contact the organization admin to upgrade their plan.'
+        }
+        hideCta
+        hidePrice
+      />
     </Modal>
   );
 }

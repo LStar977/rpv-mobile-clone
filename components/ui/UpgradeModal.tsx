@@ -22,9 +22,16 @@ import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS } from '../../lib
 interface UpgradeModalProps {
   visible: boolean;
   onClose: () => void;
-  type: 'premium' | 'verification';
+  type: 'premium' | 'verification' | 'orgTier';
   title?: string;
   message?: string;
+  // orgTier extensions: callers know which path applies (admin-can-fix vs
+  // joiner-can't-fix), so let them override the CTA. Falls back to config
+  // defaults when omitted.
+  ctaLabel?: string;
+  onCta?: () => void;
+  hideCta?: boolean;
+  hidePrice?: boolean;
 }
 
 const MODAL_CONFIG = {
@@ -46,6 +53,18 @@ const MODAL_CONFIG = {
     price: 'Free',
     route: '/modals/verification-payment',
   },
+  orgTier: {
+    icon: 'business' as const,
+    defaultTitle: 'Plan Limit Reached',
+    defaultMessage: 'This organization has hit its current plan limit. Upgrade the org plan to continue.',
+    buttonText: 'Upgrade Plan',
+    buttonIcon: 'arrow-up-circle' as const,
+    price: 'From $99/month',
+    // Org billing UI lives on the org-detail screen. Callers should pass
+    // a custom onCta when they have the orgId; the default route is a
+    // safe fallback that lands on the org list.
+    route: '/(tabs)/groups',
+  },
 };
 
 export function UpgradeModal({
@@ -54,6 +73,10 @@ export function UpgradeModal({
   type,
   title,
   message,
+  ctaLabel,
+  onCta,
+  hideCta,
+  hidePrice,
 }: UpgradeModalProps) {
   const { colors } = useTheme();
   const config = MODAL_CONFIG[type];
@@ -61,7 +84,11 @@ export function UpgradeModal({
   const handleUpgrade = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     onClose();
-    router.push(config.route as any);
+    if (onCta) {
+      onCta();
+    } else {
+      router.push(config.route as any);
+    }
   };
 
   const handleClose = () => {
@@ -129,34 +156,38 @@ export function UpgradeModal({
               </Text>
 
               {/* Price badge */}
-              <View style={[styles.priceBadge, { backgroundColor: `${colors.gold}10`, borderColor: `${colors.gold}30` }]}>
-                <Ionicons name="pricetag" size={14} color={colors.gold} />
-                <Text style={[styles.priceText, { color: colors.gold }]}>
-                  {config.price}
-                </Text>
-              </View>
+              {!hidePrice && (
+                <View style={[styles.priceBadge, { backgroundColor: `${colors.gold}10`, borderColor: `${colors.gold}30` }]}>
+                  <Ionicons name="pricetag" size={14} color={colors.gold} />
+                  <Text style={[styles.priceText, { color: colors.gold }]}>
+                    {config.price}
+                  </Text>
+                </View>
+              )}
 
               {/* Action button */}
-              <TouchableOpacity
-                style={styles.actionButton}
-                onPress={handleUpgrade}
-                activeOpacity={0.8}
-              >
-                <LinearGradient
-                  colors={[colors.gold, colors.goldDark || '#A68523']}
-                  style={styles.gradientButton}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
+              {!hideCta && (
+                <TouchableOpacity
+                  style={styles.actionButton}
+                  onPress={handleUpgrade}
+                  activeOpacity={0.8}
                 >
-                  <Ionicons name={config.buttonIcon} size={20} color="#000" />
-                  <Text style={styles.buttonText}>{config.buttonText}</Text>
-                </LinearGradient>
-              </TouchableOpacity>
+                  <LinearGradient
+                    colors={[colors.gold, colors.goldDark || '#A68523']}
+                    style={styles.gradientButton}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                  >
+                    <Ionicons name={config.buttonIcon} size={20} color="#000" />
+                    <Text style={styles.buttonText}>{ctaLabel || config.buttonText}</Text>
+                  </LinearGradient>
+                </TouchableOpacity>
+              )}
 
               {/* Cancel link */}
               <TouchableOpacity onPress={handleClose} style={styles.cancelButton}>
                 <Text style={[styles.cancelText, { color: colors.textTertiary }]}>
-                  Maybe later
+                  {hideCta ? 'OK' : 'Maybe later'}
                 </Text>
               </TouchableOpacity>
             </Animated.View>
