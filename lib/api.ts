@@ -1,6 +1,7 @@
 import { getAuthToken, useAuthStore } from './auth';
 import { SEED_PROPOSALS } from './seedProposals';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getTierLimits, getVerificationUnlockFeeCents } from '../shared/tier-limits';
 
 const API_BASE_URL = 'https://representportal.com';
 const DEMO_ORGS_STORAGE_KEY = '@represent_demo_organizations';
@@ -747,6 +748,35 @@ export interface OrgUsage {
 
 export const organizationsApi = {
   async getUsage(orgId: string): Promise<ApiResponse<OrgUsage>> {
+    // Demo orgs only exist in client-side SEED_ORGANIZATIONS — the server has
+    // no row to /usage against. Synthesize a usage shape from the seed data
+    // so the org-billing screen + verification-unlock-checkout modal can
+    // render correctly during the App Store reviewer flow.
+    if (isDemoAccount() && (orgId === DEMO_ORGANIZATION_ID || orgId === DEMO_WESTBROOK_ID)) {
+      const seed = SEED_ORGANIZATIONS.find((o) => o.id === orgId);
+      const tier = (seed?.tier ?? 'free') as OrgUsage['tier'];
+      const limits = getTierLimits(tier);
+      return {
+        data: {
+          tier,
+          subscriptionStatus: 'active',
+          members: {
+            current: seed?.memberCount ?? 0,
+            limit: Number.isFinite(limits.members) ? (limits.members as number) : null,
+          },
+          verification: {
+            unlocked: !!seed?.verificationUnlockedAt,
+            unlockedAt: seed?.verificationUnlockedAt ?? null,
+            unlockFeeCents: getVerificationUnlockFeeCents(tier),
+          },
+          requireMemberVerification: !!seed?.requireMemberVerification,
+          nextBillingDate: null,
+          paymentProvider: 'stripe',
+          isAdmin: true,
+        },
+        error: null,
+      };
+    }
     return apiRequest<OrgUsage>(`/api/organizations/${orgId}/usage`);
   },
 
@@ -758,6 +788,35 @@ export const organizationsApi = {
     orgId: string,
     require: boolean,
   ): Promise<ApiResponse<{ requireMemberVerification: boolean }>> {
+    // Demo orgs: simulate the same response shape the server would return,
+    // so the org-detail toggle UX matches the real flow during App Store
+    // review. Demo orgs are seeded as Plus / Business (Pro+ tiers), never
+    // unlocked — toggling ON returns 402 VERIFICATION_UNLOCK_REQUIRED so
+    // the settings card routes to the verification-unlock-checkout modal.
+    if (isDemoAccount() && (orgId === DEMO_ORGANIZATION_ID || orgId === DEMO_WESTBROOK_ID)) {
+      const seed = SEED_ORGANIZATIONS.find((o) => o.id === orgId);
+      const tier = seed?.tier ?? 'free';
+      const limits = getTierLimits(tier);
+      if (require && !limits.requireVerification) {
+        return {
+          data: null,
+          error: 'Required-verification mode requires Pro plan or higher',
+          errorCode: 'FEATURE_NOT_AVAILABLE_ON_TIER',
+          errorStatus: 402,
+          errorDetails: { feature: 'requireVerification', tier, upgradeRequired: true },
+        };
+      }
+      if (require && !seed?.verificationUnlockedAt && tier !== 'government') {
+        return {
+          data: null,
+          error: 'Identity verification requires a one-time unlock fee',
+          errorCode: 'VERIFICATION_UNLOCK_REQUIRED',
+          errorStatus: 402,
+          errorDetails: { tier, priceCents: getVerificationUnlockFeeCents(tier) },
+        };
+      }
+      return { data: { requireMemberVerification: require }, error: null };
+    }
     return apiRequest<{ requireMemberVerification: boolean }>(
       `/api/organizations/${orgId}/require-verification`,
       { method: 'PUT', body: JSON.stringify({ require }) },
