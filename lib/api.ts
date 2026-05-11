@@ -666,6 +666,13 @@ export const proposalsApi = {
     const authState = useAuthStore.getState();
     const userId = authState.user?.id;
     if (!userId) return { data: null, error: 'Not authenticated', requiresVerification: false };
+    // Demo account: proposals live in AsyncStorage (or SEED_*) — the
+    // real backend has no row to vote against. Succeed locally so the
+    // demo flow (seeded App Store reviewer account) can vote on every
+    // ballot type without hitting "Proposal not found" 404s.
+    if (isDemoAccount()) {
+      return { data: { success: true }, error: null };
+    }
     return apiRequest('/api/voting/submit', {
       method: 'POST',
       body: JSON.stringify({
