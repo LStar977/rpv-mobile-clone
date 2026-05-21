@@ -218,7 +218,6 @@ export default function DashboardScreen() {
             country={userCountry}
             state={userState}
             city={userCity}
-            isVerified={isVerified}
             onPrimaryPress={navigateToProposals}
             router={router}
           />
@@ -540,9 +539,8 @@ function LedgerRow({ label, value, tint }: { label: string; value: string; tint:
     </View>
   );
 }
-function Communities({ proposals, votedIds, country, state, city, isVerified, onPrimaryPress, router }: {
+function Communities({ proposals, votedIds, country, state, city, onPrimaryPress, router }: {
   proposals: Proposal[]; votedIds: Set<string>; country: string; state: string; city: string;
-  isVerified: boolean;
   onPrimaryPress: () => void; router: any;
 }) {
   const dc = useDashboardColors();
@@ -556,33 +554,6 @@ function Communities({ proposals, votedIds, country, state, city, isVerified, on
     const active = matched.filter(p => !p.deadline || new Date(p.deadline).getTime() > now).length;
     return { total: matched.length, active };
   };
-  // UPDATE 30: tap the section header to open the eligibility detail modal
-  // (app/modals/your-communities.tsx). Passes all four tiers' counts and
-  // the user's verified location + isVerified status as route params so
-  // the modal renders without re-querying.
-  const globalProposals = proposals.filter(p => (p.geoRestrictions || []).length === 0);
-  const globalActive = globalProposals.filter(p => !p.deadline || new Date(p.deadline).getTime() > now).length;
-  const openDetail = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    const fed = countAt(0, country);
-    const prov = countAt(1, state);
-    const mun = countAt(2, city);
-    router.push({
-      pathname: '/modals/your-communities',
-      params: {
-        country, state, city,
-        isVerified: String(isVerified),
-        globalTotal: String(globalProposals.length),
-        globalActive: String(globalActive),
-        federalTotal: String(fed.total),
-        federalActive: String(fed.active),
-        provincialTotal: String(prov.total),
-        provincialActive: String(prov.active),
-        municipalTotal: String(mun.total),
-        municipalActive: String(mun.active),
-      },
-    });
-  };
   const fed = countAt(0, country);
   const prov = countAt(1, state);
   const mun = countAt(2, city);
@@ -594,20 +565,9 @@ function Communities({ proposals, votedIds, country, state, city, isVerified, on
   ];
   return (
     <Animated.View entering={FadeInUp.duration(500).delay(400)} style={styles.sectionPad}>
-      <TouchableOpacity
-        onPress={openDetail}
-        activeOpacity={0.7}
-        style={[styles.sectionHeader, { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }]}
-        accessibilityLabel="See where you can vote"
-      >
+      <View style={styles.sectionHeader}>
         <Text style={[styles.eyebrow, { color: dc.GOLD }]}>Your Communities</Text>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-          <Text style={{ fontSize: 11, color: dc.FG_FAINT, letterSpacing: 0.5 }}>Details</Text>
-          <Svg width={6} height={10} viewBox="0 0 6 10">
-            <Path d="M1 1 L5 5 L1 9" stroke={dc.FG_FAINT} strokeWidth={1.5} fill="none" strokeLinecap="round" strokeLinejoin="round" />
-          </Svg>
-        </View>
-      </TouchableOpacity>
+      </View>
 
       <View style={[styles.communityCard, { backgroundColor: dc.BG_CARD, borderColor: dc.LINE }]}>
         {items.map((it, i) => (
