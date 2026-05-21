@@ -1,5 +1,4 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Image, Modal, Pressable } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Image } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useRouter } from 'expo-router';
@@ -75,7 +74,6 @@ export default function DashboardScreen() {
   const [votedIds, setVotedIds] = useState<Set<string>>(new Set());
   const [userOrganizations, setUserOrganizations] = useState<Organization[]>([]);
   const [orgProposalsByOrg, setOrgProposalsByOrg] = useState<Record<string, OrganizationProposal[]>>({});
-  const [communitiesModalOpen, setCommunitiesModalOpen] = useState(false);
 
   const displayName = user?.name?.split(' ')[0] || 'User';
   const userCity = user?.city || '';
@@ -222,7 +220,6 @@ export default function DashboardScreen() {
             city={userCity}
             isVerified={isVerified}
             onPrimaryPress={navigateToProposals}
-            onOpenDetail={() => setCommunitiesModalOpen(true)}
             router={router}
           />
         )}
@@ -238,17 +235,6 @@ export default function DashboardScreen() {
         <FooterSig />
         <View style={{ height: 120 }} />
       </ScrollView>
-
-      <CommunitiesDetailModal
-        visible={communitiesModalOpen}
-        onClose={() => setCommunitiesModalOpen(false)}
-        proposals={civicProposals}
-        country={userCountry}
-        state={userState}
-        city={userCity}
-        isVerified={isVerified}
-        onVerify={handleStartKyc}
-      />
     </View>
   );
 }
@@ -554,12 +540,10 @@ function LedgerRow({ label, value, tint }: { label: string; value: string; tint:
     </View>
   );
 }
-function Communities({ proposals, votedIds, country, state, city, isVerified, onPrimaryPress, onOpenDetail, router }: {
+function Communities({ proposals, votedIds, country, state, city, isVerified, onPrimaryPress, router }: {
   proposals: Proposal[]; votedIds: Set<string>; country: string; state: string; city: string;
   isVerified: boolean;
-  onPrimaryPress: () => void;
-  onOpenDetail: () => void;
-  router: any;
+  onPrimaryPress: () => void; router: any;
 }) {
   const dc = useDashboardColors();
   const now = Date.now();
@@ -572,13 +556,32 @@ function Communities({ proposals, votedIds, country, state, city, isVerified, on
     const active = matched.filter(p => !p.deadline || new Date(p.deadline).getTime() > now).length;
     return { total: matched.length, active };
   };
-  // UPDATE 30 (v2): state-based modal in dashboard. The original
-  // routed approach (router.push to /modals/your-communities) crashed
-  // the Stack router during state rehydration on this Expo SDK; using
-  // an inline <Modal> avoids the routing layer entirely.
+  // UPDATE 30: tap the section header to open the eligibility detail modal
+  // (app/modals/your-communities.tsx). Passes all four tiers' counts and
+  // the user's verified location + isVerified status as route params so
+  // the modal renders without re-querying.
+  const globalProposals = proposals.filter(p => (p.geoRestrictions || []).length === 0);
+  const globalActive = globalProposals.filter(p => !p.deadline || new Date(p.deadline).getTime() > now).length;
   const openDetail = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    onOpenDetail();
+    const fed = countAt(0, country);
+    const prov = countAt(1, state);
+    const mun = countAt(2, city);
+    router.push({
+      pathname: '/modals/your-communities',
+      params: {
+        country, state, city,
+        isVerified: String(isVerified),
+        globalTotal: String(globalProposals.length),
+        globalActive: String(globalActive),
+        federalTotal: String(fed.total),
+        federalActive: String(fed.active),
+        provincialTotal: String(prov.total),
+        provincialActive: String(prov.active),
+        municipalTotal: String(mun.total),
+        municipalActive: String(mun.active),
+      },
+    });
   };
   const fed = countAt(0, country);
   const prov = countAt(1, state);
@@ -1141,266 +1144,3 @@ const styles = StyleSheet.create({
     letterSpacing: 2.04, textTransform: 'uppercase', marginTop: 2,
   },
 });
-
-// UPDATE 30 — "Where you can vote" detail modal. State-based <Modal>
-// rendered inside DashboardScreen rather than navigated to via Expo
-// Router. Sidesteps the StackRouter rehydration crash that fired on
-// this Expo SDK version when adding a new screen to the modals stack.
-const COUNTRY_FLAG_EMOJI: Record<string, string> = {
-  canada: '🇨🇦',
-  'united states': '🇺🇸',
-  'united kingdom': '🇬🇧',
-  australia: '🇦🇺',
-  france: '🇫🇷',
-  germany: '🇩🇪',
-};
-
-function CommunitiesDetailModal({
-  visible, onClose, proposals, country, state, city, isVerified, onVerify,
-}: {
-  visible: boolean;
-  onClose: () => void;
-  proposals: Proposal[];
-  country: string;
-  state: string;
-  city: string;
-  isVerified: boolean;
-  onVerify: () => void;
-}) {
-  const dc = useDashboardColors();
-  const insets = useSafeAreaInsets();
-  const now = Date.now();
-
-  const countAt = (level: number, name: string) => {
-    const matched = proposals.filter(p => {
-      const geo = p.geoRestrictions || [];
-      if (geo.length <= level) return false;
-      return geo[level].toLowerCase() === (name || '').toLowerCase();
-    });
-    const active = matched.filter(p => !p.deadline || new Date(p.deadline).getTime() > now).length;
-    return { total: matched.length, active };
-  };
-
-  const globalProposals = proposals.filter(p => (p.geoRestrictions || []).length === 0);
-  const globalActive = globalProposals.filter(p => !p.deadline || new Date(p.deadline).getTime() > now).length;
-  const fed = countAt(0, country);
-  const prov = countAt(1, state);
-  const mun = countAt(2, city);
-
-  const tiers = [
-    {
-      key: 'global',
-      label: 'Global',
-      scopeLabel: 'Open to everyone',
-      locationName: 'Worldwide',
-      flag: '🌍',
-      total: globalProposals.length,
-      active: globalActive,
-      eligible: true,
-    },
-    {
-      key: 'federal',
-      label: 'Federal',
-      scopeLabel: 'Country',
-      locationName: country || null,
-      flag: COUNTRY_FLAG_EMOJI[(country || '').toLowerCase()] ?? ((country || '').slice(0, 2).toUpperCase() || null),
-      total: fed.total,
-      active: fed.active,
-      eligible: isVerified && !!country,
-    },
-    {
-      key: 'provincial',
-      label: 'Provincial',
-      scopeLabel: 'Province or state',
-      locationName: state || null,
-      flag: state ? state.slice(0, 2).toUpperCase() : null,
-      total: prov.total,
-      active: prov.active,
-      eligible: isVerified && !!state,
-    },
-    {
-      key: 'municipal',
-      label: 'Municipal',
-      scopeLabel: 'City',
-      locationName: city || null,
-      flag: city ? city.slice(0, 2).toUpperCase() : null,
-      total: mun.total,
-      active: mun.active,
-      eligible: isVerified && !!city,
-    },
-  ];
-
-  const totalEligibleActive = tiers.reduce((sum, t) => sum + (t.eligible ? t.active : 0), 0);
-
-  return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <View style={{ flex: 1, backgroundColor: dc.BG }}>
-        {/* Header */}
-        <View style={{
-          flexDirection: 'row', alignItems: 'center',
-          paddingHorizontal: 16, paddingTop: 14, paddingBottom: 12,
-          borderBottomWidth: 1, borderBottomColor: dc.LINE,
-        }}>
-          <TouchableOpacity onPress={onClose} hitSlop={{ top: 8, left: 8, right: 8, bottom: 8 }}>
-            <Ionicons name="close" size={26} color={dc.FG} />
-          </TouchableOpacity>
-          <Text style={{ flex: 1, textAlign: 'center', fontSize: 16, fontWeight: '600', color: dc.FG, marginRight: 26 }}>
-            Where you can vote
-          </Text>
-        </View>
-
-        <ScrollView contentContainerStyle={{ padding: 18, paddingBottom: insets.bottom + 32 }}>
-          {/* Hero */}
-          <View style={{
-            backgroundColor: dc.BG_CARD,
-            borderWidth: 1, borderColor: dc.LINE,
-            borderRadius: 14, padding: 20, alignItems: 'center',
-            marginBottom: 18,
-          }}>
-            <Text style={{ fontSize: 10.5, fontWeight: '700', letterSpacing: 2, textTransform: 'uppercase', color: dc.FG_MUTED, marginBottom: 6 }}>
-              Your civic reach
-            </Text>
-            <Text style={{ fontSize: 44, fontWeight: '700', color: dc.GOLD, letterSpacing: -1, lineHeight: 50 }}>
-              {totalEligibleActive}
-            </Text>
-            <Text style={{ fontSize: 13, color: dc.FG_MUTED, marginTop: 4 }}>
-              active proposal{totalEligibleActive === 1 ? '' : 's'} you can vote on
-            </Text>
-            {isVerified ? (
-              <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 12, gap: 6 }}>
-                <Ionicons name="shield-checkmark" size={14} color={dc.GOLD} />
-                <Text style={{ fontSize: 11.5, color: dc.GOLD, fontWeight: '600' }}>
-                  Verified resident of {[city, state, country].filter(Boolean).join(', ')}
-                </Text>
-              </View>
-            ) : (
-              <View style={{
-                flexDirection: 'row', alignItems: 'center',
-                marginTop: 12, gap: 6,
-                paddingHorizontal: 12, paddingVertical: 5,
-                backgroundColor: 'rgba(255,200,0,0.12)',
-                borderRadius: 100,
-              }}>
-                <Ionicons name="lock-closed" size={12} color={dc.GOLD} />
-                <Text style={{ fontSize: 11.5, color: dc.GOLD, fontWeight: '600' }}>
-                  Unverified — global only
-                </Text>
-              </View>
-            )}
-          </View>
-
-          {/* Section label */}
-          <Text style={{ fontSize: 10.5, fontWeight: '700', letterSpacing: 2, textTransform: 'uppercase', color: dc.FG_MUTED, marginBottom: 10, paddingHorizontal: 2 }}>
-            Your eligibility
-          </Text>
-
-          {/* Tier rows */}
-          {tiers.map((tier) => {
-            const isMuted = !tier.eligible;
-            const accent = tier.eligible ? dc.GOLD : dc.FG_FAINT;
-            const flag = tier.flag ?? '—';
-            return (
-              <View
-                key={tier.key}
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  padding: 14,
-                  backgroundColor: dc.BG_CARD,
-                  borderColor: tier.eligible ? 'rgba(212,175,55,0.30)' : dc.LINE,
-                  borderWidth: 1,
-                  borderRadius: 12,
-                  marginBottom: 10,
-                  gap: 14,
-                  opacity: isMuted ? 0.7 : 1,
-                }}
-              >
-                <View style={{
-                  width: 50, height: 50, borderRadius: 25,
-                  backgroundColor: tier.eligible ? 'rgba(212,175,55,0.10)' : dc.BG_RAISED,
-                  borderColor: tier.eligible ? 'rgba(212,175,55,0.40)' : dc.LINE,
-                  borderWidth: 1,
-                  alignItems: 'center', justifyContent: 'center',
-                }}>
-                  <Text style={{
-                    fontSize: flag.length === 2 ? 13 : 22,
-                    fontWeight: '700',
-                    color: accent,
-                    letterSpacing: 0.5,
-                  }}>
-                    {flag}
-                  </Text>
-                </View>
-                <View style={{ flex: 1, minWidth: 0 }}>
-                  <Text style={{ fontSize: 15, fontWeight: '700', color: isMuted ? dc.FG_FAINT : dc.FG, letterSpacing: -0.1 }} numberOfLines={1}>
-                    {tier.locationName ?? '—'}
-                  </Text>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 2 }}>
-                    <Text style={{ fontSize: 10, fontWeight: '700', letterSpacing: 1.5, textTransform: 'uppercase', color: accent }}>
-                      {tier.label}
-                    </Text>
-                    <View style={{ width: 3, height: 3, borderRadius: 1.5, backgroundColor: dc.FG_FAINT }} />
-                    <Text style={{ fontSize: 11, color: dc.FG_MUTED }}>{tier.scopeLabel}</Text>
-                  </View>
-                  {tier.eligible ? (
-                    <Text style={{ fontSize: 12, color: dc.FG_MUTED, marginTop: 6 }}>
-                      <Text style={{ color: dc.FG, fontWeight: '600' }}>{tier.active}</Text> active
-                      <Text style={{ color: dc.FG_FAINT }}> · {tier.total} total</Text>
-                    </Text>
-                  ) : (
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 6 }}>
-                      <Ionicons name="lock-closed" size={11} color={dc.FG_FAINT} />
-                      <Text style={{ fontSize: 11, color: dc.FG_FAINT }}>
-                        {tier.locationName ? 'Verify identity to unlock' : 'No location on file'}
-                      </Text>
-                    </View>
-                  )}
-                </View>
-              </View>
-            );
-          })}
-
-          {/* Explainer */}
-          <View style={{
-            marginTop: 14,
-            padding: 14,
-            backgroundColor: 'rgba(212,175,55,0.06)',
-            borderColor: 'rgba(212,175,55,0.25)',
-            borderWidth: 1,
-            borderRadius: 12,
-            flexDirection: 'row',
-            gap: 10,
-          }}>
-            <Ionicons name="information-circle-outline" size={20} color={dc.GOLD} style={{ marginTop: 1 }} />
-            <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 13, fontWeight: '600', color: dc.FG, marginBottom: 4 }}>
-                How geo-gating works
-              </Text>
-              <Text style={{ fontSize: 12, color: dc.FG_MUTED, lineHeight: 17 }}>
-                Verifying your identity unlocks voting on proposals tied to your country, province, and city. Global proposals are open to anyone. One verified person, one ballot per proposal.
-              </Text>
-            </View>
-          </View>
-
-          {!isVerified && (
-            <Pressable
-              onPress={() => { onClose(); setTimeout(onVerify, 200); }}
-              style={({ pressed }) => ({
-                marginTop: 18,
-                paddingVertical: 14,
-                borderRadius: 12,
-                alignItems: 'center',
-                backgroundColor: dc.GOLD,
-                opacity: pressed ? 0.85 : 1,
-              })}
-            >
-              <Text style={{ fontSize: 15, fontWeight: '700', color: '#000' }}>
-                Verify identity to unlock
-              </Text>
-            </Pressable>
-          )}
-        </ScrollView>
-      </View>
-    </Modal>
-  );
-}
