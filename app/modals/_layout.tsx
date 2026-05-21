@@ -31,6 +31,7 @@ export default function ModalsLayout() {
       <Stack.Screen name="admin" />
       <Stack.Screen name="my-proposals" />
       <Stack.Screen name="community-proposals" />
+      <Stack.Screen name="your-communities" />
       <Stack.Screen name="legal" />
     </Stack>
   );
