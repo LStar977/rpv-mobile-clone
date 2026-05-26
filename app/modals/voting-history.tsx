@@ -404,7 +404,7 @@ const styles = StyleSheet.create({
 
   // Stats Card
   statsCard: {
-    borderRadius: BORDER_RADIUS.xxl,
+    borderRadius: BORDER_RADIUS['2xl'],
     borderWidth: 1,
     padding: SPACING.xl,
     marginBottom: SPACING.lg,
@@ -537,7 +537,7 @@ const styles = StyleSheet.create({
   emptyState: {
     alignItems: 'center',
     padding: SPACING.xxxl,
-    borderRadius: BORDER_RADIUS.xxl,
+    borderRadius: BORDER_RADIUS['2xl'],
     borderWidth: 1,
   },
   emptyIcon: {

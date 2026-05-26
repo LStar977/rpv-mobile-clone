@@ -21,6 +21,7 @@ import { RCVBallotInput } from '../../components/ui/RCVBallotInput';
 import { RCVResults } from '../../components/ui/RCVResults';
 import { MultipleChoiceBallot } from '../../components/ui/MultipleChoiceBallot';
 import { MultipleChoiceResults } from '../../components/ui/MultipleChoiceResults';
+import { ProposalModerationMenu } from '../../components/moderation/ProposalModerationMenu';
 
 const SERIF_FONT = Platform.OS === 'ios' ? 'Georgia' : 'serif';
 
@@ -54,6 +55,8 @@ export default function OrgProposalDetailScreen() {
     voteType: string;
     // options is JSON-encoded array of strings (URL params can't carry arrays)
     options: string;
+    creatorId: string;
+    creatorName: string;
   }>();
   const voteType: 'yes-no' | 'multiple-choice' | 'ranked-choice' =
     (params.voteType as any) || 'yes-no';
@@ -73,6 +76,8 @@ export default function OrgProposalDetailScreen() {
   const category = params.category || 'General';
   const orgName = params.orgName || 'Organization';
   const isOfficial = params.isOfficial === 'true';
+  const creatorId = params.creatorId || null;
+  const creatorName = params.creatorName || 'Community Member';
   const deadline = params.deadline || null;
 
   const [supportVotes, setSupportVotes] = useState(parseInt(params.supportVotes || '0', 10));
@@ -81,6 +86,7 @@ export default function OrgProposalDetailScreen() {
     params.userVote === 'support' || params.userVote === 'oppose' ? params.userVote : null
   );
   const [voting, setVoting] = useState(false);
+  const [showModerationMenu, setShowModerationMenu] = useState(false);
 
   // RCV / multi-choice state. results is the unified payload from
   // /api/proposals/:id/results; for ranked-choice it contains the IRV walk,
@@ -213,7 +219,6 @@ export default function OrgProposalDetailScreen() {
 
     try {
       const result = await organizationsApi.voteOnProposal(orgId, proposalId, vote);
-      console.log('[voteOnProposal] response:', JSON.stringify(result));
 
       if (result.error) {
         if (handleOrgVerificationError(result)) return;
@@ -259,8 +264,24 @@ export default function OrgProposalDetailScreen() {
             {orgName}
           </Text>
         </View>
-        <View style={{ width: 40 }} />
+        <TouchableOpacity
+          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setShowModerationMenu(true); }}
+          style={{ width: 40, alignItems: 'center', justifyContent: 'center' }}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          accessibilityLabel="Proposal options"
+        >
+          <Ionicons name="ellipsis-horizontal" size={20} color={colors.text} />
+        </TouchableOpacity>
       </View>
+
+      <ProposalModerationMenu
+        visible={showModerationMenu}
+        onClose={() => setShowModerationMenu(false)}
+        proposalId={proposalId || null}
+        creatorId={creatorId}
+        creatorName={creatorName}
+        onMuted={() => router.back()}
+      />
 
       <ScrollView
         style={styles.content}

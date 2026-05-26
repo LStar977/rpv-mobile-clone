@@ -209,7 +209,7 @@ const styles = StyleSheet.create({
   modalContainer: {
     width: '100%',
     maxWidth: 340,
-    borderRadius: BORDER_RADIUS.xxl,
+    borderRadius: BORDER_RADIUS['2xl'],
     borderWidth: 1.5,
     padding: SPACING.xl,
     alignItems: 'center',

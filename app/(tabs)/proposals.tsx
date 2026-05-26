@@ -2322,6 +2322,8 @@ export default function ProposalsScreen() {
           deadline: p.deadline || '',
           voteType,
           options: JSON.stringify((p as any).options ?? []),
+          creatorId: String((p as any).creatorId ?? (p as any).userId ?? ''),
+          creatorName: p.creatorName || 'Community Member',
         },
       });
       return;
@@ -3692,7 +3694,7 @@ const styles = StyleSheet.create({
     marginHorizontal: SPACING.lg,
     marginTop: SPACING.md,
     padding: SPACING.lg,
-    borderRadius: BORDER_RADIUS.xxl,
+    borderRadius: BORDER_RADIUS['2xl'],
     borderWidth: 1,
   },
   filterSection: { marginBottom: SPACING.md },
@@ -3722,7 +3724,7 @@ const styles = StyleSheet.create({
 
   // Card
   card: {
-    borderRadius: BORDER_RADIUS.xxl,
+    borderRadius: BORDER_RADIUS['2xl'],
     padding: SPACING.lg,
     borderWidth: 1,
     overflow: 'hidden',
@@ -3916,7 +3918,7 @@ const styles = StyleSheet.create({
 
   // Detail Card
   detailCard: {
-    borderRadius: BORDER_RADIUS.xxl,
+    borderRadius: BORDER_RADIUS['2xl'],
     borderWidth: 1,
     padding: SPACING.xl,
     overflow: 'hidden',
@@ -4095,7 +4097,7 @@ const styles = StyleSheet.create({
   swipeCard: {
     position: 'absolute',
     width: SCREEN_WIDTH - SPACING.lg * 2,
-    borderRadius: BORDER_RADIUS.xxl,
+    borderRadius: BORDER_RADIUS['2xl'],
     borderWidth: 1,
     overflow: 'hidden',
     ...SHADOWS.lg,

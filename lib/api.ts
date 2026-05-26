@@ -606,7 +606,6 @@ export const userApi = {
     if (result.data?.user) {
       const u = result.data.user;
       const verified = !!(u.verified || u.isVerified || u.is_verified || u.kycVerified || u.kyc_verified || u.passport_verified);
-      console.log('[verify] backend user keys:', Object.keys(u).join(','), '| derived verified:', verified);
       return {
         data: {
           verified,
@@ -624,9 +623,7 @@ export const userApi = {
 
 export const proposalsApi = {
   async getAll(): Promise<ApiResponse<Proposal[]>> {
-    console.log('[Proposals] getAll() called - fetching from backend...');
     const result = await apiRequest<any>('/api/proposals');
-    console.log('[Proposals] API result - error:', result.error, '| data type:', typeof result.data, '| isArray:', Array.isArray(result.data));
 
     // Extract backend proposals if available
     let backendProposals: Proposal[] = [];
@@ -642,8 +639,6 @@ export const proposalsApi = {
       creatorId: p.creatorId || p.userId,
     }));
 
-    console.log('[Proposals] Backend count:', backendProposals.length, '| Seed count:', SEED_PROPOSALS.length);
-
     const merged = [...SEED_PROPOSALS, ...backendProposals];
     return { data: merged, error: null };
   },
@@ -652,7 +647,6 @@ export const proposalsApi = {
       method: 'POST',
       body: JSON.stringify(data),
     });
-    console.log('[Proposals] Create response - error:', result.error, '| creatorId:', (result.data as any)?.creatorId || (result.data as any)?.proposal?.creatorId);
     return result;
   },
   async claimVoteToken(proposalId: number | string): Promise<ApiResponse<{ success: boolean; txHash?: string }>> {

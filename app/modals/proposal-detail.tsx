@@ -25,6 +25,7 @@ import { RCVBallotInput } from '../../components/ui/RCVBallotInput';
 import { RCVResults } from '../../components/ui/RCVResults';
 import { MultipleChoiceBallot } from '../../components/ui/MultipleChoiceBallot';
 import { MultipleChoiceResults } from '../../components/ui/MultipleChoiceResults';
+import { ProposalModerationMenu } from '../../components/moderation/ProposalModerationMenu';
 
 function isVotingEnded(deadline: string | null): boolean {
   if (!deadline) return false;
@@ -43,6 +44,8 @@ export default function ProposalDetailScreen() {
     voteType: string;
     // options is JSON-encoded array of strings (URL params can't carry arrays)
     options: string;
+    creatorId: string;
+    creatorName: string;
   }>();
 
   const proposalId = params.proposalId || '';
@@ -50,6 +53,8 @@ export default function ProposalDetailScreen() {
   const description = params.description || '';
   const category = params.category || 'General';
   const deadline = params.deadline || null;
+  const creatorId = params.creatorId || null;
+  const creatorName = params.creatorName || 'Community Member';
   const voteType: 'multiple-choice' | 'ranked-choice' =
     params.voteType === 'ranked-choice' ? 'ranked-choice' : 'multiple-choice';
   const proposalOptions: string[] = (() => {
@@ -64,6 +69,7 @@ export default function ProposalDetailScreen() {
   const isEnded = isVotingEnded(deadline);
 
   const [voting, setVoting] = useState(false);
+  const [showModerationMenu, setShowModerationMenu] = useState(false);
   const [rcvResults, setRcvResults] = useState<any | null>(null);
   const [rcvSubmitted, setRcvSubmitted] = useState(false);
   const [mcResults, setMcResults] = useState<{ options: string[]; counts: Record<string, number> } | null>(null);
@@ -160,8 +166,23 @@ export default function ProposalDetailScreen() {
         <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>
           Proposal
         </Text>
-        <View style={{ width: 40 }} />
+        <TouchableOpacity
+          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setShowModerationMenu(true); }}
+          style={{ width: 40, alignItems: 'center', justifyContent: 'center' }}
+          accessibilityLabel="Proposal options"
+        >
+          <Ionicons name="ellipsis-horizontal" size={20} color={colors.text} />
+        </TouchableOpacity>
       </View>
+
+      <ProposalModerationMenu
+        visible={showModerationMenu}
+        onClose={() => setShowModerationMenu(false)}
+        proposalId={proposalId || null}
+        creatorId={creatorId}
+        creatorName={creatorName}
+        onMuted={() => router.back()}
+      />
 
       <ScrollView contentContainerStyle={{ padding: SPACING.lg, paddingBottom: insets.bottom + SPACING['3xl'] }}>
         <Animated.View entering={FadeIn.duration(200)}>

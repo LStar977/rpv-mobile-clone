@@ -924,7 +924,7 @@ const styles = StyleSheet.create({
   profileCard: {
     alignItems: 'center',
     padding: SPACING.xxxl,
-    borderRadius: BORDER_RADIUS.xxl,
+    borderRadius: BORDER_RADIUS['2xl'],
     borderWidth: 1.5,
     marginBottom: SPACING.xl,
     overflow: 'hidden',
@@ -957,7 +957,7 @@ const styles = StyleSheet.create({
 
   // Menu Card
   menuCard: {
-    borderRadius: BORDER_RADIUS.xxl,
+    borderRadius: BORDER_RADIUS['2xl'],
     borderWidth: 1,
     overflow: 'hidden',
     marginBottom: SPACING.xl,
@@ -984,7 +984,7 @@ const styles = StyleSheet.create({
 
   // Theme Card
   themeCard: {
-    borderRadius: BORDER_RADIUS.xxl,
+    borderRadius: BORDER_RADIUS['2xl'],
     borderWidth: 1,
     padding: SPACING.lg,
     marginBottom: SPACING.xl,

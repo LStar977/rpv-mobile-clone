@@ -226,7 +226,7 @@ const styles = StyleSheet.create({
   },
   benefitsCard: {
     padding: SPACING.xl,
-    borderRadius: BORDER_RADIUS.xxl,
+    borderRadius: BORDER_RADIUS['2xl'],
     borderWidth: 1,
     marginBottom: SPACING.lg,
     ...SHADOWS.md,
@@ -270,7 +270,7 @@ const styles = StyleSheet.create({
   },
   upsellCard: {
     padding: SPACING.lg,
-    borderRadius: BORDER_RADIUS.xxl,
+    borderRadius: BORDER_RADIUS['2xl'],
     borderWidth: 2,
     overflow: 'hidden',
   },

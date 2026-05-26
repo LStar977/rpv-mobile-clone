@@ -2137,6 +2137,8 @@ export default function OrganizationDetailScreen() {
         // are unaffected. Options is JSON-encoded (URL params can't carry arrays).
         voteType: ((p as any).voteType as string) || 'yes-no',
         options: JSON.stringify((p as any).options ?? []),
+        creatorId: String((p as any).creatorId ?? (p as any).userId ?? ''),
+        creatorName: (p as any).creatorName || 'Community Member',
       },
     });
   };

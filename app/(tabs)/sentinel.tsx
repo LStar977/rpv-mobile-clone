@@ -2025,7 +2025,7 @@ const styles = StyleSheet.create({
 
   // Form Card
   formCard: {
-    borderRadius: BORDER_RADIUS.xxl,
+    borderRadius: BORDER_RADIUS['2xl'],
     padding: SPACING.xl,
     marginBottom: SPACING.lg,
     borderWidth: 1.5,
@@ -2181,7 +2181,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: SPACING.xl,
     marginHorizontal: SPACING.lg,
-    borderRadius: BORDER_RADIUS.xxl,
+    borderRadius: BORDER_RADIUS['2xl'],
     borderWidth: 1.5,
     marginBottom: SPACING.lg,
     overflow: 'hidden',
@@ -2280,9 +2280,9 @@ const styles = StyleSheet.create({
   // Legacy Grade Hero (kept for reference)
   gradeHero: {
     alignItems: 'center',
-    paddingVertical: SPACING.xxl,
+    paddingVertical: SPACING['2xl'],
     marginHorizontal: SPACING.lg,
-    borderRadius: BORDER_RADIUS.xxl,
+    borderRadius: BORDER_RADIUS['2xl'],
     borderWidth: 1.5,
     marginBottom: SPACING.lg,
     overflow: 'hidden',
@@ -2316,7 +2316,7 @@ const styles = StyleSheet.create({
     marginHorizontal: SPACING.lg,
     marginBottom: SPACING.lg,
     padding: SPACING.lg,
-    borderRadius: BORDER_RADIUS.xxl,
+    borderRadius: BORDER_RADIUS['2xl'],
     borderWidth: 1,
   },
   sectionHeader: {

@@ -217,7 +217,6 @@ export default function ImportRosterScreen() {
     setStage('importing');
     try {
       const apiResult = await organizationsApi.importRoster(orgId, parsed);
-      console.log('[importRoster] response:', JSON.stringify(apiResult));
       if (apiResult.error || !apiResult.data) {
         // Tier-gated errors get the upgrade modal; everything else falls
         // through to the inline error path.

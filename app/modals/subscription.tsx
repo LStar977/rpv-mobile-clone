@@ -211,12 +211,12 @@ export default function SubscriptionScreen() {
         <View style={styles.tierHeader}>
           <View style={[
             styles.tierIconContainer,
-            { backgroundColor: isHighlighted ? `${colors.gold}20` : `${colors.primary}15` }
+            { backgroundColor: isHighlighted ? `${colors.gold}20` : `${colors.textSecondary}15` }
           ]}>
             <Ionicons
               name={tier.icon}
               size={24}
-              color={isHighlighted ? colors.gold : colors.primary}
+              color={isHighlighted ? colors.gold : colors.textSecondary}
             />
           </View>
           <View style={styles.tierInfo}>
@@ -528,7 +528,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   tierCard: {
-    borderRadius: BORDER_RADIUS.xxl,
+    borderRadius: BORDER_RADIUS['2xl'],
     padding: SPACING.lg,
     marginBottom: SPACING.lg,
     ...SHADOWS.md,
@@ -664,7 +664,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   faqSection: {
-    borderRadius: BORDER_RADIUS.xxl,
+    borderRadius: BORDER_RADIUS['2xl'],
     borderWidth: 1,
     padding: SPACING.lg,
     marginTop: SPACING.md,
