@@ -14,5 +14,6 @@ dist/
 # Local-only design preview files (not meant for the repo)
 _*-preview.html
 
-# Generated landing-page deliverable (built artifact)
+# Generated landing-page deliverables (built artifacts)
 represent-vote-landing.zip
+represent-vote-site.zip
