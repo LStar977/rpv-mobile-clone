@@ -13,6 +13,9 @@ interface User {
   state: string | null;
   city: string | null;
   verified: boolean | null;
+  // Passed the Didit "Citizen" workflow (passport + proof of address).
+  // Gates citizens-only proposals. Independent of `verified`.
+  citizenshipVerified: boolean | null;
 }
 
 interface AuthState {
@@ -283,6 +286,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
               state: data.user.state || null,
               city: data.user.city || null,
               verified: !!(data.user.verified || data.user.isVerified || data.user.is_verified || data.user.kycVerified || data.user.kyc_verified || data.user.passport_verified),
+              citizenshipVerified: !!(data.user.citizenshipVerified || data.user.citizenship_verified),
             };
             
             // Update cached user with fresh data

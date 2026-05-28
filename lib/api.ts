@@ -469,6 +469,7 @@ export interface Proposal {
   voteType?: string;
   options?: string[];
   imageUrl?: string;
+  requiresCitizenship?: boolean;
 }
 
 interface CreateProposalData {
@@ -481,6 +482,7 @@ interface CreateProposalData {
   options?: string[];
   imageUrl?: string;
   isOfficial?: boolean;
+  requiresCitizenship?: boolean;
 }
 
 interface UploadResponse {
@@ -719,8 +721,18 @@ export const proposalsApi = {
 // verification — skips the Stripe checkout gate and bills the org via
 // metered usage. The user is verified normally; the org pays.
 export const kycApi = {
-  async createSession(originatingOrgId?: string): Promise<ApiResponse<{ sessionUrl: string; sessionId: string; verificationId?: string }>> {
-    const body = originatingOrgId ? JSON.stringify({ originatingOrgId }) : undefined;
+  // flow: 'standard' uses the default Didit workflow (driver's license).
+  // 'citizen' uses the Citizen workflow (passport + proof of address) and
+  // sets users.citizenshipVerified=true on success — required to vote on
+  // citizens-only proposals.
+  async createSession(
+    originatingOrgId?: string,
+    flow: 'standard' | 'citizen' = 'standard',
+  ): Promise<ApiResponse<{ sessionUrl: string; sessionId: string; verificationId?: string }>> {
+    const payload: Record<string, any> = {};
+    if (originatingOrgId) payload.originatingOrgId = originatingOrgId;
+    if (flow === 'citizen') payload.flow = 'citizen';
+    const body = Object.keys(payload).length ? JSON.stringify(payload) : undefined;
     return apiRequest('/api/didit/create-session', { method: 'POST', body });
   },
   async checkDecision(verificationId: string): Promise<ApiResponse<{ status: string; decision?: string }>> {
@@ -1195,6 +1207,7 @@ export const organizationsApi = {
         // proposal object and there's no API hydration on the demo path.
         voteType: data.voteType ?? 'yes-no',
         options: data.options ?? [],
+        requiresCitizenship: data.requiresCitizenship ?? false,
       };
 
       try {
