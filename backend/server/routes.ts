@@ -132,7 +132,13 @@ async function createDiditSession(
     throw new Error("Didit not configured (set DIDIT_API_KEY + DIDIT_WORKFLOW_ID)");
   }
   const domain = process.env.REPLIT_DEV_DOMAIN || process.env.REPLIT_DEPLOYMENT_URL || "localhost:5000";
-  const callbackUrl = `https://${domain}/api/didit/webhook`;
+  // Per-session `callback` is where Didit redirects the user's browser
+  // AFTER they finish verification — NOT the server-to-server webhook
+  // (that's configured separately in the Didit dashboard and stays at
+  // /api/didit/webhook). We give it a dedicated user-facing page so the
+  // WebView in the mobile app can intercept it and close cleanly, with
+  // a friendly fallback HTML if interception ever misses.
+  const callbackUrl = `https://${domain}/verification-complete`;
   const body: any = {
     workflow_id: workflowId,
     callback: callbackUrl,
@@ -280,6 +286,43 @@ async function checkMemberCap(
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // User-facing page Didit redirects to after the verification session
+  // completes. The mobile WebView intercepts this URL and bounces the
+  // user back into the app — this HTML is only shown if interception
+  // misses (web SPA users, slow networks, or stale clients).
+  // The actual server-to-server webhook is /api/didit/webhook (below).
+  app.get("/verification-complete", (_req: any, res: any) => {
+    res
+      .status(200)
+      .type("html")
+      .send(`<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Verification complete</title>
+  <style>
+    :root { color-scheme: dark; }
+    html, body { margin: 0; padding: 0; height: 100%; background: #0b0b0c; color: #f5efe1; font-family: -apple-system, system-ui, Segoe UI, Roboto, sans-serif; }
+    .wrap { min-height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 32px; text-align: center; }
+    .badge { width: 72px; height: 72px; border-radius: 36px; background: rgba(234,186,88,0.15); display: flex; align-items: center; justify-content: center; margin-bottom: 24px; border: 1px solid rgba(234,186,88,0.4); }
+    .check { color: #eaba58; font-size: 36px; font-weight: 700; }
+    h1 { font-family: Georgia, serif; font-weight: 500; font-size: 28px; margin: 0 0 12px; color: #f5efe1; }
+    p { font-size: 15px; line-height: 1.55; max-width: 320px; color: rgba(245,239,225,0.7); margin: 0 0 32px; }
+    .btn { display: inline-flex; align-items: center; gap: 8px; background: #eaba58; color: #0b0b0c; font-weight: 600; padding: 14px 22px; border-radius: 12px; text-decoration: none; font-size: 15px; }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <div class="badge"><span class="check">&#10003;</span></div>
+    <h1>Verification complete</h1>
+    <p>You can return to the Represent app. If it didn't reopen automatically, switch back to it now.</p>
+    <a class="btn" href="represent://verification-complete">Return to Represent</a>
+  </main>
+</body>
+</html>`);
+  });
+
   // Setup OAuth authentication (Google, Apple, GitHub)
   await setupAuth(app);
 
