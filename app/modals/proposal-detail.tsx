@@ -94,6 +94,20 @@ export default function ProposalDetailScreen() {
   // verification (the org has paid the one-time unlock fee, so members
   // never see a payment prompt).
   const handleOrgVerificationError = useCallback((result: { errorCode?: string; errorDetails?: any }): boolean => {
+    if (result.errorCode === 'CITIZENSHIP_REQUIRED') {
+      Alert.alert(
+        'Citizens only',
+        'This proposal is open to verified citizens. Verify your citizenship (passport + proof of address) to vote.',
+        [
+          { text: 'Not now', style: 'cancel' },
+          {
+            text: 'Verify citizenship',
+            onPress: () => router.push({ pathname: '/modals/verification-payment', params: { flow: 'citizen' } }),
+          },
+        ],
+      );
+      return true;
+    }
     if (result.errorCode === 'VERIFICATION_REQUIRED_BY_ORG') {
       const orgName = result.errorDetails?.orgName ?? 'This organization';
       const orgIdParam = result.errorDetails?.orgId;
