@@ -919,7 +919,15 @@ function SwipeCard({ proposal, onSwipeLeft, onSwipeRight, onSwipeUp, onTap, isTo
         {/* Card body */}
         <View style={premiumCardStyles.cardBody}>
           {/* Tier label */}
-          <Text style={[premiumCardStyles.refText, { color: pc.GOLD }]}>{tierLabel}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <Text style={[premiumCardStyles.refText, { color: pc.GOLD }]}>{tierLabel}</Text>
+            {proposal.requiresCitizenship && (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                <Ionicons name="shield-checkmark" size={11} color={pc.GOLD} />
+                <Text style={[premiumCardStyles.refText, { color: pc.GOLD }]}>CITIZENS ONLY</Text>
+              </View>
+            )}
+          </View>
 
           {/* Serif title */}
           <Text style={[premiumCardStyles.serifTitle, { color: pc.FG }]} numberOfLines={2}>{proposal.title}</Text>
@@ -1330,6 +1338,7 @@ interface ProposalCardProps {
   onPress: () => void;
   index: number;
   isUserVerified: boolean;
+  isUserCitizen: boolean;
   userCountry: string;
   userState: string;
   userCity: string;
@@ -1343,6 +1352,7 @@ function ProposalCard({
   onPress,
   index,
   isUserVerified,
+  isUserCitizen,
   userCountry,
   userState,
   userCity,
@@ -1498,6 +1508,16 @@ function ProposalCard({
           <Ionicons name="location-outline" size={12} color={colors.error} />
           <Text style={[styles.restrictionText, { color: colors.error }]}>
             Not in your region
+          </Text>
+        </View>
+      )}
+
+      {/* Citizens-only badge */}
+      {proposal.requiresCitizenship && (
+        <View style={[styles.restrictionBadge, { backgroundColor: isUserCitizen ? `${colors.success}12` : `${colors.warning}12` }]}>
+          <Ionicons name="shield-checkmark" size={12} color={isUserCitizen ? colors.success : colors.warning} />
+          <Text style={[styles.restrictionText, { color: isUserCitizen ? colors.success : colors.warning }]}>
+            {isUserCitizen ? 'Citizens only' : 'Citizens only — verify to vote'}
           </Text>
         </View>
       )}
@@ -2352,6 +2372,7 @@ export default function ProposalsScreen() {
           options: JSON.stringify((p as any).options ?? []),
           creatorId: String((p as any).creatorId ?? (p as any).userId ?? ''),
           creatorName: p.creatorName || 'Community Member',
+          requiresCitizenship: (p as any).requiresCitizenship ? '1' : '',
         },
       });
       return;
@@ -2656,6 +2677,7 @@ export default function ProposalsScreen() {
               onPress={() => openProposal(item)}
               index={index}
               isUserVerified={isVerified}
+              isUserCitizen={citizenshipVerified}
               userCountry={userCountry}
               userState={userState}
               userCity={userCity}

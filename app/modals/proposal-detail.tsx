@@ -46,6 +46,7 @@ export default function ProposalDetailScreen() {
     options: string;
     creatorId: string;
     creatorName: string;
+    requiresCitizenship: string;
   }>();
 
   const proposalId = params.proposalId || '';
@@ -55,6 +56,7 @@ export default function ProposalDetailScreen() {
   const deadline = params.deadline || null;
   const creatorId = params.creatorId || null;
   const creatorName = params.creatorName || 'Community Member';
+  const requiresCitizenship = params.requiresCitizenship === '1';
   const voteType: 'multiple-choice' | 'ranked-choice' =
     params.voteType === 'ranked-choice' ? 'ranked-choice' : 'multiple-choice';
   const proposalOptions: string[] = (() => {
@@ -201,8 +203,16 @@ export default function ProposalDetailScreen() {
       <ScrollView contentContainerStyle={{ padding: SPACING.lg, paddingBottom: insets.bottom + SPACING['3xl'] }}>
         <Animated.View entering={FadeIn.duration(200)}>
           {/* Category chip */}
-          <View style={[styles.categoryChip, { backgroundColor: `${colors.gold}15`, borderColor: colors.gold }]}>
-            <Text style={[styles.categoryText, { color: colors.gold }]}>{category}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: SPACING.sm, flexWrap: 'wrap' }}>
+            <View style={[styles.categoryChip, { backgroundColor: `${colors.gold}15`, borderColor: colors.gold }]}>
+              <Text style={[styles.categoryText, { color: colors.gold }]}>{category}</Text>
+            </View>
+            {requiresCitizenship && (
+              <View style={[styles.categoryChip, { backgroundColor: `${colors.gold}15`, borderColor: colors.gold, flexDirection: 'row', alignItems: 'center', gap: 4 }]}>
+                <Ionicons name="shield-checkmark" size={12} color={colors.gold} />
+                <Text style={[styles.categoryText, { color: colors.gold }]}>Citizens only</Text>
+              </View>
+            )}
           </View>
 
           {/* Title */}
