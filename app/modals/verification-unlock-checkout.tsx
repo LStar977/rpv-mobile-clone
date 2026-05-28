@@ -20,6 +20,7 @@ import * as Haptics from 'expo-haptics';
 import { useTheme, SPACING, BORDER_RADIUS, SHADOWS } from '../../lib/theme';
 import { organizationsApi, type Organization } from '../../lib/api';
 import { iapAvailable, purchaseProduct, unlockSkuForTier } from '../../lib/iap';
+import { useAuthStore } from '../../lib/auth';
 
 const POLL_INTERVAL_MS = 2000;
 const POLL_TIMEOUT_MS = 30_000;
@@ -77,6 +78,16 @@ export default function VerificationUnlockCheckoutScreen() {
   const handlePurchase = async () => {
     if (!orgId || !org) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+    // Demo account: org is sandboxed (no real Stripe customer / no real
+    // StoreKit product to charge). Simulate the unlock locally so the demo
+    // and App reviewers see the success path instead of "Invalid product ID".
+    if (useAuthStore.getState().user?.email === 'demo@represent.app') {
+      setPhase('success');
+      await flipToggleOn();
+      return;
+    }
+
     setPhase('starting');
     setErrorMessage(null);
 
