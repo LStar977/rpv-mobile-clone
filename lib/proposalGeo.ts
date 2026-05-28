@@ -29,6 +29,17 @@ export function canUserVoteOnProposal(
   });
 }
 
+// Citizens-only gate. A proposal flagged requiresCitizenship can only be
+// voted on by users who passed the Didit Citizen workflow. Independent of
+// the geo gate above — both must pass.
+export function meetsCitizenshipRequirement(
+  proposal: Proposal,
+  citizenshipVerified: boolean,
+): boolean {
+  if (!proposal.requiresCitizenship) return true;
+  return citizenshipVerified;
+}
+
 const COUNTRY_ALIASES: Record<string, string> = {
   'united states': 'United States of America',
   'usa': 'United States of America',

@@ -15,10 +15,13 @@ export default function VeriffScreen() {
   // user's org has requireMemberVerification=true). Threaded through to
   // the session-create call so the backend packs it into vendor_data and
   // the org gets billed via Stripe metered usage on success.
-  const params = useLocalSearchParams<{ sessionUrl?: string; verificationId?: string; originatingOrgId?: string }>();
+  const params = useLocalSearchParams<{ sessionUrl?: string; verificationId?: string; originatingOrgId?: string; flow?: string }>();
   const originatingOrgId = typeof params.originatingOrgId === 'string' && params.originatingOrgId.length > 0
     ? params.originatingOrgId
     : undefined;
+  // 'citizen' selects the Didit Citizen workflow (passport + proof of
+  // address) which sets citizenshipVerified on success.
+  const flow: 'standard' | 'citizen' = params.flow === 'citizen' ? 'citizen' : 'standard';
 
   const [sessionUrl, setSessionUrl] = useState<string | undefined>(params.sessionUrl);
   const [verificationId, setVerificationId] = useState<string | undefined>(params.verificationId);
@@ -32,7 +35,7 @@ export default function VeriffScreen() {
   const handleRetry = useCallback(async () => {
     setRetrying(true);
     try {
-      const response = await veriffApi.createSession(originatingOrgId);
+      const response = await veriffApi.createSession(originatingOrgId, flow);
       if (response.data?.sessionUrl && response.data?.verificationId) {
         setSessionUrl(response.data.sessionUrl);
         setVerificationId(response.data.verificationId);
@@ -45,7 +48,7 @@ export default function VeriffScreen() {
     } finally {
       setRetrying(false);
     }
-  }, [originatingOrgId]);
+  }, [originatingOrgId, flow]);
 
   const handleNavigationStateChange = (navState: any) => {
     const url = navState.url || '';

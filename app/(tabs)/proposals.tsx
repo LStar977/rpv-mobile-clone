@@ -14,6 +14,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Image,
+  Switch,
   Dimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -48,7 +49,7 @@ import { useAuthStore } from '../../lib/auth';
 import { useBallotStore } from '../../lib/ballots';
 import { shareProposal } from '../../lib/share';
 import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS, ANIMATION, responsive } from '../../lib/theme';
-import { getTierLabel, getLocationLabel, canUserVoteOnProposal } from '../../lib/proposalGeo';
+import { getTierLabel, getLocationLabel, canUserVoteOnProposal, meetsCitizenshipRequirement } from '../../lib/proposalGeo';
 import { useModerationStore, useSyncMutes } from '../../lib/moderation';
 import { ProposalModerationMenu } from '../../components/moderation/ProposalModerationMenu';
 import Svg, { Rect, Line, Ellipse, Path, Circle, G, Defs, LinearGradient as SvgLinearGradient, Stop } from 'react-native-svg';
@@ -1683,6 +1684,7 @@ export default function ProposalsScreen() {
   const [userState, setUserState] = useState('');
   const [userCity, setUserCity] = useState('');
   const [isVerified, setIsVerified] = useState(false);
+  const [citizenshipVerified, setCitizenshipVerified] = useState(false);
 
   const [selectedProposal, setSelectedProposal] = useState<Proposal | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
@@ -1724,6 +1726,7 @@ export default function ProposalsScreen() {
     imageUri: '' as string,
     voteType: 'yes-no' as 'yes-no' | 'multiple-choice' | 'ranked-choice',
     options: ['', ''] as string[],
+    requiresCitizenship: false,
   });
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -1917,11 +1920,15 @@ export default function ProposalsScreen() {
           setUserState('Ontario');
           setUserCity('Toronto');
           setIsVerified(true);
+          setCitizenshipVerified(true);
         } else if (profileRes.data) {
           setUserCountry(profileRes.data.country || '');
           setUserState(profileRes.data.state || '');
           setUserCity(profileRes.data.city || '');
           setIsVerified(profileRes.data.verified || false);
+          setCitizenshipVerified(
+            !!(profileRes.data.citizenshipVerified || profileRes.data.citizenship_verified),
+          );
         }
 
         if (limitsRes.data) {
@@ -1960,6 +1967,25 @@ export default function ProposalsScreen() {
           ? 'Verify your identity to vote on geo-restricted proposals.'
           : `This proposal is restricted to ${geo[geo.length - 1] ?? 'a specific region'}. Voting is only open to residents.`,
         [{ text: 'OK', style: 'cancel' }],
+      );
+      return;
+    }
+
+    // Citizens-only gate. Runs before the demo/seed bypass so the eligibility
+    // badge and behaviour agree. Server enforces CITIZENSHIP_REQUIRED too.
+    if (target && !meetsCitizenshipRequirement(target, citizenshipVerified)) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      Alert.alert(
+        'Citizens only',
+        'This proposal is open to verified citizens. Verify your citizenship (passport + proof of address) to vote.',
+        [
+          { text: 'Not now', style: 'cancel' },
+          {
+            text: 'Verify citizenship',
+            onPress: () =>
+              router.push({ pathname: '/modals/verification-payment', params: { flow: 'citizen' } }),
+          },
+        ],
       );
       return;
     }
@@ -2252,6 +2278,7 @@ export default function ProposalsScreen() {
         options: newProposal.voteType === 'yes-no'
           ? undefined
           : newProposal.options.map((o) => o.trim()).filter(Boolean),
+        requiresCitizenship: newProposal.requiresCitizenship,
       });
 
       if (result.error) {
@@ -2275,6 +2302,7 @@ export default function ProposalsScreen() {
         imageUri: '',
         voteType: 'yes-no',
         options: ['', ''],
+        requiresCitizenship: false,
       });
       fetchData(true);
 
@@ -3256,6 +3284,30 @@ export default function ProposalsScreen() {
               </ScrollView>
             </View>
 
+            <View style={[styles.formDivider, { borderTopColor: colors.border }]}>
+              <View style={[styles.formDividerIcon, { backgroundColor: `${colors.gold}15` }]}>
+                <Ionicons name="shield-checkmark-outline" size={16} color={colors.gold} />
+              </View>
+              <Text style={[styles.formDividerLabel, { color: colors.gold }]}>Eligibility</Text>
+            </View>
+
+            <View style={styles.formSection}>
+              <View style={styles.citizenToggleRow}>
+                <View style={styles.citizenToggleText}>
+                  <Text style={[styles.formSubLabel, { color: colors.text, marginBottom: 2 }]}>Citizens only</Text>
+                  <Text style={[styles.scopeDesc, { color: colors.textTertiary }]}>
+                    Only voters who verify citizenship (passport + proof of address) can vote.
+                  </Text>
+                </View>
+                <Switch
+                  value={newProposal.requiresCitizenship}
+                  onValueChange={(v) => setNewProposal((p) => ({ ...p, requiresCitizenship: v }))}
+                  trackColor={{ false: colors.border, true: colors.gold }}
+                  thumbColor="#fff"
+                />
+              </View>
+            </View>
+
             <View style={{ height: 100 }} />
           </ScrollView>
         </KeyboardAvoidingView>
@@ -3992,6 +4044,8 @@ const styles = StyleSheet.create({
   },
   scopeTitle: { ...TYPOGRAPHY.labelLarge, marginTop: SPACING.sm },
   scopeDesc: { ...TYPOGRAPHY.bodySmall, marginTop: 2 },
+  citizenToggleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: SPACING.md },
+  citizenToggleText: { flex: 1 },
   warningBanner: {
     flexDirection: 'row',
     alignItems: 'flex-start',

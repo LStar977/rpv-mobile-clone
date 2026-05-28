@@ -21,18 +21,24 @@ export default function VerificationPaymentScreen() {
   // originatingOrgId + (optional) originatingOrgName. The screen swaps the
   // self-pay copy for an org-paid banner and threads orgId through to the
   // /modals/veriff session-create call.
-  const params = useLocalSearchParams<{ originatingOrgId?: string; originatingOrgName?: string }>();
+  const params = useLocalSearchParams<{ originatingOrgId?: string; originatingOrgName?: string; flow?: string }>();
   const originatingOrgId = typeof params.originatingOrgId === 'string' && params.originatingOrgId.length > 0
     ? params.originatingOrgId : undefined;
   const originatingOrgName = typeof params.originatingOrgName === 'string' && params.originatingOrgName.length > 0
     ? params.originatingOrgName : undefined;
+  // 'citizen' = citizens-only proposal gate. Uses the Didit Citizen
+  // workflow (passport + proof of address) and swaps the screen copy.
+  const isCitizenFlow = params.flow === 'citizen';
   const isOrgPaid = !!originatingOrgId;
 
   const handleStartVerification = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    const veriffParams: Record<string, string> = {};
+    if (originatingOrgId) veriffParams.originatingOrgId = originatingOrgId;
+    if (isCitizenFlow) veriffParams.flow = 'citizen';
     router.replace({
       pathname: '/modals/veriff',
-      params: originatingOrgId ? { originatingOrgId } : {},
+      params: veriffParams,
     });
   };
 
@@ -64,10 +70,14 @@ export default function VerificationPaymentScreen() {
           </View>
 
           <Text style={[styles.heroTitle, { color: colors.text }]}>
-            {isOrgPaid ? 'Verify to vote in this organization' : 'Unlock Full Voting Access'}
+            {isCitizenFlow
+              ? 'Verify your citizenship'
+              : isOrgPaid ? 'Verify to vote in this organization' : 'Unlock Full Voting Access'}
           </Text>
           <Text style={[styles.heroSubtitle, { color: colors.textSecondary }]}>
-            {isOrgPaid
+            {isCitizenFlow
+              ? 'This proposal is open to citizens only. Verify with your passport and proof of address to confirm citizenship and unlock voting.'
+              : isOrgPaid
               ? `${originatingOrgName ?? 'Your organization'} requires identity verification before voting. Your verification is covered — no payment needed.`
               : 'Verify your identity once to participate in all proposals in your region.'}
           </Text>
@@ -97,8 +107,9 @@ export default function VerificationPaymentScreen() {
         >
           <Ionicons name="information-circle-outline" size={20} color={colors.info} />
           <Text style={[styles.processText, { color: colors.textSecondary }]}>
-            You'll complete identity verification using a government-issued ID.
-            Your location will be verified automatically.
+            {isCitizenFlow
+              ? "You'll verify with a passport and a proof-of-address document. This confirms citizenship and your region."
+              : "You'll complete identity verification using a government-issued ID. Your location will be verified automatically."}
           </Text>
         </Animated.View>
 
