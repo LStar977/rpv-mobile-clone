@@ -219,14 +219,14 @@ function PrRow({
   value?: string;
   valueColor?: string;
   last?: boolean;
-  onPress: () => void;
+  onPress?: () => void;
 }) {
   const pr = useProfileColors();
+  const Container: any = onPress ? TouchableOpacity : View;
   return (
-    <TouchableOpacity
+    <Container
       style={[prStyles.row, !last && { borderBottomWidth: 1, borderBottomColor: pr.LINE }]}
-      onPress={onPress}
-      activeOpacity={0.7}
+      {...(onPress ? { onPress, activeOpacity: 0.7 } : {})}
     >
       <View style={[prStyles.rowIcon, { backgroundColor: pr.BG_RAISED, borderColor: pr.LINE }]}>
         <Ionicons name={icon} size={18} color={pr.GL} />
@@ -236,8 +236,8 @@ function PrRow({
         {sub && <Text style={[prStyles.rowSub, { color: pr.FG_FAINT }]}>{sub}</Text>}
       </View>
       {value && <Text style={[prStyles.rowValue, { color: valueColor || pr.FG_MUTED }]}>{value}</Text>}
-      <Ionicons name="chevron-forward" size={14} color={pr.FG_FAINT} />
-    </TouchableOpacity>
+      {onPress && <Ionicons name="chevron-forward" size={14} color={pr.FG_FAINT} />}
+    </Container>
   );
 }
 
@@ -625,10 +625,11 @@ export default function ProfileScreen() {
   const [badgesEarned, setBadgesEarned] = useState<number | null>(null);
   const [adminOrgCount, setAdminOrgCount] = useState<number | null>(null);
   const [votesCast, setVotesCast] = useState<number | null>(null);
-  const [verification, setVerification] = useState<{ verified: boolean; status: PassportStatus; verifiedAt?: string | null }>({
+  const [verification, setVerification] = useState<{ verified: boolean; status: PassportStatus; verifiedAt?: string | null; citizenshipVerified: boolean }>({
     verified: false,
     status: 'unverified',
     verifiedAt: null,
+    citizenshipVerified: false,
   });
   const [profileLocation, setProfileLocation] = useState<{ country?: string; state?: string; city?: string } | null>(null);
   const [startingKyc, setStartingKyc] = useState(false);
@@ -716,10 +717,16 @@ export default function ProfileScreen() {
       const isDemoAccount = user?.email === 'demo@represent.app';
       if (verRes.status === 'fulfilled') {
         const v = (verRes.value?.data || {}) as any;
+        // citizenshipVerified comes from the user object on /api/auth/verify
+        // (not the verification-status subset), so pick it off profRes too.
+        const profUser: any = (profRes.status === 'fulfilled' ? profRes.value?.data : null) || {};
         setVerification({
           verified: isDemoAccount ? true : !!v.verified,
           status: isDemoAccount ? 'verified' : ((v.status as PassportStatus) || (v.verified ? 'verified' : 'unverified')),
           verifiedAt: isDemoAccount ? new Date().toISOString() : (v.verifiedAt || v.verified_at || null),
+          citizenshipVerified: isDemoAccount
+            ? true
+            : !!(profUser.citizenshipVerified || profUser.citizenship_verified),
         });
       }
       if (profRes.status === 'fulfilled') {
@@ -795,6 +802,18 @@ export default function ProfileScreen() {
     }
   }, [tutorialActive, completeTutorialAction, isAuthenticated, verification.status, fetchProfileData]);
 
+  // Citizens-only verification (Didit Citizen workflow: passport + proof
+  // of address). Independent of the standard KYC above — a user can be
+  // standard-verified without citizenship-verified.
+  const handleStartCitizenKyc = useCallback(() => {
+    if (!isAuthenticated) {
+      Alert.alert('Sign In Required', 'Please sign in to begin citizenship verification.');
+      return;
+    }
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    router.push({ pathname: '/modals/verification-payment', params: { flow: 'citizen' } });
+  }, [isAuthenticated]);
+
   const handleLogout = () => {
     Alert.alert('Log Out', 'Are you sure you want to log out?', [
       { text: 'Cancel', style: 'cancel' },
@@ -864,6 +883,14 @@ export default function ProfileScreen() {
 
         {/* Section I: Civic Record */}
         <PrSection delay={200}>
+          <PrRow
+            icon="shield-checkmark-outline"
+            label="Citizenship"
+            sub={verification.citizenshipVerified ? 'Verified citizen' : 'Passport + proof of address required for citizens-only proposals'}
+            value={verification.citizenshipVerified ? 'Verified' : 'Verify'}
+            valueColor={verification.citizenshipVerified ? colors.success : colors.goldLight}
+            onPress={verification.citizenshipVerified ? undefined : handleStartCitizenKyc}
+          />
           <PrRow icon="time-outline" label="Voting history" sub={votesCast !== null ? `${votesCast.toLocaleString()} ballots cast` : undefined} onPress={() => navigateTo('/modals/voting-history')} />
           <PrRow icon="analytics-outline" label="Analytics" sub="Patterns & impact" onPress={() => navigateTo('/modals/analytics')} />
           <PrRow icon="trophy-outline" label="Badges & achievements" value={badgesEarned !== null ? `${badgesEarned} / ${BADGES_TOTAL}` : undefined} valueColor={colors.goldLight} last onPress={() => navigateTo('/modals/badges')} />
