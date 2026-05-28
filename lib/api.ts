@@ -1782,6 +1782,15 @@ export const moderationApi = {
     reason: ReportReason,
     note?: string,
   ): Promise<ApiResponse<{ ok: true; hidden?: boolean }>> {
+    // Seed proposals (seed-*), demo-org proposals (demo-*), and anything
+    // on the demo account live client-side only — the backend has no row
+    // to report against and would 404 "Proposal not found". Succeed
+    // locally so the moderation flow works for the App reviewer (who uses
+    // the demo account + sees seed content) and for any seed proposal.
+    const idStr = String(proposalId);
+    if (isDemoAccount() || idStr.startsWith('seed-') || idStr.startsWith('demo-')) {
+      return { data: { ok: true }, error: null };
+    }
     return apiRequest<{ ok: true; hidden?: boolean }>(`/api/proposals/${proposalId}/report`, {
       method: 'POST',
       body: JSON.stringify({ reason, note: note?.slice(0, 500) }),

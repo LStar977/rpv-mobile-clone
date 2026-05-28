@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   TextInput,
   Alert,
   ActivityIndicator,
+  Keyboard,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -61,6 +62,16 @@ export function ProposalModerationMenu({
   const [stage, setStage] = useState<Stage>('menu');
   const [reason, setReason] = useState<ReportReason | null>(null);
   const [note, setNote] = useState('');
+  const [kbHeight, setKbHeight] = useState(0);
+
+  // Lift the bottom sheet above the keyboard while typing the note.
+  // Without this the keyboard covers the sheet (Submit button hidden) and
+  // tapping to dismiss the keyboard lands on the scrim behind it.
+  useEffect(() => {
+    const show = Keyboard.addListener('keyboardWillShow', (e) => setKbHeight(e.endCoordinates.height));
+    const hide = Keyboard.addListener('keyboardWillHide', () => setKbHeight(0));
+    return () => { show.remove(); hide.remove(); };
+  }, []);
 
   if (!visible) return null;
 
@@ -106,6 +117,7 @@ export function ProposalModerationMenu({
 
   const submitReport = async (finalReason: ReportReason, finalNote: string) => {
     if (!proposalId) return;
+    Keyboard.dismiss();
     setStage('submitting');
     const result = await moderationApi.reportProposal(proposalId, finalReason, finalNote);
     if (result.error) {
@@ -124,10 +136,18 @@ export function ProposalModerationMenu({
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
       <Pressable
-        onPress={close}
+        onPress={() => {
+          // While typing the note, a scrim tap should dismiss the keyboard,
+          // not close the whole sheet (that was eating the report mid-entry).
+          if (kbHeight > 0) {
+            Keyboard.dismiss();
+            return;
+          }
+          close();
+        }}
         style={[StyleSheet.absoluteFill, styles.scrim]}
       />
-      <View style={[styles.sheet, { paddingBottom: 28 + insets.bottom }]}>
+      <View style={[styles.sheet, { bottom: kbHeight, paddingBottom: kbHeight > 0 ? 20 : 28 + insets.bottom }]}>
         <View style={styles.handle} />
 
         {stage === 'menu' && (
