@@ -119,9 +119,15 @@ async function createDiditSession(
   firstName?: string,
   lastName?: string,
   originatingOrgId?: string | null,
+  flow: 'standard' | 'citizen' = 'standard',
 ): Promise<{ sessionId: string; sessionUrl: string }> {
   const apiKey = process.env.DIDIT_API_KEY;
-  const workflowId = process.env.DIDIT_WORKFLOW_ID;
+  // 'citizen' uses a separate Didit workflow (passport + proof of address)
+  // that proves citizenship. Falls back to the standard workflow if the
+  // citizen workflow env var isn't set.
+  const workflowId = flow === 'citizen'
+    ? (process.env.DIDIT_WORKFLOW_ID_CITIZEN || process.env.DIDIT_WORKFLOW_ID)
+    : process.env.DIDIT_WORKFLOW_ID;
   if (!apiKey || !workflowId) {
     throw new Error("Didit not configured (set DIDIT_API_KEY + DIDIT_WORKFLOW_ID)");
   }
@@ -494,6 +500,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (proposal.deadline && new Date(proposal.deadline).getTime() < Date.now()) {
           return res.status(400).json({ error: "Voting has closed for this proposal" });
         }
+        if ((proposal as any).requiresCitizenship && !(user as any)?.citizenshipVerified) {
+          return res.status(403).json({
+            error: "This proposal is open to verified citizens only",
+            code: "CITIZENSHIP_REQUIRED",
+          });
+        }
         if (proposal.organizationId) {
           const isMember = await storage.isOrganizationMember(proposal.organizationId, userId);
           if (!isMember) {
@@ -548,6 +560,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // unlock fee at toggle-on; subsequent votes are free for the org.
       } else if (!user?.verified) {
         return res.status(403).json({ error: "You must complete identity verification before voting." });
+      }
+
+      // Citizens-only gate. Independent of org membership and standard
+      // verification — requires the Didit Citizen workflow pass.
+      if ((proposal as any).requiresCitizenship && !(user as any)?.citizenshipVerified) {
+        return res.status(403).json({
+          error: "This proposal is open to verified citizens only",
+          code: "CITIZENSHIP_REQUIRED",
+        });
       }
 
       // On-chain voting requires a smart wallet (created at signup). For
@@ -1401,7 +1422,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "Identity verification required to create proposals" });
       }
 
-      const { title, description, category, geoRestrictions, riding, demographicRestrictions, voteType, options, organizationId, imageUrl } = req.body;
+      const { title, description, category, geoRestrictions, riding, demographicRestrictions, voteType, options, organizationId, imageUrl, requiresCitizenship } = req.body;
 
       // UPDATE 27 — UGC profanity gate (Apple Guideline 1.2). Cheap
       // pre-publish filter; layered moderation (managed APIs, user
@@ -1480,6 +1501,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       if (imageUrl) {
         updateData.imageUrl = imageUrl;
+      }
+      if (requiresCitizenship === true) {
+        updateData.requiresCitizenship = true;
       }
 
       // Persist voteType + options. Only multiple-choice gets on-chain
@@ -2473,7 +2497,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const user = await storage.getUser(userId);
       if (!user) return res.status(404).json({ error: "User not found" });
 
-      if (user.verified) {
+      // 'citizen' flow gates on citizenshipVerified (a standard-verified user
+      // can still need the stronger citizen pass). Standard flow gates on
+      // `verified` as before.
+      const flow: 'standard' | 'citizen' = req.body?.flow === 'citizen' ? 'citizen' : 'standard';
+      if (flow === 'citizen') {
+        if ((user as any).citizenshipVerified) {
+          return res.status(400).json({ error: "Citizenship already verified" });
+        }
+      } else if (user.verified) {
         return res.status(400).json({ error: "User already verified" });
       }
 
@@ -2502,6 +2534,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         user.firstName || (user.name?.split(" ")[0]),
         user.lastName || (user.name?.split(" ").slice(1).join(" ")),
         attributedOrgId,
+        flow,
       );
 
       // Persist session id so check-decision and sync-location can look it up
@@ -2530,13 +2563,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(401).json({ error: "Invalid signature" });
     }
     try {
-      const { session_id, status, vendor_data, decision } = req.body || {};
+      const { session_id, status, vendor_data, decision, workflow_id } = req.body || {};
       const { userId, originatingOrgId } = parseVendorData(vendor_data);
       log(`Didit webhook: userId=${rid(userId)}, originatingOrgId=${rid(originatingOrgId)}, status=${status}, sessionId=${rid(session_id)}`);
 
       if (!session_id || !userId) {
         return res.status(200).json({ received: true });
       }
+
+      // Was this the Citizen workflow (passport + proof of address)? If so we
+      // also stamp citizenshipVerified so the user can vote on citizens-only
+      // proposals. Compare against the configured citizen workflow id.
+      const citizenWorkflowId = process.env.DIDIT_WORKFLOW_ID_CITIZEN;
+      const sessionWorkflowId = workflow_id || decision?.workflow_id;
+      const isCitizenSession = !!citizenWorkflowId && sessionWorkflowId === citizenWorkflowId;
 
       if (status === "Approved" || status === "approved") {
         const fields = mapDiditDecisionToUserFields(decision || req.body);
@@ -2554,6 +2594,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (fields.gender) updateData.gender = fields.gender;
         if (fields.firstName) updateData.firstName = fields.firstName;
         if (fields.lastName) updateData.lastName = fields.lastName;
+        if (isCitizenSession) {
+          updateData.citizenshipVerified = true;
+          updateData.citizenshipVerifiedAt = new Date();
+        }
 
         await storage.updateUserVerification(userId, updateData);
         await grantInitialBallotsIfNeeded(userId);
@@ -4808,7 +4852,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.claims?.sub;
       const { orgId } = req.params;
-      const { title, description, category, isOfficial, voteType, options } = req.body;
+      const { title, description, category, isOfficial, voteType, options, requiresCitizenship } = req.body;
 
       if (!title || !description || !category) {
         return res.status(400).json({ error: "title, description, and category are required" });
@@ -4851,6 +4895,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
       if (resolvedVoteType !== 'yes-no') updateData.options = options;
       if (isOfficial && isAdmin) updateData.isOfficial = true;
+      if (requiresCitizenship === true) updateData.requiresCitizenship = true;
       await storage.updateProposal(proposal.id, updateData);
 
       const updated = await storage.getProposal(proposal.id);
@@ -4915,6 +4960,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const proposal = await storage.getProposal(proposalId);
       if (!proposal || proposal.organizationId !== orgId) {
         return res.status(404).json({ error: "Proposal not found in this organization" });
+      }
+
+      if ((proposal as any).requiresCitizenship) {
+        const voter = await storage.getUser(userId);
+        if (!(voter as any)?.citizenshipVerified) {
+          return res.status(403).json({
+            error: "This proposal is open to verified citizens only",
+            code: "CITIZENSHIP_REQUIRED",
+          });
+        }
       }
 
       const alreadyVoted = await storage.hasUserVotedOnProposal(userId, proposalId);

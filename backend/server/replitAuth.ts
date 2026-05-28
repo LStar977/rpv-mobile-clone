@@ -520,6 +520,7 @@ export async function setupAuth(app: Express) {
           profileImageUrl: user.profileImageUrl,
           walletAddress: wallet?.address,
           verified: isDemoUser ? true : (user.verified || false),
+          citizenshipVerified: isDemoUser ? true : ((user as any).citizenshipVerified || false),
           country: isDemoUser ? 'Canada' : (user.country || ''),
           state: isDemoUser ? 'Ontario' : (user.state || ''),
           city: isDemoUser ? 'Toronto' : (user.city || ''),
