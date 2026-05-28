@@ -2002,8 +2002,7 @@ export default function ProposalsScreen() {
           { text: 'Not now', style: 'cancel' },
           {
             text: 'Verify citizenship',
-            onPress: () =>
-              router.push({ pathname: '/modals/verification-payment', params: { flow: 'citizen' } }),
+            onPress: () => router.push('/modals/verification-payment'),
           },
         ],
       );

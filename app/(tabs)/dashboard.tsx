@@ -118,23 +118,13 @@ export default function DashboardScreen() {
     setRefreshing(false);
   }, [loadData]);
 
-  const handleStartKyc = useCallback(async () => {
+  const handleStartKyc = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    try {
-      const response = await veriffApi.createSession();
-      if (response.data?.sessionUrl && response.data?.verificationId) {
-        router.push({
-          pathname: '/modals/veriff',
-          params: {
-            sessionUrl: response.data.sessionUrl,
-            verificationId: response.data.verificationId,
-          },
-        });
-      }
-    } catch {
-      // Errors are surfaced via the WebView screen's no-session state on retry.
-    }
-  }, [router]);
+    // Route to the verification picker so the user can choose Standard or
+    // Citizen verification (instead of forcing one). The picker creates the
+    // Didit session after they pick.
+    router.push('/modals/verification-payment');
+  }, []);
 
   const navigateToProposals = () => router.push('/(tabs)/proposals');
 

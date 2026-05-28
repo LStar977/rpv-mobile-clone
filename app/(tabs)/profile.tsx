@@ -756,7 +756,7 @@ export default function ProfileScreen() {
     setRefreshing(false);
   }, [fetchTier, fetchProfileData]);
 
-  const handleStartKyc = useCallback(async () => {
+  const handleStartKyc = useCallback(() => {
     if (tutorialActive) {
       completeTutorialAction('tap-button');
       return;
@@ -766,52 +766,25 @@ export default function ProfileScreen() {
       return;
     }
     if (verification.status === 'pending') {
-      // Pending: re-fetch status instead of starting a new session.
-      await fetchProfileData();
+      // Pending: re-fetch status instead of routing.
+      fetchProfileData();
       return;
     }
-
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    setStartingKyc(true);
-    try {
-      const response = await veriffApi.createSession();
-      if (response.data?.sessionUrl && response.data?.verificationId) {
-        router.push({
-          pathname: '/modals/veriff',
-          params: {
-            sessionUrl: response.data.sessionUrl,
-            verificationId: response.data.verificationId,
-          },
-        });
-      } else {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-        Alert.alert(
-          'Verification Error',
-          (response.data as any)?.error || 'Could not start verification session. Please try again.'
-        );
-      }
-    } catch (error) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      console.error('Veriff session error:', error);
-      Alert.alert(
-        'Connection Error',
-        'Unable to connect to the verification service. Please check your connection and try again.'
-      );
-    } finally {
-      setStartingKyc(false);
-    }
+    // Route to the verification picker so the user can choose Standard or
+    // Citizen verification.
+    router.push('/modals/verification-payment');
   }, [tutorialActive, completeTutorialAction, isAuthenticated, verification.status, fetchProfileData]);
 
-  // Citizens-only verification (Didit Citizen workflow: passport + proof
-  // of address). Independent of the standard KYC above — a user can be
-  // standard-verified without citizenship-verified.
+  // Citizenship row also goes through the picker so the choice + tradeoffs
+  // are explicit. The user can pick Citizen if that's what they want.
   const handleStartCitizenKyc = useCallback(() => {
     if (!isAuthenticated) {
-      Alert.alert('Sign In Required', 'Please sign in to begin citizenship verification.');
+      Alert.alert('Sign In Required', 'Please sign in to begin verification.');
       return;
     }
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    router.push({ pathname: '/modals/verification-payment', params: { flow: 'citizen' } });
+    router.push('/modals/verification-payment');
   }, [isAuthenticated]);
 
   const handleLogout = () => {
