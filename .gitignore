@@ -13,3 +13,6 @@ dist/
 
 # Local-only design preview files (not meant for the repo)
 _*-preview.html
+
+# Build artifacts
+*.zip
