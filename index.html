@@ -42,6 +42,7 @@
       html { scroll-behavior: auto; }
       .reveal { opacity: 1 !important; transform: none !important; clip-path: none !important; }
       .viz-now .bar { animation: none !important; }
+      #crowd svg { animation: none !important; }
     }
 
     body {
@@ -128,8 +129,9 @@
         radial-gradient(60% 50% at 18% 14%, rgba(230,178,74,.07), transparent 60%); }
     .grain { position: absolute; inset: 0; z-index: 2; pointer-events: none; opacity: .055; mix-blend-mode: overlay;
       background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
-    .hero-content { position: relative; z-index: 5; flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 116px 0 clamp(290px, 40vh, 470px); pointer-events: none; }
+    .hero-content { position: relative; z-index: 5; flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: space-between; text-align: center; padding: clamp(104px,14vh,148px) 0 clamp(34px,6vh,58px); pointer-events: none; }
     .hero-content a, .hero-content button { pointer-events: auto; }
+    .hero-top-grp, .hero-bottom-grp { width: 100%; display: flex; flex-direction: column; align-items: center; }
     .hero-headline { max-width: 940px; margin: 0 auto; }
     .hero-headline h1 { font-size: clamp(34px, 5.6vw, 72px); font-weight: 500; letter-spacing: -0.03em; line-height: 1.05; }
     .hero-headline .line { display: block; overflow: hidden; }
@@ -246,8 +248,9 @@
     .vision { position: relative; text-align: center; overflow: hidden; background: var(--black); }
     .vision-aura { position: absolute; inset: -25% 0; z-index: 0; background: radial-gradient(46% 46% at 50% 46%, rgba(230,178,74,.14), transparent 72%); }
     #crowd { position: absolute; inset: 0; z-index: 1; pointer-events: none; }
-    #crowd svg { position: absolute; fill: var(--gold); opacity: 0; transform: translateY(24px) scale(.8); transition: opacity 1s ease, transform 1.1s cubic-bezier(.16,1,.3,1); }
-    #crowd.in svg { opacity: var(--o); transform: translateY(0) scale(1); }
+    #crowd svg { position: absolute; bottom: 0; fill: var(--gold); opacity: 0; transition: opacity 1.1s ease; transform-origin: 50% 100%; animation: handwave 3.4s ease-in-out infinite; will-change: transform; }
+    #crowd.in svg { opacity: var(--o); }
+    @keyframes handwave { 0%,100% { transform: translateY(7px) rotate(-1.5deg); } 50% { transform: translateY(-8px) rotate(1.5deg); } }
     .vision .container { position: relative; z-index: 3; max-width: 980px; }
     .vision h2 { font-size: clamp(34px, 6.6vw, 80px); font-weight: 500; line-height: 1.05; margin-bottom: 30px; }
     .vision p { font-size: clamp(17px, 2.3vw, 23px); color: var(--muted); max-width: 700px; margin: 0 auto 18px; }
@@ -325,13 +328,17 @@
     <div class="grain"></div>
 
     <div class="hero-content">
-      <div class="hero-headline">
+      <div class="hero-top-grp">
         <span class="eyebrow hero-eye">Voice beyond the ballot box</span>
-        <h1>
-          <span class="line"><span>Your voice doesn't stop</span></span>
-          <span class="line"><span>at the <em class="serif gradient-text">ballot box.</em></span></span>
-        </h1>
-        <p class="hero-sub">Democracy shouldn't be a once-every-four-years event. Represent gives you a direct say on the issues that shape your life — housing, healthcare, transit — whenever it counts.</p>
+        <div class="hero-headline">
+          <h1>
+            <span class="line"><span>Your voice doesn't stop</span></span>
+            <span class="line"><span>at the <em class="serif gradient-text">ballot box.</em></span></span>
+          </h1>
+          <p class="hero-sub">Democracy shouldn't be a once-every-four-years event. A direct say on the issues that shape your life — housing, healthcare, transit — whenever it counts.</p>
+        </div>
+      </div>
+      <div class="hero-bottom-grp">
         <div class="hero-actions">
           <div class="stores">
             <a href="#download" class="store-badge" data-magnetic data-cursor aria-label="Download on the App Store">
@@ -348,6 +355,7 @@
       </div>
     </div>
     <div class="scroll-cue"><span class="mouse"></span><span>Scroll</span></div>
+    <!-- hero groups: top = headline, bottom = CTA, box centered between -->
   </section>
 
   <!-- MARQUEE -->
@@ -592,22 +600,39 @@
       });
     })();
 
-    /* CROWD OF RAISED HANDS (vision) */
+    /* CROWD OF RAISED HANDS (vision) — depth-sorted crowd with a living wave */
     (function(){
       var crowd = document.getElementById('crowd'); if(!crowd) return;
-      var N = innerWidth < 700 ? 16 : 30, frag = document.createDocumentFragment();
+      var N = innerWidth < 700 ? 22 : 40, items = [];
       for (var i=0;i<N;i++){
+        var depth = Math.random();                       // 0 = far/high/small, 1 = near/low/big
+        items.push({
+          depth: depth,
+          left: Math.random()*100,
+          size: 24 + depth*78,                            // nearer hands are bigger
+          bottom: -6 + (1-depth)*52 + (Math.random()*8-4),// nearer hands sit lower (smaller bottom%)
+          op: 0.10 + depth*0.40,
+          dur: 2.8 + Math.random()*2.4,
+          delay: -(Math.random()*4)                       // desync the wave
+        });
+      }
+      items.sort(function(a,b){ return a.depth-b.depth; });// draw far first so near overlap on top
+      var frag = document.createDocumentFragment();
+      items.forEach(function(it, idx){
         var s = document.createElementNS('http://www.w3.org/2000/svg','svg');
         s.setAttribute('viewBox','0 0 64 90');
         var u = document.createElementNS('http://www.w3.org/2000/svg','use');
         u.setAttributeNS('http://www.w3.org/1999/xlink','href','#rhand'); u.setAttribute('href','#rhand');
         s.appendChild(u);
-        var size = 26 + Math.random()*54, left = Math.random()*100, top = Math.random()*100, dist = Math.abs(left-50)/50;
-        var op = 0.05 + dist*0.16 + Math.random()*0.05;
-        s.style.width = size+'px'; s.style.height = (size*1.4)+'px'; s.style.left = left+'%'; s.style.top = top+'%';
-        s.style.setProperty('--o', op.toFixed(3)); s.style.transitionDelay = (Math.random()*0.6).toFixed(2)+'s';
+        s.style.width = it.size+'px'; s.style.height = (it.size*1.4)+'px';
+        s.style.left = it.left+'%'; s.style.bottom = it.bottom+'%';
+        s.style.zIndex = Math.round(it.depth*20);
+        s.style.setProperty('--o', it.op.toFixed(3));
+        s.style.transitionDelay = (Math.random()*0.7).toFixed(2)+'s';
+        s.style.animationDuration = it.dur.toFixed(2)+'s';
+        s.style.animationDelay = it.delay.toFixed(2)+'s';
         frag.appendChild(s);
-      }
+      });
       crowd.appendChild(frag);
     })();
 
@@ -624,15 +649,17 @@
     function ballotScene(canvas){
       var ctx = canvas.getContext('2d'), dpr = Math.min(devicePixelRatio||1, 2);
       var W=0,H=0,box=null,parts=[],rings=[],raf=null,running=false,frameN=0,ringTimer=0;
-      var mouse={x:null}, N = innerWidth<700 ? 90 : 220;
+      var mouse={x:null}, N = innerWidth<700 ? 130 : 280;
       var logoImg = document.querySelector('header .logo img');
+      var heroEl = document.getElementById('top');
+      var phase = 'wait', introT = 0, flashA = 0, power = 0, active = false;
 
       function layout(){
         var rect = canvas.getBoundingClientRect();
         W = Math.floor(rect.width*dpr); H = Math.floor(rect.height*dpr);
         canvas.width=W; canvas.height=H;
-        var bw = Math.min(rect.width*0.28, 215)*dpr, bh = bw*0.64, depth = bw*0.42;
-        var cx = W*0.5, baseY = H*0.87, topY = baseY-bh, ex = depth*0.52, ey = -depth*0.48;
+        var bw = Math.min(rect.width*0.38, 330)*dpr, bh = bw*0.66, depth = bw*0.42;
+        var cx = W*0.5, baseY = H*0.76, topY = baseY-bh, ex = depth*0.52, ey = -depth*0.48;
         box = { bw:bw, bh:bh, cx:cx, baseY:baseY, topY:topY, ex:ex, ey:ey,
           A:{x:cx-bw/2,y:topY}, B:{x:cx+bw/2,y:topY}, C:{x:cx+bw/2,y:baseY}, D:{x:cx-bw/2,y:baseY} };
         box.slot = { x:cx+ex/2, y:topY+ey/2, w:bw*0.46, h:Math.max(depth*0.16, 4*dpr) };
@@ -682,29 +709,58 @@
         roundRect(s.x-s.w/2, s.y-s.h/2, s.w, s.h, s.h/2); ctx.fill(); ctx.stroke(); ctx.restore();
       }
 
+      function drawBallot(k){
+        var s = box.slot, startY = s.y - box.bh*1.5, y = startY + (s.y-startY)*(k*k), w = s.w*0.74, h = s.w*0.5;
+        ctx.save();
+        ctx.beginPath(); ctx.rect(0, 0, W, s.y + 1*dpr); ctx.clip();   // slide into the slot
+        ctx.translate(s.x, y); ctx.rotate(-0.13*(1-k));
+        ctx.save(); ctx.globalCompositeOperation='lighter'; ctx.globalAlpha=0.4;
+        ctx.drawImage(SPR_GOLD, -w*0.75, -h*0.75, w*1.5, h*1.5); ctx.restore();
+        roundRect(-w/2, -h/2, w, h, h*0.2);
+        var g=ctx.createLinearGradient(0,-h/2,0,h/2); g.addColorStop(0,'#FBF7EC'); g.addColorStop(1,'#E6DDC6');
+        ctx.fillStyle=g; ctx.fill(); ctx.strokeStyle='rgba(230,178,74,0.9)'; ctx.lineWidth=1.4*dpr; ctx.stroke();
+        ctx.strokeStyle='#C8862E'; ctx.lineWidth=2.3*dpr; ctx.lineCap='round'; ctx.lineJoin='round';
+        ctx.beginPath(); ctx.moveTo(-w*0.17,0); ctx.lineTo(-w*0.04,h*0.16); ctx.lineTo(w*0.19,-h*0.15); ctx.stroke();
+        ctx.restore();
+      }
+      function erupt(){
+        phase='flow'; active=true; power=0; flashA=1;
+        rings.push({r:box.slot.w*0.3,a:0.85}); rings.push({r:box.slot.w*0.3,a:0.55}); rings.push({r:box.slot.w*0.3,a:0.4});
+        for(var i=0;i<parts.length;i++){ spawn(parts[i],false); parts[i].vy -= (Math.random()*1.6+0.9)*dpr; }
+      }
       function frame(){
         frameN++;
         ctx.clearRect(0,0,W,H);
         drawBox();
-        ringTimer++;
-        if(ringTimer > 64){ ringTimer=0; rings.push({r:box.slot.w*0.35, a:0.5}); }
+
+        if(phase==='wait'){ if(heroEl && heroEl.classList.contains('show')){ phase='drop'; introT=0; } }
+        else if(phase==='drop'){ introT++; var k=Math.min(introT/58,1); drawBallot(k); if(k>=1) erupt(); }
+
+        // ripples
+        if(active){ ringTimer++; if(ringTimer > 64){ ringTimer=0; rings.push({r:box.slot.w*0.35, a:0.5}); } }
         ctx.save(); ctx.globalCompositeOperation='lighter';
         for(var ri=rings.length-1; ri>=0; ri--){ var rg=rings[ri]; rg.r += 1.7*dpr; rg.a -= 0.009;
           if(rg.a<=0){ rings.splice(ri,1); continue; }
           ctx.beginPath(); ctx.ellipse(box.slot.x, box.slot.y, rg.r, rg.r*0.34, 0, 0, 6.3);
           ctx.strokeStyle='rgba(230,178,74,'+rg.a.toFixed(3)+')'; ctx.lineWidth=1.4*dpr; ctx.stroke();
         }
-        var halo = box.bw*1.05, ha = 0.22 + 0.08*Math.sin(frameN*0.05);
-        ctx.globalAlpha = ha; ctx.drawImage(SPR_BRIGHT, box.slot.x-halo/2, box.slot.y-halo*0.7, halo, halo); ctx.globalAlpha=1;
-        for(var i=0;i<parts.length;i++){ var p=parts[i];
-          p.life++; if(p.life>=p.max){ spawn(p,false); continue; }
-          p.vy += 0.011*dpr;
-          if(mouse.x!=null) p.vx += (mouse.x - p.x)*0.00016*dpr;
-          p.vx *= 0.992; p.x += p.vx; p.y += p.vy;
-          var t = p.life/p.max, a = t<0.18 ? t/0.18 : 1-(t-0.18)/0.82; if(a<0) a=0;
-          var spr = p.br ? SPR_BRIGHT : SPR_GOLD, ds = p.size*dpr*9*(0.7+0.5*(1-t));
-          ctx.globalAlpha = a*(p.br?0.9:0.6);
-          ctx.drawImage(spr, p.x-ds/2, p.y-ds/2, ds, ds);
+        // erupt flash
+        if(flashA>0){ var fl=box.bw*1.7; ctx.globalAlpha=flashA*0.7; ctx.drawImage(SPR_BRIGHT, box.slot.x-fl/2, box.slot.y-fl*0.62, fl, fl); ctx.globalAlpha=1; flashA-=0.035; }
+
+        if(active){
+          if(power<1) power = Math.min(power+0.02, 1);
+          var halo = box.bw*1.05, ha = (0.22 + 0.08*Math.sin(frameN*0.05))*power;
+          ctx.globalAlpha = ha; ctx.drawImage(SPR_BRIGHT, box.slot.x-halo/2, box.slot.y-halo*0.7, halo, halo); ctx.globalAlpha=1;
+          for(var i=0;i<parts.length;i++){ var p=parts[i];
+            p.life++; if(p.life>=p.max){ spawn(p,false); continue; }
+            p.vy += 0.011*dpr;
+            if(mouse.x!=null) p.vx += (mouse.x - p.x)*0.00016*dpr;
+            p.vx *= 0.992; p.x += p.vx; p.y += p.vy;
+            var t = p.life/p.max, a = t<0.18 ? t/0.18 : 1-(t-0.18)/0.82; if(a<0) a=0;
+            var spr = p.br ? SPR_BRIGHT : SPR_GOLD, ds = p.size*dpr*9*(0.7+0.5*(1-t));
+            ctx.globalAlpha = a*(p.br?0.9:0.6)*power;
+            ctx.drawImage(spr, p.x-ds/2, p.y-ds/2, ds, ds);
+          }
         }
         ctx.globalAlpha=1; ctx.restore();
         raf = requestAnimationFrame(frame);
