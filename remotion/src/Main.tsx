@@ -1,5 +1,5 @@
 import React from 'react';
-import { AbsoluteFill } from 'remotion';
+import { AbsoluteFill, Audio, interpolate, staticFile, useCurrentFrame, useVideoConfig } from 'remotion';
 import { TransitionSeries, linearTiming } from '@remotion/transitions';
 import { fade } from '@remotion/transitions/fade';
 import { COLORS } from './theme';
@@ -13,9 +13,23 @@ import { CTA } from './scenes/CTA';
 
 const T = 16; // transition length
 
+const Soundtrack: React.FC = () => {
+  const frame = useCurrentFrame();
+  const { durationInFrames } = useVideoConfig();
+  // gentle master fade in/out on top of the track's own envelope
+  const volume = interpolate(
+    frame,
+    [0, 12, durationInFrames - 36, durationInFrames - 1],
+    [0, 1, 1, 0],
+    { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }
+  );
+  return <Audio src={staticFile('music.wav')} volume={volume} />;
+};
+
 export const Main: React.FC = () => {
   return (
     <AbsoluteFill style={{ backgroundColor: COLORS.black }}>
+      <Soundtrack />
       <TransitionSeries>
         <TransitionSeries.Sequence durationInFrames={90}>
           <IntroLogo />
