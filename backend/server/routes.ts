@@ -193,19 +193,77 @@ function mapDiditDecisionToUserFields(decision: any): {
   const id = decision?.id_verification ?? decision?.kyc ?? decision ?? {};
   const address = id.address ?? {};
   const isPassport = String(id.document_type ?? id.documentType ?? "").toUpperCase().includes("PASSPORT");
+
+  // TEMP DIAGNOSTIC: log the decision shape so we can confirm exactly which
+  // fields Didit populates per document type. Remove once confirmed.
+  try { log(`Didit decision shape: ${JSON.stringify(decision)?.slice(0, 2500)}`); } catch { /* ignore */ }
+
+  // Country probes. Didit's field name varies by document type and workflow.
+  // Passports carry nationality/issuing country but no address; ID cards and
+  // licenses carry an address. Probe every known shape, then normalize a
+  // possible ISO code (CAN / CA) to the full country name so geo-gating
+  // matches proposal geoRestrictions (which store "Canada", not "CAN").
+  let country =
+    id.document_country ?? id.documentCountry ??
+    id.issuing_country ?? id.issuingCountry ??
+    id.issuing_state ?? // some passport payloads put issuing authority here
+    id.nationality ?? id.country ?? id.country_name ??
+    address.country ?? address.country_name;
+  let state = address.state ?? address.region ?? address.province ?? id.state ?? id.province;
+  let city = address.city ?? address.locality ?? address.town ?? id.city;
+
+  // Recursive fallback: if structured probes missed, walk the whole decision
+  // for the first plausible country/state/city string. Keeps geo working
+  // even if Didit reshapes the payload.
+  if (!country || (!isPassport && (!state || !city))) {
+    const visit = (obj: any, depth: number) => {
+      if (!obj || typeof obj !== "object" || depth > 6) return;
+      for (const [k, v] of Object.entries(obj)) {
+        if (v && typeof v === "object") { visit(v, depth + 1); continue; }
+        if (typeof v !== "string" || !v.trim()) continue;
+        const key = k.toLowerCase();
+        if (!country && (key === "nationality" || key === "country" || key === "country_name" || key.includes("issuing_country") || key.includes("document_country"))) country = v;
+        else if (!state && (key === "state" || key === "province" || key === "region")) state = v;
+        else if (!city && (key === "city" || key === "locality" || key === "town")) city = v;
+      }
+    };
+    try { visit(decision, 0); } catch { /* best-effort */ }
+  }
+
   return {
     firstName: id.first_name ?? id.firstName,
     lastName: id.last_name ?? id.lastName,
     dateOfBirth: id.date_of_birth ?? id.dateOfBirth,
     gender: normalizeGender(id.gender),
     documentType: id.document_type ?? id.documentType,
-    // Passport: nationality from doc; ID card / driver's license: address country
-    country: isPassport
-      ? (id.document_country ?? id.documentCountry ?? address.country)
-      : (address.country ?? id.document_country ?? id.documentCountry),
-    state: address.state ?? address.region,
-    city: address.city,
+    country: normalizeCountryCode(country),
+    state,
+    city,
   };
+}
+
+// Didit sometimes returns ISO 3166 alpha-2/alpha-3 codes for country instead
+// of the full name. Proposal geoRestrictions store full names ("Canada"), so
+// normalize the common cases. Unknown values pass through unchanged.
+function normalizeCountryCode(c: any): string | undefined {
+  if (!c || typeof c !== "string") return undefined;
+  const v = c.trim();
+  if (!v) return undefined;
+  const upper = v.toUpperCase();
+  const map: Record<string, string> = {
+    CA: "Canada", CAN: "Canada",
+    US: "United States", USA: "United States", "UNITED STATES OF AMERICA": "United States",
+    GB: "United Kingdom", GBR: "United Kingdom", UK: "United Kingdom",
+    AU: "Australia", AUS: "Australia",
+    IN: "India", IND: "India",
+    DE: "Germany", DEU: "Germany",
+    FR: "France", FRA: "France",
+    MX: "Mexico", MEX: "Mexico",
+  };
+  if (map[upper]) return map[upper];
+  // If it's a 2-3 letter code we don't recognize, leave as-is; if it's a
+  // longer human-readable string, return it title-cased-ish (unchanged).
+  return v;
 }
 
 function normalizeGender(g: any): string | undefined {

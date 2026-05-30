@@ -201,10 +201,31 @@ export async function purchaseProduct(sku: string): Promise<IAPPurchaseResult> {
     return { success: false, error: 'In-app purchases not available' };
   }
 
+  const consumable = isConsumableSku(sku);
+
+  // CRITICAL: StoreKit must have the product loaded into its cache before
+  // requestPurchase/requestSubscription will work. Calling the purchase
+  // request for a SKU that was never fetched throws "Invalid product ID"
+  // (E_DEVELOPER_ERROR / SKErrorDomain) even when the product is correctly
+  // configured in App Store Connect. Prefetch the specific SKU first.
+  try {
+    if (consumable) {
+      await RNIap.getProducts({ skus: [sku] });
+    } else {
+      await RNIap.getSubscriptions({ skus: [sku] });
+    }
+  } catch (e: any) {
+    return {
+      success: false,
+      error:
+        'This purchase is temporarily unavailable. Please make sure you are signed in to the App Store and try again.',
+    };
+  }
+
   return new Promise((resolve) => {
     pendingPurchaseResolve = resolve;
 
-    const request = isConsumableSku(sku)
+    const request = consumable
       ? RNIap.requestPurchase({ sku })
       : RNIap.requestSubscription({ sku });
 

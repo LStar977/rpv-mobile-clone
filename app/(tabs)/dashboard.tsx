@@ -576,11 +576,14 @@ function Communities({ proposals, votedIds, country, state, city, isVerified, on
   const prov = countAt(1, state);
   const mun = countAt(2, city);
   const flagCode = (s: string) => s.slice(0, 2).toUpperCase();
+  // Only show tiers the user actually has a location for. A passport-only
+  // standard verification yields country but no province/city, so those
+  // rows would otherwise render blank. Federal always shows when verified.
   const items = [
     { tier: 'Federal', name: country, meta: `${fed.total} proposals · ${fed.active} active`, primary: true, flag: flagCode(country), scope: 'country' as const },
     { tier: 'Provincial', name: state, meta: `${prov.total} proposals · ${prov.active} active`, primary: false, flag: flagCode(state), scope: 'state' as const },
     { tier: 'Municipal', name: city, meta: `${mun.total} proposals · ${mun.active} active`, primary: false, flag: flagCode(city), scope: 'city' as const },
-  ];
+  ].filter((it) => !!it.name && it.name.trim().length > 0);
   return (
     <Animated.View entering={FadeInUp.duration(500).delay(400)} style={styles.sectionPad}>
       <TouchableOpacity
