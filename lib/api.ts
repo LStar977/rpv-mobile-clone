@@ -9,6 +9,24 @@ const DEMO_PROPOSALS_STORAGE_KEY = '@represent_demo_proposals';
 const DELETED_PROPOSALS_STORAGE_KEY = '@represent_deleted_proposals';
 const ORG_VOTES_STORAGE_KEY = '@represent_org_votes';
 
+// Device-local caches that are NOT scoped per-user. They must be cleared on
+// logout/account-switch, otherwise one account's locally-recorded org votes
+// (and demo data) bleed into the next account on the same device — e.g. a
+// brand-new account showing "7 ballots cast" because a previous account or
+// demo session left org votes in AsyncStorage.
+export async function clearLocalUserData(): Promise<void> {
+  try {
+    await AsyncStorage.multiRemove([
+      ORG_VOTES_STORAGE_KEY,
+      DEMO_ORGS_STORAGE_KEY,
+      DEMO_PROPOSALS_STORAGE_KEY,
+      DELETED_PROPOSALS_STORAGE_KEY,
+    ]);
+  } catch {
+    /* best-effort — non-fatal if clearing fails */
+  }
+}
+
 // Helper to check if current user is demo account
 function isDemoAccount(): boolean {
   const authState = useAuthStore.getState();

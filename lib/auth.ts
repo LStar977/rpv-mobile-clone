@@ -215,6 +215,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       await SecureStore.deleteItemAsync(TOKEN_KEY);
       await SecureStore.deleteItemAsync(USER_KEY);
 
+      // Clear device-local, non-user-scoped caches (org votes, demo data)
+      // so the next account on this device doesn't inherit them — fixes a
+      // fresh account showing a phantom ballot count.
+      try {
+        const { clearLocalUserData } = require('./api');
+        await clearLocalUserData();
+      } catch { /* non-fatal */ }
+
       set({
         user: null,
         token: null,
@@ -244,6 +252,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
       await SecureStore.deleteItemAsync(TOKEN_KEY);
       await SecureStore.deleteItemAsync(USER_KEY);
+
+      try {
+        const { clearLocalUserData } = require('./api');
+        await clearLocalUserData();
+      } catch { /* non-fatal */ }
 
       set({
         user: null,
