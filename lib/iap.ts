@@ -262,9 +262,39 @@ export async function validateReceipt(
       body: JSON.stringify({ receipt, productId, organizationId }),
     });
 
+    // Try to surface the backend's actual error text so failures are
+    // diagnosable in TestFlight without log access. The endpoint can fail
+    // many ways: HTML SPA catch-all (endpoint not deployed), 500 with
+    // "shared secret not configured", 200 with { valid: false, reason }
+    // from Apple, etc. Show whatever's there.
+    let body: any = null;
+    let bodyText = '';
+    try {
+      bodyText = await response.text();
+      body = bodyText ? JSON.parse(bodyText) : null;
+    } catch {
+      /* response wasn't JSON — leave bodyText raw */
+    }
+
     if (!response.ok) {
-      const error = await response.json().catch(() => ({}));
-      return { valid: false, error: error.message || 'Receipt validation failed' };
+      const detail =
+        body?.error ||
+        body?.message ||
+        body?.reason ||
+        (bodyText && bodyText.startsWith('<') ? 'Endpoint not deployed (received HTML)' : bodyText?.slice(0, 200)) ||
+        '';
+      return {
+        valid: false,
+        error: `Receipt validation failed (HTTP ${response.status})${detail ? ': ' + detail : ''}`,
+      };
+    }
+
+    // Backend may return 200 with { valid: false, error/reason }. Honor it.
+    if (body && body.valid === false) {
+      return {
+        valid: false,
+        error: body.error || body.reason || 'Receipt rejected by backend',
+      };
     }
 
     return { valid: true };
