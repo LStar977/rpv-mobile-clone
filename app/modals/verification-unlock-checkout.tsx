@@ -21,6 +21,7 @@ import { useTheme, SPACING, BORDER_RADIUS, SHADOWS } from '../../lib/theme';
 import { organizationsApi, type Organization } from '../../lib/api';
 import { iapAvailable, purchaseProduct, unlockSkuForTier } from '../../lib/iap';
 import { useAuthStore } from '../../lib/auth';
+import { SubscriptionLegal } from '../../components/ui/SubscriptionLegal';
 
 const POLL_INTERVAL_MS = 2000;
 const POLL_TIMEOUT_MS = 30_000;
@@ -287,6 +288,16 @@ export default function VerificationUnlockCheckoutScreen() {
           </View>
         )}
 
+        {/* Apple Guideline 3.1.2(c) — one-time purchase disclosure */}
+        {phase !== 'success' && (
+          <SubscriptionLegal
+            mode="consumable"
+            productTitle={`${tierName} — Verification Unlock`}
+            productLength="one-time"
+            productPrice={priceLabel}
+          />
+        )}
+
         {/* CTA */}
         {phase !== 'success' ? (
           <TouchableOpacity
@@ -299,6 +310,7 @@ export default function VerificationUnlockCheckoutScreen() {
               paddingVertical: SPACING.md,
               alignItems: 'center',
               opacity: phase === 'starting' || phase === 'awaiting' || unlockFeeCents == null ? 0.6 : 1,
+              marginTop: SPACING.md,
             }}
           >
             {phase === 'starting' || phase === 'awaiting' ? (
