@@ -85,12 +85,17 @@ export interface IAPPurchaseResult {
 let purchaseUpdateSubscription: any = null;
 let purchaseErrorSubscription: any = null;
 let pendingPurchaseResolve: ((result: IAPPurchaseResult) => void) | null = null;
+let iapInitialized = false;
 
 /**
  * Initialize IAP connection and listeners
  */
 export async function initIAP(): Promise<boolean> {
   if (!iapAvailable || !RNIap || Platform.OS !== 'ios') return false;
+  // Guard against double-init (e.g. on app resume). Registering the
+  // listeners twice makes both fire on a purchase — double state updates
+  // and a double finishTransaction attempt.
+  if (iapInitialized) return true;
 
   try {
     await RNIap.initConnection();
@@ -103,10 +108,21 @@ export async function initIAP(): Promise<boolean> {
           // Verification-unlock SKUs are consumables (server-side state
           // is the source of truth). Subscriptions stay non-consumable.
           const consumable = isConsumableSku(purchase.productId);
+          let finished = false;
           try {
             await RNIap.finishTransaction({ purchase, isConsumable: consumable });
+            finished = true;
           } catch (e) {
-            console.error('Error finishing transaction:', e);
+            // If finishTransaction fails, Apple will re-deliver this
+            // purchase on next launch. Retry once before giving up —
+            // resolving success on an unfinished transaction risks a
+            // confusing re-delivery flow later.
+            try {
+              await RNIap.finishTransaction({ purchase, isConsumable: consumable });
+              finished = true;
+            } catch (e2) {
+              console.error('Error finishing transaction (after retry):', e2);
+            }
           }
 
           if (pendingPurchaseResolve) {
@@ -117,6 +133,11 @@ export async function initIAP(): Promise<boolean> {
               productId: purchase.productId,
             });
             pendingPurchaseResolve = null;
+          } else if (finished) {
+            // Re-delivered purchase with no in-flight request (e.g. the
+            // app was killed mid-purchase). The receipt was finished;
+            // server-side validation on next restore covers entitlement.
+            console.log('IAP: finished re-delivered transaction', purchase.productId);
           }
         }
       }
@@ -137,6 +158,7 @@ export async function initIAP(): Promise<boolean> {
       }
     );
 
+    iapInitialized = true;
     return true;
   } catch (error) {
     console.error('IAP init error:', error);
@@ -159,6 +181,7 @@ export function endIAP() {
   if (iapAvailable && RNIap) {
     RNIap.endConnection();
   }
+  iapInitialized = false;
 }
 
 /**
@@ -199,6 +222,15 @@ export async function getProducts(skus?: string[]): Promise<IAPProduct[]> {
 export async function purchaseProduct(sku: string): Promise<IAPPurchaseResult> {
   if (!iapAvailable || !RNIap || Platform.OS !== 'ios') {
     return { success: false, error: 'In-app purchases not available' };
+  }
+
+  // A second purchase starting while one is in flight would silently
+  // overwrite pendingPurchaseResolve, leaving the first caller's promise
+  // hanging forever (infinite spinner). Resolve the old one as cancelled
+  // before taking over.
+  if (pendingPurchaseResolve) {
+    pendingPurchaseResolve({ success: false, cancelled: true, error: 'Superseded by a new purchase' });
+    pendingPurchaseResolve = null;
   }
 
   const consumable = isConsumableSku(sku);

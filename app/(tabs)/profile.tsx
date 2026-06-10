@@ -646,6 +646,15 @@ export default function ProfileScreen() {
 
     if (!token) return;
 
+    // Source-agnostic check first: the auth user carries subscriptionStatus
+    // from /api/auth/verify, updated by BOTH the Stripe webhook and the
+    // Apple IAP receipt path. /api/stripe/subscription only knows Stripe,
+    // so IAP-paid Premium users were shown "Free tier" here.
+    if (user?.isPremium || user?.subscriptionStatus === 'active') {
+      setUserTier('premium');
+      return;
+    }
+
     try {
       const response = await fetch(`${API_URL}/api/stripe/subscription`, {
         headers: {
@@ -667,7 +676,7 @@ export default function ProfileScreen() {
     } catch (error) {
       console.error('Failed to fetch subscription:', error);
     }
-  }, [token, user?.email]);
+  }, [token, user?.email, user?.subscriptionStatus, user?.isPremium]);
 
   useEffect(() => {
     fetchTier();

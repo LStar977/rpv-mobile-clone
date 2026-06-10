@@ -16,6 +16,12 @@ interface User {
   // Passed the Didit "Citizen" workflow (passport + proof of address).
   // Gates citizens-only proposals. Independent of `verified`.
   citizenshipVerified: boolean | null;
+  // Source-agnostic subscription state from /api/auth/verify. Updated by
+  // both the Stripe webhook AND the IAP receipt-validation path. Screens
+  // must derive Premium from THIS — not /api/stripe/subscription, which
+  // doesn't know about Apple IAP and reports IAP subscribers as free.
+  subscriptionStatus?: string | null;
+  isPremium?: boolean;
 }
 
 interface AuthState {
@@ -300,6 +306,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
               city: data.user.city || null,
               verified: !!(data.user.verified || data.user.isVerified || data.user.is_verified || data.user.kycVerified || data.user.kyc_verified || data.user.passport_verified),
               citizenshipVerified: !!(data.user.citizenshipVerified || data.user.citizenship_verified),
+              subscriptionStatus: data.user.subscriptionStatus ?? null,
+              isPremium: !!(data.user.isPremium || data.user.subscriptionStatus === 'active'),
             };
             
             // Update cached user with fresh data

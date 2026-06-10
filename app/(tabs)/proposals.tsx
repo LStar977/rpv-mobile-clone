@@ -2044,8 +2044,18 @@ export default function ProposalsScreen() {
     if (ballotTier !== 'premium') {
       const canSpend = spendBallot();
       if (!canSpend) {
+        // Explain the cap before routing — a silent redirect to the paywall
+        // reads as a bug. This is also the single best Premium conversion
+        // moment in the app: the user is mid-action and motivated.
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-        router.push('/modals/subscription');
+        Alert.alert(
+          "You're out of ballots for today",
+          'Free accounts get 20 votes per day. Your ballots refresh at midnight — or go Premium for unlimited voting.',
+          [
+            { text: 'Tomorrow then', style: 'cancel' },
+            { text: 'Go unlimited', onPress: () => router.push('/modals/subscription') },
+          ],
+        );
         return;
       }
     }
