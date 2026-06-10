@@ -5,7 +5,7 @@ import { baseNetwork } from "./base-network";
 import { log } from "./app";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { setupBadgeRoutes } from "./badge-routes";
-import { passportNFTs, activatedRidings, electoralRidingQRCodes, proposals, votes, voteTokenClaims, organizations, transactions, proposalReports, userMutes } from "@shared/schema";
+import { passportNFTs, activatedRidings, electoralRidingQRCodes, proposals, votes, voteTokenClaims, organizations, transactions, proposalReports, userMutes, proposalComments, users as usersTable } from "@shared/schema";
 import { getMemberLimit, getTierLimits, isFeatureEnabled, tierDisplayName, type OrgTier } from "@shared/tier-limits";
 import {
   ORG_VERIFICATION_UNLOCK_PRICE_IDS,
@@ -17,7 +17,7 @@ import {
   parseVendorData,
 } from "./verificationUnlock";
 import { checkContent } from "./profanityFilter";
-import { eq, count, and, sql } from "drizzle-orm";
+import { eq, count, and, sql, desc, isNull } from "drizzle-orm";
 import { db } from "./db";
 import { savePushToken, notifyNewProposal, notifyTokenClaimed, notifyProposalVote } from "./notifications";
 import { sendEmail, buildOrgInviteEmail } from "./email";
@@ -5717,6 +5717,188 @@ h1{font-family:Georgia,serif;font-weight:500;font-size:clamp(28px,6vw,40px);line
       res.json({ ok: true, hidden: shouldHide });
     } catch (error: any) {
       log(`Proposal report error: ${error?.message ?? error}`);
+      res.status(500).json({ error: "Failed to submit report" });
+    }
+  });
+
+  // ─── Comments on proposals ───────────────────────────────────────────
+  //
+  // Flat (no threading) v1. Same UGC moderation posture as proposals:
+  // profanity filter at create, per-comment reports with the same
+  // AUTO_HIDE_AT threshold, creator-or-admin delete. Listings exclude
+  // hidden comments and comments from authors the requester has muted.
+
+  const COMMENT_MAX_LEN = 500;
+
+  // GET /api/proposals/:proposalId/comments — newest first, capped at 200.
+  app.get("/api/proposals/:proposalId/comments", isAuthenticated, async (req: any, res) => {
+    try {
+      const requesterId = req.user.claims?.sub;
+      const { proposalId } = req.params;
+
+      const rows = await db
+        .select({
+          id: proposalComments.id,
+          proposalId: proposalComments.proposalId,
+          userId: proposalComments.userId,
+          body: proposalComments.body,
+          createdAt: proposalComments.createdAt,
+          authorName: usersTable.name,
+          authorVerified: usersTable.verified,
+        })
+        .from(proposalComments)
+        .leftJoin(usersTable, eq(proposalComments.userId, usersTable.id))
+        .where(and(
+          eq(proposalComments.proposalId, proposalId),
+          isNull(proposalComments.hiddenAt),
+        ))
+        .orderBy(desc(proposalComments.createdAt))
+        .limit(200);
+
+      // Apply the requester's mute set so muted authors disappear here too.
+      let visible = rows;
+      if (requesterId) {
+        try {
+          const mutedRows = await db
+            .select({ mutedId: userMutes.mutedId })
+            .from(userMutes)
+            .where(eq(userMutes.muterId, requesterId));
+          if (mutedRows.length > 0) {
+            const mutedSet = new Set(mutedRows.map((r) => r.mutedId));
+            visible = rows.filter((r) => !mutedSet.has(r.userId));
+          }
+        } catch { /* fail open */ }
+      }
+
+      res.json({ comments: visible });
+    } catch (error: any) {
+      log(`List comments error: ${error?.message ?? error}`);
+      res.status(500).json({ error: "Failed to load comments" });
+    }
+  });
+
+  // POST /api/proposals/:proposalId/comments — create. Auth required;
+  // profanity-filtered; body capped.
+  app.post("/api/proposals/:proposalId/comments", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims?.sub;
+      if (!userId) return res.status(401).json({ error: "Unauthorized" });
+      const { proposalId } = req.params;
+      const rawBody = typeof req.body?.body === "string" ? req.body.body.trim() : "";
+      if (!rawBody) return res.status(400).json({ error: "Comment cannot be empty" });
+      if (rawBody.length > COMMENT_MAX_LEN) {
+        return res.status(400).json({ error: `Comments are capped at ${COMMENT_MAX_LEN} characters` });
+      }
+
+      const proposal = await storage.getProposal(proposalId);
+      if (!proposal || (proposal as any).hiddenAt) {
+        return res.status(404).json({ error: "Proposal not found" });
+      }
+
+      const profanity = checkContent({ title: "", description: rawBody });
+      if (!profanity.ok) {
+        return res.status(400).json({
+          error: "Your comment contains language that isn't allowed. Please rephrase.",
+          code: "CONTENT_REJECTED",
+        });
+      }
+
+      const [inserted] = await db.insert(proposalComments).values({
+        proposalId,
+        userId,
+        body: rawBody,
+      }).returning();
+
+      const author = await storage.getUser(userId);
+      res.status(201).json({
+        comment: {
+          ...inserted,
+          authorName: author?.name ?? null,
+          authorVerified: author?.verified ?? false,
+        },
+      });
+    } catch (error: any) {
+      log(`Create comment error: ${error?.message ?? error}`);
+      res.status(500).json({ error: "Failed to post comment" });
+    }
+  });
+
+  // DELETE /api/comments/:commentId — creator or platform admin only.
+  app.delete("/api/comments/:commentId", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims?.sub;
+      if (!userId) return res.status(401).json({ error: "Unauthorized" });
+      const { commentId } = req.params;
+
+      const [comment] = await db
+        .select()
+        .from(proposalComments)
+        .where(eq(proposalComments.id, commentId))
+        .limit(1);
+      if (!comment) return res.status(404).json({ error: "Comment not found" });
+
+      const user = await storage.getUser(userId);
+      const isAdmin = user?.email === "masonwoods45@gmail.com";
+      if (!isAdmin && comment.userId !== userId) {
+        return res.status(403).json({ error: "You can only delete your own comments" });
+      }
+
+      await db.delete(proposalComments).where(eq(proposalComments.id, commentId));
+      res.json({ ok: true });
+    } catch (error: any) {
+      log(`Delete comment error: ${error?.message ?? error}`);
+      res.status(500).json({ error: "Failed to delete comment" });
+    }
+  });
+
+  // POST /api/comments/:commentId/report — same reasons + threshold as
+  // proposal reports; auto-hides the comment at AUTO_HIDE_AT.
+  app.post("/api/comments/:commentId/report", isAuthenticated, async (req: any, res) => {
+    try {
+      const reporterId = req.user.claims?.sub;
+      if (!reporterId) return res.status(401).json({ error: "Unauthorized" });
+      const { commentId } = req.params;
+      const { reason } = req.body ?? {};
+      if (typeof reason !== "string" || !REPORT_REASONS.has(reason)) {
+        return res.status(400).json({ error: "Invalid reason" });
+      }
+
+      const [comment] = await db
+        .select()
+        .from(proposalComments)
+        .where(eq(proposalComments.id, commentId))
+        .limit(1);
+      if (!comment) return res.status(404).json({ error: "Comment not found" });
+
+      const newCount = (comment.reportCount ?? 0) + 1;
+      const shouldHide = newCount >= AUTO_HIDE_AT && !comment.hiddenAt;
+      await db.update(proposalComments).set({
+        reportCount: newCount,
+        ...(shouldHide ? { hiddenAt: new Date() } : {}),
+      }).where(eq(proposalComments.id, commentId));
+
+      try {
+        const adminEmail = process.env.MODERATION_ADMIN_EMAIL;
+        if (adminEmail) {
+          const text =
+            `Comment: ${commentId} on proposal ${comment.proposalId}\n` +
+            `Author: ${comment.userId}\nReporter: ${reporterId}\nReason: ${reason}\n` +
+            `Reports total: ${newCount}\nAuto-hidden: ${shouldHide ? "yes" : "no"}\n\n` +
+            `Body:\n${comment.body}\n`;
+          await sendEmail({
+            to: adminEmail,
+            subject: `[Represent] Comment report: ${reason}${shouldHide ? " (auto-hidden)" : ""}`,
+            html: `<pre style="font-family:monospace;font-size:13px;">${text.replace(/[<>&]/g, (c) => ({"<":"&lt;",">":"&gt;","&":"&amp;"}[c]!))}</pre>`,
+            text,
+          });
+        }
+      } catch (e: any) {
+        log(`comment report email failed: ${e?.message ?? e}`);
+      }
+
+      res.json({ ok: true, hidden: shouldHide });
+    } catch (error: any) {
+      log(`Comment report error: ${error?.message ?? error}`);
       res.status(500).json({ error: "Failed to submit report" });
     }
   });

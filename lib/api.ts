@@ -21,6 +21,7 @@ export async function clearLocalUserData(): Promise<void> {
       DEMO_ORGS_STORAGE_KEY,
       DEMO_PROPOSALS_STORAGE_KEY,
       DELETED_PROPOSALS_STORAGE_KEY,
+      '@represent_demo_comments',
     ]);
   } catch {
     /* best-effort — non-fatal if clearing fails */
@@ -1843,6 +1844,110 @@ export const moderationApi = {
     if (result.data?.mutedUsers) return { data: result.data.mutedUsers, error: null };
     if (Array.isArray(result.data)) return { data: result.data, error: null };
     return { data: [], error: result.error };
+  },
+};
+
+// ─── Comments on proposals ──────────────────────────────────────────────
+export interface ProposalComment {
+  id: string;
+  proposalId: string;
+  userId: string;
+  body: string;
+  createdAt: string;
+  authorName: string | null;
+  authorVerified: boolean;
+}
+
+const DEMO_COMMENTS_STORAGE_KEY = '@represent_demo_comments';
+
+// Demo + seed proposals have no backend row, so their comments live in
+// AsyncStorage keyed by proposal id. Real proposals on the demo account
+// are also kept local — the demo account must never write to production.
+function isLocalOnlyComments(proposalId: number | string): boolean {
+  const idStr = String(proposalId);
+  return isDemoAccount() || idStr.startsWith('seed-') || idStr.startsWith('demo-');
+}
+
+async function readLocalComments(): Promise<Record<string, ProposalComment[]>> {
+  try {
+    const stored = await AsyncStorage.getItem(DEMO_COMMENTS_STORAGE_KEY);
+    return stored ? JSON.parse(stored) : {};
+  } catch {
+    return {};
+  }
+}
+
+export const commentsApi = {
+  async list(proposalId: number | string): Promise<ApiResponse<ProposalComment[]>> {
+    if (isLocalOnlyComments(proposalId)) {
+      const all = await readLocalComments();
+      return { data: all[String(proposalId)] ?? [], error: null };
+    }
+    const result = await apiRequest<any>(`/api/proposals/${proposalId}/comments`);
+    if (result.data?.comments) return { data: result.data.comments, error: null };
+    if (Array.isArray(result.data)) return { data: result.data, error: null };
+    return { data: [], error: result.error };
+  },
+
+  async create(proposalId: number | string, body: string): Promise<ApiResponse<ProposalComment>> {
+    const trimmed = body.trim().slice(0, 500);
+    if (!trimmed) return { data: null, error: 'Comment cannot be empty' };
+
+    if (isLocalOnlyComments(proposalId)) {
+      const user = useAuthStore.getState().user;
+      const comment: ProposalComment = {
+        id: `local-comment-${Date.now()}`,
+        proposalId: String(proposalId),
+        userId: user?.id ?? 'local',
+        body: trimmed,
+        createdAt: new Date().toISOString(),
+        authorName: user?.name ?? 'You',
+        authorVerified: !!user?.verified,
+      };
+      try {
+        const all = await readLocalComments();
+        const key = String(proposalId);
+        all[key] = [comment, ...(all[key] ?? [])];
+        await AsyncStorage.setItem(DEMO_COMMENTS_STORAGE_KEY, JSON.stringify(all));
+      } catch { /* still return the comment for optimistic UI */ }
+      return { data: comment, error: null };
+    }
+
+    const result = await apiRequest<any>(`/api/proposals/${proposalId}/comments`, {
+      method: 'POST',
+      body: JSON.stringify({ body: trimmed }),
+    });
+    if (result.data?.comment) return { data: result.data.comment, error: null };
+    return { data: null, error: result.error || 'Failed to post comment' };
+  },
+
+  async remove(commentId: string, proposalId?: number | string): Promise<ApiResponse<{ ok: true }>> {
+    if (commentId.startsWith('local-comment-')) {
+      try {
+        const all = await readLocalComments();
+        if (proposalId != null) {
+          const key = String(proposalId);
+          all[key] = (all[key] ?? []).filter((c) => c.id !== commentId);
+        } else {
+          for (const key of Object.keys(all)) {
+            all[key] = all[key].filter((c) => c.id !== commentId);
+          }
+        }
+        await AsyncStorage.setItem(DEMO_COMMENTS_STORAGE_KEY, JSON.stringify(all));
+      } catch { /* best-effort */ }
+      return { data: { ok: true }, error: null };
+    }
+    return apiRequest<{ ok: true }>(`/api/comments/${commentId}`, { method: 'DELETE' });
+  },
+
+  async report(commentId: string, reason: ReportReason): Promise<ApiResponse<{ ok: true }>> {
+    if (commentId.startsWith('local-comment-')) {
+      return { data: { ok: true }, error: null };
+    }
+    return apiRequest<{ ok: true }>(`/api/comments/${commentId}/report`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    });
   },
 };
 

@@ -17,6 +17,7 @@ import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { organizationsApi, proposalsApi } from '../../lib/api';
 import { useAuthStore } from '../../lib/auth';
+import { CommentsSection } from '../../components/comments/CommentsSection';
 import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS } from '../../lib/theme';
 import { RCVBallotInput } from '../../components/ui/RCVBallotInput';
 import { RCVResults } from '../../components/ui/RCVResults';
@@ -425,6 +426,13 @@ export default function OrgProposalDetailScreen() {
             </Text>
           </View>
         </Animated.View>
+
+        {/* Discussion */}
+        {proposalId ? (
+          <Animated.View entering={FadeInUp.delay(200).duration(400)} style={{ paddingHorizontal: SPACING.lg }}>
+            <CommentsSection proposalId={proposalId} />
+          </Animated.View>
+        ) : null}
       </ScrollView>
 
       {/* Vote Buttons */}

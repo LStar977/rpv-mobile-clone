@@ -21,6 +21,7 @@ import * as Haptics from 'expo-haptics';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { proposalsApi } from '../../lib/api';
 import { useAuthStore } from '../../lib/auth';
+import { CommentsSection } from '../../components/comments/CommentsSection';
 import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY } from '../../lib/theme';
 import { RCVBallotInput } from '../../components/ui/RCVBallotInput';
 import { RCVResults } from '../../components/ui/RCVResults';
@@ -276,6 +277,9 @@ export default function ProposalDetailScreen() {
               )
             )}
           </View>
+
+          {/* Discussion */}
+          {proposalId ? <CommentsSection proposalId={proposalId} /> : null}
         </Animated.View>
       </ScrollView>
     </View>

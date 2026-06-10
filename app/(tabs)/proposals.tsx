@@ -52,6 +52,7 @@ import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS, ANIMATION, respo
 import { getTierLabel, getLocationLabel, canUserVoteOnProposal, meetsCitizenshipRequirement } from '../../lib/proposalGeo';
 import { useModerationStore, useSyncMutes } from '../../lib/moderation';
 import { ProposalModerationMenu } from '../../components/moderation/ProposalModerationMenu';
+import { CommentsSection } from '../../components/comments/CommentsSection';
 import Svg, { Rect, Line, Ellipse, Path, Circle, G, Defs, LinearGradient as SvgLinearGradient, Stop } from 'react-native-svg';
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -2925,6 +2926,13 @@ export default function ProposalsScreen() {
                     )}
                   </View>
                 </View>
+
+                {/* Discussion */}
+                {detail?.id != null && (
+                  <View style={{ paddingHorizontal: SPACING.lg }}>
+                    <CommentsSection proposalId={detail.id} />
+                  </View>
+                )}
 
                 <View style={{ height: 80 }} />
               </ScrollView>

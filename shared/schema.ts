@@ -288,6 +288,21 @@ export const userMutes = pgTable("user_mutes", {
   uniqueMute: unique().on(table.muterId, table.mutedId),
 }));
 
+// Comments on proposals. Flat (no threading) for v1 — a comment is one
+// voice on one proposal. UGC moderation mirrors proposals: profanity
+// filter at create, per-comment reports, auto-hide at the report
+// threshold (hiddenAt), creator-or-admin delete. Body capped at 500
+// chars by the API layer.
+export const proposalComments = pgTable("proposal_comments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  proposalId: varchar("proposal_id").notNull().references(() => proposals.id),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  body: text("body").notNull(),
+  reportCount: integer("report_count").default(0),
+  hiddenAt: timestamp("hidden_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Table to store option addresses for multiple-choice proposals
 export const proposalOptionAddresses = pgTable("proposal_option_addresses", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
