@@ -10,6 +10,21 @@ import { useAuthStore } from '../../lib/auth';
 
 type ErrorState = null | 'no-session' | 'webview-error' | 'cancelled';
 
+// Only load KYC-provider URLs in the WebView. The session URL comes from
+// our backend, but defense-in-depth: a compromised response or MITM'd
+// payload must not be able to point the identity-document camera flow at
+// an arbitrary site.
+function isTrustedKycUrl(url: string | undefined): url is string {
+  if (!url || !url.startsWith('https://')) return false;
+  try {
+    const host = new URL(url).hostname;
+    return host === 'didit.me' || host.endsWith('.didit.me') ||
+           host === 'veriff.com' || host.endsWith('.veriff.com');
+  } catch {
+    return false;
+  }
+}
+
 export default function VeriffScreen() {
   const { colors } = useTheme();
   // originatingOrgId: when present, this verification is org-paid (the
@@ -24,7 +39,9 @@ export default function VeriffScreen() {
   // address) which sets citizenshipVerified on success.
   const flow: 'standard' | 'citizen' = params.flow === 'citizen' ? 'citizen' : 'standard';
 
-  const [sessionUrl, setSessionUrl] = useState<string | undefined>(params.sessionUrl);
+  const [sessionUrl, setSessionUrl] = useState<string | undefined>(
+    isTrustedKycUrl(params.sessionUrl) ? params.sessionUrl : undefined,
+  );
   const [verificationId, setVerificationId] = useState<string | undefined>(params.verificationId);
   // Start in `null` (loading) when no sessionUrl is preloaded — the
   // bootstrap effect below auto-creates one. Only flip to `no-session`
@@ -68,7 +85,7 @@ export default function VeriffScreen() {
     setRetrying(true);
     try {
       const response = await veriffApi.createSession(originatingOrgId, flow);
-      if (response.data?.sessionUrl && response.data?.verificationId) {
+      if (isTrustedKycUrl(response.data?.sessionUrl) && response.data?.verificationId) {
         setSessionUrl(response.data.sessionUrl);
         setVerificationId(response.data.verificationId);
         setErrorState(null);

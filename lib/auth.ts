@@ -284,11 +284,22 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const token = await SecureStore.getItemAsync(TOKEN_KEY);
 
       if (token) {
-        const response = await fetch(`${API_BASE_URL}/api/auth/verify`, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
-        });
+        // 8s timeout — without it a hung backend leaves the app stuck on
+        // the splash/loading state forever. On abort we fall through to
+        // the cached-credentials path below.
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 8000);
+        let response: Response;
+        try {
+          response = await fetch(`${API_BASE_URL}/api/auth/verify`, {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+            },
+            signal: controller.signal,
+          });
+        } finally {
+          clearTimeout(timeout);
+        }
 
         if (response.ok) {
           const data = await response.json();
@@ -322,11 +333,22 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             return;
           }
         }
+
+        // Only clear credentials when the server EXPLICITLY rejects the
+        // token (401/403, or a 200 whose body says the token is invalid).
+        // A transient 5xx / network blip must not log the user out — keep
+        // the hydrated session and re-validate next launch.
+        const explicitlyRejected =
+          response.status === 401 || response.status === 403 || response.ok;
+        if (!explicitlyRejected) {
+          set({ isLoading: false });
+          return;
+        }
       }
 
       await SecureStore.deleteItemAsync(TOKEN_KEY);
       await SecureStore.deleteItemAsync(USER_KEY);
-      
+
       set({
         user: null,
         token: null,

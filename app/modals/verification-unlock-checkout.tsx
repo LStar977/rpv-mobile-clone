@@ -15,7 +15,7 @@
 import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Linking, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import * as Haptics from 'expo-haptics';
 import { useTheme, SPACING, BORDER_RADIUS, SHADOWS } from '../../lib/theme';
 import { organizationsApi, type Organization } from '../../lib/api';
@@ -38,6 +38,18 @@ export default function VerificationUnlockCheckoutScreen() {
   const [paymentProvider, setPaymentProvider] = useState<'stripe' | 'iap' | null>(null);
   const [phase, setPhase] = useState<Phase>('idle');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Stripe-checkout polling lifecycle. Cleared on unmount so a dismissed
+  // modal stops polling instead of leaking a recursive setTimeout chain.
+  const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const aliveRef = useRef(true);
+  useEffect(() => {
+    aliveRef.current = true;
+    return () => {
+      aliveRef.current = false;
+      if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
+    };
+  }, []);
 
   // Initial load: fetch the org's usage shape so we know the price + rail.
   useEffect(() => {
@@ -155,9 +167,14 @@ export default function VerificationUnlockCheckoutScreen() {
     }
     setPhase('awaiting');
     // Poll the usage endpoint until verificationUnlockedAt flips or timeout.
+    // Timer handle lives in a ref and is cancelled on unmount — otherwise
+    // dismissing the modal mid-poll leaves the recursive setTimeout chain
+    // running forever in the background (battery + network leak).
     const startedAt = Date.now();
     const tick = async () => {
+      if (!aliveRef.current) return;
       const r = await organizationsApi.getUsage(orgId);
+      if (!aliveRef.current) return;
       if (r.data?.verification?.unlocked) {
         await flipToggleOn();
         setPhase('success');
@@ -170,9 +187,9 @@ export default function VerificationUnlockCheckoutScreen() {
         setPhase('error');
         return;
       }
-      setTimeout(tick, POLL_INTERVAL_MS);
+      pollTimerRef.current = setTimeout(tick, POLL_INTERVAL_MS);
     };
-    setTimeout(tick, POLL_INTERVAL_MS);
+    pollTimerRef.current = setTimeout(tick, POLL_INTERVAL_MS);
   };
 
   const flipToggleOn = async () => {

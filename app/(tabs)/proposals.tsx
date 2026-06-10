@@ -1778,20 +1778,28 @@ export default function ProposalsScreen() {
     setNewProposal((p) => ({ ...p, country: userCountry, state: userState, city: userCity }));
   }, [userCountry, userState, userCity]);
 
-  // Check if swipe hint should be shown (first time in swipe mode)
+  // Check if swipe hint should be shown (first time in swipe mode).
+  // Read from disk at most once per screen lifetime, and guard the async
+  // setState against unmount (toggling view modes used to re-hit disk every
+  // time and could setState after the screen was gone).
+  const swipeHintCheckedRef = useRef(false);
   useEffect(() => {
-    if (viewMode === 'swipe') {
-      AsyncStorage.getItem(SWIPE_HINT_KEY).then((value) => {
-        if (!value) {
-          setShowSwipeHint(true);
-        }
-      });
-    }
+    if (viewMode !== 'swipe' || swipeHintCheckedRef.current) return;
+    swipeHintCheckedRef.current = true;
+    let alive = true;
+    AsyncStorage.getItem(SWIPE_HINT_KEY)
+      .then((value) => {
+        if (alive && !value) setShowSwipeHint(true);
+      })
+      .catch(() => { /* hint is cosmetic — never block on storage errors */ });
+    return () => { alive = false; };
   }, [viewMode]);
 
   const dismissSwipeHint = useCallback(async () => {
     setShowSwipeHint(false);
-    await AsyncStorage.setItem(SWIPE_HINT_KEY, 'shown');
+    try {
+      await AsyncStorage.setItem(SWIPE_HINT_KEY, 'shown');
+    } catch { /* cosmetic */ }
   }, []);
 
   const filteredProposals = useMemo(() => {

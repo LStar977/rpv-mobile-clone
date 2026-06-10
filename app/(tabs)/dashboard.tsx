@@ -108,8 +108,26 @@ export default function DashboardScreen() {
     }
   }, []);
 
+  // Lightweight refetch for tab refocus: proposals + votes only. The full
+  // loadData() additionally fans out one request per org (N+1) — paying
+  // that on every tab switch made navigation feel sluggish.
+  const refreshLight = useCallback(async () => {
+    const [propRes, votedRes] = await Promise.all([
+      proposalsApi.getAll(),
+      userApi.getVotedProposals(),
+    ]);
+    if (propRes.data) setProposals(propRes.data);
+    if (votedRes.data) setVotedIds(new Set(votedRes.data.map(String)));
+  }, []);
+
+  // Mount: full load. Refocus: light refresh only (the mount also fires
+  // useFocusEffect, so skip the first focus to avoid the double-fetch).
+  const firstFocusRef = useRef(true);
   useEffect(() => { loadData(); }, [loadData]);
-  useFocusEffect(useCallback(() => { loadData(); }, [loadData]));
+  useFocusEffect(useCallback(() => {
+    if (firstFocusRef.current) { firstFocusRef.current = false; return; }
+    refreshLight();
+  }, [refreshLight]));
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
