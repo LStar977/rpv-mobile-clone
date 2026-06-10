@@ -19,10 +19,14 @@ function TabIcon({
   name,
   color,
   focused,
+  premiumBadge,
 }: {
   name: keyof typeof Ionicons.glyphMap;
   color: string;
   focused: boolean;
+  // Small gold lock dot for premium-gated tabs so free users aren't
+  // surprised by a paywall after tapping (Sentinel).
+  premiumBadge?: boolean;
 }) {
   const { colors } = useTheme();
   const scale = useSharedValue(focused ? 1 : 0.85);
@@ -61,6 +65,11 @@ function TabIcon({
           size={24}
           color={color}
         />
+        {premiumBadge && (
+          <View style={[styles.premiumBadge, { backgroundColor: colors.gold }]}>
+            <Ionicons name="lock-closed" size={7} color="#000" />
+          </View>
+        )}
       </Animated.View>
       <Animated.View
         style={[
@@ -80,6 +89,11 @@ export default function TabLayout() {
   const insets = useSafeAreaInsets();
   const { user } = useAuthStore();
   const [showOnboarding, setShowOnboarding] = useState(false);
+  // Premium-gated tabs show a small lock badge for non-premium users.
+  const isPremiumUser =
+    user?.email === DEMO_EMAIL ||
+    !!user?.isPremium ||
+    user?.subscriptionStatus === 'active';
 
   useEffect(() => {
     const checkOnboarding = async () => {
@@ -159,7 +173,12 @@ export default function TabLayout() {
         options={{
           title: 'Sentinel',
           tabBarIcon: ({ color, focused }) => (
-            <TabIcon name="sparkles-outline" color={color} focused={focused} />
+            <TabIcon
+              name="sparkles-outline"
+              color={color}
+              focused={focused}
+              premiumBadge={!isPremiumUser}
+            />
           ),
         }}
       />
@@ -214,5 +233,15 @@ const styles = StyleSheet.create({
     height: 5,
     borderRadius: 2.5,
     marginTop: 4,
+  },
+  premiumBadge: {
+    position: 'absolute',
+    top: -3,
+    right: -7,
+    width: 13,
+    height: 13,
+    borderRadius: 7,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

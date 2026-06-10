@@ -47,7 +47,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { proposalsApi, userApi, uploadsApi, limitsApi, Proposal, UsageLimits } from '../../lib/api';
 import { useAuthStore } from '../../lib/auth';
 import { useBallotStore } from '../../lib/ballots';
-import { shareProposal } from '../../lib/share';
+import { shareProposal, shareVoteAchievement } from '../../lib/share';
 import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS, ANIMATION, responsive } from '../../lib/theme';
 import { getTierLabel, getLocationLabel, canUserVoteOnProposal, meetsCitizenshipRequirement } from '../../lib/proposalGeo';
 import { useModerationStore, useSyncMutes } from '../../lib/moderation';
@@ -1609,6 +1609,9 @@ function ProposalCard({
             }}
             disabled={isVoting}
             activeOpacity={0.85}
+            accessibilityRole="button"
+            accessibilityLabel={`Vote support on ${proposal.title}`}
+            accessibilityState={{ disabled: isVoting }}
           >
             {isVoting ? (
               <ActivityIndicator size="small" color="#fff" />
@@ -1629,6 +1632,9 @@ function ProposalCard({
             }}
             disabled={isVoting}
             activeOpacity={0.85}
+            accessibilityRole="button"
+            accessibilityLabel={`Vote oppose on ${proposal.title}`}
+            accessibilityState={{ disabled: isVoting }}
           >
             {isVoting ? (
               <ActivityIndicator size="small" color="#fff" />
@@ -1644,6 +1650,20 @@ function ProposalCard({
     </AnimatedTouchable>
   );
 }
+
+// Memoized list-item wrapper: without this, every parent re-render (vote
+// counts, filters, swipe index) re-renders every visible card. Re-render
+// only when the card's own proposal data / vote state changes.
+const MemoProposalCard = React.memo(ProposalCard, (prev, next) => (
+  prev.proposal === next.proposal &&
+  prev.hasVoted === next.hasVoted &&
+  prev.isVoting === next.isVoting &&
+  prev.isUserVerified === next.isUserVerified &&
+  prev.isUserCitizen === next.isUserCitizen &&
+  prev.userCountry === next.userCountry &&
+  prev.userState === next.userState &&
+  prev.userCity === next.userCity
+));
 
 // Skeleton Card
 function ProposalSkeleton({ index }: { index: number }) {
@@ -1720,6 +1740,10 @@ export default function ProposalsScreen() {
   // Vote confirmation overlay state
   const [showVoteOverlay, setShowVoteOverlay] = useState(false);
   const [lastVoteType, setLastVoteType] = useState<'support' | 'oppose'>('support');
+  // Context for the post-vote "Share your vote" pill on the confirmation
+  // overlay — the user's just-cast vote is the highest-motivation share
+  // moment in the app.
+  const lastVotedRef = useRef<{ id: number | string; title: string } | null>(null);
 
   // Vote queue for sequential processing of real (non-seed) votes
   const voteQueueRef = useRef<Array<{ proposalId: number | string; vote: 'support' | 'oppose'; title: string }>>([]);
@@ -2034,6 +2058,7 @@ export default function ProposalsScreen() {
         )
       );
       setLastVoteType(vote);
+      lastVotedRef.current = { id: proposalId, title: target?.title || 'Proposal' };
       setShowVoteOverlay(true);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       return;
@@ -2162,6 +2187,7 @@ export default function ProposalsScreen() {
 
       // Show animated confirmation overlay
       setLastVoteType(vote);
+      lastVotedRef.current = { id: proposalId, title: proposalTitle };
       setShowVoteOverlay(true);
 
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -2205,6 +2231,7 @@ export default function ProposalsScreen() {
 
     // Show animation immediately (optimistic UI) instead of waiting for API
     setLastVoteType(vote);
+    lastVotedRef.current = { id: proposal.id, title: proposal.title || 'Proposal' };
     setShowVoteOverlay(true);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
@@ -2686,7 +2713,7 @@ export default function ProposalsScreen() {
           data={filteredProposals}
           keyExtractor={(p) => String(p.id)}
           renderItem={({ item, index }) => (
-            <ProposalCard
+            <MemoProposalCard
               proposal={item}
               hasVoted={votedProposals.has(item.id as number)}
               onVote={handleVote}
@@ -3357,6 +3384,10 @@ export default function ProposalsScreen() {
         visible={showVoteOverlay}
         voteType={lastVoteType}
         onDismiss={() => setShowVoteOverlay(false)}
+        onShare={() => {
+          const last = lastVotedRef.current;
+          if (last) shareVoteAchievement(last.title, lastVoteType, last.id);
+        }}
       />
 
       {/* Verification/Upgrade Modal */}
