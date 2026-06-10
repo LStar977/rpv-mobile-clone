@@ -713,16 +713,18 @@ export const proposalsApi = {
     return apiRequest<Proposal[]>('/api/proposals/featured');
   },
   async deleteProposal(proposalId: number | string): Promise<ApiResponse<{ success: boolean; isSeedProposal?: boolean }>> {
-    // Only admins can delete proposals from backend
-    if (!isAdminAccount()) {
-      return { data: null, error: 'Unauthorized: Admin access required' };
-    }
+    // Authorization is enforced server-side: platform admin can delete
+    // anything, creators can delete their own proposals. The client just
+    // forwards the request — no duplicated permission logic here.
 
     // Check if it's a seed proposal (handled locally)
     const isSeed = typeof proposalId === 'string' && proposalId.startsWith('seed-');
 
     if (isSeed) {
       // Seed proposals are removed from UI state only (reappear on restart)
+      if (!isAdminAccount()) {
+        return { data: null, error: 'Seed proposals can only be removed by an admin' };
+      }
       return { data: { success: true, isSeedProposal: true }, error: null };
     }
 

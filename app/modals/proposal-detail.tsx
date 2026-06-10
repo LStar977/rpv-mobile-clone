@@ -20,6 +20,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { proposalsApi } from '../../lib/api';
+import { useAuthStore } from '../../lib/auth';
 import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY } from '../../lib/theme';
 import { RCVBallotInput } from '../../components/ui/RCVBallotInput';
 import { RCVResults } from '../../components/ui/RCVResults';
@@ -55,6 +56,8 @@ export default function ProposalDetailScreen() {
   const category = params.category || 'General';
   const deadline = params.deadline || null;
   const creatorId = params.creatorId || null;
+  const viewerId = useAuthStore((s) => s.user?.id ?? null);
+  const isOwnProposal = !!(creatorId && viewerId && String(creatorId) === String(viewerId));
   const creatorName = params.creatorName || 'Community Member';
   const requiresCitizenship = params.requiresCitizenship === '1';
   const voteType: 'multiple-choice' | 'ranked-choice' =
@@ -197,7 +200,9 @@ export default function ProposalDetailScreen() {
         proposalId={proposalId || null}
         creatorId={creatorId}
         creatorName={creatorName}
+        isOwnProposal={isOwnProposal}
         onMuted={() => router.back()}
+        onDeleted={() => router.back()}
       />
 
       <ScrollView contentContainerStyle={{ padding: SPACING.lg, paddingBottom: insets.bottom + SPACING['3xl'] }}>

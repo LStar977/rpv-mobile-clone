@@ -13,7 +13,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
-import { moderationApi, type ReportReason } from '../../lib/api';
+import { moderationApi, proposalsApi, type ReportReason } from '../../lib/api';
 import { useModerationStore } from '../../lib/moderation';
 
 const O_GOLD = '#EABA58';
@@ -45,6 +45,11 @@ export type ProposalModerationMenuProps = {
   creatorName: string;
   /** Called after a mute action. Lets parents refresh feeds optimistically. */
   onMuted?: () => void;
+  /** When true, shows a "Delete proposal" row (the viewer is the creator).
+      Server enforces creator-only deletion; this only controls visibility. */
+  isOwnProposal?: boolean;
+  /** Called after a successful delete so parents can refresh feeds. */
+  onDeleted?: () => void;
 };
 
 type Stage = 'menu' | 'reportReason' | 'reportNote' | 'submitting';
@@ -56,6 +61,8 @@ export function ProposalModerationMenu({
   creatorId,
   creatorName,
   onMuted,
+  isOwnProposal,
+  onDeleted,
 }: ProposalModerationMenuProps) {
   const insets = useSafeAreaInsets();
   const muteAction = useModerationStore((s) => s.mute);
@@ -110,6 +117,32 @@ export function ProposalModerationMenu({
     );
   };
 
+  const handleDelete = () => {
+    if (!proposalId) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    Alert.alert(
+      'Delete this proposal?',
+      'Voting closes immediately and this can\'t be undone. Existing votes are removed from the record.',
+      [
+        { text: 'Keep it', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            const result = await proposalsApi.deleteProposal(proposalId);
+            if (result.error) {
+              Alert.alert('Could not delete', result.error);
+              return;
+            }
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            onDeleted?.();
+            close();
+          },
+        },
+      ],
+    );
+  };
+
   const handleReportTap = () => {
     Haptics.selectionAsync();
     setStage('reportReason');
@@ -156,6 +189,23 @@ export function ProposalModerationMenu({
             <Text style={styles.subtitle}>
               Help keep Represent civil.
             </Text>
+
+            {isOwnProposal && (
+              <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={handleDelete}
+                style={styles.row}
+              >
+                <View style={[styles.rowIcon, { backgroundColor: 'rgba(255,107,91,0.12)' }]}>
+                  <Ionicons name="trash-outline" size={20} color={O_RED} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.rowLabel}>Delete this proposal</Text>
+                  <Text style={styles.rowSub}>Permanent. Closes voting and removes existing votes.</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={O_FG_FAINT} />
+              </TouchableOpacity>
+            )}
 
             <TouchableOpacity
               activeOpacity={0.85}

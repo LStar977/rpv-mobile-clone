@@ -16,6 +16,7 @@ import Animated, { FadeInDown, FadeInUp, useSharedValue, useAnimatedStyle, withS
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { organizationsApi, proposalsApi } from '../../lib/api';
+import { useAuthStore } from '../../lib/auth';
 import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS } from '../../lib/theme';
 import { RCVBallotInput } from '../../components/ui/RCVBallotInput';
 import { RCVResults } from '../../components/ui/RCVResults';
@@ -77,6 +78,8 @@ export default function OrgProposalDetailScreen() {
   const orgName = params.orgName || 'Organization';
   const isOfficial = params.isOfficial === 'true';
   const creatorId = params.creatorId || null;
+  const viewerId = useAuthStore((s) => s.user?.id ?? null);
+  const isOwnProposal = !!(creatorId && viewerId && String(creatorId) === String(viewerId));
   const creatorName = params.creatorName || 'Community Member';
   const deadline = params.deadline || null;
 
@@ -294,7 +297,9 @@ export default function OrgProposalDetailScreen() {
         proposalId={proposalId || null}
         creatorId={creatorId}
         creatorName={creatorName}
+        isOwnProposal={isOwnProposal}
         onMuted={() => router.back()}
+        onDeleted={() => router.back()}
       />
 
       <ScrollView

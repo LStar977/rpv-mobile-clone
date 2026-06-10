@@ -2937,8 +2937,20 @@ export default function ProposalsScreen() {
             proposalId={detail?.id ?? null}
             creatorId={(detail as any)?.creatorId ?? (detail as any)?.userId ?? null}
             creatorName={detail?.creatorName || 'Community Member'}
+            isOwnProposal={(() => {
+              const cid = (detail as any)?.creatorId ?? (detail as any)?.userId;
+              return !!(cid && user?.id && String(cid) === String(user.id));
+            })()}
             onMuted={() => {
               // Close the detail view too — user just hid the creator
+              closeProposal();
+            }}
+            onDeleted={() => {
+              // Remove locally so the list updates without waiting for refetch
+              const id = detail?.id;
+              if (id != null) {
+                setProposals((prev) => prev.filter((p) => String(p.id) !== String(id)));
+              }
               closeProposal();
             }}
           />
