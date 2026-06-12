@@ -135,9 +135,20 @@ export function useSyncBallotTier() {
         return;
       }
 
+      // Source-agnostic check FIRST: the auth user object carries
+      // subscriptionStatus from /api/auth/verify, which both the Stripe
+      // webhook AND the Apple IAP receipt path update. The old code only
+      // asked /api/stripe/subscription — which knows nothing about IAP,
+      // so iOS premium subscribers were left on the free tier and hit
+      // the 20-vote daily cap they had just paid to remove.
+      if (user.isPremium || user.subscriptionStatus === 'active') {
+        setTier('premium');
+        return;
+      }
+
       try {
-        // Authoritative subscription state lives on the server. Fetch it
-        // on auth change rather than trusting whatever we last persisted.
+        // Fallback: ask Stripe directly (covers users whose cached auth
+        // object predates the subscriptionStatus field).
         const token = useAuthStore.getState().token;
         const headers: Record<string, string> = { 'Content-Type': 'application/json' };
         if (token) headers['Authorization'] = `Bearer ${token}`;

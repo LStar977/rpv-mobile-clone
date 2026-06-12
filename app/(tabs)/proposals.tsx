@@ -14,6 +14,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Image,
+  Switch,
   Dimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -46,11 +47,12 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { proposalsApi, userApi, uploadsApi, limitsApi, Proposal, UsageLimits } from '../../lib/api';
 import { useAuthStore } from '../../lib/auth';
 import { useBallotStore } from '../../lib/ballots';
-import { shareProposal } from '../../lib/share';
+import { shareProposal, shareVoteAchievement } from '../../lib/share';
 import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS, ANIMATION, responsive } from '../../lib/theme';
-import { getTierLabel, getLocationLabel, canUserVoteOnProposal } from '../../lib/proposalGeo';
+import { getTierLabel, getLocationLabel, canUserVoteOnProposal, meetsCitizenshipRequirement } from '../../lib/proposalGeo';
 import { useModerationStore, useSyncMutes } from '../../lib/moderation';
 import { ProposalModerationMenu } from '../../components/moderation/ProposalModerationMenu';
+import { CommentsSection } from '../../components/comments/CommentsSection';
 import Svg, { Rect, Line, Ellipse, Path, Circle, G, Defs, LinearGradient as SvgLinearGradient, Stop } from 'react-native-svg';
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -370,6 +372,8 @@ function VoteHeader({
   selectedFilter,
   onFilterChange,
   insetTop,
+  onCreate,
+  onToggleView,
 }: {
   index: number;
   total: number;
@@ -378,21 +382,60 @@ function VoteHeader({
   selectedFilter: string;
   onFilterChange: (filter: string) => void;
   insetTop: number;
+  onCreate: () => void;
+  onToggleView: () => void;
 }) {
   const pc = useProposalColors();
   const filters = ['All', 'Federal', 'Provincial', 'Municipal', 'Closing'];
 
   return (
     <View style={{ paddingTop: insetTop + 8, backgroundColor: pc.BG }}>
-      {/* Title block */}
+      {/* Title block + actions */}
       <View style={voteHeaderStyles.titleBlock}>
-        <View>
+        <View style={{ flex: 1 }}>
           <Text style={[voteHeaderStyles.serifTitle, { color: pc.FG }]}>Proposals</Text>
           <View style={voteHeaderStyles.subtitleRow}>
             <Text style={[voteHeaderStyles.subtitleText, { color: pc.FG_MUTED }]}>{activeCount} active</Text>
             <View style={[voteHeaderStyles.dotSeparator, { backgroundColor: pc.LINE_STRONG }]} />
             <Text style={[voteHeaderStyles.subtitleText, { color: pc.FG_MUTED }]}>{closingSoon} closing soon</Text>
           </View>
+        </View>
+        {/* Swipe-mode actions: list-view toggle + create button. */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <TouchableOpacity
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              onToggleView();
+            }}
+            style={{
+              width: 38, height: 38, borderRadius: 10,
+              borderWidth: 1, borderColor: pc.LINE_STRONG,
+              alignItems: 'center', justifyContent: 'center',
+              backgroundColor: 'transparent',
+            }}
+            accessibilityLabel="Switch to list view"
+          >
+            <Ionicons name="list-outline" size={18} color={pc.FG} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              onCreate();
+            }}
+            accessibilityLabel="Create proposal"
+          >
+            <LinearGradient
+              colors={[pc.GOLD, pc.GOLD_DARK]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={{
+                width: 38, height: 38, borderRadius: 10,
+                alignItems: 'center', justifyContent: 'center',
+              }}
+            >
+              <Ionicons name="add" size={22} color="#000" />
+            </LinearGradient>
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -877,7 +920,15 @@ function SwipeCard({ proposal, onSwipeLeft, onSwipeRight, onSwipeUp, onTap, isTo
         {/* Card body */}
         <View style={premiumCardStyles.cardBody}>
           {/* Tier label */}
-          <Text style={[premiumCardStyles.refText, { color: pc.GOLD }]}>{tierLabel}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <Text style={[premiumCardStyles.refText, { color: pc.GOLD }]}>{tierLabel}</Text>
+            {proposal.requiresCitizenship && (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                <Ionicons name="shield-checkmark" size={11} color={pc.GOLD} />
+                <Text style={[premiumCardStyles.refText, { color: pc.GOLD }]}>CITIZENS ONLY</Text>
+              </View>
+            )}
+          </View>
 
           {/* Serif title */}
           <Text style={[premiumCardStyles.serifTitle, { color: pc.FG }]} numberOfLines={2}>{proposal.title}</Text>
@@ -1288,6 +1339,7 @@ interface ProposalCardProps {
   onPress: () => void;
   index: number;
   isUserVerified: boolean;
+  isUserCitizen: boolean;
   userCountry: string;
   userState: string;
   userCity: string;
@@ -1301,6 +1353,7 @@ function ProposalCard({
   onPress,
   index,
   isUserVerified,
+  isUserCitizen,
   userCountry,
   userState,
   userCity,
@@ -1460,6 +1513,16 @@ function ProposalCard({
         </View>
       )}
 
+      {/* Citizens-only badge */}
+      {proposal.requiresCitizenship && (
+        <View style={[styles.restrictionBadge, { backgroundColor: isUserCitizen ? `${colors.success}12` : `${colors.warning}12` }]}>
+          <Ionicons name="shield-checkmark" size={12} color={isUserCitizen ? colors.success : colors.warning} />
+          <Text style={[styles.restrictionText, { color: isUserCitizen ? colors.success : colors.warning }]}>
+            {isUserCitizen ? 'Citizens only' : 'Citizens only — verify to vote'}
+          </Text>
+        </View>
+      )}
+
       {/* Content */}
       <Text style={[styles.cardTitle, { color: colors.text }]} numberOfLines={2}>
         {proposal.title}
@@ -1522,6 +1585,20 @@ function ProposalCard({
           <Ionicons name="checkmark-circle" size={16} color={colors.success} />
           <Text style={[styles.statusText, { color: colors.success }]}>You have voted</Text>
         </View>
+      ) : !canVoteByLocation && proposalGeo.length > 0 && isUserVerified ? (
+        <View style={[styles.statusBanner, { backgroundColor: `${colors.error}10` }]}>
+          <Ionicons name="lock-closed" size={16} color={colors.error} />
+          <Text style={[styles.statusText, { color: colors.error }]}>
+            Voting open only to {proposalGeo[proposalGeo.length - 1]} residents
+          </Text>
+        </View>
+      ) : !isUserVerified && proposalGeo.length > 0 ? (
+        <View style={[styles.statusBanner, { backgroundColor: `${colors.warning}10` }]}>
+          <Ionicons name="lock-closed" size={16} color={colors.warning} />
+          <Text style={[styles.statusText, { color: colors.warning }]}>
+            Verify your identity to vote
+          </Text>
+        </View>
       ) : (
         <View style={styles.voteActions}>
           <TouchableOpacity
@@ -1533,6 +1610,9 @@ function ProposalCard({
             }}
             disabled={isVoting}
             activeOpacity={0.85}
+            accessibilityRole="button"
+            accessibilityLabel={`Vote support on ${proposal.title}`}
+            accessibilityState={{ disabled: isVoting }}
           >
             {isVoting ? (
               <ActivityIndicator size="small" color="#fff" />
@@ -1553,6 +1633,9 @@ function ProposalCard({
             }}
             disabled={isVoting}
             activeOpacity={0.85}
+            accessibilityRole="button"
+            accessibilityLabel={`Vote oppose on ${proposal.title}`}
+            accessibilityState={{ disabled: isVoting }}
           >
             {isVoting ? (
               <ActivityIndicator size="small" color="#fff" />
@@ -1568,6 +1651,20 @@ function ProposalCard({
     </AnimatedTouchable>
   );
 }
+
+// Memoized list-item wrapper: without this, every parent re-render (vote
+// counts, filters, swipe index) re-renders every visible card. Re-render
+// only when the card's own proposal data / vote state changes.
+const MemoProposalCard = React.memo(ProposalCard, (prev, next) => (
+  prev.proposal === next.proposal &&
+  prev.hasVoted === next.hasVoted &&
+  prev.isVoting === next.isVoting &&
+  prev.isUserVerified === next.isUserVerified &&
+  prev.isUserCitizen === next.isUserCitizen &&
+  prev.userCountry === next.userCountry &&
+  prev.userState === next.userState &&
+  prev.userCity === next.userCity
+));
 
 // Skeleton Card
 function ProposalSkeleton({ index }: { index: number }) {
@@ -1628,6 +1725,7 @@ export default function ProposalsScreen() {
   const [userState, setUserState] = useState('');
   const [userCity, setUserCity] = useState('');
   const [isVerified, setIsVerified] = useState(false);
+  const [citizenshipVerified, setCitizenshipVerified] = useState(false);
 
   const [selectedProposal, setSelectedProposal] = useState<Proposal | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
@@ -1643,6 +1741,10 @@ export default function ProposalsScreen() {
   // Vote confirmation overlay state
   const [showVoteOverlay, setShowVoteOverlay] = useState(false);
   const [lastVoteType, setLastVoteType] = useState<'support' | 'oppose'>('support');
+  // Context for the post-vote "Share your vote" pill on the confirmation
+  // overlay — the user's just-cast vote is the highest-motivation share
+  // moment in the app.
+  const lastVotedRef = useRef<{ id: number | string; title: string } | null>(null);
 
   // Vote queue for sequential processing of real (non-seed) votes
   const voteQueueRef = useRef<Array<{ proposalId: number | string; vote: 'support' | 'oppose'; title: string }>>([]);
@@ -1669,6 +1771,7 @@ export default function ProposalsScreen() {
     imageUri: '' as string,
     voteType: 'yes-no' as 'yes-no' | 'multiple-choice' | 'ranked-choice',
     options: ['', ''] as string[],
+    requiresCitizenship: false,
   });
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -1700,20 +1803,28 @@ export default function ProposalsScreen() {
     setNewProposal((p) => ({ ...p, country: userCountry, state: userState, city: userCity }));
   }, [userCountry, userState, userCity]);
 
-  // Check if swipe hint should be shown (first time in swipe mode)
+  // Check if swipe hint should be shown (first time in swipe mode).
+  // Read from disk at most once per screen lifetime, and guard the async
+  // setState against unmount (toggling view modes used to re-hit disk every
+  // time and could setState after the screen was gone).
+  const swipeHintCheckedRef = useRef(false);
   useEffect(() => {
-    if (viewMode === 'swipe') {
-      AsyncStorage.getItem(SWIPE_HINT_KEY).then((value) => {
-        if (!value) {
-          setShowSwipeHint(true);
-        }
-      });
-    }
+    if (viewMode !== 'swipe' || swipeHintCheckedRef.current) return;
+    swipeHintCheckedRef.current = true;
+    let alive = true;
+    AsyncStorage.getItem(SWIPE_HINT_KEY)
+      .then((value) => {
+        if (alive && !value) setShowSwipeHint(true);
+      })
+      .catch(() => { /* hint is cosmetic — never block on storage errors */ });
+    return () => { alive = false; };
   }, [viewMode]);
 
   const dismissSwipeHint = useCallback(async () => {
     setShowSwipeHint(false);
-    await AsyncStorage.setItem(SWIPE_HINT_KEY, 'shown');
+    try {
+      await AsyncStorage.setItem(SWIPE_HINT_KEY, 'shown');
+    } catch { /* cosmetic */ }
   }, []);
 
   const filteredProposals = useMemo(() => {
@@ -1862,11 +1973,15 @@ export default function ProposalsScreen() {
           setUserState('Ontario');
           setUserCity('Toronto');
           setIsVerified(true);
+          setCitizenshipVerified(true);
         } else if (profileRes.data) {
           setUserCountry(profileRes.data.country || '');
           setUserState(profileRes.data.state || '');
           setUserCity(profileRes.data.city || '');
           setIsVerified(profileRes.data.verified || false);
+          setCitizenshipVerified(
+            !!(profileRes.data.citizenshipVerified || profileRes.data.citizenship_verified),
+          );
         }
 
         if (limitsRes.data) {
@@ -1888,6 +2003,45 @@ export default function ProposalsScreen() {
 
 
   const handleVote = async (proposalId: number | string, vote: 'support' | 'oppose') => {
+    // Geo / verification gate. Apply BEFORE the demo + seed bypass so the
+    // demo account (used by App Store reviewers) can't register votes on
+    // proposals that show the "Not in your region" badge — the gate badge
+    // and the actual behaviour have to agree. Server enforces this too,
+    // but the demo path skips the API entirely so client-side enforcement
+    // is the only thing standing in the way for that flow.
+    const target = proposals.find((p) => String(p.id) === String(proposalId));
+    if (target && !canUserVoteOnProposal(target, userCountry, userState, userCity, isVerified)) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      const geo = target.geoRestrictions ?? [];
+      const isUnverifiedGeo = geo.length > 0 && !isVerified;
+      Alert.alert(
+        isUnverifiedGeo ? 'Verification required' : 'Not eligible',
+        isUnverifiedGeo
+          ? 'Verify your identity to vote on geo-restricted proposals.'
+          : `This proposal is restricted to ${geo[geo.length - 1] ?? 'a specific region'}. Voting is only open to residents.`,
+        [{ text: 'OK', style: 'cancel' }],
+      );
+      return;
+    }
+
+    // Citizens-only gate. Runs before the demo/seed bypass so the eligibility
+    // badge and behaviour agree. Server enforces CITIZENSHIP_REQUIRED too.
+    if (target && !meetsCitizenshipRequirement(target, citizenshipVerified)) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      Alert.alert(
+        'Citizens only',
+        'This proposal is open to verified citizens. Verify your citizenship (passport + proof of address) to vote.',
+        [
+          { text: 'Not now', style: 'cancel' },
+          {
+            text: 'Verify citizenship',
+            onPress: () => router.push('/modals/verification-payment'),
+          },
+        ],
+      );
+      return;
+    }
+
     // Seed proposals + demo account votes: local-only, never hit the API.
     // Demo account is sandboxed so App Store reviewers don't pollute real proposal counts.
     const isDemoAccount = user?.email === 'demo@represent.app';
@@ -1905,6 +2059,7 @@ export default function ProposalsScreen() {
         )
       );
       setLastVoteType(vote);
+      lastVotedRef.current = { id: proposalId, title: target?.title || 'Proposal' };
       setShowVoteOverlay(true);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       return;
@@ -1923,8 +2078,18 @@ export default function ProposalsScreen() {
     if (ballotTier !== 'premium') {
       const canSpend = spendBallot();
       if (!canSpend) {
+        // Explain the cap before routing — a silent redirect to the paywall
+        // reads as a bug. This is also the single best Premium conversion
+        // moment in the app: the user is mid-action and motivated.
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-        router.push('/modals/subscription');
+        Alert.alert(
+          "You're out of ballots for today",
+          'Free accounts get 20 votes per day. Your ballots refresh at midnight — or go Premium for unlimited voting.',
+          [
+            { text: 'Tomorrow then', style: 'cancel' },
+            { text: 'Go unlimited', onPress: () => router.push('/modals/subscription') },
+          ],
+        );
         return;
       }
     }
@@ -2023,6 +2188,7 @@ export default function ProposalsScreen() {
 
       // Show animated confirmation overlay
       setLastVoteType(vote);
+      lastVotedRef.current = { id: proposalId, title: proposalTitle };
       setShowVoteOverlay(true);
 
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -2066,6 +2232,7 @@ export default function ProposalsScreen() {
 
     // Show animation immediately (optimistic UI) instead of waiting for API
     setLastVoteType(vote);
+    lastVotedRef.current = { id: proposal.id, title: proposal.title || 'Proposal' };
     setShowVoteOverlay(true);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
@@ -2100,6 +2267,39 @@ export default function ProposalsScreen() {
 
     // Demo account bypasses all limits (for App Store review)
     const isDemoAccount = user?.email === 'demo@represent.app';
+
+    // Free accounts run one active proposal at a time; premium is
+    // unlimited. /api/user/limits doesn't exist on the backend yet (the
+    // limitsApi fallback always reports used: 0), so count the user's
+    // live proposals from the already-loaded list. The server enforces
+    // the same rule (PROPOSAL_LIMIT) — this pre-check is the upsell UX.
+    const isPremiumUser = !!user?.isPremium || user?.subscriptionStatus === 'active';
+    if (!isDemoAccount && !isPremiumUser) {
+      const now = Date.now();
+      const myActiveProposals = proposals.filter((p) =>
+        String(p.creatorId) === String(user?.id ?? '') &&
+        !String(p.id).startsWith('seed-') &&
+        (!p.deadline || new Date(p.deadline).getTime() > now)
+      ).length;
+      if (myActiveProposals >= 1) {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        Alert.alert(
+          'One active proposal at a time',
+          'Free accounts can run one active proposal at a time. Upgrade to Premium for unlimited proposals, or wait for your current one to close.',
+          [
+            { text: 'Not now', style: 'cancel' },
+            {
+              text: 'Upgrade',
+              onPress: () => {
+                setShowCreateModal(false);
+                router.push('/modals/subscription');
+              },
+            },
+          ],
+        );
+        return;
+      }
+    }
 
     // Check proposal limits (skip for premium users with unlimited, or demo account)
     if (!isDemoAccount && usageLimits && usageLimits.proposals.limit !== 'unlimited') {
@@ -2176,9 +2376,27 @@ export default function ProposalsScreen() {
         options: newProposal.voteType === 'yes-no'
           ? undefined
           : newProposal.options.map((o) => o.trim()).filter(Boolean),
+        requiresCitizenship: newProposal.requiresCitizenship,
       });
 
       if (result.error) {
+        if (result.errorCode === 'PROPOSAL_LIMIT') {
+          Alert.alert(
+            'One active proposal at a time',
+            'Free accounts can run one active proposal at a time. Upgrade to Premium for unlimited proposals.',
+            [
+              { text: 'Not now', style: 'cancel' },
+              {
+                text: 'Upgrade',
+                onPress: () => {
+                  setShowCreateModal(false);
+                  router.push('/modals/subscription');
+                },
+              },
+            ],
+          );
+          return;
+        }
         Alert.alert('Error', result.error);
         return;
       }
@@ -2199,6 +2417,7 @@ export default function ProposalsScreen() {
         imageUri: '',
         voteType: 'yes-no',
         options: ['', ''],
+        requiresCitizenship: false,
       });
       fetchData(true);
 
@@ -2246,6 +2465,9 @@ export default function ProposalsScreen() {
           deadline: p.deadline || '',
           voteType,
           options: JSON.stringify((p as any).options ?? []),
+          creatorId: String((p as any).creatorId ?? (p as any).userId ?? ''),
+          creatorName: p.creatorName || 'Community Member',
+          requiresCitizenship: (p as any).requiresCitizenship ? '1' : '',
         },
       });
       return;
@@ -2288,6 +2510,20 @@ export default function ProposalsScreen() {
 
             <View style={styles.headerActions}>
               <BallotDisplay size="sm" />
+
+              <TouchableOpacity
+                style={[
+                  styles.filterBtn,
+                  { backgroundColor: colors.surface, borderColor: colors.border },
+                ]}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  setViewMode('swipe');
+                }}
+                accessibilityLabel="Switch to swipe view"
+              >
+                <Ionicons name="layers-outline" size={18} color={colors.text} />
+              </TouchableOpacity>
 
               <TouchableOpacity
                 style={[
@@ -2493,6 +2729,8 @@ export default function ProposalsScreen() {
                   if (filter === 'Closing') setSelectedStatus('Active');
                 }}
                 insetTop={insets.top}
+                onCreate={() => setShowCreateModal(true)}
+                onToggleView={() => setViewMode('list')}
               />
 
               {/* Card stack */}
@@ -2526,7 +2764,7 @@ export default function ProposalsScreen() {
           data={filteredProposals}
           keyExtractor={(p) => String(p.id)}
           renderItem={({ item, index }) => (
-            <ProposalCard
+            <MemoProposalCard
               proposal={item}
               hasVoted={votedProposals.has(item.id as number)}
               onVote={handleVote}
@@ -2534,6 +2772,7 @@ export default function ProposalsScreen() {
               onPress={() => openProposal(item)}
               index={index}
               isUserVerified={isVerified}
+              isUserCitizen={citizenshipVerified}
               userCountry={userCountry}
               userState={userState}
               userCity={userCity}
@@ -2738,6 +2977,13 @@ export default function ProposalsScreen() {
                   </View>
                 </View>
 
+                {/* Discussion */}
+                {detail?.id != null && (
+                  <View style={{ paddingHorizontal: SPACING.lg }}>
+                    <CommentsSection proposalId={detail.id} />
+                  </View>
+                )}
+
                 <View style={{ height: 80 }} />
               </ScrollView>
             );
@@ -2749,8 +2995,20 @@ export default function ProposalsScreen() {
             proposalId={detail?.id ?? null}
             creatorId={(detail as any)?.creatorId ?? (detail as any)?.userId ?? null}
             creatorName={detail?.creatorName || 'Community Member'}
+            isOwnProposal={(() => {
+              const cid = (detail as any)?.creatorId ?? (detail as any)?.userId;
+              return !!(cid && user?.id && String(cid) === String(user.id));
+            })()}
             onMuted={() => {
               // Close the detail view too — user just hid the creator
+              closeProposal();
+            }}
+            onDeleted={() => {
+              // Remove locally so the list updates without waiting for refetch
+              const id = detail?.id;
+              if (id != null) {
+                setProposals((prev) => prev.filter((p) => String(p.id) !== String(id)));
+              }
               closeProposal();
             }}
           />
@@ -3162,6 +3420,30 @@ export default function ProposalsScreen() {
               </ScrollView>
             </View>
 
+            <View style={[styles.formDivider, { borderTopColor: colors.border }]}>
+              <View style={[styles.formDividerIcon, { backgroundColor: `${colors.gold}15` }]}>
+                <Ionicons name="shield-checkmark-outline" size={16} color={colors.gold} />
+              </View>
+              <Text style={[styles.formDividerLabel, { color: colors.gold }]}>Eligibility</Text>
+            </View>
+
+            <View style={styles.formSection}>
+              <View style={styles.citizenToggleRow}>
+                <View style={styles.citizenToggleText}>
+                  <Text style={[styles.formSubLabel, { color: colors.text, marginBottom: 2 }]}>Citizens only</Text>
+                  <Text style={[styles.scopeDesc, { color: colors.textTertiary }]}>
+                    Only voters who verify citizenship (passport + proof of address) can vote.
+                  </Text>
+                </View>
+                <Switch
+                  value={newProposal.requiresCitizenship}
+                  onValueChange={(v) => setNewProposal((p) => ({ ...p, requiresCitizenship: v }))}
+                  trackColor={{ false: colors.border, true: colors.gold }}
+                  thumbColor="#fff"
+                />
+              </View>
+            </View>
+
             <View style={{ height: 100 }} />
           </ScrollView>
         </KeyboardAvoidingView>
@@ -3172,6 +3454,10 @@ export default function ProposalsScreen() {
         visible={showVoteOverlay}
         voteType={lastVoteType}
         onDismiss={() => setShowVoteOverlay(false)}
+        onShare={() => {
+          const last = lastVotedRef.current;
+          if (last) shareVoteAchievement(last.title, lastVoteType, last.id);
+        }}
       />
 
       {/* Verification/Upgrade Modal */}
@@ -3600,7 +3886,7 @@ const styles = StyleSheet.create({
     marginHorizontal: SPACING.lg,
     marginTop: SPACING.md,
     padding: SPACING.lg,
-    borderRadius: BORDER_RADIUS.xxl,
+    borderRadius: BORDER_RADIUS['2xl'],
     borderWidth: 1,
   },
   filterSection: { marginBottom: SPACING.md },
@@ -3630,7 +3916,7 @@ const styles = StyleSheet.create({
 
   // Card
   card: {
-    borderRadius: BORDER_RADIUS.xxl,
+    borderRadius: BORDER_RADIUS['2xl'],
     padding: SPACING.lg,
     borderWidth: 1,
     overflow: 'hidden',
@@ -3824,7 +4110,7 @@ const styles = StyleSheet.create({
 
   // Detail Card
   detailCard: {
-    borderRadius: BORDER_RADIUS.xxl,
+    borderRadius: BORDER_RADIUS['2xl'],
     borderWidth: 1,
     padding: SPACING.xl,
     overflow: 'hidden',
@@ -3898,6 +4184,8 @@ const styles = StyleSheet.create({
   },
   scopeTitle: { ...TYPOGRAPHY.labelLarge, marginTop: SPACING.sm },
   scopeDesc: { ...TYPOGRAPHY.bodySmall, marginTop: 2 },
+  citizenToggleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: SPACING.md },
+  citizenToggleText: { flex: 1 },
   warningBanner: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -4003,7 +4291,7 @@ const styles = StyleSheet.create({
   swipeCard: {
     position: 'absolute',
     width: SCREEN_WIDTH - SPACING.lg * 2,
-    borderRadius: BORDER_RADIUS.xxl,
+    borderRadius: BORDER_RADIUS['2xl'],
     borderWidth: 1,
     overflow: 'hidden',
     ...SHADOWS.lg,

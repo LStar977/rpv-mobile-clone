@@ -520,11 +520,18 @@ export async function setupAuth(app: Express) {
           profileImageUrl: user.profileImageUrl,
           walletAddress: wallet?.address,
           verified: isDemoUser ? true : (user.verified || false),
+          citizenshipVerified: isDemoUser ? true : ((user as any).citizenshipVerified || false),
           country: isDemoUser ? 'Canada' : (user.country || ''),
           state: isDemoUser ? 'Ontario' : (user.state || ''),
           city: isDemoUser ? 'Toronto' : (user.city || ''),
-          isPremium: isDemoUser ? true : undefined,
-          subscriptionStatus: isDemoUser ? 'active' : undefined,
+          // Source-agnostic subscription state. The users row is updated by
+          // BOTH the Stripe webhook and the IAP receipt-validation path, so
+          // this is the single truth the mobile app should read — unlike
+          // /api/stripe/subscription, which only knows about Stripe and
+          // reports IAP-paid premium users as 'free'.
+          isPremium: isDemoUser ? true : user.subscriptionStatus === 'active',
+          subscriptionStatus: isDemoUser ? 'active' : (user.subscriptionStatus || 'free'),
+          subscriptionEndDate: isDemoUser ? null : (user.subscriptionEndDate ?? null),
         },
       });
     } catch (error) {

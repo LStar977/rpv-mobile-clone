@@ -14,6 +14,15 @@ export interface PaymentResult {
   cancelled?: boolean;
 }
 
+// The demo account is auto-premium and its orgs are pre-provisioned, so
+// there is nothing real to purchase. Firing a StoreKit call from the demo
+// account just yields "Invalid product ID" (and would pollute nothing even
+// if it succeeded). Short-circuit to a friendly local success so the demo
+// account + App reviewers never hit a payment error.
+function isDemoAccount(): boolean {
+  return useAuthStore.getState().user?.email === 'demo@represent.app';
+}
+
 /**
  * Determine if IAP should be used (iOS with IAP available).
  * Apple Guideline 3.1: digital subscriptions on iOS MUST use Apple IAP.
@@ -39,6 +48,10 @@ export async function processVerificationPayment(_token: string | null): Promise
  * Android: Stripe Payment Sheet.
  */
 export async function processPremiumPayment(token: string | null): Promise<PaymentResult> {
+  if (isDemoAccount()) {
+    Alert.alert('Demo account', 'The demo account already includes Premium — no purchase needed.');
+    return { success: true };
+  }
   if (Platform.OS === 'ios') {
     if (!iapAvailable) {
       Alert.alert(
@@ -70,6 +83,10 @@ export async function processOrganizationPayment(
   tier: OrgTier,
   organizationId: string,
 ): Promise<PaymentResult> {
+  if (isDemoAccount()) {
+    Alert.alert('Demo account', 'Demo organizations are already provisioned — no purchase needed.');
+    return { success: true };
+  }
   // Free tier doesn't go through any payment flow — the org just gets
   // tier='free' in the DB and the user is done. The caller decides whether
   // to create the org with this tier or upgrade an existing org.

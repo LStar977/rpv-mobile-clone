@@ -1,0 +1,25 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body {
+  background: #000;
+  color: #F2E6CC;
+  font-family: var(--font-inter), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  overflow-x: hidden;
+}
+
+::selection {
+  background: #D4A949;
+  color: #000;
+}
+
+@keyframes shimmer {
+  0%, 100% { opacity: 0.6; }
+  50%      { opacity: 1; }
+}
+.shimmer { animation: shimmer 2.4s ease-in-out infinite; }

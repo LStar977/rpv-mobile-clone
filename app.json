@@ -15,7 +15,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.representwallet.app",
-      "buildNumber": "1",
+      "buildNumber": "2",
       "usesAppleSignIn": true,
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
@@ -37,7 +37,10 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#040707"
       },
-      "package": "com.representwallet.app"
+      "package": "com.representwallet.app",
+      "permissions": [
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png",
@@ -63,8 +66,9 @@
         "origin": false
       },
       "eas": {
-        "projectId": "represent-wallet"
+        "projectId": "60aaafa2-14de-4863-90e2-c972babf0fe1"
       }
-    }
+    },
+    "owner": "lstar977"
   }
 }

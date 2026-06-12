@@ -1,0 +1,114 @@
+{
+  "proposals": [
+    {
+      "title": "Shadow Referendum Q1: Should Alberta take increased control over immigration?",
+      "description": "Official Question 1 on Alberta's October 19, 2026 referendum ballot reads: \"Do you support the Government of Alberta taking increased control over immigration for the purposes of decreasing immigration to more sustainable levels, prioritizing economic migration and giving Albertans first priority on new employment opportunities?\"\n\nThis proposal mirrors the official ballot question so verified Albertans can register their position before the province votes. Supporters argue provincial control would better match immigration to Alberta's labour market and infrastructure capacity. Opponents argue immigration is constitutionally shared with Ottawa and that reduced immigration could worsen labour shortages.\n\nVote Support for Yes, Oppose for No — exactly as you would on the official ballot.",
+      "category": "Other",
+      "geoRestrictions": ["Canada", "Alberta"],
+      "voteType": "yes-no",
+      "deadline": "2026-10-19T05:59:59Z"
+    },
+    {
+      "title": "Shadow Referendum Q2: Should provincial services require citizenship, PR, or Alberta-approved status?",
+      "description": "Official Question 2 on Alberta's October 19, 2026 referendum ballot reads: \"Do you support the Government of Alberta introducing a law mandating that only Canadian citizens, permanent residents and individuals with an Alberta-approved immigration status will be eligible for provincially-funded programs, such as health care, education and other social services?\"\n\nThis proposal mirrors the official ballot question. Supporters argue provincially funded services should be reserved for those with settled status. Opponents argue it would create barriers for temporary workers and students who pay taxes in Alberta.\n\nVote Support for Yes, Oppose for No — exactly as you would on the official ballot.",
+      "category": "Other",
+      "geoRestrictions": ["Canada", "Alberta"],
+      "voteType": "yes-no",
+      "deadline": "2026-10-19T05:59:59Z"
+    },
+    {
+      "title": "Shadow Referendum Q3: Should non-permanent residents wait 12 months before qualifying for social programs?",
+      "description": "Official Question 3 on Alberta's October 19, 2026 referendum ballot reads: \"Assuming that all Canadian citizens and permanent residents continue to qualify for social support programs as they do now, do you support the Government of Alberta introducing a law requiring all individuals with a non-permanent legal immigration status to reside in Alberta for at least 12 months before qualifying for any provincially-funded social support programs?\"\n\nThis proposal mirrors the official ballot question. Supporters frame it as a residency commitment before drawing on provincial programs. Opponents argue it would leave newcomers without a safety net during their first year.\n\nVote Support for Yes, Oppose for No — exactly as you would on the official ballot.",
+      "category": "Other",
+      "geoRestrictions": ["Canada", "Alberta"],
+      "voteType": "yes-no",
+      "deadline": "2026-10-19T05:59:59Z"
+    },
+    {
+      "title": "Shadow Referendum Q4: Should non-permanent residents pay fees for healthcare and education?",
+      "description": "Official Question 4 on Alberta's October 19, 2026 referendum ballot reads: \"Assuming that all Canadian citizens and permanent residents continue to qualify for public health care and education as they do now, do you support the Government of Alberta charging a reasonable fee or premium to individuals with a non-permanent immigration status living in Alberta for their and their family's use of the healthcare and education systems?\"\n\nThis proposal mirrors the official ballot question. Supporters argue temporary residents should contribute directly to services they use. Opponents argue many already contribute through taxes and that fees could deter needed workers and students.\n\nVote Support for Yes, Oppose for No — exactly as you would on the official ballot.",
+      "category": "Healthcare",
+      "geoRestrictions": ["Canada", "Alberta"],
+      "voteType": "yes-no",
+      "deadline": "2026-10-19T05:59:59Z"
+    },
+    {
+      "title": "Shadow Referendum Q5: Should proof of citizenship be required to vote provincially?",
+      "description": "Official Question 5 on Alberta's October 19, 2026 referendum ballot reads: \"Do you support the Government of Alberta introducing a law requiring individuals to provide proof of citizenship, such as a passport, birth certificate, or citizenship card, to vote in an Alberta provincial election?\"\n\nThis proposal mirrors the official ballot question — and on Represent, this one is open to verified citizens only, the same standard the question itself proposes. Supporters argue citizenship proof protects election integrity. Opponents argue it adds barriers for eligible voters who lack ready documentation.\n\nVote Support for Yes, Oppose for No — exactly as you would on the official ballot.",
+      "category": "Other",
+      "geoRestrictions": ["Canada", "Alberta"],
+      "voteType": "yes-no",
+      "deadline": "2026-10-19T05:59:59Z",
+      "requiresCitizenship": true
+    },
+    {
+      "title": "Shadow Referendum Q6: Should provinces select their own superior court justices?",
+      "description": "Official Question 6 on Alberta's October 19, 2026 referendum ballot reads: \"Do you support the Government of Alberta working with the governments of other willing provinces to amend the Canadian Constitution to have provincial governments, and not the federal government, select the justices appointed to provincial King's Bench and Appeal courts?\"\n\nThis proposal mirrors the official ballot question. Supporters argue provinces should choose the judges who interpret provincial law. Opponents argue federal appointment insulates courts from local political pressure.\n\nVote Support for Yes, Oppose for No — exactly as you would on the official ballot.",
+      "category": "Other",
+      "geoRestrictions": ["Canada", "Alberta"],
+      "voteType": "yes-no",
+      "deadline": "2026-10-19T05:59:59Z"
+    },
+    {
+      "title": "Shadow Referendum Q7: Should the federal Senate be abolished?",
+      "description": "Official Question 7 on Alberta's October 19, 2026 referendum ballot reads: \"Do you support the Government of Alberta working with the governments of other willing provinces to amend the Canadian Constitution to abolish the unelected federal Senate?\"\n\nThis proposal mirrors the official ballot question. Supporters argue an unelected chamber has no place in a modern democracy. Opponents argue the Senate provides regional representation and sober second thought, and that abolition would require near-unanimous constitutional consent.\n\nVote Support for Yes, Oppose for No — exactly as you would on the official ballot.",
+      "category": "Other",
+      "geoRestrictions": ["Canada", "Alberta"],
+      "voteType": "yes-no",
+      "deadline": "2026-10-19T05:59:59Z"
+    },
+    {
+      "title": "Shadow Referendum Q8: Should provinces be able to opt out of federal programs without losing funding?",
+      "description": "Official Question 8 on Alberta's October 19, 2026 referendum ballot reads: \"Do you support the Government of Alberta working with the governments of other willing provinces to amend the Canadian Constitution to allow provinces to opt out of federal programs that intrude on provincial jurisdiction such as health care, education and social services, without a province losing any of the associated federal funding for use in its social programs?\"\n\nThis proposal mirrors the official ballot question. Supporters argue provinces know their own priorities and should direct the funds. Opponents argue opt-outs with full compensation would fragment national programs.\n\nVote Support for Yes, Oppose for No — exactly as you would on the official ballot.",
+      "category": "Other",
+      "geoRestrictions": ["Canada", "Alberta"],
+      "voteType": "yes-no",
+      "deadline": "2026-10-19T05:59:59Z"
+    },
+    {
+      "title": "Shadow Referendum Q9: Should provincial laws take priority over federal laws in shared jurisdiction?",
+      "description": "Official Question 9 on Alberta's October 19, 2026 referendum ballot reads: \"Do you support the Government of Alberta working with the governments of other willing provinces to amend the Canadian Constitution to better protect provincial rights from federal interference by giving a province's laws dealing with provincial or shared areas of constitutional jurisdiction priority over federal laws when the province's laws and federal laws conflict?\"\n\nThis proposal mirrors the official ballot question. Supporters argue it would end federal overreach into provincial matters. Opponents argue federal paramountcy in shared areas keeps national standards coherent.\n\nVote Support for Yes, Oppose for No — exactly as you would on the official ballot.",
+      "category": "Other",
+      "geoRestrictions": ["Canada", "Alberta"],
+      "voteType": "yes-no",
+      "deadline": "2026-10-19T05:59:59Z"
+    },
+    {
+      "title": "Shadow Referendum Q10: Should Alberta remain in Canada, or begin the separation referendum process?",
+      "description": "The defining question. Official Question 10 on Alberta's October 19, 2026 referendum ballot reads: \"Should Alberta remain a province of Canada, or should the Government of Alberta commence the legal process required under the Canadian Constitution to hold a binding provincial referendum on whether or not Alberta should separate from Canada?\"\n\nThis proposal mirrors the official ballot question with both official options, verbatim. On Represent, it is open to verified citizens only — the same eligibility standard as the real vote. Every ballot here is cast by an identity-verified citizen located in Alberta, and the running tally is public.\n\nWhen the official results come in on October 19, compare them to this one.",
+      "category": "Other",
+      "geoRestrictions": ["Canada", "Alberta"],
+      "voteType": "multiple-choice",
+      "options": [
+        "Alberta should remain a province of Canada",
+        "The Government of Alberta should commence the legal process required under the Canadian Constitution to hold a binding provincial referendum on whether or not Alberta should separate from Canada"
+      ],
+      "deadline": "2026-10-19T05:59:59Z",
+      "requiresCitizenship": true
+    },
+    {
+      "title": "Should the federal government create Build Canada Homes to build non-market housing?",
+      "description": "The federal government has proposed Build Canada Homes, a new Crown corporation dedicated to building affordable and non-market housing, as part of its pledge to reach 500,000 housing completions per year — nearly double Canada's historical record of about 260,000.\n\nSupporters argue Canada's non-market housing supply lags far behind peer countries and that a dedicated federal builder is the fastest way to close the gap. Opponents question why a fourth federal housing agency is needed and argue the money would do more in the hands of provinces, municipalities, or private builders.\n\nShould the federal government create Build Canada Homes?",
+      "category": "Housing",
+      "geoRestrictions": ["Canada"],
+      "voteType": "yes-no",
+      "deadline": "2026-07-15T05:59:59Z"
+    },
+    {
+      "title": "Should physicians be allowed to practice in both public and private healthcare systems?",
+      "description": "Alberta is moving toward a dual-practice healthcare model that would allow physicians to work in the public system while also offering private-pay care under a regulated framework. Other provinces are watching closely, and the debate is national.\n\nSupporters argue dual practice expands capacity, retains doctors, and reduces wait times without removing anyone's public coverage. Opponents argue it draws physicians away from the public system and creates two-tier access to care.\n\nShould provinces allow physicians to practice in both public and private systems?",
+      "category": "Healthcare",
+      "geoRestrictions": ["Canada"],
+      "voteType": "yes-no",
+      "deadline": "2026-07-15T05:59:59Z"
+    },
+    {
+      "title": "Should Canada eliminate interprovincial trade barriers?",
+      "description": "Canadians can often trade more freely with other countries than across their own provincial borders. Differing regulations, licensing regimes, and restrictions on goods like alcohol cost the economy tens of billions of dollars a year by most estimates, and momentum for reform has grown as Canada looks to strengthen its internal economy.\n\nSupporters argue free internal trade is an obvious win that would lower prices and boost growth. Opponents note that some barriers protect provincial industries, safety standards, and revenue streams that provinces are reluctant to give up.\n\nShould Canada eliminate interprovincial trade barriers?",
+      "category": "Economy",
+      "geoRestrictions": ["Canada"],
+      "voteType": "yes-no",
+      "deadline": "2026-07-15T05:59:59Z"
+    }
+  ]
+}

@@ -5,7 +5,7 @@ import { baseNetwork } from "./base-network";
 import { log } from "./app";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { setupBadgeRoutes } from "./badge-routes";
-import { passportNFTs, activatedRidings, electoralRidingQRCodes, proposals, votes, voteTokenClaims, organizations, transactions, proposalReports, userMutes } from "@shared/schema";
+import { passportNFTs, activatedRidings, electoralRidingQRCodes, proposals, votes, voteTokenClaims, organizations, transactions, proposalReports, userMutes, proposalComments, users as usersTable } from "@shared/schema";
 import { getMemberLimit, getTierLimits, isFeatureEnabled, tierDisplayName, type OrgTier } from "@shared/tier-limits";
 import {
   ORG_VERIFICATION_UNLOCK_PRICE_IDS,
@@ -17,7 +17,7 @@ import {
   parseVendorData,
 } from "./verificationUnlock";
 import { checkContent } from "./profanityFilter";
-import { eq, count, and, sql } from "drizzle-orm";
+import { eq, count, and, sql, desc, isNull } from "drizzle-orm";
 import { db } from "./db";
 import { savePushToken, notifyNewProposal, notifyTokenClaimed, notifyProposalVote } from "./notifications";
 import { sendEmail, buildOrgInviteEmail } from "./email";
@@ -119,14 +119,26 @@ async function createDiditSession(
   firstName?: string,
   lastName?: string,
   originatingOrgId?: string | null,
+  flow: 'standard' | 'citizen' = 'standard',
 ): Promise<{ sessionId: string; sessionUrl: string }> {
   const apiKey = process.env.DIDIT_API_KEY;
-  const workflowId = process.env.DIDIT_WORKFLOW_ID;
+  // 'citizen' uses a separate Didit workflow (passport + proof of address)
+  // that proves citizenship. Falls back to the standard workflow if the
+  // citizen workflow env var isn't set.
+  const workflowId = flow === 'citizen'
+    ? (process.env.DIDIT_WORKFLOW_ID_CITIZEN || process.env.DIDIT_WORKFLOW_ID)
+    : process.env.DIDIT_WORKFLOW_ID;
   if (!apiKey || !workflowId) {
     throw new Error("Didit not configured (set DIDIT_API_KEY + DIDIT_WORKFLOW_ID)");
   }
   const domain = process.env.REPLIT_DEV_DOMAIN || process.env.REPLIT_DEPLOYMENT_URL || "localhost:5000";
-  const callbackUrl = `https://${domain}/api/didit/webhook`;
+  // Per-session `callback` is where Didit redirects the user's browser
+  // AFTER they finish verification — NOT the server-to-server webhook
+  // (that's configured separately in the Didit dashboard and stays at
+  // /api/didit/webhook). We give it a dedicated user-facing page so the
+  // WebView in the mobile app can intercept it and close cleanly, with
+  // a friendly fallback HTML if interception ever misses.
+  const callbackUrl = `https://${domain}/verification-complete`;
   const body: any = {
     workflow_id: workflowId,
     callback: callbackUrl,
@@ -181,19 +193,77 @@ function mapDiditDecisionToUserFields(decision: any): {
   const id = decision?.id_verification ?? decision?.kyc ?? decision ?? {};
   const address = id.address ?? {};
   const isPassport = String(id.document_type ?? id.documentType ?? "").toUpperCase().includes("PASSPORT");
+
+  // TEMP DIAGNOSTIC: log the decision shape so we can confirm exactly which
+  // fields Didit populates per document type. Remove once confirmed.
+  try { log(`Didit decision shape: ${JSON.stringify(decision)?.slice(0, 2500)}`); } catch { /* ignore */ }
+
+  // Country probes. Didit's field name varies by document type and workflow.
+  // Passports carry nationality/issuing country but no address; ID cards and
+  // licenses carry an address. Probe every known shape, then normalize a
+  // possible ISO code (CAN / CA) to the full country name so geo-gating
+  // matches proposal geoRestrictions (which store "Canada", not "CAN").
+  let country =
+    id.document_country ?? id.documentCountry ??
+    id.issuing_country ?? id.issuingCountry ??
+    id.issuing_state ?? // some passport payloads put issuing authority here
+    id.nationality ?? id.country ?? id.country_name ??
+    address.country ?? address.country_name;
+  let state = address.state ?? address.region ?? address.province ?? id.state ?? id.province;
+  let city = address.city ?? address.locality ?? address.town ?? id.city;
+
+  // Recursive fallback: if structured probes missed, walk the whole decision
+  // for the first plausible country/state/city string. Keeps geo working
+  // even if Didit reshapes the payload.
+  if (!country || (!isPassport && (!state || !city))) {
+    const visit = (obj: any, depth: number) => {
+      if (!obj || typeof obj !== "object" || depth > 6) return;
+      for (const [k, v] of Object.entries(obj)) {
+        if (v && typeof v === "object") { visit(v, depth + 1); continue; }
+        if (typeof v !== "string" || !v.trim()) continue;
+        const key = k.toLowerCase();
+        if (!country && (key === "nationality" || key === "country" || key === "country_name" || key.includes("issuing_country") || key.includes("document_country"))) country = v;
+        else if (!state && (key === "state" || key === "province" || key === "region")) state = v;
+        else if (!city && (key === "city" || key === "locality" || key === "town")) city = v;
+      }
+    };
+    try { visit(decision, 0); } catch { /* best-effort */ }
+  }
+
   return {
     firstName: id.first_name ?? id.firstName,
     lastName: id.last_name ?? id.lastName,
     dateOfBirth: id.date_of_birth ?? id.dateOfBirth,
     gender: normalizeGender(id.gender),
     documentType: id.document_type ?? id.documentType,
-    // Passport: nationality from doc; ID card / driver's license: address country
-    country: isPassport
-      ? (id.document_country ?? id.documentCountry ?? address.country)
-      : (address.country ?? id.document_country ?? id.documentCountry),
-    state: address.state ?? address.region,
-    city: address.city,
+    country: normalizeCountryCode(country),
+    state,
+    city,
   };
+}
+
+// Didit sometimes returns ISO 3166 alpha-2/alpha-3 codes for country instead
+// of the full name. Proposal geoRestrictions store full names ("Canada"), so
+// normalize the common cases. Unknown values pass through unchanged.
+function normalizeCountryCode(c: any): string | undefined {
+  if (!c || typeof c !== "string") return undefined;
+  const v = c.trim();
+  if (!v) return undefined;
+  const upper = v.toUpperCase();
+  const map: Record<string, string> = {
+    CA: "Canada", CAN: "Canada",
+    US: "United States", USA: "United States", "UNITED STATES OF AMERICA": "United States",
+    GB: "United Kingdom", GBR: "United Kingdom", UK: "United Kingdom",
+    AU: "Australia", AUS: "Australia",
+    IN: "India", IND: "India",
+    DE: "Germany", DEU: "Germany",
+    FR: "France", FRA: "France",
+    MX: "Mexico", MEX: "Mexico",
+  };
+  if (map[upper]) return map[upper];
+  // If it's a 2-3 letter code we don't recognize, leave as-is; if it's a
+  // longer human-readable string, return it title-cased-ish (unchanged).
+  return v;
 }
 
 function normalizeGender(g: any): string | undefined {
@@ -274,8 +344,146 @@ async function checkMemberCap(
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // User-facing page Didit redirects to after the verification session
+  // completes. The mobile WebView intercepts this URL and bounces the
+  // user back into the app — this HTML is only shown if interception
+  // misses (web SPA users, slow networks, or stale clients).
+  // The actual server-to-server webhook is /api/didit/webhook (below).
+  app.get("/verification-complete", (_req: any, res: any) => {
+    res
+      .status(200)
+      .type("html")
+      .send(`<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Verification complete</title>
+  <style>
+    :root { color-scheme: dark; }
+    html, body { margin: 0; padding: 0; height: 100%; background: #0b0b0c; color: #f5efe1; font-family: -apple-system, system-ui, Segoe UI, Roboto, sans-serif; }
+    .wrap { min-height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 32px; text-align: center; }
+    .badge { width: 72px; height: 72px; border-radius: 36px; background: rgba(234,186,88,0.15); display: flex; align-items: center; justify-content: center; margin-bottom: 24px; border: 1px solid rgba(234,186,88,0.4); }
+    .check { color: #eaba58; font-size: 36px; font-weight: 700; }
+    h1 { font-family: Georgia, serif; font-weight: 500; font-size: 28px; margin: 0 0 12px; color: #f5efe1; }
+    p { font-size: 15px; line-height: 1.55; max-width: 320px; color: rgba(245,239,225,0.7); margin: 0 0 32px; }
+    .btn { display: inline-flex; align-items: center; gap: 8px; background: #eaba58; color: #0b0b0c; font-weight: 600; padding: 14px 22px; border-radius: 12px; text-decoration: none; font-size: 15px; }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <div class="badge"><span class="check">&#10003;</span></div>
+    <h1>Verification complete</h1>
+    <p>You can return to the Represent app. If it didn't reopen automatically, switch back to it now.</p>
+    <a class="btn" href="represent://verification-complete">Return to Represent</a>
+  </main>
+</body>
+</html>`);
+  });
+
   // Setup OAuth authentication (Google, Apple, GitHub)
   await setupAuth(app);
+
+  // ── Public proposal page ──────────────────────────────────────────
+  // Server-rendered, unauthenticated, shareable. This is the URL the
+  // mobile share sheet sends (representportal.com/p/:id). It must:
+  //   1. carry og:/twitter: meta so links unfurl on social
+  //   2. show the live tally so journalists/curious people see substance
+  //   3. funnel to the App Store to vote
+  // Registered before the SPA catch-all so Express matches it first.
+  const APP_STORE_URL = "https://apps.apple.com/ca/app/id6756912022";
+  const escapeHtml = (s: string) =>
+    String(s ?? "").replace(/[&<>"']/g, (c) =>
+      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c] as string));
+
+  app.get("/p/:proposalId", async (req: any, res: any) => {
+    try {
+      const proposal = await storage.getProposal(req.params.proposalId);
+      if (!proposal || (proposal as any).hiddenAt) {
+        return res.status(404).type("html").send(
+          `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Proposal not found — Represent</title></head><body style="margin:0;background:#0B0B0C;color:#F5EFE1;font-family:-apple-system,system-ui,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;text-align:center;padding:32px"><div><h1 style="font-family:Georgia,serif;font-weight:500">Proposal not found</h1><p style="color:rgba(245,239,225,.6)">It may have closed or been removed.</p><a href="${APP_STORE_URL}" style="color:#EABA58">Get Represent Vote →</a></div></body></html>`,
+        );
+      }
+
+      const title = escapeHtml(proposal.title);
+      const desc = escapeHtml((proposal.description || "").slice(0, 200));
+      const support = Number(proposal.supportVotes) || 0;
+      const oppose = Number(proposal.opposeVotes) || 0;
+      const total = support + oppose;
+      const pct = total > 0 ? Math.round((support / total) * 100) : 0;
+      const geo: string[] = Array.isArray(proposal.geoRestrictions) ? proposal.geoRestrictions : [];
+      const scope = geo.length === 0 ? "Global" : geo[geo.length - 1];
+      const ended = proposal.deadline && new Date(proposal.deadline).getTime() < Date.now();
+      const citizens = (proposal as any).requiresCitizenship
+        ? `<span style="display:inline-block;font-size:11px;font-weight:700;letter-spacing:.08em;color:#EABA58;background:rgba(234,186,88,.14);padding:5px 10px;border-radius:7px;margin-left:8px">CITIZENS ONLY</span>`
+        : "";
+      const pageUrl = `https://representportal.com/p/${escapeHtml(String(proposal.id))}`;
+
+      res.status(200).type("html").send(`<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${title} — Represent Vote</title>
+<meta name="description" content="${desc}">
+<meta property="og:title" content="${title}">
+<meta property="og:description" content="${total.toLocaleString()} verified votes · ${pct}% support — cast yours on Represent Vote.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="${pageUrl}">
+<meta property="og:site_name" content="Represent Vote">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="${title}">
+<meta name="twitter:description" content="${total.toLocaleString()} verified votes · ${pct}% support. One person, one verified ballot.">
+<style>
+:root{color-scheme:dark}
+body{margin:0;background:#0B0B0C;color:#F5EFE1;font-family:-apple-system,system-ui,Segoe UI,Roboto,sans-serif;line-height:1.6}
+.wrap{max-width:680px;margin:0 auto;padding:48px 24px 64px}
+.brand{display:flex;align-items:center;gap:10px;color:#EABA58;font-weight:700;letter-spacing:.2em;font-size:13px;margin-bottom:40px}
+.brand svg{flex-shrink:0}
+.eyebrow{font-size:12px;font-weight:700;letter-spacing:.18em;color:#EABA58;text-transform:uppercase}
+h1{font-family:Georgia,serif;font-weight:500;font-size:clamp(28px,6vw,40px);line-height:1.15;margin:14px 0 16px}
+.desc{color:rgba(245,239,225,.65);font-size:16px}
+.card{background:#131419;border:1px solid rgba(245,239,225,.1);border-radius:18px;padding:26px;margin:32px 0}
+.bar{height:10px;border-radius:6px;background:rgba(245,239,225,.1);overflow:hidden;margin:14px 0 10px}
+.bar i{display:block;height:100%;width:${pct}%;background:linear-gradient(90deg,#EABA58,#C99838);border-radius:6px}
+.row{display:flex;justify-content:space-between;font-size:14px;color:rgba(245,239,225,.7)}
+.row b{color:#F5EFE1}
+.status{font-size:12.5px;font-weight:600;letter-spacing:.06em;color:${ended ? "rgba(245,239,225,.45)" : "#3F7A5C"};margin-top:14px}
+.cta{display:block;text-align:center;background:#EABA58;color:#0B0B0C;font-weight:700;font-size:16px;padding:16px;border-radius:13px;text-decoration:none;margin-top:8px}
+.note{text-align:center;font-size:12.5px;color:rgba(245,239,225,.4);margin-top:14px}
+.foot{margin-top:48px;border-top:1px solid rgba(245,239,225,.1);padding-top:20px;font-size:12.5px;color:rgba(245,239,225,.4);display:flex;gap:16px;flex-wrap:wrap}
+.foot a{color:rgba(245,239,225,.55);text-decoration:none}
+</style>
+</head>
+<body>
+<main class="wrap">
+  <div class="brand">
+    <svg width="26" height="26" viewBox="0 0 100 100" fill="none"><circle cx="50" cy="50" r="44" stroke="#EABA58" stroke-width="5"/><path d="M52 16c-3 0-5.5 2.4-5.5 5.5v22c0 1-1.5 1-1.5 0V31c0-3-2.4-5.5-5.5-5.5S34 28 34 31v25c-1-2-2.5-4-4.5-3.4-2 .6-2.4 2.8-1.3 4.8l7.2 13c2 3.5 5.5 6.4 11 6.4h2.5c7 0 12-5 12-12V27c0-3-2.5-5.5-5.5-5.5S50 24 50 27v15c0 1-1.5 1-1.5 0V21.5c0-3-2.5-5.5-5.5-5.5z" fill="#EABA58"/></svg>
+    REPRESENT
+  </div>
+  <span class="eyebrow">${escapeHtml(scope)} proposal</span>${citizens}
+  <h1>${title}</h1>
+  <p class="desc">${desc}</p>
+  <div class="card">
+    <div class="row"><b>${pct}% support</b><span><b>${total.toLocaleString()}</b> verified votes</span></div>
+    <div class="bar"><i></i></div>
+    <div class="row"><span>Support ${support.toLocaleString()}</span><span>Oppose ${oppose.toLocaleString()}</span></div>
+    <div class="status">${ended ? "● Voting closed" : "● Voting open now"}</div>
+  </div>
+  <a class="cta" href="${APP_STORE_URL}">Cast your verified vote — get the app</a>
+  <p class="note">One person, one ballot. Identity-verified. Free to verify.</p>
+  <div class="foot">
+    <span>© 2026 Represent Labs</span>
+    <a href="https://representportal.com/privacy">Privacy</a>
+    <a href="https://representportal.com/terms">Terms</a>
+  </div>
+</main>
+</body>
+</html>`);
+    } catch (e: any) {
+      log(`Public proposal page error: ${e?.message || e}`);
+      res.status(500).type("html").send("<!doctype html><title>Error</title>Something went wrong.");
+    }
+  });
 
   // Setup badge system routes
   setupBadgeRoutes(app);
@@ -494,6 +702,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (proposal.deadline && new Date(proposal.deadline).getTime() < Date.now()) {
           return res.status(400).json({ error: "Voting has closed for this proposal" });
         }
+        if ((proposal as any).requiresCitizenship && !(user as any)?.citizenshipVerified) {
+          return res.status(403).json({
+            error: "This proposal is open to verified citizens only",
+            code: "CITIZENSHIP_REQUIRED",
+          });
+        }
         if (proposal.organizationId) {
           const isMember = await storage.isOrganizationMember(proposal.organizationId, userId);
           if (!isMember) {
@@ -548,6 +762,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // unlock fee at toggle-on; subsequent votes are free for the org.
       } else if (!user?.verified) {
         return res.status(403).json({ error: "You must complete identity verification before voting." });
+      }
+
+      // Citizens-only gate. Independent of org membership and standard
+      // verification — requires the Didit Citizen workflow pass.
+      if ((proposal as any).requiresCitizenship && !(user as any)?.citizenshipVerified) {
+        return res.status(403).json({
+          error: "This proposal is open to verified citizens only",
+          code: "CITIZENSHIP_REQUIRED",
+        });
       }
 
       // On-chain voting requires a smart wallet (created at signup). For
@@ -1260,11 +1483,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const user = await storage.getUser(userId);
-      if (!user || user.email !== 'masonwoods45@gmail.com') {
-        return res.status(403).json({ error: "Unauthorized: Admin access required" });
+      if (!user) {
+        return res.status(403).json({ error: "Unauthorized" });
       }
 
       const proposalId = req.params.id;
+
+      // Platform admin can delete anything; otherwise only the creator can
+      // delete their own proposal. A typo'd or mistaken proposal shouldn't
+      // require a support email to remove.
+      const isAdmin = user.email === 'masonwoods45@gmail.com';
+      const proposal = await storage.getProposal(proposalId);
+      if (!proposal) {
+        return res.status(404).json({ error: "Proposal not found" });
+      }
+      const isCreator = (proposal as any).userId === userId || (proposal as any).creatorId === userId;
+      if (!isAdmin && !isCreator) {
+        return res.status(403).json({ error: "You can only delete proposals you created" });
+      }
 
       await db.delete(votes).where(eq(votes.proposalId, proposalId));
       await db.delete(voteTokenClaims).where(eq(voteTokenClaims.proposalId, proposalId));
@@ -1275,7 +1511,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Proposal not found" });
       }
 
-      log(`Admin ${user.email} deleted proposal ${proposalId}`);
+      log(`${isAdmin ? 'Admin' : 'Creator'} ${user.email} deleted proposal ${proposalId}`);
       res.json({ success: true });
     } catch (error) {
       log(`Error deleting proposal: ${error}`);
@@ -1401,7 +1637,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "Identity verification required to create proposals" });
       }
 
-      const { title, description, category, geoRestrictions, riding, demographicRestrictions, voteType, options, organizationId, imageUrl } = req.body;
+      const { title, description, category, geoRestrictions, riding, demographicRestrictions, voteType, options, organizationId, imageUrl, requiresCitizenship } = req.body;
 
       // UPDATE 27 — UGC profanity gate (Apple Guideline 1.2). Cheap
       // pre-publish filter; layered moderation (managed APIs, user
@@ -1480,6 +1716,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       if (imageUrl) {
         updateData.imageUrl = imageUrl;
+      }
+      if (requiresCitizenship === true) {
+        updateData.requiresCitizenship = true;
       }
 
       // Persist voteType + options. Only multiple-choice gets on-chain
@@ -2473,7 +2712,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const user = await storage.getUser(userId);
       if (!user) return res.status(404).json({ error: "User not found" });
 
-      if (user.verified) {
+      // 'citizen' flow gates on citizenshipVerified (a standard-verified user
+      // can still need the stronger citizen pass). Standard flow gates on
+      // `verified` as before.
+      const flow: 'standard' | 'citizen' = req.body?.flow === 'citizen' ? 'citizen' : 'standard';
+      if (flow === 'citizen') {
+        if ((user as any).citizenshipVerified) {
+          return res.status(400).json({ error: "Citizenship already verified" });
+        }
+      } else if (user.verified) {
         return res.status(400).json({ error: "User already verified" });
       }
 
@@ -2502,6 +2749,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         user.firstName || (user.name?.split(" ")[0]),
         user.lastName || (user.name?.split(" ").slice(1).join(" ")),
         attributedOrgId,
+        flow,
       );
 
       // Persist session id so check-decision and sync-location can look it up
@@ -2530,13 +2778,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(401).json({ error: "Invalid signature" });
     }
     try {
-      const { session_id, status, vendor_data, decision } = req.body || {};
+      const { session_id, status, vendor_data, decision, workflow_id } = req.body || {};
       const { userId, originatingOrgId } = parseVendorData(vendor_data);
       log(`Didit webhook: userId=${rid(userId)}, originatingOrgId=${rid(originatingOrgId)}, status=${status}, sessionId=${rid(session_id)}`);
 
       if (!session_id || !userId) {
         return res.status(200).json({ received: true });
       }
+
+      // Was this the Citizen workflow (passport + proof of address)? If so we
+      // also stamp citizenshipVerified so the user can vote on citizens-only
+      // proposals. Compare against the configured citizen workflow id.
+      const citizenWorkflowId = process.env.DIDIT_WORKFLOW_ID_CITIZEN;
+      const sessionWorkflowId = workflow_id || decision?.workflow_id;
+      const isCitizenSession = !!citizenWorkflowId && sessionWorkflowId === citizenWorkflowId;
 
       if (status === "Approved" || status === "approved") {
         const fields = mapDiditDecisionToUserFields(decision || req.body);
@@ -2554,6 +2809,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (fields.gender) updateData.gender = fields.gender;
         if (fields.firstName) updateData.firstName = fields.firstName;
         if (fields.lastName) updateData.lastName = fields.lastName;
+        if (isCitizenSession) {
+          updateData.citizenshipVerified = true;
+          updateData.citizenshipVerifiedAt = new Date();
+        }
 
         await storage.updateUserVerification(userId, updateData);
         await grantInitialBallotsIfNeeded(userId);
@@ -4808,7 +5067,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.claims?.sub;
       const { orgId } = req.params;
-      const { title, description, category, isOfficial, voteType, options } = req.body;
+      const { title, description, category, isOfficial, voteType, options, requiresCitizenship } = req.body;
 
       if (!title || !description || !category) {
         return res.status(400).json({ error: "title, description, and category are required" });
@@ -4851,6 +5110,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
       if (resolvedVoteType !== 'yes-no') updateData.options = options;
       if (isOfficial && isAdmin) updateData.isOfficial = true;
+      if (requiresCitizenship === true) updateData.requiresCitizenship = true;
       await storage.updateProposal(proposal.id, updateData);
 
       const updated = await storage.getProposal(proposal.id);
@@ -4915,6 +5175,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const proposal = await storage.getProposal(proposalId);
       if (!proposal || proposal.organizationId !== orgId) {
         return res.status(404).json({ error: "Proposal not found in this organization" });
+      }
+
+      if ((proposal as any).requiresCitizenship) {
+        const voter = await storage.getUser(userId);
+        if (!(voter as any)?.citizenshipVerified) {
+          return res.status(403).json({
+            error: "This proposal is open to verified citizens only",
+            code: "CITIZENSHIP_REQUIRED",
+          });
+        }
       }
 
       const alreadyVoted = await storage.hasUserVotedOnProposal(userId, proposalId);
@@ -5447,6 +5717,188 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ ok: true, hidden: shouldHide });
     } catch (error: any) {
       log(`Proposal report error: ${error?.message ?? error}`);
+      res.status(500).json({ error: "Failed to submit report" });
+    }
+  });
+
+  // ─── Comments on proposals ───────────────────────────────────────────
+  //
+  // Flat (no threading) v1. Same UGC moderation posture as proposals:
+  // profanity filter at create, per-comment reports with the same
+  // AUTO_HIDE_AT threshold, creator-or-admin delete. Listings exclude
+  // hidden comments and comments from authors the requester has muted.
+
+  const COMMENT_MAX_LEN = 500;
+
+  // GET /api/proposals/:proposalId/comments — newest first, capped at 200.
+  app.get("/api/proposals/:proposalId/comments", isAuthenticated, async (req: any, res) => {
+    try {
+      const requesterId = req.user.claims?.sub;
+      const { proposalId } = req.params;
+
+      const rows = await db
+        .select({
+          id: proposalComments.id,
+          proposalId: proposalComments.proposalId,
+          userId: proposalComments.userId,
+          body: proposalComments.body,
+          createdAt: proposalComments.createdAt,
+          authorName: usersTable.name,
+          authorVerified: usersTable.verified,
+        })
+        .from(proposalComments)
+        .leftJoin(usersTable, eq(proposalComments.userId, usersTable.id))
+        .where(and(
+          eq(proposalComments.proposalId, proposalId),
+          isNull(proposalComments.hiddenAt),
+        ))
+        .orderBy(desc(proposalComments.createdAt))
+        .limit(200);
+
+      // Apply the requester's mute set so muted authors disappear here too.
+      let visible = rows;
+      if (requesterId) {
+        try {
+          const mutedRows = await db
+            .select({ mutedId: userMutes.mutedId })
+            .from(userMutes)
+            .where(eq(userMutes.muterId, requesterId));
+          if (mutedRows.length > 0) {
+            const mutedSet = new Set(mutedRows.map((r) => r.mutedId));
+            visible = rows.filter((r) => !mutedSet.has(r.userId));
+          }
+        } catch { /* fail open */ }
+      }
+
+      res.json({ comments: visible });
+    } catch (error: any) {
+      log(`List comments error: ${error?.message ?? error}`);
+      res.status(500).json({ error: "Failed to load comments" });
+    }
+  });
+
+  // POST /api/proposals/:proposalId/comments — create. Auth required;
+  // profanity-filtered; body capped.
+  app.post("/api/proposals/:proposalId/comments", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims?.sub;
+      if (!userId) return res.status(401).json({ error: "Unauthorized" });
+      const { proposalId } = req.params;
+      const rawBody = typeof req.body?.body === "string" ? req.body.body.trim() : "";
+      if (!rawBody) return res.status(400).json({ error: "Comment cannot be empty" });
+      if (rawBody.length > COMMENT_MAX_LEN) {
+        return res.status(400).json({ error: `Comments are capped at ${COMMENT_MAX_LEN} characters` });
+      }
+
+      const proposal = await storage.getProposal(proposalId);
+      if (!proposal || (proposal as any).hiddenAt) {
+        return res.status(404).json({ error: "Proposal not found" });
+      }
+
+      const profanity = checkContent({ title: "", description: rawBody });
+      if (!profanity.ok) {
+        return res.status(400).json({
+          error: "Your comment contains language that isn't allowed. Please rephrase.",
+          code: "CONTENT_REJECTED",
+        });
+      }
+
+      const [inserted] = await db.insert(proposalComments).values({
+        proposalId,
+        userId,
+        body: rawBody,
+      }).returning();
+
+      const author = await storage.getUser(userId);
+      res.status(201).json({
+        comment: {
+          ...inserted,
+          authorName: author?.name ?? null,
+          authorVerified: author?.verified ?? false,
+        },
+      });
+    } catch (error: any) {
+      log(`Create comment error: ${error?.message ?? error}`);
+      res.status(500).json({ error: "Failed to post comment" });
+    }
+  });
+
+  // DELETE /api/comments/:commentId — creator or platform admin only.
+  app.delete("/api/comments/:commentId", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims?.sub;
+      if (!userId) return res.status(401).json({ error: "Unauthorized" });
+      const { commentId } = req.params;
+
+      const [comment] = await db
+        .select()
+        .from(proposalComments)
+        .where(eq(proposalComments.id, commentId))
+        .limit(1);
+      if (!comment) return res.status(404).json({ error: "Comment not found" });
+
+      const user = await storage.getUser(userId);
+      const isAdmin = user?.email === "masonwoods45@gmail.com";
+      if (!isAdmin && comment.userId !== userId) {
+        return res.status(403).json({ error: "You can only delete your own comments" });
+      }
+
+      await db.delete(proposalComments).where(eq(proposalComments.id, commentId));
+      res.json({ ok: true });
+    } catch (error: any) {
+      log(`Delete comment error: ${error?.message ?? error}`);
+      res.status(500).json({ error: "Failed to delete comment" });
+    }
+  });
+
+  // POST /api/comments/:commentId/report — same reasons + threshold as
+  // proposal reports; auto-hides the comment at AUTO_HIDE_AT.
+  app.post("/api/comments/:commentId/report", isAuthenticated, async (req: any, res) => {
+    try {
+      const reporterId = req.user.claims?.sub;
+      if (!reporterId) return res.status(401).json({ error: "Unauthorized" });
+      const { commentId } = req.params;
+      const { reason } = req.body ?? {};
+      if (typeof reason !== "string" || !REPORT_REASONS.has(reason)) {
+        return res.status(400).json({ error: "Invalid reason" });
+      }
+
+      const [comment] = await db
+        .select()
+        .from(proposalComments)
+        .where(eq(proposalComments.id, commentId))
+        .limit(1);
+      if (!comment) return res.status(404).json({ error: "Comment not found" });
+
+      const newCount = (comment.reportCount ?? 0) + 1;
+      const shouldHide = newCount >= AUTO_HIDE_AT && !comment.hiddenAt;
+      await db.update(proposalComments).set({
+        reportCount: newCount,
+        ...(shouldHide ? { hiddenAt: new Date() } : {}),
+      }).where(eq(proposalComments.id, commentId));
+
+      try {
+        const adminEmail = process.env.MODERATION_ADMIN_EMAIL;
+        if (adminEmail) {
+          const text =
+            `Comment: ${commentId} on proposal ${comment.proposalId}\n` +
+            `Author: ${comment.userId}\nReporter: ${reporterId}\nReason: ${reason}\n` +
+            `Reports total: ${newCount}\nAuto-hidden: ${shouldHide ? "yes" : "no"}\n\n` +
+            `Body:\n${comment.body}\n`;
+          await sendEmail({
+            to: adminEmail,
+            subject: `[Represent] Comment report: ${reason}${shouldHide ? " (auto-hidden)" : ""}`,
+            html: `<pre style="font-family:monospace;font-size:13px;">${text.replace(/[<>&]/g, (c) => ({"<":"&lt;",">":"&gt;","&":"&amp;"}[c]!))}</pre>`,
+            text,
+          });
+        }
+      } catch (e: any) {
+        log(`comment report email failed: ${e?.message ?? e}`);
+      }
+
+      res.json({ ok: true, hidden: shouldHide });
+    } catch (error: any) {
+      log(`Comment report error: ${error?.message ?? error}`);
       res.status(500).json({ error: "Failed to submit report" });
     }
   });

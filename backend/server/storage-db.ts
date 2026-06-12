@@ -12,6 +12,8 @@ export interface VerificationData {
   verifiedAt?: Date;
   country?: string;
   state?: string;
+  citizenshipVerified?: boolean;
+  citizenshipVerifiedAt?: Date;
 }
 
 export interface GeoLocation {
@@ -319,6 +321,10 @@ export class DatabaseStorage implements IStorage {
     if (verification.documentType) updateData.documentType = verification.documentType;
     if (verification.gender) updateData.gender = verification.gender;
     if (verification.dateOfBirth) updateData.dateOfBirth = verification.dateOfBirth;
+    if ((verification as any).citizenshipVerified) {
+      updateData.citizenshipVerified = true;
+      updateData.citizenshipVerifiedAt = (verification as any).citizenshipVerifiedAt ?? new Date();
+    }
 
     await db.update(users).set(updateData).where(eq(users.id, userId));
   }

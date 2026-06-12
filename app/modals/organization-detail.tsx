@@ -1668,7 +1668,8 @@ export default function OrganizationDetailScreen() {
     isOfficial: boolean;
     voteType: 'yes-no' | 'multiple-choice' | 'ranked-choice';
     options: string[];
-  }>({ title: '', description: '', category: 'Other', isOfficial: false, voteType: 'yes-no', options: ['', ''] });
+    requiresCitizenship: boolean;
+  }>({ title: '', description: '', category: 'Other', isOfficial: false, voteType: 'yes-no', options: ['', ''], requiresCitizenship: false });
 
   const [members, setMembers] = useState<any[]>([]);
   const [inviteCodes, setInviteCodes] = useState<any[]>([]);
@@ -1962,11 +1963,12 @@ export default function OrganizationDetailScreen() {
         isOfficial: newProposal.isOfficial,
         voteType: newProposal.voteType,
         options: cleanedOptions,
+        requiresCitizenship: newProposal.requiresCitizenship,
       });
       if (result.error) { Alert.alert('Error', result.error); return; }
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setShowCreateModal(false);
-      setNewProposal({ title: '', description: '', category: 'Other', isOfficial: false, voteType: 'yes-no', options: ['', ''] });
+      setNewProposal({ title: '', description: '', category: 'Other', isOfficial: false, voteType: 'yes-no', options: ['', ''], requiresCitizenship: false });
       fetchData();
     } catch (error) {
       Alert.alert('Error', 'Failed to create proposal. Please try again.');
@@ -2137,6 +2139,8 @@ export default function OrganizationDetailScreen() {
         // are unaffected. Options is JSON-encoded (URL params can't carry arrays).
         voteType: ((p as any).voteType as string) || 'yes-no',
         options: JSON.stringify((p as any).options ?? []),
+        creatorId: String((p as any).creatorId ?? (p as any).userId ?? ''),
+        creatorName: (p as any).creatorName || 'Community Member',
       },
     });
   };
@@ -2461,6 +2465,28 @@ export default function OrganizationDetailScreen() {
                 <Switch
                   value={newProposal.isOfficial}
                   onValueChange={(v) => setNewProposal((p) => ({ ...p, isOfficial: v }))}
+                  trackColor={{ false: O_LINE_STRONG, true: O_GOLD }}
+                  thumbColor="#FFF"
+                />
+              </View>
+            )}
+
+            {organization?.role === 'admin' && (
+              <View style={[styles.officialToggleRow, { backgroundColor: O_BG_CARD, borderColor: O_LINE_STRONG }]}>
+                <View style={styles.officialToggleInfo}>
+                  <View style={[styles.officialToggleIcon, { backgroundColor: 'rgba(234,186,88,0.15)' }]}>
+                    <Ionicons name="shield-checkmark" size={16} color={O_GOLD} />
+                  </View>
+                  <View style={styles.officialToggleText}>
+                    <Text style={[styles.officialToggleTitle, { color: O_FG }]}>Citizens only</Text>
+                    <Text style={[styles.officialToggleSubtitle, { color: O_FG_MUTED }]}>
+                      Only voters who verify citizenship (passport + proof of address) can vote
+                    </Text>
+                  </View>
+                </View>
+                <Switch
+                  value={newProposal.requiresCitizenship}
+                  onValueChange={(v) => setNewProposal((p) => ({ ...p, requiresCitizenship: v }))}
                   trackColor={{ false: O_LINE_STRONG, true: O_GOLD }}
                   thumbColor="#FFF"
                 />

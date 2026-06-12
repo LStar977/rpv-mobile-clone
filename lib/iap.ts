@@ -85,12 +85,17 @@ export interface IAPPurchaseResult {
 let purchaseUpdateSubscription: any = null;
 let purchaseErrorSubscription: any = null;
 let pendingPurchaseResolve: ((result: IAPPurchaseResult) => void) | null = null;
+let iapInitialized = false;
 
 /**
  * Initialize IAP connection and listeners
  */
 export async function initIAP(): Promise<boolean> {
   if (!iapAvailable || !RNIap || Platform.OS !== 'ios') return false;
+  // Guard against double-init (e.g. on app resume). Registering the
+  // listeners twice makes both fire on a purchase — double state updates
+  // and a double finishTransaction attempt.
+  if (iapInitialized) return true;
 
   try {
     await RNIap.initConnection();
@@ -103,10 +108,21 @@ export async function initIAP(): Promise<boolean> {
           // Verification-unlock SKUs are consumables (server-side state
           // is the source of truth). Subscriptions stay non-consumable.
           const consumable = isConsumableSku(purchase.productId);
+          let finished = false;
           try {
             await RNIap.finishTransaction({ purchase, isConsumable: consumable });
+            finished = true;
           } catch (e) {
-            console.error('Error finishing transaction:', e);
+            // If finishTransaction fails, Apple will re-deliver this
+            // purchase on next launch. Retry once before giving up —
+            // resolving success on an unfinished transaction risks a
+            // confusing re-delivery flow later.
+            try {
+              await RNIap.finishTransaction({ purchase, isConsumable: consumable });
+              finished = true;
+            } catch (e2) {
+              console.error('Error finishing transaction (after retry):', e2);
+            }
           }
 
           if (pendingPurchaseResolve) {
@@ -117,6 +133,11 @@ export async function initIAP(): Promise<boolean> {
               productId: purchase.productId,
             });
             pendingPurchaseResolve = null;
+          } else if (finished) {
+            // Re-delivered purchase with no in-flight request (e.g. the
+            // app was killed mid-purchase). The receipt was finished;
+            // server-side validation on next restore covers entitlement.
+            console.log('IAP: finished re-delivered transaction', purchase.productId);
           }
         }
       }
@@ -137,6 +158,7 @@ export async function initIAP(): Promise<boolean> {
       }
     );
 
+    iapInitialized = true;
     return true;
   } catch (error) {
     console.error('IAP init error:', error);
@@ -159,6 +181,7 @@ export function endIAP() {
   if (iapAvailable && RNIap) {
     RNIap.endConnection();
   }
+  iapInitialized = false;
 }
 
 /**
@@ -201,10 +224,40 @@ export async function purchaseProduct(sku: string): Promise<IAPPurchaseResult> {
     return { success: false, error: 'In-app purchases not available' };
   }
 
+  // A second purchase starting while one is in flight would silently
+  // overwrite pendingPurchaseResolve, leaving the first caller's promise
+  // hanging forever (infinite spinner). Resolve the old one as cancelled
+  // before taking over.
+  if (pendingPurchaseResolve) {
+    pendingPurchaseResolve({ success: false, cancelled: true, error: 'Superseded by a new purchase' });
+    pendingPurchaseResolve = null;
+  }
+
+  const consumable = isConsumableSku(sku);
+
+  // CRITICAL: StoreKit must have the product loaded into its cache before
+  // requestPurchase/requestSubscription will work. Calling the purchase
+  // request for a SKU that was never fetched throws "Invalid product ID"
+  // (E_DEVELOPER_ERROR / SKErrorDomain) even when the product is correctly
+  // configured in App Store Connect. Prefetch the specific SKU first.
+  try {
+    if (consumable) {
+      await RNIap.getProducts({ skus: [sku] });
+    } else {
+      await RNIap.getSubscriptions({ skus: [sku] });
+    }
+  } catch (e: any) {
+    return {
+      success: false,
+      error:
+        'This purchase is temporarily unavailable. Please make sure you are signed in to the App Store and try again.',
+    };
+  }
+
   return new Promise((resolve) => {
     pendingPurchaseResolve = resolve;
 
-    const request = isConsumableSku(sku)
+    const request = consumable
       ? RNIap.requestPurchase({ sku })
       : RNIap.requestSubscription({ sku });
 
@@ -241,9 +294,39 @@ export async function validateReceipt(
       body: JSON.stringify({ receipt, productId, organizationId }),
     });
 
+    // Try to surface the backend's actual error text so failures are
+    // diagnosable in TestFlight without log access. The endpoint can fail
+    // many ways: HTML SPA catch-all (endpoint not deployed), 500 with
+    // "shared secret not configured", 200 with { valid: false, reason }
+    // from Apple, etc. Show whatever's there.
+    let body: any = null;
+    let bodyText = '';
+    try {
+      bodyText = await response.text();
+      body = bodyText ? JSON.parse(bodyText) : null;
+    } catch {
+      /* response wasn't JSON — leave bodyText raw */
+    }
+
     if (!response.ok) {
-      const error = await response.json().catch(() => ({}));
-      return { valid: false, error: error.message || 'Receipt validation failed' };
+      const detail =
+        body?.error ||
+        body?.message ||
+        body?.reason ||
+        (bodyText && bodyText.startsWith('<') ? 'Endpoint not deployed (received HTML)' : bodyText?.slice(0, 200)) ||
+        '';
+      return {
+        valid: false,
+        error: `Receipt validation failed (HTTP ${response.status})${detail ? ': ' + detail : ''}`,
+      };
+    }
+
+    // Backend may return 200 with { valid: false, error/reason }. Honor it.
+    if (body && body.valid === false) {
+      return {
+        valid: false,
+        error: body.error || body.reason || 'Receipt rejected by backend',
+      };
     }
 
     return { valid: true };

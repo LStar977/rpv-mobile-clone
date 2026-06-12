@@ -21,6 +21,7 @@ import { Button, TierBadge } from '../../components/ui';
 import { adminApi, organizationsApi, userApi, veriffApi } from '../../lib/api';
 import { restorePurchases } from '../../lib/iap';
 import { PassportCard, type PassportStatus } from '../../components/identity/PassportCard';
+import { InviteFriendsCard } from '../../components/referrals/InviteFriendsCard';
 import { useTutorialStore } from '../../lib/tutorial';
 import type { UserTier } from '../../components/ui';
 
@@ -219,14 +220,14 @@ function PrRow({
   value?: string;
   valueColor?: string;
   last?: boolean;
-  onPress: () => void;
+  onPress?: () => void;
 }) {
   const pr = useProfileColors();
+  const Container: any = onPress ? TouchableOpacity : View;
   return (
-    <TouchableOpacity
+    <Container
       style={[prStyles.row, !last && { borderBottomWidth: 1, borderBottomColor: pr.LINE }]}
-      onPress={onPress}
-      activeOpacity={0.7}
+      {...(onPress ? { onPress, activeOpacity: 0.7 } : {})}
     >
       <View style={[prStyles.rowIcon, { backgroundColor: pr.BG_RAISED, borderColor: pr.LINE }]}>
         <Ionicons name={icon} size={18} color={pr.GL} />
@@ -236,8 +237,8 @@ function PrRow({
         {sub && <Text style={[prStyles.rowSub, { color: pr.FG_FAINT }]}>{sub}</Text>}
       </View>
       {value && <Text style={[prStyles.rowValue, { color: valueColor || pr.FG_MUTED }]}>{value}</Text>}
-      <Ionicons name="chevron-forward" size={14} color={pr.FG_FAINT} />
-    </TouchableOpacity>
+      {onPress && <Ionicons name="chevron-forward" size={14} color={pr.FG_FAINT} />}
+    </Container>
   );
 }
 
@@ -625,10 +626,11 @@ export default function ProfileScreen() {
   const [badgesEarned, setBadgesEarned] = useState<number | null>(null);
   const [adminOrgCount, setAdminOrgCount] = useState<number | null>(null);
   const [votesCast, setVotesCast] = useState<number | null>(null);
-  const [verification, setVerification] = useState<{ verified: boolean; status: PassportStatus; verifiedAt?: string | null }>({
+  const [verification, setVerification] = useState<{ verified: boolean; status: PassportStatus; verifiedAt?: string | null; citizenshipVerified: boolean }>({
     verified: false,
     status: 'unverified',
     verifiedAt: null,
+    citizenshipVerified: false,
   });
   const [profileLocation, setProfileLocation] = useState<{ country?: string; state?: string; city?: string } | null>(null);
   const [startingKyc, setStartingKyc] = useState(false);
@@ -644,6 +646,15 @@ export default function ProfileScreen() {
     }
 
     if (!token) return;
+
+    // Source-agnostic check first: the auth user carries subscriptionStatus
+    // from /api/auth/verify, updated by BOTH the Stripe webhook and the
+    // Apple IAP receipt path. /api/stripe/subscription only knows Stripe,
+    // so IAP-paid Premium users were shown "Free tier" here.
+    if (user?.isPremium || user?.subscriptionStatus === 'active') {
+      setUserTier('premium');
+      return;
+    }
 
     try {
       const response = await fetch(`${API_URL}/api/stripe/subscription`, {
@@ -666,7 +677,7 @@ export default function ProfileScreen() {
     } catch (error) {
       console.error('Failed to fetch subscription:', error);
     }
-  }, [token, user?.email]);
+  }, [token, user?.email, user?.subscriptionStatus, user?.isPremium]);
 
   useEffect(() => {
     fetchTier();
@@ -716,10 +727,16 @@ export default function ProfileScreen() {
       const isDemoAccount = user?.email === 'demo@represent.app';
       if (verRes.status === 'fulfilled') {
         const v = (verRes.value?.data || {}) as any;
+        // citizenshipVerified comes from the user object on /api/auth/verify
+        // (not the verification-status subset), so pick it off profRes too.
+        const profUser: any = (profRes.status === 'fulfilled' ? profRes.value?.data : null) || {};
         setVerification({
           verified: isDemoAccount ? true : !!v.verified,
           status: isDemoAccount ? 'verified' : ((v.status as PassportStatus) || (v.verified ? 'verified' : 'unverified')),
           verifiedAt: isDemoAccount ? new Date().toISOString() : (v.verifiedAt || v.verified_at || null),
+          citizenshipVerified: isDemoAccount
+            ? true
+            : !!(profUser.citizenshipVerified || profUser.citizenship_verified),
         });
       }
       if (profRes.status === 'fulfilled') {
@@ -749,7 +766,7 @@ export default function ProfileScreen() {
     setRefreshing(false);
   }, [fetchTier, fetchProfileData]);
 
-  const handleStartKyc = useCallback(async () => {
+  const handleStartKyc = useCallback(() => {
     if (tutorialActive) {
       completeTutorialAction('tap-button');
       return;
@@ -759,41 +776,26 @@ export default function ProfileScreen() {
       return;
     }
     if (verification.status === 'pending') {
-      // Pending: re-fetch status instead of starting a new session.
-      await fetchProfileData();
+      // Pending: re-fetch status instead of routing.
+      fetchProfileData();
       return;
     }
-
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    setStartingKyc(true);
-    try {
-      const response = await veriffApi.createSession();
-      if (response.data?.sessionUrl && response.data?.verificationId) {
-        router.push({
-          pathname: '/modals/veriff',
-          params: {
-            sessionUrl: response.data.sessionUrl,
-            verificationId: response.data.verificationId,
-          },
-        });
-      } else {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-        Alert.alert(
-          'Verification Error',
-          (response.data as any)?.error || 'Could not start verification session. Please try again.'
-        );
-      }
-    } catch (error) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      console.error('Veriff session error:', error);
-      Alert.alert(
-        'Connection Error',
-        'Unable to connect to the verification service. Please check your connection and try again.'
-      );
-    } finally {
-      setStartingKyc(false);
-    }
+    // Route to the verification picker so the user can choose Standard or
+    // Citizen verification.
+    router.push('/modals/verification-payment');
   }, [tutorialActive, completeTutorialAction, isAuthenticated, verification.status, fetchProfileData]);
+
+  // Citizenship row also goes through the picker so the choice + tradeoffs
+  // are explicit. The user can pick Citizen if that's what they want.
+  const handleStartCitizenKyc = useCallback(() => {
+    if (!isAuthenticated) {
+      Alert.alert('Sign In Required', 'Please sign in to begin verification.');
+      return;
+    }
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    router.push('/modals/verification-payment');
+  }, [isAuthenticated]);
 
   const handleLogout = () => {
     Alert.alert('Log Out', 'Are you sure you want to log out?', [
@@ -864,6 +866,14 @@ export default function ProfileScreen() {
 
         {/* Section I: Civic Record */}
         <PrSection delay={200}>
+          <PrRow
+            icon="shield-checkmark-outline"
+            label="Citizenship"
+            sub={verification.citizenshipVerified ? 'Verified citizen' : 'Passport + proof of address required for citizens-only proposals'}
+            value={verification.citizenshipVerified ? 'Verified' : 'Verify'}
+            valueColor={verification.citizenshipVerified ? colors.success : colors.goldLight}
+            onPress={verification.citizenshipVerified ? undefined : handleStartCitizenKyc}
+          />
           <PrRow icon="time-outline" label="Voting history" sub={votesCast !== null ? `${votesCast.toLocaleString()} ballots cast` : undefined} onPress={() => navigateTo('/modals/voting-history')} />
           <PrRow icon="analytics-outline" label="Analytics" sub="Patterns & impact" onPress={() => navigateTo('/modals/analytics')} />
           <PrRow icon="trophy-outline" label="Badges & achievements" value={badgesEarned !== null ? `${badgesEarned} / ${BADGES_TOTAL}` : undefined} valueColor={colors.goldLight} last onPress={() => navigateTo('/modals/badges')} />
@@ -890,6 +900,9 @@ export default function ProfileScreen() {
             />
           )}
         </PrSection>
+
+        {/* Referral program */}
+        <InviteFriendsCard delay={275} />
 
         {/* Section III: Administration */}
         <PrSection delay={300}>
@@ -924,7 +937,7 @@ const styles = StyleSheet.create({
   profileCard: {
     alignItems: 'center',
     padding: SPACING.xxxl,
-    borderRadius: BORDER_RADIUS.xxl,
+    borderRadius: BORDER_RADIUS['2xl'],
     borderWidth: 1.5,
     marginBottom: SPACING.xl,
     overflow: 'hidden',
@@ -957,7 +970,7 @@ const styles = StyleSheet.create({
 
   // Menu Card
   menuCard: {
-    borderRadius: BORDER_RADIUS.xxl,
+    borderRadius: BORDER_RADIUS['2xl'],
     borderWidth: 1,
     overflow: 'hidden',
     marginBottom: SPACING.xl,
@@ -984,7 +997,7 @@ const styles = StyleSheet.create({
 
   // Theme Card
   themeCard: {
-    borderRadius: BORDER_RADIUS.xxl,
+    borderRadius: BORDER_RADIUS['2xl'],
     borderWidth: 1,
     padding: SPACING.lg,
     marginBottom: SPACING.xl,

@@ -26,6 +26,12 @@ export const users = pgTable("users", {
   verified: boolean("verified").default(false),
   verificationId: varchar("verification_id"),
   verificationMethod: varchar("verification_method"),
+  // Citizen-only proposals require a stronger KYC pass (Didit "Citizen"
+  // workflow: passport + proof of address). Set true by that webhook only.
+  // Independent of `verified` — a user can be verified (driver's license)
+  // without being citizenship-verified.
+  citizenshipVerified: boolean("citizenship_verified").default(false),
+  citizenshipVerifiedAt: timestamp("citizenship_verified_at"),
   documentType: varchar("document_type"),
   country: varchar("country"),
   state: varchar("state"),
@@ -250,6 +256,11 @@ export const proposals = pgTable("proposals", {
   // enforced by the listing query (hiddenAt IS NOT NULL excluded).
   reportCount: integer("report_count").default(0),
   hiddenAt: timestamp("hidden_at"),
+  // Citizens-only gate. When true, only users with citizenshipVerified=true
+  // (passed the Didit "Citizen" workflow: passport + proof of address) may
+  // vote. Enforced server-side at /api/voting/submit with a
+  // CITIZENSHIP_REQUIRED 403. Independent of org member verification.
+  requiresCitizenship: boolean("requires_citizenship").default(false),
 });
 
 // UPDATE 27 — UGC moderation. One row per (reporter, proposal) report
@@ -276,6 +287,21 @@ export const userMutes = pgTable("user_mutes", {
 }, (table) => ({
   uniqueMute: unique().on(table.muterId, table.mutedId),
 }));
+
+// Comments on proposals. Flat (no threading) for v1 — a comment is one
+// voice on one proposal. UGC moderation mirrors proposals: profanity
+// filter at create, per-comment reports, auto-hide at the report
+// threshold (hiddenAt), creator-or-admin delete. Body capped at 500
+// chars by the API layer.
+export const proposalComments = pgTable("proposal_comments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  proposalId: varchar("proposal_id").notNull().references(() => proposals.id),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  body: text("body").notNull(),
+  reportCount: integer("report_count").default(0),
+  hiddenAt: timestamp("hidden_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
 
 // Table to store option addresses for multiple-choice proposals
 export const proposalOptionAddresses = pgTable("proposal_option_addresses", {

@@ -22,6 +22,7 @@ import { ORG_TIERS, type OrgTier } from '../../lib/org-tiers';
 import { TierCard } from '../../components/ui/TierCard';
 import { processOrganizationPayment, cancelOrganizationStripe } from '../../lib/payment';
 import { showPaymentError, showPaymentSuccess } from '../../lib/stripe';
+import { SubscriptionLegal } from '../../components/ui/SubscriptionLegal';
 
 const APPLE_SUBSCRIPTIONS_URL = 'https://apps.apple.com/account/subscriptions';
 
@@ -284,22 +285,31 @@ export default function OrganizationBillingScreen() {
             ))}
 
           {selectedTier && selectedTier !== usage.tier && (
-            <TouchableOpacity
-              style={[styles.primaryButton, { backgroundColor: colors.gold }]}
-              onPress={handleConfirmTierChange}
-              disabled={actionLoading !== null}
-              activeOpacity={0.8}
-            >
-              {actionLoading === 'upgrade' ? (
-                <ActivityIndicator color="#000" />
-              ) : (
-                <Text style={styles.primaryButtonText}>
-                  {ORG_TIERS[selectedTier].priceValue > (ORG_TIERS[usage.tier as OrgTier]?.priceValue ?? 0)
-                    ? `Upgrade to ${ORG_TIERS[selectedTier].name}`
-                    : `Switch to ${ORG_TIERS[selectedTier].name}`}
-                </Text>
-              )}
-            </TouchableOpacity>
+            <>
+              <TouchableOpacity
+                style={[styles.primaryButton, { backgroundColor: colors.gold }]}
+                onPress={handleConfirmTierChange}
+                disabled={actionLoading !== null}
+                activeOpacity={0.8}
+              >
+                {actionLoading === 'upgrade' ? (
+                  <ActivityIndicator color="#000" />
+                ) : (
+                  <Text style={styles.primaryButtonText}>
+                    {ORG_TIERS[selectedTier].priceValue > (ORG_TIERS[usage.tier as OrgTier]?.priceValue ?? 0)
+                      ? `Upgrade to ${ORG_TIERS[selectedTier].name}`
+                      : `Switch to ${ORG_TIERS[selectedTier].name}`}
+                  </Text>
+                )}
+              </TouchableOpacity>
+              {/* Apple Guideline 3.1.2(c) — subscription disclosure */}
+              <SubscriptionLegal
+                mode="subscription"
+                productTitle={`${ORG_TIERS[selectedTier].name} — Organization plan`}
+                productLength="1 month"
+                productPrice={`${ORG_TIERS[selectedTier].price}/month`}
+              />
+            </>
           )}
 
           {/* Manage section */}

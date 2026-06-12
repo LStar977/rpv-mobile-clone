@@ -1,12 +1,32 @@
 import { getAuthToken, useAuthStore } from './auth';
 import { SEED_PROPOSALS } from './seedProposals';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getTierLimits, getVerificationUnlockFeeCents } from '../shared/tier-limits';
 
 const API_BASE_URL = 'https://representportal.com';
 const DEMO_ORGS_STORAGE_KEY = '@represent_demo_organizations';
 const DEMO_PROPOSALS_STORAGE_KEY = '@represent_demo_proposals';
 const DELETED_PROPOSALS_STORAGE_KEY = '@represent_deleted_proposals';
 const ORG_VOTES_STORAGE_KEY = '@represent_org_votes';
+
+// Device-local caches that are NOT scoped per-user. They must be cleared on
+// logout/account-switch, otherwise one account's locally-recorded org votes
+// (and demo data) bleed into the next account on the same device — e.g. a
+// brand-new account showing "7 ballots cast" because a previous account or
+// demo session left org votes in AsyncStorage.
+export async function clearLocalUserData(): Promise<void> {
+  try {
+    await AsyncStorage.multiRemove([
+      ORG_VOTES_STORAGE_KEY,
+      DEMO_ORGS_STORAGE_KEY,
+      DEMO_PROPOSALS_STORAGE_KEY,
+      DELETED_PROPOSALS_STORAGE_KEY,
+      '@represent_demo_comments',
+    ]);
+  } catch {
+    /* best-effort — non-fatal if clearing fails */
+  }
+}
 
 // Helper to check if current user is demo account
 function isDemoAccount(): boolean {
@@ -468,6 +488,7 @@ export interface Proposal {
   voteType?: string;
   options?: string[];
   imageUrl?: string;
+  requiresCitizenship?: boolean;
 }
 
 interface CreateProposalData {
@@ -480,6 +501,7 @@ interface CreateProposalData {
   options?: string[];
   imageUrl?: string;
   isOfficial?: boolean;
+  requiresCitizenship?: boolean;
 }
 
 interface UploadResponse {
@@ -605,7 +627,6 @@ export const userApi = {
     if (result.data?.user) {
       const u = result.data.user;
       const verified = !!(u.verified || u.isVerified || u.is_verified || u.kycVerified || u.kyc_verified || u.passport_verified);
-      console.log('[verify] backend user keys:', Object.keys(u).join(','), '| derived verified:', verified);
       return {
         data: {
           verified,
@@ -623,9 +644,7 @@ export const userApi = {
 
 export const proposalsApi = {
   async getAll(): Promise<ApiResponse<Proposal[]>> {
-    console.log('[Proposals] getAll() called - fetching from backend...');
     const result = await apiRequest<any>('/api/proposals');
-    console.log('[Proposals] API result - error:', result.error, '| data type:', typeof result.data, '| isArray:', Array.isArray(result.data));
 
     // Extract backend proposals if available
     let backendProposals: Proposal[] = [];
@@ -641,17 +660,19 @@ export const proposalsApi = {
       creatorId: p.creatorId || p.userId,
     }));
 
-    console.log('[Proposals] Backend count:', backendProposals.length, '| Seed count:', SEED_PROPOSALS.length);
-
-    const merged = [...SEED_PROPOSALS, ...backendProposals];
-    return { data: merged, error: null };
+    // Seed proposals are demo-account-only showcase content (App Store
+    // review). Production users see real proposals exclusively — an
+    // honest empty feed beats a fake full one.
+    if (isDemoAccount()) {
+      return { data: [...SEED_PROPOSALS, ...backendProposals], error: null };
+    }
+    return { data: backendProposals, error: result.error };
   },
   async create(data: CreateProposalData): Promise<ApiResponse<Proposal>> {
     const result = await apiRequest<Proposal>('/api/proposals', {
       method: 'POST',
       body: JSON.stringify(data),
     });
-    console.log('[Proposals] Create response - error:', result.error, '| creatorId:', (result.data as any)?.creatorId || (result.data as any)?.proposal?.creatorId);
     return result;
   },
   async claimVoteToken(proposalId: number | string): Promise<ApiResponse<{ success: boolean; txHash?: string }>> {
@@ -665,6 +686,13 @@ export const proposalsApi = {
     const authState = useAuthStore.getState();
     const userId = authState.user?.id;
     if (!userId) return { data: null, error: 'Not authenticated', requiresVerification: false };
+    // Demo account: proposals live in AsyncStorage (or SEED_*) — the
+    // real backend has no row to vote against. Succeed locally so the
+    // demo flow (seeded App Store reviewer account) can vote on every
+    // ballot type without hitting "Proposal not found" 404s.
+    if (isDemoAccount()) {
+      return { data: { success: true }, error: null };
+    }
     return apiRequest('/api/voting/submit', {
       method: 'POST',
       body: JSON.stringify({
@@ -691,16 +719,18 @@ export const proposalsApi = {
     return apiRequest<Proposal[]>('/api/proposals/featured');
   },
   async deleteProposal(proposalId: number | string): Promise<ApiResponse<{ success: boolean; isSeedProposal?: boolean }>> {
-    // Only admins can delete proposals from backend
-    if (!isAdminAccount()) {
-      return { data: null, error: 'Unauthorized: Admin access required' };
-    }
+    // Authorization is enforced server-side: platform admin can delete
+    // anything, creators can delete their own proposals. The client just
+    // forwards the request — no duplicated permission logic here.
 
     // Check if it's a seed proposal (handled locally)
     const isSeed = typeof proposalId === 'string' && proposalId.startsWith('seed-');
 
     if (isSeed) {
       // Seed proposals are removed from UI state only (reappear on restart)
+      if (!isAdminAccount()) {
+        return { data: null, error: 'Seed proposals can only be removed by an admin' };
+      }
       return { data: { success: true, isSeedProposal: true }, error: null };
     }
 
@@ -717,8 +747,18 @@ export const proposalsApi = {
 // verification — skips the Stripe checkout gate and bills the org via
 // metered usage. The user is verified normally; the org pays.
 export const kycApi = {
-  async createSession(originatingOrgId?: string): Promise<ApiResponse<{ sessionUrl: string; sessionId: string; verificationId?: string }>> {
-    const body = originatingOrgId ? JSON.stringify({ originatingOrgId }) : undefined;
+  // flow: 'standard' uses the default Didit workflow (driver's license).
+  // 'citizen' uses the Citizen workflow (passport + proof of address) and
+  // sets users.citizenshipVerified=true on success — required to vote on
+  // citizens-only proposals.
+  async createSession(
+    originatingOrgId?: string,
+    flow: 'standard' | 'citizen' = 'standard',
+  ): Promise<ApiResponse<{ sessionUrl: string; sessionId: string; verificationId?: string }>> {
+    const payload: Record<string, any> = {};
+    if (originatingOrgId) payload.originatingOrgId = originatingOrgId;
+    if (flow === 'citizen') payload.flow = 'citizen';
+    const body = Object.keys(payload).length ? JSON.stringify(payload) : undefined;
     return apiRequest('/api/didit/create-session', { method: 'POST', body });
   },
   async checkDecision(verificationId: string): Promise<ApiResponse<{ status: string; decision?: string }>> {
@@ -747,6 +787,35 @@ export interface OrgUsage {
 
 export const organizationsApi = {
   async getUsage(orgId: string): Promise<ApiResponse<OrgUsage>> {
+    // Demo orgs only exist in client-side SEED_ORGANIZATIONS — the server has
+    // no row to /usage against. Synthesize a usage shape from the seed data
+    // so the org-billing screen + verification-unlock-checkout modal can
+    // render correctly during the App Store reviewer flow.
+    if (isDemoAccount() && (orgId === DEMO_ORGANIZATION_ID || orgId === DEMO_WESTBROOK_ID)) {
+      const seed = SEED_ORGANIZATIONS.find((o) => o.id === orgId);
+      const tier = (seed?.tier ?? 'free') as OrgUsage['tier'];
+      const limits = getTierLimits(tier);
+      return {
+        data: {
+          tier,
+          subscriptionStatus: 'active',
+          members: {
+            current: seed?.memberCount ?? 0,
+            limit: Number.isFinite(limits.members) ? (limits.members as number) : null,
+          },
+          verification: {
+            unlocked: !!seed?.verificationUnlockedAt,
+            unlockedAt: seed?.verificationUnlockedAt ?? null,
+            unlockFeeCents: getVerificationUnlockFeeCents(tier),
+          },
+          requireMemberVerification: !!seed?.requireMemberVerification,
+          nextBillingDate: null,
+          paymentProvider: 'stripe',
+          isAdmin: true,
+        },
+        error: null,
+      };
+    }
     return apiRequest<OrgUsage>(`/api/organizations/${orgId}/usage`);
   },
 
@@ -758,6 +827,35 @@ export const organizationsApi = {
     orgId: string,
     require: boolean,
   ): Promise<ApiResponse<{ requireMemberVerification: boolean }>> {
+    // Demo orgs: simulate the same response shape the server would return,
+    // so the org-detail toggle UX matches the real flow during App Store
+    // review. Demo orgs are seeded as Plus / Business (Pro+ tiers), never
+    // unlocked — toggling ON returns 402 VERIFICATION_UNLOCK_REQUIRED so
+    // the settings card routes to the verification-unlock-checkout modal.
+    if (isDemoAccount() && (orgId === DEMO_ORGANIZATION_ID || orgId === DEMO_WESTBROOK_ID)) {
+      const seed = SEED_ORGANIZATIONS.find((o) => o.id === orgId);
+      const tier = seed?.tier ?? 'free';
+      const limits = getTierLimits(tier);
+      if (require && !limits.requireVerification) {
+        return {
+          data: null,
+          error: 'Required-verification mode requires Pro plan or higher',
+          errorCode: 'FEATURE_NOT_AVAILABLE_ON_TIER',
+          errorStatus: 402,
+          errorDetails: { feature: 'requireVerification', tier, upgradeRequired: true },
+        };
+      }
+      if (require && !seed?.verificationUnlockedAt && tier !== 'government') {
+        return {
+          data: null,
+          error: 'Identity verification requires a one-time unlock fee',
+          errorCode: 'VERIFICATION_UNLOCK_REQUIRED',
+          errorStatus: 402,
+          errorDetails: { tier, priceCents: getVerificationUnlockFeeCents(tier) },
+        };
+      }
+      return { data: { requireMemberVerification: require }, error: null };
+    }
     return apiRequest<{ requireMemberVerification: boolean }>(
       `/api/organizations/${orgId}/require-verification`,
       { method: 'PUT', body: JSON.stringify({ require }) },
@@ -1130,6 +1228,12 @@ export const organizationsApi = {
         organizationId: orgId,
         organizationName: orgName,
         isOfficial: data.isOfficial ?? false,
+        // RCV / multi-choice metadata. Without these, the detail modal
+        // falls back to yes/no voting because it reads voteType from the
+        // proposal object and there's no API hydration on the demo path.
+        voteType: data.voteType ?? 'yes-no',
+        options: data.options ?? [],
+        requiresCitizenship: data.requiresCitizenship ?? false,
       };
 
       try {
@@ -1627,7 +1731,15 @@ export const badgesApi = {
   },
 
   async checkNewBadges(): Promise<ApiResponse<{ newBadges: any[] }>> {
-    return apiRequest('/api/badges/check', { method: 'POST' });
+    const userId = useAuthStore.getState().user?.id;
+    if (!userId || isDemoAccount()) return { data: { newBadges: [] }, error: null };
+    // The backfill endpoint is idempotent: it scans the user's stats,
+    // awards anything earned-but-missing, and returns only newly awarded
+    // badges. (The previous '/api/badges/check' path never existed on the
+    // backend, so no badge was ever awarded.)
+    const result = await apiRequest<any>(`/api/badges/backfill/${userId}`, { method: 'POST' });
+    if (result.data?.newBadges) return { data: { newBadges: result.data.newBadges }, error: null };
+    return { data: { newBadges: [] }, error: result.error };
   },
 };
 
@@ -1654,27 +1766,8 @@ export const adminApi = {
     if (result.data) {
       return { data: result.data, error: null };
     }
-
-    // Return mock data if backend endpoint doesn't exist yet
-    const activeCount = SEED_PROPOSALS.filter(p => {
-      if (!p.deadline) return true;
-      return new Date(p.deadline).getTime() > Date.now();
-    }).length;
-
-    return {
-      data: {
-        totalUsers: 1247,
-        verifiedUsers: 892,
-        premiumUsers: 156,
-        totalProposals: SEED_PROPOSALS.length + 23,
-        activeProposals: activeCount + 18,
-        totalVotesCast: 15847,
-        totalOrganizations: 34,
-        recentSignups: 89,
-        recentVotes: 1243,
-      },
-      error: null,
-    };
+    // No fabricated fallback numbers — real stats or an honest error.
+    return { data: null, error: result.error || 'Stats unavailable' };
   },
 
   async getAllProposals(): Promise<ApiResponse<Proposal[]>> {
@@ -1682,7 +1775,8 @@ export const adminApi = {
       return { data: null, error: 'Unauthorized: Admin access required' };
     }
 
-    // Get all proposals (both seed and backend) without geo filtering
+    // Get all real proposals without geo filtering. Seeds are demo-only
+    // showcase content and never appear in the production admin view.
     const result = await apiRequest<any>('/api/proposals');
 
     let backendProposals: Proposal[] = [];
@@ -1691,10 +1785,7 @@ export const adminApi = {
     } else if (result.data?.proposals) {
       backendProposals = result.data.proposals;
     }
-
-    // Merge with all seed proposals for admin view
-    const merged = [...SEED_PROPOSALS, ...backendProposals];
-    return { data: merged, error: null };
+    return { data: backendProposals, error: result.error };
   },
 
   isAdmin(): boolean {
@@ -1717,6 +1808,15 @@ export const moderationApi = {
     reason: ReportReason,
     note?: string,
   ): Promise<ApiResponse<{ ok: true; hidden?: boolean }>> {
+    // Seed proposals (seed-*), demo-org proposals (demo-*), and anything
+    // on the demo account live client-side only — the backend has no row
+    // to report against and would 404 "Proposal not found". Succeed
+    // locally so the moderation flow works for the App reviewer (who uses
+    // the demo account + sees seed content) and for any seed proposal.
+    const idStr = String(proposalId);
+    if (isDemoAccount() || idStr.startsWith('seed-') || idStr.startsWith('demo-')) {
+      return { data: { ok: true }, error: null };
+    }
     return apiRequest<{ ok: true; hidden?: boolean }>(`/api/proposals/${proposalId}/report`, {
       method: 'POST',
       body: JSON.stringify({ reason, note: note?.slice(0, 500) }),
@@ -1739,6 +1839,161 @@ export const moderationApi = {
   },
 };
 
+// ─── Comments on proposals ──────────────────────────────────────────────
+export interface ProposalComment {
+  id: string;
+  proposalId: string;
+  userId: string;
+  body: string;
+  createdAt: string;
+  authorName: string | null;
+  authorVerified: boolean;
+}
+
+const DEMO_COMMENTS_STORAGE_KEY = '@represent_demo_comments';
+
+// Demo + seed proposals have no backend row, so their comments live in
+// AsyncStorage keyed by proposal id. Real proposals on the demo account
+// are also kept local — the demo account must never write to production.
+function isLocalOnlyComments(proposalId: number | string): boolean {
+  const idStr = String(proposalId);
+  return isDemoAccount() || idStr.startsWith('seed-') || idStr.startsWith('demo-');
+}
+
+async function readLocalComments(): Promise<Record<string, ProposalComment[]>> {
+  try {
+    const stored = await AsyncStorage.getItem(DEMO_COMMENTS_STORAGE_KEY);
+    return stored ? JSON.parse(stored) : {};
+  } catch {
+    return {};
+  }
+}
+
+export const commentsApi = {
+  async list(proposalId: number | string): Promise<ApiResponse<ProposalComment[]>> {
+    if (isLocalOnlyComments(proposalId)) {
+      const all = await readLocalComments();
+      return { data: all[String(proposalId)] ?? [], error: null };
+    }
+    const result = await apiRequest<any>(`/api/proposals/${proposalId}/comments`);
+    if (result.data?.comments) return { data: result.data.comments, error: null };
+    if (Array.isArray(result.data)) return { data: result.data, error: null };
+    return { data: [], error: result.error };
+  },
+
+  async create(proposalId: number | string, body: string): Promise<ApiResponse<ProposalComment>> {
+    const trimmed = body.trim().slice(0, 500);
+    if (!trimmed) return { data: null, error: 'Comment cannot be empty' };
+
+    if (isLocalOnlyComments(proposalId)) {
+      const user = useAuthStore.getState().user;
+      const comment: ProposalComment = {
+        id: `local-comment-${Date.now()}`,
+        proposalId: String(proposalId),
+        userId: user?.id ?? 'local',
+        body: trimmed,
+        createdAt: new Date().toISOString(),
+        authorName: user?.name ?? 'You',
+        authorVerified: !!user?.verified,
+      };
+      try {
+        const all = await readLocalComments();
+        const key = String(proposalId);
+        all[key] = [comment, ...(all[key] ?? [])];
+        await AsyncStorage.setItem(DEMO_COMMENTS_STORAGE_KEY, JSON.stringify(all));
+      } catch { /* still return the comment for optimistic UI */ }
+      return { data: comment, error: null };
+    }
+
+    const result = await apiRequest<any>(`/api/proposals/${proposalId}/comments`, {
+      method: 'POST',
+      body: JSON.stringify({ body: trimmed }),
+    });
+    if (result.data?.comment) return { data: result.data.comment, error: null };
+    return { data: null, error: result.error || 'Failed to post comment' };
+  },
+
+  async remove(commentId: string, proposalId?: number | string): Promise<ApiResponse<{ ok: true }>> {
+    if (commentId.startsWith('local-comment-')) {
+      try {
+        const all = await readLocalComments();
+        if (proposalId != null) {
+          const key = String(proposalId);
+          all[key] = (all[key] ?? []).filter((c) => c.id !== commentId);
+        } else {
+          for (const key of Object.keys(all)) {
+            all[key] = all[key].filter((c) => c.id !== commentId);
+          }
+        }
+        await AsyncStorage.setItem(DEMO_COMMENTS_STORAGE_KEY, JSON.stringify(all));
+      } catch { /* best-effort */ }
+      return { data: { ok: true }, error: null };
+    }
+    return apiRequest<{ ok: true }>(`/api/comments/${commentId}`, { method: 'DELETE' });
+  },
+
+  async report(commentId: string, reason: ReportReason): Promise<ApiResponse<{ ok: true }>> {
+    if (commentId.startsWith('local-comment-')) {
+      return { data: { ok: true }, error: null };
+    }
+    return apiRequest<{ ok: true }>(`/api/comments/${commentId}/report`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    });
+  },
+};
+
+// ─── Referrals ──────────────────────────────────────────────────────────
+export interface ReferralStats {
+  code: string; // 'NO_CODE' when the user hasn't generated one yet
+  referredCount: number;
+  rewardsEarned: number;
+  rewardType: string;
+  rewardAmount: string;
+  config?: { referrerThreshold: number };
+}
+
+export const referralsApi = {
+  async stats(): Promise<ApiResponse<ReferralStats>> {
+    if (isDemoAccount()) {
+      return {
+        data: {
+          code: 'REPDEMO1',
+          referredCount: 1,
+          rewardsEarned: 0,
+          rewardType: 'subscription_months',
+          rewardAmount: '1',
+          config: { referrerThreshold: 3 },
+        },
+        error: null,
+      };
+    }
+    return apiRequest<ReferralStats>('/api/referrals/stats');
+  },
+
+  // Generates a code if the user doesn't have one. NOTE: the backend
+  // regenerates (replaces) any existing code, so callers must only invoke
+  // this when stats() returned code === 'NO_CODE' — otherwise previously
+  // shared links/codes would silently stop attributing.
+  async generate(): Promise<ApiResponse<ReferralStats>> {
+    if (isDemoAccount()) return referralsApi.stats();
+    return apiRequest<ReferralStats>('/api/referrals/generate', { method: 'POST' });
+  },
+
+  // Records that the current (new) user was referred by `code`.
+  // The referral only counts toward rewards once this user completes
+  // identity verification (enforced server-side).
+  async redeem(code: string): Promise<ApiResponse<{ ok: boolean }>> {
+    const trimmed = code.trim().toUpperCase();
+    if (!trimmed) return { data: null, error: 'Enter a referral code' };
+    if (isDemoAccount()) return { data: { ok: true }, error: null };
+    return apiRequest<{ ok: boolean }>('/api/referrals/redeem', {
+      method: 'POST',
+      body: JSON.stringify({ code: trimmed }),
+    });
+  },
+};
+
 export const api = {
   user: userApi,
   proposals: proposalsApi,
@@ -1751,6 +2006,7 @@ export const api = {
   badges: badgesApi,
   admin: adminApi,
   moderation: moderationApi,
+  referrals: referralsApi,
 };
 
 export default api;

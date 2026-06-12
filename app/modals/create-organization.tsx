@@ -25,6 +25,7 @@ import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS } from '../../lib
 import { showPaymentError, showPaymentSuccess } from '../../lib/stripe';
 import { processOrganizationPayment } from '../../lib/payment';
 import { ORG_TIERS, type OrgTier } from '../../lib/org-tiers';
+import { SubscriptionLegal } from '../../components/ui/SubscriptionLegal';
 import { TierCard } from '../../components/ui/TierCard';
 
 type Step = 'details' | 'tier' | 'payment';
@@ -430,6 +431,14 @@ export default function CreateOrganizationScreen() {
             You'll be charged {tier.price}/month. Cancel anytime from your organization settings.
           </Text>
         </View>
+
+        {/* Apple Guideline 3.1.2(c) — subscription disclosure */}
+        <SubscriptionLegal
+          mode="subscription"
+          productTitle={`${tier.name} — Organization plan`}
+          productLength="1 month"
+          productPrice={`${tier.price}/month`}
+        />
       </Animated.View>
     );
   };

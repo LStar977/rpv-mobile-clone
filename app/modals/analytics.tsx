@@ -592,7 +592,7 @@ const styles = StyleSheet.create({
   premiumHero: {
     alignItems: 'center',
     paddingVertical: SPACING.xxxl,
-    borderRadius: BORDER_RADIUS.xxl,
+    borderRadius: BORDER_RADIUS['2xl'],
     marginBottom: SPACING.lg,
   },
   premiumIconBg: {
@@ -614,7 +614,7 @@ const styles = StyleSheet.create({
   },
   descriptionCard: {
     padding: SPACING.xl,
-    borderRadius: BORDER_RADIUS.xxl,
+    borderRadius: BORDER_RADIUS['2xl'],
     borderWidth: 1,
     marginBottom: SPACING.lg,
   },
@@ -630,7 +630,7 @@ const styles = StyleSheet.create({
   },
   featuresCard: {
     padding: SPACING.xl,
-    borderRadius: BORDER_RADIUS.xxl,
+    borderRadius: BORDER_RADIUS['2xl'],
     borderWidth: 1.5,
     marginBottom: SPACING.lg,
     overflow: 'hidden',
@@ -660,7 +660,7 @@ const styles = StyleSheet.create({
   },
   pricingCard: {
     padding: SPACING.xl,
-    borderRadius: BORDER_RADIUS.xxl,
+    borderRadius: BORDER_RADIUS['2xl'],
     marginBottom: SPACING.lg,
   },
   pricingContent: {
@@ -716,7 +716,7 @@ const styles = StyleSheet.create({
   // Analytics Dashboard Styles
   ratioCard: {
     padding: SPACING.xl,
-    borderRadius: BORDER_RADIUS.xxl,
+    borderRadius: BORDER_RADIUS['2xl'],
     borderWidth: 1,
     marginBottom: SPACING.xl,
   },

@@ -1,13 +1,29 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { View, StyleSheet, ActivityIndicator, Text, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../lib/theme';
-import { veriffApi } from '../../lib/api';
+import { veriffApi, kycApi } from '../../lib/api';
+import { useAuthStore } from '../../lib/auth';
 
 type ErrorState = null | 'no-session' | 'webview-error' | 'cancelled';
+
+// Only load KYC-provider URLs in the WebView. The session URL comes from
+// our backend, but defense-in-depth: a compromised response or MITM'd
+// payload must not be able to point the identity-document camera flow at
+// an arbitrary site.
+function isTrustedKycUrl(url: string | undefined): url is string {
+  if (!url || !url.startsWith('https://')) return false;
+  try {
+    const host = new URL(url).hostname;
+    return host === 'didit.me' || host.endsWith('.didit.me') ||
+           host === 'veriff.com' || host.endsWith('.veriff.com');
+  } catch {
+    return false;
+  }
+}
 
 export default function VeriffScreen() {
   const { colors } = useTheme();
@@ -15,25 +31,61 @@ export default function VeriffScreen() {
   // user's org has requireMemberVerification=true). Threaded through to
   // the session-create call so the backend packs it into vendor_data and
   // the org gets billed via Stripe metered usage on success.
-  const params = useLocalSearchParams<{ sessionUrl?: string; verificationId?: string; originatingOrgId?: string }>();
+  const params = useLocalSearchParams<{ sessionUrl?: string; verificationId?: string; originatingOrgId?: string; flow?: string }>();
   const originatingOrgId = typeof params.originatingOrgId === 'string' && params.originatingOrgId.length > 0
     ? params.originatingOrgId
     : undefined;
+  // 'citizen' selects the Didit Citizen workflow (passport + proof of
+  // address) which sets citizenshipVerified on success.
+  const flow: 'standard' | 'citizen' = params.flow === 'citizen' ? 'citizen' : 'standard';
 
-  const [sessionUrl, setSessionUrl] = useState<string | undefined>(params.sessionUrl);
+  const [sessionUrl, setSessionUrl] = useState<string | undefined>(
+    isTrustedKycUrl(params.sessionUrl) ? params.sessionUrl : undefined,
+  );
   const [verificationId, setVerificationId] = useState<string | undefined>(params.verificationId);
-  const [errorState, setErrorState] = useState<ErrorState>(sessionUrl ? null : 'no-session');
-  const [retrying, setRetrying] = useState(false);
+  // Start in `null` (loading) when no sessionUrl is preloaded — the
+  // bootstrap effect below auto-creates one. Only flip to `no-session`
+  // if that auto-create actually fails.
+  const [errorState, setErrorState] = useState<ErrorState>(null);
+  const [retrying, setRetrying] = useState(!params.sessionUrl);
 
   const handleClose = () => {
+    // Refresh auth in the background — if the user actually completed
+    // verification and just tapped X to close, the dashboard needs to see
+    // the new verified state without a manual refresh.
+    useAuthStore.getState().checkAuth().catch(() => {});
     router.back();
   };
+
+  // Called on a positive verification signal from the WebView (either Didit
+  // says "success" or the per-session callback redirected us). Force-pull
+  // the decision so the backend updates even if the webhook hasn't fired
+  // yet, then refresh the auth store so the home/profile reflect verified
+  // state immediately, then close back to the app.
+  const handleVerificationComplete = useCallback(async () => {
+    try {
+      if (verificationId) {
+        await kycApi.checkDecision(verificationId);
+      }
+    } catch {
+      /* non-fatal */
+    }
+    try {
+      await useAuthStore.getState().checkAuth();
+    } catch {
+      /* non-fatal */
+    }
+    router.replace({
+      pathname: '/(tabs)/profile',
+      params: { verificationId: verificationId ?? '', completed: 'true' },
+    });
+  }, [verificationId]);
 
   const handleRetry = useCallback(async () => {
     setRetrying(true);
     try {
-      const response = await veriffApi.createSession(originatingOrgId);
-      if (response.data?.sessionUrl && response.data?.verificationId) {
+      const response = await veriffApi.createSession(originatingOrgId, flow);
+      if (isTrustedKycUrl(response.data?.sessionUrl) && response.data?.verificationId) {
         setSessionUrl(response.data.sessionUrl);
         setVerificationId(response.data.verificationId);
         setErrorState(null);
@@ -45,13 +97,38 @@ export default function VeriffScreen() {
     } finally {
       setRetrying(false);
     }
-  }, [originatingOrgId]);
+  }, [originatingOrgId, flow]);
+
+  // Auto-bootstrap on mount when no sessionUrl was passed (the typical
+  // path from the verification picker, which routes here with just a
+  // flow param). Skips the "Try again" fallback screen on the happy path.
+  useEffect(() => {
+    if (!params.sessionUrl) {
+      handleRetry();
+    }
+    // Intentionally only on mount — handleRetry is stable enough and we
+    // don't want flow/orgId changes mid-screen to re-bootstrap.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleNavigationStateChange = (navState: any) => {
     const url = navState.url || '';
-    // KYC provider host: Didit (active) — Veriff host kept for any in-flight
-    // sessions during the rollout window.
-    const isKycHost = url.includes('didit.me') || url.includes('verify.didit.me') || url.includes('veriff.com');
+
+    // Post-verification redirect. The backend sets the Didit per-session
+    // `callback` to its own /api/didit/webhook URL, so after the user
+    // finishes, Didit redirects the WebView to that backend endpoint —
+    // which is server-to-server and renders nothing (the user sees
+    // Replit's "Run this app" placeholder). Catch the URL here and bounce
+    // back into the app.
+    if (url.includes('/api/didit/webhook') || url.includes('/verification-complete')) {
+      handleVerificationComplete();
+      return;
+    }
+
+    // KYC provider host (Didit / legacy Veriff). Anything outside these
+    // domains is either our own redirect (caught above) or noise the
+    // WebView handles internally.
+    const isKycHost = url.includes('didit.me') || url.includes('veriff.com');
     if (!isKycHost) return;
 
     if (url.includes('cancelled') || url.includes('canceled')) {
@@ -59,10 +136,7 @@ export default function VeriffScreen() {
       return;
     }
     if (url.includes('finished') || url.includes('success') || url.includes('complete')) {
-      router.replace({
-        pathname: '/(tabs)/profile',
-        params: { verificationId, completed: 'true' },
-      });
+      handleVerificationComplete();
     }
   };
 

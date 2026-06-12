@@ -40,6 +40,7 @@ import { useTheme, SPACING, RADIUS, TYPOGRAPHY, SHADOWS, EASING, responsive } fr
 import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { useAuthStore } from '../lib/auth';
+import { referralsApi } from '../lib/api';
 import { router, useRootNavigationState } from 'expo-router';
 import { isBiometricAvailable, getBiometricType, authenticateWithBiometrics, isBiometricEnabled } from '../lib/biometrics';
 import { Button, Input, Card, Badge } from '../components/ui';
@@ -945,6 +946,7 @@ export default function AuthScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
+  const [referralCode, setReferralCode] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
@@ -1124,11 +1126,45 @@ export default function AuthScreen() {
 
     if (result.success) {
       haptics.success();
+      // Record the referral after auth (the redeem endpoint needs the new
+      // user's token). Fire-and-forget — a bad/missing code must never
+      // block account creation.
+      if (isSignup && referralCode.trim()) {
+        referralsApi.redeem(referralCode).catch(() => {});
+      }
       router.replace('/(tabs)/dashboard');
     } else {
       haptics.error();
       setError(result.error || 'Authentication failed. Please try again.');
     }
+  };
+
+  // Request a password-reset email. The reset itself happens on the web
+  // (representportal.com serves the reset form from the emailed link), so
+  // the app only needs to kick off the request. Always shows the same
+  // confirmation regardless of whether the account exists — never confirm
+  // or deny an email's existence.
+  const handleForgotPassword = async () => {
+    const target = email.trim();
+    if (!target || !target.includes('@')) {
+      setError('Enter your email above first, then tap "Forgot password?"');
+      haptics.warning();
+      return;
+    }
+    haptics.selection();
+    try {
+      await fetch('https://representportal.com/api/auth/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: target }),
+      });
+    } catch {
+      // Deliberately silent — same UX either way.
+    }
+    Alert.alert(
+      'Check your email',
+      `If an account exists for ${target}, we've sent a link to reset your password. The link expires in 1 hour.`,
+    );
   };
 
   // Hidden demo login trigger - 5 taps on logo
@@ -1396,6 +1432,31 @@ export default function AuthScreen() {
             secureTextEntry
             leftIcon="lock-closed-outline"
           />
+
+          {!isLogin && (
+            <Input
+              label="Referral code (optional)"
+              placeholder="e.g. REP7K9X2"
+              value={referralCode}
+              onChangeText={(t) => setReferralCode(t.toUpperCase())}
+              autoCapitalize="characters"
+              autoCorrect={false}
+              leftIcon="gift-outline"
+            />
+          )}
+
+          {isLogin && (
+            <TouchableOpacity
+              onPress={handleForgotPassword}
+              style={{ alignSelf: 'flex-end', marginTop: -6, marginBottom: 10, paddingVertical: 4 }}
+              accessibilityRole="button"
+              accessibilityLabel="Forgot password"
+            >
+              <Text style={{ color: colors.textSecondary, fontSize: 13.5, fontWeight: '500' }}>
+                Forgot password?
+              </Text>
+            </TouchableOpacity>
+          )}
 
           {!isLogin && (
             <TouchableOpacity

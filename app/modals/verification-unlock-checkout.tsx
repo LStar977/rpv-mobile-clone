@@ -15,11 +15,13 @@
 import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Linking, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import * as Haptics from 'expo-haptics';
 import { useTheme, SPACING, BORDER_RADIUS, SHADOWS } from '../../lib/theme';
 import { organizationsApi, type Organization } from '../../lib/api';
 import { iapAvailable, purchaseProduct, unlockSkuForTier } from '../../lib/iap';
+import { useAuthStore } from '../../lib/auth';
+import { SubscriptionLegal } from '../../components/ui/SubscriptionLegal';
 
 const POLL_INTERVAL_MS = 2000;
 const POLL_TIMEOUT_MS = 30_000;
@@ -36,6 +38,18 @@ export default function VerificationUnlockCheckoutScreen() {
   const [paymentProvider, setPaymentProvider] = useState<'stripe' | 'iap' | null>(null);
   const [phase, setPhase] = useState<Phase>('idle');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Stripe-checkout polling lifecycle. Cleared on unmount so a dismissed
+  // modal stops polling instead of leaking a recursive setTimeout chain.
+  const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const aliveRef = useRef(true);
+  useEffect(() => {
+    aliveRef.current = true;
+    return () => {
+      aliveRef.current = false;
+      if (pollTimerRef.current) clearTimeout(pollTimerRef.current);
+    };
+  }, []);
 
   // Initial load: fetch the org's usage shape so we know the price + rail.
   useEffect(() => {
@@ -77,6 +91,16 @@ export default function VerificationUnlockCheckoutScreen() {
   const handlePurchase = async () => {
     if (!orgId || !org) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+    // Demo account: org is sandboxed (no real Stripe customer / no real
+    // StoreKit product to charge). Simulate the unlock locally so the demo
+    // and App reviewers see the success path instead of "Invalid product ID".
+    if (useAuthStore.getState().user?.email === 'demo@represent.app') {
+      setPhase('success');
+      await flipToggleOn();
+      return;
+    }
+
     setPhase('starting');
     setErrorMessage(null);
 
@@ -143,9 +167,14 @@ export default function VerificationUnlockCheckoutScreen() {
     }
     setPhase('awaiting');
     // Poll the usage endpoint until verificationUnlockedAt flips or timeout.
+    // Timer handle lives in a ref and is cancelled on unmount — otherwise
+    // dismissing the modal mid-poll leaves the recursive setTimeout chain
+    // running forever in the background (battery + network leak).
     const startedAt = Date.now();
     const tick = async () => {
+      if (!aliveRef.current) return;
       const r = await organizationsApi.getUsage(orgId);
+      if (!aliveRef.current) return;
       if (r.data?.verification?.unlocked) {
         await flipToggleOn();
         setPhase('success');
@@ -158,9 +187,9 @@ export default function VerificationUnlockCheckoutScreen() {
         setPhase('error');
         return;
       }
-      setTimeout(tick, POLL_INTERVAL_MS);
+      pollTimerRef.current = setTimeout(tick, POLL_INTERVAL_MS);
     };
-    setTimeout(tick, POLL_INTERVAL_MS);
+    pollTimerRef.current = setTimeout(tick, POLL_INTERVAL_MS);
   };
 
   const flipToggleOn = async () => {
@@ -276,6 +305,16 @@ export default function VerificationUnlockCheckoutScreen() {
           </View>
         )}
 
+        {/* Apple Guideline 3.1.2(c) — one-time purchase disclosure */}
+        {phase !== 'success' && (
+          <SubscriptionLegal
+            mode="consumable"
+            productTitle={`${tierName} — Verification Unlock`}
+            productLength="one-time"
+            productPrice={priceLabel}
+          />
+        )}
+
         {/* CTA */}
         {phase !== 'success' ? (
           <TouchableOpacity
@@ -288,6 +327,7 @@ export default function VerificationUnlockCheckoutScreen() {
               paddingVertical: SPACING.md,
               alignItems: 'center',
               opacity: phase === 'starting' || phase === 'awaiting' || unlockFeeCents == null ? 0.6 : 1,
+              marginTop: SPACING.md,
             }}
           >
             {phase === 'starting' || phase === 'awaiting' ? (

@@ -13,6 +13,15 @@ interface User {
   state: string | null;
   city: string | null;
   verified: boolean | null;
+  // Passed the Didit "Citizen" workflow (passport + proof of address).
+  // Gates citizens-only proposals. Independent of `verified`.
+  citizenshipVerified: boolean | null;
+  // Source-agnostic subscription state from /api/auth/verify. Updated by
+  // both the Stripe webhook AND the IAP receipt-validation path. Screens
+  // must derive Premium from THIS — not /api/stripe/subscription, which
+  // doesn't know about Apple IAP and reports IAP subscribers as free.
+  subscriptionStatus?: string | null;
+  isPremium?: boolean;
 }
 
 interface AuthState {
@@ -212,6 +221,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       await SecureStore.deleteItemAsync(TOKEN_KEY);
       await SecureStore.deleteItemAsync(USER_KEY);
 
+      // Clear device-local, non-user-scoped caches (org votes, demo data)
+      // so the next account on this device doesn't inherit them — fixes a
+      // fresh account showing a phantom ballot count.
+      try {
+        const { clearLocalUserData } = require('./api');
+        await clearLocalUserData();
+      } catch { /* non-fatal */ }
+
       set({
         user: null,
         token: null,
@@ -242,6 +259,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       await SecureStore.deleteItemAsync(TOKEN_KEY);
       await SecureStore.deleteItemAsync(USER_KEY);
 
+      try {
+        const { clearLocalUserData } = require('./api');
+        await clearLocalUserData();
+      } catch { /* non-fatal */ }
+
       set({
         user: null,
         token: null,
@@ -262,11 +284,22 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const token = await SecureStore.getItemAsync(TOKEN_KEY);
 
       if (token) {
-        const response = await fetch(`${API_BASE_URL}/api/auth/verify`, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
-        });
+        // 8s timeout — without it a hung backend leaves the app stuck on
+        // the splash/loading state forever. On abort we fall through to
+        // the cached-credentials path below.
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 8000);
+        let response: Response;
+        try {
+          response = await fetch(`${API_BASE_URL}/api/auth/verify`, {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+            },
+            signal: controller.signal,
+          });
+        } finally {
+          clearTimeout(timeout);
+        }
 
         if (response.ok) {
           const data = await response.json();
@@ -283,6 +316,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
               state: data.user.state || null,
               city: data.user.city || null,
               verified: !!(data.user.verified || data.user.isVerified || data.user.is_verified || data.user.kycVerified || data.user.kyc_verified || data.user.passport_verified),
+              citizenshipVerified: !!(data.user.citizenshipVerified || data.user.citizenship_verified),
+              subscriptionStatus: data.user.subscriptionStatus ?? null,
+              isPremium: !!(data.user.isPremium || data.user.subscriptionStatus === 'active'),
             };
             
             // Update cached user with fresh data
@@ -297,11 +333,22 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             return;
           }
         }
+
+        // Only clear credentials when the server EXPLICITLY rejects the
+        // token (401/403, or a 200 whose body says the token is invalid).
+        // A transient 5xx / network blip must not log the user out — keep
+        // the hydrated session and re-validate next launch.
+        const explicitlyRejected =
+          response.status === 401 || response.status === 403 || response.ok;
+        if (!explicitlyRejected) {
+          set({ isLoading: false });
+          return;
+        }
       }
 
       await SecureStore.deleteItemAsync(TOKEN_KEY);
       await SecureStore.deleteItemAsync(USER_KEY);
-      
+
       set({
         user: null,
         token: null,

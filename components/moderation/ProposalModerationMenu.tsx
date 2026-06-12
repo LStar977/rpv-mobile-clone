@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,11 +8,12 @@ import {
   TextInput,
   Alert,
   ActivityIndicator,
+  Keyboard,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
-import { moderationApi, type ReportReason } from '../../lib/api';
+import { moderationApi, proposalsApi, type ReportReason } from '../../lib/api';
 import { useModerationStore } from '../../lib/moderation';
 
 const O_GOLD = '#EABA58';
@@ -44,6 +45,11 @@ export type ProposalModerationMenuProps = {
   creatorName: string;
   /** Called after a mute action. Lets parents refresh feeds optimistically. */
   onMuted?: () => void;
+  /** When true, shows a "Delete proposal" row (the viewer is the creator).
+      Server enforces creator-only deletion; this only controls visibility. */
+  isOwnProposal?: boolean;
+  /** Called after a successful delete so parents can refresh feeds. */
+  onDeleted?: () => void;
 };
 
 type Stage = 'menu' | 'reportReason' | 'reportNote' | 'submitting';
@@ -55,12 +61,24 @@ export function ProposalModerationMenu({
   creatorId,
   creatorName,
   onMuted,
+  isOwnProposal,
+  onDeleted,
 }: ProposalModerationMenuProps) {
   const insets = useSafeAreaInsets();
   const muteAction = useModerationStore((s) => s.mute);
   const [stage, setStage] = useState<Stage>('menu');
   const [reason, setReason] = useState<ReportReason | null>(null);
   const [note, setNote] = useState('');
+  const [kbHeight, setKbHeight] = useState(0);
+
+  // Lift the bottom sheet above the keyboard while typing the note.
+  // Without this the keyboard covers the sheet (Submit button hidden) and
+  // tapping to dismiss the keyboard lands on the scrim behind it.
+  useEffect(() => {
+    const show = Keyboard.addListener('keyboardWillShow', (e) => setKbHeight(e.endCoordinates.height));
+    const hide = Keyboard.addListener('keyboardWillHide', () => setKbHeight(0));
+    return () => { show.remove(); hide.remove(); };
+  }, []);
 
   if (!visible) return null;
 
@@ -99,6 +117,32 @@ export function ProposalModerationMenu({
     );
   };
 
+  const handleDelete = () => {
+    if (!proposalId) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    Alert.alert(
+      'Delete this proposal?',
+      'Voting closes immediately and this can\'t be undone. Existing votes are removed from the record.',
+      [
+        { text: 'Keep it', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            const result = await proposalsApi.deleteProposal(proposalId);
+            if (result.error) {
+              Alert.alert('Could not delete', result.error);
+              return;
+            }
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            onDeleted?.();
+            close();
+          },
+        },
+      ],
+    );
+  };
+
   const handleReportTap = () => {
     Haptics.selectionAsync();
     setStage('reportReason');
@@ -106,6 +150,7 @@ export function ProposalModerationMenu({
 
   const submitReport = async (finalReason: ReportReason, finalNote: string) => {
     if (!proposalId) return;
+    Keyboard.dismiss();
     setStage('submitting');
     const result = await moderationApi.reportProposal(proposalId, finalReason, finalNote);
     if (result.error) {
@@ -124,10 +169,18 @@ export function ProposalModerationMenu({
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
       <Pressable
-        onPress={close}
+        onPress={() => {
+          // While typing the note, a scrim tap should dismiss the keyboard,
+          // not close the whole sheet (that was eating the report mid-entry).
+          if (kbHeight > 0) {
+            Keyboard.dismiss();
+            return;
+          }
+          close();
+        }}
         style={[StyleSheet.absoluteFill, styles.scrim]}
       />
-      <View style={[styles.sheet, { paddingBottom: 28 + insets.bottom }]}>
+      <View style={[styles.sheet, { bottom: kbHeight, paddingBottom: kbHeight > 0 ? 20 : 28 + insets.bottom }]}>
         <View style={styles.handle} />
 
         {stage === 'menu' && (
@@ -136,6 +189,23 @@ export function ProposalModerationMenu({
             <Text style={styles.subtitle}>
               Help keep Represent civil.
             </Text>
+
+            {isOwnProposal && (
+              <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={handleDelete}
+                style={styles.row}
+              >
+                <View style={[styles.rowIcon, { backgroundColor: 'rgba(255,107,91,0.12)' }]}>
+                  <Ionicons name="trash-outline" size={20} color={O_RED} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.rowLabel}>Delete this proposal</Text>
+                  <Text style={styles.rowSub}>Permanent. Closes voting and removes existing votes.</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={O_FG_FAINT} />
+              </TouchableOpacity>
+            )}
 
             <TouchableOpacity
               activeOpacity={0.85}

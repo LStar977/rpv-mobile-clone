@@ -4,6 +4,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
+import { useState } from 'react';
 import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS } from '../../lib/theme';
 
 const VERIFICATION_BENEFITS = [
@@ -14,6 +15,13 @@ const VERIFICATION_BENEFITS = [
   { icon: 'gift', text: 'Free verification, lifetime access' },
 ];
 
+const CITIZEN_BENEFITS = [
+  { icon: 'shield-checkmark', text: 'Vote on citizens-only proposals (e.g. the Alberta referendum)' },
+  { icon: 'checkmark-circle', text: 'Everything standard verification unlocks' },
+  { icon: 'document-text', text: 'Passport + proof of address required' },
+  { icon: 'gift', text: 'Free, lifetime access' },
+];
+
 export default function VerificationPaymentScreen() {
   const { colors } = useTheme();
 
@@ -21,18 +29,29 @@ export default function VerificationPaymentScreen() {
   // originatingOrgId + (optional) originatingOrgName. The screen swaps the
   // self-pay copy for an org-paid banner and threads orgId through to the
   // /modals/veriff session-create call.
-  const params = useLocalSearchParams<{ originatingOrgId?: string; originatingOrgName?: string }>();
+  const params = useLocalSearchParams<{ originatingOrgId?: string; originatingOrgName?: string; flow?: string }>();
   const originatingOrgId = typeof params.originatingOrgId === 'string' && params.originatingOrgId.length > 0
     ? params.originatingOrgId : undefined;
   const originatingOrgName = typeof params.originatingOrgName === 'string' && params.originatingOrgName.length > 0
     ? params.originatingOrgName : undefined;
   const isOrgPaid = !!originatingOrgId;
 
+  // Picker state: if the route carries flow=citizen or an org-paid flag,
+  // skip the picker. Otherwise let the user pick standard vs citizen.
+  const initialFlow: 'standard' | 'citizen' | null =
+    params.flow === 'citizen' ? 'citizen' : isOrgPaid ? 'standard' : null;
+  const [chosenFlow, setChosenFlow] = useState<'standard' | 'citizen' | null>(initialFlow);
+
+  const isCitizenFlow = chosenFlow === 'citizen';
+
   const handleStartVerification = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    const veriffParams: Record<string, string> = {};
+    if (originatingOrgId) veriffParams.originatingOrgId = originatingOrgId;
+    if (isCitizenFlow) veriffParams.flow = 'citizen';
     router.replace({
       pathname: '/modals/veriff',
-      params: originatingOrgId ? { originatingOrgId } : {},
+      params: veriffParams,
     });
   };
 
@@ -40,12 +59,118 @@ export default function VerificationPaymentScreen() {
     router.replace('/modals/subscription');
   };
 
+  // ── Picker view (no preselected flow) ──────────────────────────────
+  if (chosenFlow === null) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <View style={[styles.header, { borderBottomColor: colors.border }]}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+            <Ionicons name="close" size={24} color={colors.text} />
+          </TouchableOpacity>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>Verify Identity</Text>
+          <View style={{ width: 40 }} />
+        </View>
+
+        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+          <Animated.View entering={FadeInDown.duration(400)} style={styles.heroSection}>
+            <Text style={[styles.heroTitle, { color: colors.text }]}>Choose verification level</Text>
+            <Text style={[styles.heroSubtitle, { color: colors.textSecondary }]}>
+              Both are free and take about 2 minutes. Pick the one that matches what you want to vote on.
+            </Text>
+          </Animated.View>
+
+          {/* Standard card */}
+          <Animated.View entering={FadeInUp.delay(100).duration(400)}>
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={() => {
+                Haptics.selectionAsync();
+                setChosenFlow('standard');
+              }}
+              style={[styles.pickerCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
+            >
+              <View style={styles.pickerHeader}>
+                <View style={[styles.pickerIcon, { backgroundColor: `${colors.success}15` }]}>
+                  <Ionicons name="card-outline" size={22} color={colors.success} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.pickerTitle, { color: colors.text }]}>Standard Verification</Text>
+                  <Text style={[styles.pickerSubtitle, { color: colors.textSecondary }]}>
+                    Driver's license or government ID
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
+              </View>
+              <Text style={[styles.pickerDesc, { color: colors.textSecondary }]}>
+                Unlocks voting on geo-restricted proposals in your country, province, and city. Required for most proposals on the platform.
+              </Text>
+            </TouchableOpacity>
+          </Animated.View>
+
+          {/* Citizen card */}
+          <Animated.View entering={FadeInUp.delay(200).duration(400)}>
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={() => {
+                Haptics.selectionAsync();
+                setChosenFlow('citizen');
+              }}
+              style={[styles.pickerCard, { backgroundColor: colors.surface, borderColor: colors.gold, borderWidth: 1.5 }]}
+            >
+              <LinearGradient
+                colors={[`${colors.gold}10`, 'transparent']}
+                style={StyleSheet.absoluteFill}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+              />
+              <View style={styles.pickerHeader}>
+                <View style={[styles.pickerIcon, { backgroundColor: `${colors.gold}15` }]}>
+                  <Ionicons name="shield-checkmark" size={22} color={colors.gold} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: SPACING.xs, flexWrap: 'wrap' }}>
+                    <Text style={[styles.pickerTitle, { color: colors.text }]}>Citizen Verification</Text>
+                    <View style={[styles.pickerBadge, { backgroundColor: colors.gold }]}>
+                      <Text style={styles.pickerBadgeText}>UNLOCKS MORE</Text>
+                    </View>
+                  </View>
+                  <Text style={[styles.pickerSubtitle, { color: colors.textSecondary }]}>
+                    Passport + proof of address
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color={colors.gold} />
+              </View>
+              <Text style={[styles.pickerDesc, { color: colors.textSecondary }]}>
+                Everything Standard unlocks, <Text style={{ color: colors.gold, fontWeight: '600' }}>plus citizens-only proposals</Text> like the Alberta separation referendum.
+              </Text>
+            </TouchableOpacity>
+          </Animated.View>
+
+          <View style={{ height: 40 }} />
+        </ScrollView>
+      </View>
+    );
+  }
+
+  // ── Flow-specific confirmation view ────────────────────────────────
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
       <View style={[styles.header, { borderBottomColor: colors.border }]}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="close" size={24} color={colors.text} />
+        <TouchableOpacity
+          onPress={() => {
+            // When the picker was shown and the user already picked, the
+            // back button returns to the picker (state reset) rather than
+            // closing the modal. When org-paid (picker was skipped), close.
+            if (initialFlow === null) {
+              setChosenFlow(null);
+            } else {
+              router.back();
+            }
+          }}
+          style={styles.backButton}
+        >
+          <Ionicons name={initialFlow === null ? 'arrow-back' : 'close'} size={24} color={colors.text} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: colors.text }]}>Verify Identity</Text>
         <View style={{ width: 40 }} />
@@ -64,10 +189,14 @@ export default function VerificationPaymentScreen() {
           </View>
 
           <Text style={[styles.heroTitle, { color: colors.text }]}>
-            {isOrgPaid ? 'Verify to vote in this organization' : 'Unlock Full Voting Access'}
+            {isCitizenFlow
+              ? 'Verify your citizenship'
+              : isOrgPaid ? 'Verify to vote in this organization' : 'Unlock Full Voting Access'}
           </Text>
           <Text style={[styles.heroSubtitle, { color: colors.textSecondary }]}>
-            {isOrgPaid
+            {isCitizenFlow
+              ? 'Verify with your passport and a proof-of-address document to unlock citizens-only proposals.'
+              : isOrgPaid
               ? `${originatingOrgName ?? 'Your organization'} requires identity verification before voting. Your verification is covered — no payment needed.`
               : 'Verify your identity once to participate in all proposals in your region.'}
           </Text>
@@ -80,7 +209,7 @@ export default function VerificationPaymentScreen() {
         >
           <Text style={[styles.benefitsTitle, { color: colors.text }]}>What you get</Text>
 
-          {VERIFICATION_BENEFITS.map((benefit, index) => (
+          {(isCitizenFlow ? CITIZEN_BENEFITS : VERIFICATION_BENEFITS).map((benefit, index) => (
             <View key={index} style={styles.benefitRow}>
               <View style={[styles.benefitIcon, { backgroundColor: `${colors.success}15` }]}>
                 <Ionicons name={benefit.icon as any} size={16} color={colors.success} />
@@ -97,8 +226,9 @@ export default function VerificationPaymentScreen() {
         >
           <Ionicons name="information-circle-outline" size={20} color={colors.info} />
           <Text style={[styles.processText, { color: colors.textSecondary }]}>
-            You'll complete identity verification using a government-issued ID.
-            Your location will be verified automatically.
+            {isCitizenFlow
+              ? "You'll verify with a passport and a proof-of-address document. This confirms citizenship and your region."
+              : "You'll complete identity verification using a government-issued ID. Your location will be verified automatically."}
           </Text>
         </Animated.View>
 
@@ -226,7 +356,7 @@ const styles = StyleSheet.create({
   },
   benefitsCard: {
     padding: SPACING.xl,
-    borderRadius: BORDER_RADIUS.xxl,
+    borderRadius: BORDER_RADIUS['2xl'],
     borderWidth: 1,
     marginBottom: SPACING.lg,
     ...SHADOWS.md,
@@ -270,7 +400,7 @@ const styles = StyleSheet.create({
   },
   upsellCard: {
     padding: SPACING.lg,
-    borderRadius: BORDER_RADIUS.xxl,
+    borderRadius: BORDER_RADIUS['2xl'],
     borderWidth: 2,
     overflow: 'hidden',
   },
@@ -351,5 +481,50 @@ const styles = StyleSheet.create({
   },
   btnDisabled: {
     opacity: 0.6,
+  },
+  // Picker cards
+  pickerCard: {
+    padding: SPACING.lg,
+    borderRadius: BORDER_RADIUS['2xl'],
+    borderWidth: 1,
+    marginBottom: SPACING.md,
+    overflow: 'hidden',
+  },
+  pickerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.md,
+    marginBottom: SPACING.sm,
+  },
+  pickerIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pickerTitle: {
+    fontFamily: 'Georgia',
+    fontSize: 18,
+    fontWeight: '500',
+  },
+  pickerSubtitle: {
+    ...TYPOGRAPHY.bodySmall,
+    marginTop: 2,
+  },
+  pickerDesc: {
+    ...TYPOGRAPHY.bodyMedium,
+    lineHeight: 22,
+  },
+  pickerBadge: {
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: 2,
+    borderRadius: BORDER_RADIUS.sm,
+  },
+  pickerBadgeText: {
+    ...TYPOGRAPHY.labelSmall,
+    color: '#000',
+    fontWeight: '700',
+    fontSize: 9,
   },
 });

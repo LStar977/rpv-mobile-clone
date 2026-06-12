@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, Dimensions, TouchableOpacity } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -19,12 +19,18 @@ interface VoteConfirmationOverlayProps {
   visible: boolean;
   voteType: 'support' | 'oppose';
   onDismiss: () => void;
+  // When provided, a "Share your vote" pill renders under the confirmation
+  // text and the auto-dismiss window stretches to give it a beat. This is
+  // the single cheapest viral moment in the app — the user just acted and
+  // is at peak motivation to tell someone.
+  onShare?: () => void;
 }
 
 export function VoteConfirmationOverlay({
   visible,
   voteType,
   onDismiss,
+  onShare,
 }: VoteConfirmationOverlayProps) {
   const { colors } = useTheme();
 
@@ -65,7 +71,8 @@ export function VoteConfirmationOverlay({
       textOpacity.value = withDelay(350, withTiming(1, { duration: 250 }));
       textTranslateY.value = withDelay(350, withSpring(0, ANIMATION.spring.gentle));
 
-      // Auto dismiss after delay
+      // Auto dismiss after delay (longer when the share pill is showing,
+      // so there's actually time to tap it)
       const timeout = setTimeout(() => {
         // Animate out
         textOpacity.value = withTiming(0, { duration: 150 });
@@ -73,7 +80,7 @@ export function VoteConfirmationOverlay({
         overlayOpacity.value = withDelay(100, withTiming(0, { duration: 200 }, () => {
           runOnJS(onDismiss)();
         }));
-      }, 1500);
+      }, onShare ? 2800 : 1500);
 
       return () => clearTimeout(timeout);
     } else {
@@ -151,6 +158,18 @@ export function VoteConfirmationOverlay({
           <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
             Your voice has been recorded
           </Text>
+          {onShare && (
+            <TouchableOpacity
+              style={[styles.shareBtn, { borderColor: colors.gold }]}
+              onPress={() => { onShare(); onDismiss(); }}
+              activeOpacity={0.8}
+              accessibilityRole="button"
+              accessibilityLabel="Share your vote"
+            >
+              <Ionicons name="share-outline" size={16} color={colors.gold} />
+              <Text style={[styles.shareText, { color: colors.gold }]}>Share your vote</Text>
+            </TouchableOpacity>
+          )}
         </Animated.View>
       </View>
     </Animated.View>
@@ -209,6 +228,20 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     ...TYPOGRAPHY.bodyMedium,
+  },
+  shareBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: SPACING.lg,
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.sm + 2,
+    borderRadius: BORDER_RADIUS.full,
+    borderWidth: 1.5,
+  },
+  shareText: {
+    ...TYPOGRAPHY.labelMedium,
+    fontWeight: '600',
   },
 });
 
