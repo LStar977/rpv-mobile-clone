@@ -40,6 +40,7 @@ import { useTheme, SPACING, RADIUS, TYPOGRAPHY, SHADOWS, EASING, responsive } fr
 import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { useAuthStore } from '../lib/auth';
+import { referralsApi } from '../lib/api';
 import { router, useRootNavigationState } from 'expo-router';
 import { isBiometricAvailable, getBiometricType, authenticateWithBiometrics, isBiometricEnabled } from '../lib/biometrics';
 import { Button, Input, Card, Badge } from '../components/ui';
@@ -945,6 +946,7 @@ export default function AuthScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
+  const [referralCode, setReferralCode] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
@@ -1124,6 +1126,12 @@ export default function AuthScreen() {
 
     if (result.success) {
       haptics.success();
+      // Record the referral after auth (the redeem endpoint needs the new
+      // user's token). Fire-and-forget — a bad/missing code must never
+      // block account creation.
+      if (isSignup && referralCode.trim()) {
+        referralsApi.redeem(referralCode).catch(() => {});
+      }
       router.replace('/(tabs)/dashboard');
     } else {
       haptics.error();
@@ -1424,6 +1432,18 @@ export default function AuthScreen() {
             secureTextEntry
             leftIcon="lock-closed-outline"
           />
+
+          {!isLogin && (
+            <Input
+              label="Referral code (optional)"
+              placeholder="e.g. REP7K9X2"
+              value={referralCode}
+              onChangeText={(t) => setReferralCode(t.toUpperCase())}
+              autoCapitalize="characters"
+              autoCorrect={false}
+              leftIcon="gift-outline"
+            />
+          )}
 
           {isLogin && (
             <TouchableOpacity

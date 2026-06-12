@@ -21,6 +21,7 @@ import { Button, TierBadge } from '../../components/ui';
 import { adminApi, organizationsApi, userApi, veriffApi } from '../../lib/api';
 import { restorePurchases } from '../../lib/iap';
 import { PassportCard, type PassportStatus } from '../../components/identity/PassportCard';
+import { InviteFriendsCard } from '../../components/referrals/InviteFriendsCard';
 import { useTutorialStore } from '../../lib/tutorial';
 import type { UserTier } from '../../components/ui';
 
@@ -899,6 +900,9 @@ export default function ProfileScreen() {
             />
           )}
         </PrSection>
+
+        {/* Referral program */}
+        <InviteFriendsCard delay={275} />
 
         {/* Section III: Administration */}
         <PrSection delay={300}>

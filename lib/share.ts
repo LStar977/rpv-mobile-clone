@@ -48,3 +48,18 @@ export async function shareApp(): Promise<boolean> {
     return result.action === Share.sharedAction;
   } catch (error) { console.error('Error sharing app:', error); return false; }
 }
+
+// Invite with a referral code. Both sides get a premium reward once the
+// invitee verifies, so the message leads with the code.
+export async function shareReferralInvite(code: string): Promise<boolean> {
+  try {
+    const message =
+      `Join me on Represent — identity-verified voting on the issues that shape your community. ` +
+      `Use my code ${code} when you sign up and we both get a free month of Premium once you verify.`;
+    const result = await Share.share(
+      { message: `${message}\n\n${APP_STORE_URL}` },
+      { dialogTitle: 'Invite Friends', subject: 'Join me on Represent' }
+    );
+    return result.action === Share.sharedAction;
+  } catch (error) { console.error('Error sharing referral invite:', error); return false; }
+}

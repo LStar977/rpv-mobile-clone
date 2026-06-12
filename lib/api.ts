@@ -1951,6 +1951,57 @@ export const commentsApi = {
   },
 };
 
+// ─── Referrals ──────────────────────────────────────────────────────────
+export interface ReferralStats {
+  code: string; // 'NO_CODE' when the user hasn't generated one yet
+  referredCount: number;
+  rewardsEarned: number;
+  rewardType: string;
+  rewardAmount: string;
+  config?: { referrerThreshold: number };
+}
+
+export const referralsApi = {
+  async stats(): Promise<ApiResponse<ReferralStats>> {
+    if (isDemoAccount()) {
+      return {
+        data: {
+          code: 'REPDEMO1',
+          referredCount: 1,
+          rewardsEarned: 0,
+          rewardType: 'subscription_months',
+          rewardAmount: '1',
+          config: { referrerThreshold: 3 },
+        },
+        error: null,
+      };
+    }
+    return apiRequest<ReferralStats>('/api/referrals/stats');
+  },
+
+  // Generates a code if the user doesn't have one. NOTE: the backend
+  // regenerates (replaces) any existing code, so callers must only invoke
+  // this when stats() returned code === 'NO_CODE' — otherwise previously
+  // shared links/codes would silently stop attributing.
+  async generate(): Promise<ApiResponse<ReferralStats>> {
+    if (isDemoAccount()) return referralsApi.stats();
+    return apiRequest<ReferralStats>('/api/referrals/generate', { method: 'POST' });
+  },
+
+  // Records that the current (new) user was referred by `code`.
+  // The referral only counts toward rewards once this user completes
+  // identity verification (enforced server-side).
+  async redeem(code: string): Promise<ApiResponse<{ ok: boolean }>> {
+    const trimmed = code.trim().toUpperCase();
+    if (!trimmed) return { data: null, error: 'Enter a referral code' };
+    if (isDemoAccount()) return { data: { ok: true }, error: null };
+    return apiRequest<{ ok: boolean }>('/api/referrals/redeem', {
+      method: 'POST',
+      body: JSON.stringify({ code: trimmed }),
+    });
+  },
+};
+
 export const api = {
   user: userApi,
   proposals: proposalsApi,
@@ -1963,6 +2014,7 @@ export const api = {
   badges: badgesApi,
   admin: adminApi,
   moderation: moderationApi,
+  referrals: referralsApi,
 };
 
 export default api;
