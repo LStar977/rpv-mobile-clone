@@ -5,7 +5,7 @@
 Verification costs covered separately (up to $20,000)
 
 Prepared for Phil and Investment Partners
-Prepared by Lance Morrison (Founder & CEO) and [Co-Founder Name] (Co-Founder)
+Prepared by Lance Morrison (Founder & CEO) and Daniel Morrison (Co-Founder)
 June 2026 · CONFIDENTIAL
 
 ---
@@ -103,14 +103,14 @@ stops there) — and the 200-user proof still gates every dollar after it.
 |---|---|---|
 | Corporate legal (equity, governance) | $8,000 | Shareholder agreement, articles |
 | Election advertising compliance | $3,000 | Elections Alberta third-party rules |
-| Security audit (engagement) | $6,000 | Balance paid in M1 |
-| Brand & ad creative production | $6,000 | Statics, video, per-question cards |
+| Security audit (engagement) | $5,000 | Balance paid in M1 |
+| Brand & ad creative production | $5,000 | Statics, video, per-question cards |
 | Paid acquisition tests | $8,000 | CAC discovery across 4 channels |
 | Stampede street team | $2,500 | QR materials, 2 brand reps |
 | Creator tests (3–5 Alberta micro) | $2,500 | Balanced roster, neutrality clauses |
 | Infrastructure | $125 | 1 month |
-| Founder salary | $10,000 | 1 month |
-| Performance reserve | $3,875 | CAC-rule deployment (see Reserve Rules) |
+| Founder salaries | $15,000 | 1 month — two founders @ $7,500 |
+| Performance reserve | $875 | CAC-rule deployment (see Reserve Rules) |
 | **TOTAL** | **$50,000** | |
 
 ---
@@ -132,14 +132,14 @@ founder does every show that will have him.
 
 | Category | Budget | Notes |
 |---|---|---|
-| Security audit (completion) | $6,000 | Report shared with investor |
-| Paid acquisition | $20,000 | Scaled into best-CAC channels |
+| Security audit (completion) | $7,000 | Report shared with investor |
+| Paid acquisition | $16,000 | Scaled into best-CAC channels |
 | Content creation | $4,000 | Weekly tally series, ad refresh |
 | Creator partnerships | $4,000 | Expanding test roster |
 | Community management | $2,000 | Moderation, support |
 | Infrastructure | $125 | 1 month |
-| Founder salary | $10,000 | 1 month |
-| Performance reserve | $3,875 | CAC-rule deployment |
+| Founder salaries | $15,000 | 1 month — two founders @ $7,500 |
+| Performance reserve | $1,875 | CAC-rule deployment |
 | **TOTAL** | **$50,000** | |
 
 ---
@@ -190,8 +190,8 @@ government-ID verification at scale for a civic purpose.
 | Community management | $5,000 | Moderation at scale |
 | Referral program ops | $1,000 | Tracking, support |
 | Infrastructure | $250 | 2 months |
-| Founder salary | $20,000 | 2 months |
-| Performance reserve | $36,750 | Final-3-weeks surge into best CAC |
+| Founder salaries | $30,000 | 2 months — two founders @ $7,500 |
+| Performance reserve | $26,750 | Final-3-weeks surge into best CAC |
 | **TOTAL** | **$150,000** | |
 
 **The CAC model behind 3,500:**
@@ -243,8 +243,8 @@ built); SaaS North (Ottawa, Nov) with the case study.
 | SaaS North (Ottawa) | $3,500 | B2G + investors |
 | Org pilot enablement | $3,000 | Onboarding, demos |
 | Infrastructure | $375 | 3 months |
-| Founder salary | $30,000 | 3 months |
-| Performance reserve | $47,125 | Post-results momentum is unpredictable by design |
+| Founder salaries | $45,000 | 3 months — two founders @ $7,500 |
+| Performance reserve | $32,125 | Post-results momentum is unpredictable by design |
 | **TOTAL** | **$200,000** | |
 
 ---
@@ -281,8 +281,8 @@ org sales playbook repeated from M3's first pilots.
 | Municipal roadshow + gov sales materials | $6,000 | Council presentations, pilot decks |
 | Community management | $8,000 | Scaled |
 | Infrastructure | $625 | 5 months |
-| Founder salary | $50,000 | 5 months |
-| Performance reserve | $54,875 | CAC-rule deployment |
+| Founder salaries | $75,000 | 5 months — two founders @ $7,500 |
+| Performance reserve | $29,875 | CAC-rule deployment |
 | **TOTAL** | **$250,000** | |
 
 ---
@@ -315,8 +315,8 @@ Calgary; convert M4 pilots to paid annual contracts; run the Series Seed process
 | Series Seed preparation | $10,000 | Deck, data room, legal |
 | Community management | $6,000 | Transitioning to hire |
 | Infrastructure | $750 | 6 months |
-| Founder salary | $60,000 | 6 months |
-| Performance reserve | $55,250 | Scale what works |
+| Founder salaries | $90,000 | 6 months — two founders @ $7,500 |
+| Performance reserve | $25,250 | Scale what works |
 | **TOTAL** | **$300,000** | |
 
 ---
@@ -325,13 +325,13 @@ Calgary; convert M4 pilots to paid annual contracts; run the Series Seed process
 
 | Category | Amount | Share |
 |---|---|---|
-| Paid advertising (all channels) | $324,000 | 32.4% |
+| Paid advertising (all channels) | $320,000 | 32.0% |
 | Creators & influencers | $42,500 | 4.3% |
-| Content creation & SEO | $62,000 | 6.2% |
+| Content creation & SEO | $61,000 | 6.1% |
 | Events & referendum night | $31,000 | 3.1% |
 | Grassroots, campus, street teams | $9,500 | 1.0% |
 | PR & media | $22,000 | 2.2% |
-| Founder salary (18 months @ $10k) | $180,000 | 18.0% |
+| Founder salaries (18 months, two founders @ $7,500) | $270,000 | 27.0% |
 | First hire (M5) | $40,000 | 4.0% |
 | Legal, governance & compliance | $11,000 | 1.1% |
 | Security audit | $12,000 | 1.2% |
@@ -341,12 +341,14 @@ Calgary; convert M4 pilots to paid annual contracts; run the Series Seed process
 | Series Seed prep | $10,000 | 1.0% |
 | Referral program ops | $1,000 | 0.1% |
 | Infrastructure (18 months) | $2,250 | 0.2% |
-| Performance reserve | $201,750 | 20.2% |
+| Performance reserve | $116,750 | 11.7% |
 | **TOTAL** | **$1,000,000** | 100% |
 | Verification costs (separate allowance) | up to $20,000 | $0.40/user as users verify |
 
 **Roughly half the round (≈49%) goes directly to growth** — paid acquisition, creators,
-content, events, grassroots, and PR. Founder salary is 18%. Infrastructure is 0.2%.
+content, events, grassroots, and PR. Founder salaries are 27% — two full-time founders
+at $7,500/month each, below market for both roles, with no other staff until M5.
+Infrastructure is 0.2%.
 
 **Reserve Rules:** the performance reserve is not discretionary padding. It deploys only
 into channels currently beating the verified-user CAC target for that milestone, is
