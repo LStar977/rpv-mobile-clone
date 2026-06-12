@@ -1,0 +1,19 @@
+{
+  "publishedAt": "2026-06-12",
+  "shareUrlBase": "https://representportal.com/p/",
+  "proposals": [
+    { "q": "Q1", "id": "65bc4f40-ed16-4a0e-8851-9b8903f9ec14", "title": "Alberta control over immigration" },
+    { "q": "Q2", "id": "2a0e78ef-f87f-4051-977b-acbbe071c258", "title": "Provincial services require citizenship/PR/approved status" },
+    { "q": "Q3", "id": "759945a4-040a-4321-a2f7-45c52fb574d5", "title": "12-month residency before social programs" },
+    { "q": "Q4", "id": "0b69ee1d-a4e5-4415-93c8-ad8b3272565a", "title": "Fees for non-permanent residents (healthcare/education)" },
+    { "q": "Q5", "id": "64c7abd0-538b-4d41-8bb1-0f055f8cc77f", "title": "Proof of citizenship to vote provincially", "citizensOnly": true },
+    { "q": "Q6", "id": "1497849e-d3c3-4180-8bcf-b7badd85e117", "title": "Provinces select superior court justices" },
+    { "q": "Q7", "id": "9d2f763c-bf7a-4f39-925b-087129e4e1af", "title": "Abolish the federal Senate" },
+    { "q": "Q8", "id": "daac1ce4-0392-4043-9868-34a2e3a17e74", "title": "Opt out of federal programs without losing funding" },
+    { "q": "Q9", "id": "57576c44-49b2-4336-9839-3460b4e1b3c9", "title": "Provincial laws priority in shared jurisdiction" },
+    { "q": "Q10", "id": "80b8cec4-4690-4e0c-b92f-9563b8c2fd95", "title": "Remain in Canada vs. begin separation process", "citizensOnly": true, "flagship": true },
+    { "q": "National", "id": "756404e1-70b0-4e54-bc3a-da9a90df95f1", "title": "Build Canada Homes" },
+    { "q": "National", "id": "4102294d-65c0-40ac-97f0-a1a7dc996934", "title": "Dual-practice healthcare" },
+    { "q": "National", "id": "81ce0efa-997d-46cf-96cc-ae4b50a7cb1e", "title": "Eliminate interprovincial trade barriers" }
+  ]
+}
