@@ -660,8 +660,13 @@ export const proposalsApi = {
       creatorId: p.creatorId || p.userId,
     }));
 
-    const merged = [...SEED_PROPOSALS, ...backendProposals];
-    return { data: merged, error: null };
+    // Seed proposals are demo-account-only showcase content (App Store
+    // review). Production users see real proposals exclusively — an
+    // honest empty feed beats a fake full one.
+    if (isDemoAccount()) {
+      return { data: [...SEED_PROPOSALS, ...backendProposals], error: null };
+    }
+    return { data: backendProposals, error: result.error };
   },
   async create(data: CreateProposalData): Promise<ApiResponse<Proposal>> {
     const result = await apiRequest<Proposal>('/api/proposals', {
@@ -1761,27 +1766,8 @@ export const adminApi = {
     if (result.data) {
       return { data: result.data, error: null };
     }
-
-    // Return mock data if backend endpoint doesn't exist yet
-    const activeCount = SEED_PROPOSALS.filter(p => {
-      if (!p.deadline) return true;
-      return new Date(p.deadline).getTime() > Date.now();
-    }).length;
-
-    return {
-      data: {
-        totalUsers: 1247,
-        verifiedUsers: 892,
-        premiumUsers: 156,
-        totalProposals: SEED_PROPOSALS.length + 23,
-        activeProposals: activeCount + 18,
-        totalVotesCast: 15847,
-        totalOrganizations: 34,
-        recentSignups: 89,
-        recentVotes: 1243,
-      },
-      error: null,
-    };
+    // No fabricated fallback numbers — real stats or an honest error.
+    return { data: null, error: result.error || 'Stats unavailable' };
   },
 
   async getAllProposals(): Promise<ApiResponse<Proposal[]>> {
@@ -1789,7 +1775,8 @@ export const adminApi = {
       return { data: null, error: 'Unauthorized: Admin access required' };
     }
 
-    // Get all proposals (both seed and backend) without geo filtering
+    // Get all real proposals without geo filtering. Seeds are demo-only
+    // showcase content and never appear in the production admin view.
     const result = await apiRequest<any>('/api/proposals');
 
     let backendProposals: Proposal[] = [];
@@ -1798,10 +1785,7 @@ export const adminApi = {
     } else if (result.data?.proposals) {
       backendProposals = result.data.proposals;
     }
-
-    // Merge with all seed proposals for admin view
-    const merged = [...SEED_PROPOSALS, ...backendProposals];
-    return { data: merged, error: null };
+    return { data: backendProposals, error: result.error };
   },
 
   isAdmin(): boolean {
