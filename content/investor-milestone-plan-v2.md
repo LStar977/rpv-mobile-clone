@@ -388,7 +388,7 @@ economics, and a data room that supports a Series Seed at a step-up valuation.
 | Community management | $6,000 | Transitioning to hire |
 | Infrastructure | $750 | 6 months |
 | Founder salary | $90,000 | 6 months |
-| Contingency | $44,250 | Scale what works |
+| Contingency | $45,250 | Scale what works |
 | **TOTAL** | **$300,000** | |
 
 *Verification costs (20,000 new × $0.40 = $8,000) covered separately.*
@@ -399,12 +399,12 @@ economics, and a data room that supports a Series Seed at a step-up valuation.
 
 | Category | From $1M | Separate | Total |
 |---|---|---|---|
-| Paid advertising (all channels) | $258,000 | — | $258,000 |
+| Paid advertising (all channels) | $230,000 | — | $230,000 |
 | Creators & influencers | $38,500 | — | $38,500 |
-| Content creation | $43,000 | — | $43,000 |
-| Events, conferences & referendum night | $44,500 | — | $44,500 |
+| Content creation | $63,000 | — | $63,000 |
+| Events, conferences & referendum night | $33,500 | — | $33,500 |
 | Grassroots, campus, street teams | $9,500 | — | $9,500 |
-| PR & media | $26,000 | — | $26,000 |
+| PR & media | $22,000 | — | $22,000 |
 | Founder salary (18 months) | $270,000 | — | $270,000 |
 | First hire (M5) | $40,000 | — | $40,000 |
 | Legal, governance & compliance | $11,000 | — | $11,000 |
@@ -413,16 +413,16 @@ economics, and a data room that supports a Series Seed at a step-up valuation.
 | Government sales & materials | $14,000 | — | $14,000 |
 | Community management | $27,000 | — | $27,000 |
 | Series Seed prep | $10,000 | — | $10,000 |
-| Referral ops & retargeting infra | $14,000 | — | $14,000 |
+| Referral ops & retargeting infra | $9,000 | — | $9,000 |
 | Infrastructure (hosting + tools) | $2,250 | — | $2,250 |
-| Contingency / scale what works | $199,250 | — | $199,250 |
+| Contingency / scale what works | $200,250 | — | $200,250 |
 | Verification costs (50K users) | — | $20,000 | $20,000 |
 | **TOTAL** | **$1,000,000** | **$20,000** | **$1,020,000** |
 
-~38% of the $1M goes to marketing, creators, content, events, and PR. 27% to founder
-salary. ~20% held in contingency, deployed tranche-by-tranche into whichever channel is
-posting the best verified-user CAC. Infrastructure is under 0.25% — the founder builds
-and maintains the entire product with a $125/month stack.
+~40% of the $1M goes to marketing — paid acquisition, creators, content, events, and
+PR. 27% to founder salary. 20% held in contingency, deployed tranche-by-tranche into
+whichever channel is posting the best verified-user CAC. Infrastructure is under 0.25%
+— the founder builds and maintains the entire product with a $125/month stack.
 
 ---
 
