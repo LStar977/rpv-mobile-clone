@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Tabs } from 'expo-router';
+import { Tabs, router } from 'expo-router';
 import { View, StyleSheet, Platform, Modal } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -13,6 +13,11 @@ import Animated, {
 import { useTheme, SHADOWS, ANIMATION } from '../../lib/theme';
 import { useAuthStore } from '../../lib/auth';
 import { Onboarding, hasCompletedOnboarding, resetOnboarding } from '../../components/Onboarding';
+import {
+  registerForPushNotifications,
+  savePushTokenToServer,
+  addNotificationResponseListener,
+} from '../../lib/notifications';
 
 // Custom Tab Bar Icon with animation
 function TabIcon({
@@ -87,8 +92,9 @@ const DEMO_EMAIL = 'demo@represent.app';
 export default function TabLayout() {
   const { colors, isDark } = useTheme();
   const insets = useSafeAreaInsets();
-  const { user } = useAuthStore();
+  const { user, token } = useAuthStore();
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [onboardingChecked, setOnboardingChecked] = useState(false);
   // Premium-gated tabs show a small lock badge for non-premium users.
   const isPremiumUser =
     user?.email === DEMO_EMAIL ||
@@ -105,6 +111,7 @@ export default function TabLayout() {
       if (!completed) {
         setShowOnboarding(true);
       }
+      setOnboardingChecked(true);
     };
     checkOnboarding();
   }, [user?.email]);
@@ -112,6 +119,37 @@ export default function TabLayout() {
   const handleOnboardingComplete = () => {
     setShowOnboarding(false);
   };
+
+  // Push notification registration. Waits until onboarding is settled so
+  // the iOS permission prompt never stacks on the onboarding modal. iOS
+  // only ever shows the system prompt once, so re-running on later
+  // sessions is a no-op that just refreshes the stored token. Demo account
+  // is excluded — reviewers' devices must not be registered against it.
+  useEffect(() => {
+    if (!onboardingChecked || showOnboarding) return;
+    if (!user?.id || !token || user.email === DEMO_EMAIL) return;
+    let alive = true;
+    (async () => {
+      const pushToken = await registerForPushNotifications();
+      if (alive && pushToken) {
+        await savePushTokenToServer(user.id, token);
+      }
+    })();
+    return () => { alive = false; };
+  }, [onboardingChecked, showOnboarding, user?.id, user?.email, token]);
+
+  // Route notification taps. All current server pushes carry a proposalId
+  // (new proposal, deadline reminder, results) — land the user on the
+  // voting tab, which surfaces the relevant proposal at the top of the deck.
+  useEffect(() => {
+    const sub = addNotificationResponseListener((response: any) => {
+      const data = response?.notification?.request?.content?.data;
+      if (data?.proposalId || data?.type === 'new_proposal' || data?.type === 'deadline_reminder') {
+        router.push('/(tabs)/proposals');
+      }
+    });
+    return () => sub.remove();
+  }, []);
 
   return (
     <>
