@@ -61,9 +61,6 @@
     "extra": {
       "router": {
         "origin": false
-      },
-      "eas": {
-        "projectId": "represent-wallet"
       }
     }
   }
