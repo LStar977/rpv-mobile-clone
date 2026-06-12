@@ -2268,6 +2268,39 @@ export default function ProposalsScreen() {
     // Demo account bypasses all limits (for App Store review)
     const isDemoAccount = user?.email === 'demo@represent.app';
 
+    // Free accounts run one active proposal at a time; premium is
+    // unlimited. /api/user/limits doesn't exist on the backend yet (the
+    // limitsApi fallback always reports used: 0), so count the user's
+    // live proposals from the already-loaded list. The server enforces
+    // the same rule (PROPOSAL_LIMIT) — this pre-check is the upsell UX.
+    const isPremiumUser = !!user?.isPremium || user?.subscriptionStatus === 'active';
+    if (!isDemoAccount && !isPremiumUser) {
+      const now = Date.now();
+      const myActiveProposals = proposals.filter((p) =>
+        String(p.creatorId) === String(user?.id ?? '') &&
+        !String(p.id).startsWith('seed-') &&
+        (!p.deadline || new Date(p.deadline).getTime() > now)
+      ).length;
+      if (myActiveProposals >= 1) {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        Alert.alert(
+          'One active proposal at a time',
+          'Free accounts can run one active proposal at a time. Upgrade to Premium for unlimited proposals, or wait for your current one to close.',
+          [
+            { text: 'Not now', style: 'cancel' },
+            {
+              text: 'Upgrade',
+              onPress: () => {
+                setShowCreateModal(false);
+                router.push('/modals/subscription');
+              },
+            },
+          ],
+        );
+        return;
+      }
+    }
+
     // Check proposal limits (skip for premium users with unlimited, or demo account)
     if (!isDemoAccount && usageLimits && usageLimits.proposals.limit !== 'unlimited') {
       if (usageLimits.proposals.used >= usageLimits.proposals.limit) {
@@ -2347,6 +2380,23 @@ export default function ProposalsScreen() {
       });
 
       if (result.error) {
+        if (result.errorCode === 'PROPOSAL_LIMIT') {
+          Alert.alert(
+            'One active proposal at a time',
+            'Free accounts can run one active proposal at a time. Upgrade to Premium for unlimited proposals.',
+            [
+              { text: 'Not now', style: 'cancel' },
+              {
+                text: 'Upgrade',
+                onPress: () => {
+                  setShowCreateModal(false);
+                  router.push('/modals/subscription');
+                },
+              },
+            ],
+          );
+          return;
+        }
         Alert.alert('Error', result.error);
         return;
       }

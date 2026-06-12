@@ -1726,7 +1726,15 @@ export const badgesApi = {
   },
 
   async checkNewBadges(): Promise<ApiResponse<{ newBadges: any[] }>> {
-    return apiRequest('/api/badges/check', { method: 'POST' });
+    const userId = useAuthStore.getState().user?.id;
+    if (!userId || isDemoAccount()) return { data: { newBadges: [] }, error: null };
+    // The backfill endpoint is idempotent: it scans the user's stats,
+    // awards anything earned-but-missing, and returns only newly awarded
+    // badges. (The previous '/api/badges/check' path never existed on the
+    // backend, so no badge was ever awarded.)
+    const result = await apiRequest<any>(`/api/badges/backfill/${userId}`, { method: 'POST' });
+    if (result.data?.newBadges) return { data: { newBadges: result.data.newBadges }, error: null };
+    return { data: { newBadges: [] }, error: result.error };
   },
 };
 
