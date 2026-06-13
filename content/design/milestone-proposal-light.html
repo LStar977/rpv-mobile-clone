@@ -65,7 +65,7 @@
       <div style="font-size: 10.5px; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase; color: #B8902F;">Six gates · Eighteen months</div>
       <h2 style="margin: 14px 0 0; font-family: Fraunces, Georgia, serif; font-weight: 600; font-size: 31px; line-height: 1.15; letter-spacing: -0.01em; color: #0B0B0B;">Milestone Summary</h2>
       <div style="margin-top: 34px; display: grid; grid-template-columns: 30px 200px 1fr 128px; gap: 0 22px; padding-bottom: 10px; border-bottom: 1px solid rgba(184,144,47,0.5); font-size: 9px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: #6E6557;">
-        <span>Ph</span><span>Milestone · Window</span><span>What it proves</span><span style="text-align: right;">Phase</span>
+        <span>Ph</span><span>Milestone · Window</span><span>What it proves</span><span style="text-align: right;">Funding</span>
       </div>
       <sc-for list="{{ summaryRows }}" as="m" hint-placeholder-count="6">
         <div style="display: grid; grid-template-columns: 30px 200px 1fr 128px; gap: 0 22px; align-items: center; padding: 21px 0; border-bottom: 1px solid rgba(11,11,11,0.1);">
@@ -75,7 +75,7 @@
             <span style="font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.04em; color: #6E6557;">{{ m.window }}</span>
           </span>
           <span style="font-family: Fraunces, Georgia, serif; font-style: italic; font-weight: 500; font-size: 14px; line-height: 1.45; color: rgba(11,11,11,0.75);">{{ m.proves }}</span>
-          <span style="font-family: 'JetBrains Mono', monospace; font-feature-settings: 'tnum' 1; font-size: 20px; font-weight: 500; text-align: right; color: #B8902F;">{{ m.phase }}</span>
+          <span style="font-family: 'JetBrains Mono', monospace; font-feature-settings: 'tnum' 1; font-size: 20px; font-weight: 500; text-align: right; color: #B8902F;">{{ m.amount }}</span>
         </div>
       </sc-for>
       <div style="flex: 1;"></div>
@@ -391,12 +391,12 @@ class Component extends DCLogic {
   renderVals() {
     return {
       summaryRows: [
-        { phase: "—", name: "Activate — foundation & launch", window: "AT SIGNING (JUL)", proves: "Foundation + campaign engine, before August", phase: "$50,000" },
-        { phase: "1", name: "Prove — first paying attention", window: "MONTH 1 (AUG)", proves: "People sign up; the engine scales on proof", phase: "$50,000" },
-        { phase: "2", name: "Alberta Verified — the Referendum Sprint", window: "MONTHS 2–4 (SEP → OCT 18)", proves: "Albertans will verify identity at scale", phase: "$150,000" },
-        { phase: "3", name: "The Results Moment & Retention", window: "MONTHS 4–7 (OCT 19 → JAN)", proves: "The platform survives its event; users stay & engage", phase: "$200,000" },
-        { phase: "4", name: "Government & Expansion", window: "MONTHS 7–12 (FEB → JUN 2027)", proves: "Officials and governments adopt", phase: "$250,000" },
-        { phase: "5", name: "Scale & Revenue", window: "MONTHS 12–18 (JUL → DEC 2027)", proves: "The market exists and will pay", phase: "$300,000" }
+        { phase: "—", name: "Activate — foundation & launch", window: "AT SIGNING (JUL)", proves: "Foundation + campaign engine, before August", amount: "$50,000" },
+        { phase: "1", name: "Prove — first paying attention", window: "MONTH 1 (AUG)", proves: "People sign up; the engine scales on proof", amount: "$50,000" },
+        { phase: "2", name: "Alberta Verified — the Referendum Sprint", window: "MONTHS 2–4 (SEP → OCT 18)", proves: "Albertans will verify identity at scale", amount: "$150,000" },
+        { phase: "3", name: "The Results Moment & Retention", window: "MONTHS 4–7 (OCT 19 → JAN)", proves: "The platform survives its event; users stay & engage", amount: "$200,000" },
+        { phase: "4", name: "Government & Expansion", window: "MONTHS 7–12 (FEB → JUN 2027)", proves: "Officials and governments adopt", amount: "$250,000" },
+        { phase: "5", name: "Scale & Revenue", window: "MONTHS 12–18 (JUL → DEC 2027)", proves: "The market exists and will pay", amount: "$300,000" }
       ],
       t0Budget: [
         { cat: "Founder salaries", amt: "$15,000", note: "One month — two founders @ $7,500" },
