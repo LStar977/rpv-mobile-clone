@@ -33,7 +33,7 @@
       <h1 style="margin: 54px 0 0; font-family: Fraunces, Georgia, serif; font-weight: 600; font-size: 58px; line-height: 1.08; letter-spacing: -0.015em; color: #F2E6CC; text-wrap: balance;">Investment Milestone Proposal</h1>
       <div style="margin-top: 30px; display: flex; flex-direction: column; gap: 7px; font-size: 15px; line-height: 1.5; color: rgba(242,230,204,0.88);">
         <span><span style="font-family: 'JetBrains Mono', monospace; font-feature-settings: 'tnum' 1; font-size: 14.5px; color: #F2E6CC;">$1,000,000</span>&nbsp; Milestone-Based Investment</span>
-        <span style="font-size: 13.5px; color: #8A8275;">Verification costs covered separately · up to $20,000</span>
+        
       </div>
       <div style="flex: 1;"></div>
       <div style="display: flex; flex-direction: column; align-items: center; gap: 18px;">
@@ -189,7 +189,6 @@
         <span style="font-size: 11.5px; font-style: italic; color: #8A8275;">—</span>
       </div>
       <div style="flex: 1;"></div>
-      <p style="margin: 0; font-size: 11.5px; font-style: italic; line-height: 1.6; color: #8A8275;">Verification costs (3,500 × $0.40 = $1,400) covered by the investor’s separate verification budget.</p>
     </div>
   </div>
 
@@ -226,7 +225,6 @@
         <span style="font-size: 11.5px; font-style: italic; color: #8A8275;">—</span>
       </div>
       <div style="flex: 1;"></div>
-      <p style="margin: 0; font-size: 11.5px; font-style: italic; line-height: 1.6; color: #8A8275;">Verification costs (6,500 new × $0.40 = $2,600) covered separately.</p>
     </div>
   </div>
 
@@ -263,7 +261,6 @@
         <span style="font-size: 11.5px; font-style: italic; color: #8A8275;">—</span>
       </div>
       <div style="flex: 1;"></div>
-      <p style="margin: 0; font-size: 11.5px; font-style: italic; line-height: 1.6; color: #8A8275;">Verification costs (10,000 new × $0.40 = $4,000) covered separately.</p>
     </div>
   </div>
 
@@ -300,7 +297,6 @@
         <span style="font-size: 11.5px; font-style: italic; color: #8A8275;">—</span>
       </div>
       <div style="flex: 1;"></div>
-      <p style="margin: 0; font-size: 11.5px; font-style: italic; line-height: 1.6; color: #8A8275;">Verification costs (15,000 new × $0.40 = $6,000) covered separately.</p>
     </div>
   </div>
 
@@ -319,7 +315,7 @@
           <div style="font-size: 10.5px; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase; color: #D4A949;">Activation + five milestones · Eighteen months</div>
           <h2 style="margin: 6px 0 0; font-family: Fraunces, Georgia, serif; font-weight: 600; font-size: 22px; line-height: 1.15; letter-spacing: -0.01em; color: #F2E6CC;">Total Investment Summary</h2>
         </div>
-        <span style="font-family: 'JetBrains Mono', monospace; font-feature-settings: 'tnum' 1; font-size: 23px; font-weight: 500; color: #D4A949;">$1,020,000</span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-feature-settings: 'tnum' 1; font-size: 23px; font-weight: 500; color: #D4A949;">$1,000,000</span>
       </div>
       <div style="margin-top: 30px; display: grid; grid-template-columns: 1fr 96px 86px 96px; gap: 0 22px; padding-bottom: 10px; border-bottom: 1px solid rgba(212,169,73,0.5); font-size: 9px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: #8A8275;">
         <span>Category</span><span style="text-align: right;">From $1M</span><span style="text-align: right;">Separate</span><span style="text-align: right;">Total</span>
@@ -336,7 +332,7 @@
         <span style="font-size: 12px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: #F2E6CC;">Total</span>
         <span style="font-family: 'JetBrains Mono', monospace; font-feature-settings: 'tnum' 1; font-size: 13.5px; font-weight: 600; text-align: right; color: #D4A949;">$1,000,000</span>
         <span style="font-family: 'JetBrains Mono', monospace; font-feature-settings: 'tnum' 1; font-size: 13.5px; font-weight: 600; text-align: right; color: #D4A949;">$20,000</span>
-        <span style="font-family: 'JetBrains Mono', monospace; font-feature-settings: 'tnum' 1; font-size: 13.5px; font-weight: 600; text-align: right; color: #D4A949;">$1,020,000</span>
+        <span style="font-family: 'JetBrains Mono', monospace; font-feature-settings: 'tnum' 1; font-size: 13.5px; font-weight: 600; text-align: right; color: #D4A949;">$1,000,000</span>
       </div>
     </div>
   </div>
@@ -400,12 +396,13 @@ class Component extends DCLogic {
       ],
       t0Budget: [
         { cat: "Founder salaries", amt: "$15,000", note: "One month — two founders @ $7,500" },
-        { cat: "Legal — incorporation, equity, shareholder agreement", amt: "$8,000", note: "" },
-        { cat: "Elections Alberta advertising compliance", amt: "$3,000", note: "Clears all paid referendum advertising" },
-        { cat: "Brand & ad creative production", amt: "$6,000", note: "Statics, video, per-question cards" },
-        { cat: "Launch marketing & ads", amt: "$15,000", note: "Stampede street presence + first campaigns" },
-        { cat: "Creator partnerships", amt: "$2,500", note: "Alberta micro-creators, balanced roster" },
-        { cat: "Infrastructure & tools", amt: "$500", note: "Hosting + software" }
+        { cat: "App onboarding fixes", amt: "$12,000", note: "Polish before the first 200 verifications" },
+        { cat: "Legal / disclaimer review", amt: "$11,000", note: "Incorporation, shareholder agreement, advertising compliance" },
+        { cat: "Creative assets", amt: "$6,000", note: "Statics, video, per-question cards" },
+        { cat: "Founder travel & meetings", amt: "$3,000", note: "Stampede street presence + early outreach" },
+        { cat: "Small ad test", amt: "$2,000", note: "First paid campaigns" },
+        { cat: "AI tools / subscriptions", amt: "$500", note: "" },
+        { cat: "Contingency", amt: "$500", note: "" }
       ],
       m1Budget: [
         { cat: "Founder salaries", amt: "$15,000", note: "One month — two founders @ $7,500" },
@@ -506,8 +503,7 @@ class Component extends DCLogic {
         { cat: "Series Seed preparation", m: "$10,000", sep: "—", tot: "$10,000" },
         { cat: "Government sales & materials", m: "$10,000", sep: "—", tot: "$10,000" },
         { cat: "Android development", m: "$5,000", sep: "—", tot: "$5,000" },
-        { cat: "Print & posters", m: "$2,000", sep: "—", tot: "$2,000" },
-        { cat: "Verification costs (covered separately)", m: "—", sep: "$20,000", tot: "$20,000" }
+        { cat: "Print & posters", m: "$2,000", sep: "—", tot: "$2,000" }
       ],
       events: [
         { ev: "Calgary Stampede street presence", loc: "Calgary", date: "Jul 3–12, 2026", bud: "$2,500", pur: "Guerrilla QR presence at Alberta’s largest event", hot: false },
