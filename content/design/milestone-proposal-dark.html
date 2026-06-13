@@ -120,6 +120,7 @@
         <span style="font-family: 'JetBrains Mono', monospace; font-feature-settings: 'tnum' 1; font-size: 15px; font-weight: 600; text-align: right; color: #D4A949;">$50,000</span>
         <span style="font-size: 11.5px; font-style: italic; color: #8A8275;">—</span>
       </div>
+      <p style="margin: 10px 0 0; font-size: 10.5px; font-style: italic; line-height: 1.5; color: #8A8275;">The Activation budget launches the first proof gate — it is not a product rebuild. Funds go to company setup, legal readiness, campaign launch, trust messaging, acquisition tests, funnel tracking, and acquiring the first 200 registered users (including at least 100 verified).</p>
     </div>
   </div>
 
@@ -403,14 +404,15 @@ class Component extends DCLogic {
         { phase: "5", name: "Scale & Revenue", window: "MONTHS 12–18 (JUL → DEC 2027)", proves: "The market exists and will pay", amount: "$300,000" }
       ],
       t0Budget: [
-        { cat: "Founder salaries", amt: "$15,000", note: "One month — two founders @ $7,500" },
-        { cat: "App onboarding fixes", amt: "$12,000", note: "Polish before the first 200 verifications" },
-        { cat: "Legal / disclaimer review", amt: "$11,000", note: "Incorporation, shareholder agreement, advertising compliance" },
-        { cat: "Creative assets", amt: "$6,000", note: "Statics, video, per-question cards" },
-        { cat: "Founder travel & meetings", amt: "$3,000", note: "Stampede street presence + early outreach" },
-        { cat: "Small ad test", amt: "$2,000", note: "First paid campaigns" },
-        { cat: "AI tools / subscriptions", amt: "$500", note: "" },
-        { cat: "Contingency", amt: "$500", note: "" }
+        { cat: "Operations", amt: "$10,000", note: "One-month activation execution: founding-team coordination, launch management, admin overhead" },
+        { cat: "Legal, incorporation & investment docs", amt: "$10,000", note: "Incorporation, shareholder agreement, investment docs, advertising compliance" },
+        { cat: "Launch creative & campaign assets", amt: "$7,500", note: "Static ads, short videos, landing graphics, vote & trust visuals" },
+        { cat: "Paid launch advertising", amt: "$6,000", note: "First Alberta paid campaigns — Meta, TikTok, Google, Reddit, test channels" },
+        { cat: "Contingency", amt: "$4,500", note: "Reserve for urgent campaign needs or high-performing channels" },
+        { cat: "Founder travel & direct outreach", amt: "$4,000", note: "Calgary/Edmonton meetings, Stampede presence, partner meetings" },
+        { cat: "Product readiness & verification flow", amt: "$3,500", note: "Onboarding polish, verification copy, trust screens, funnel tracking" },
+        { cat: "Analytics, software & subscriptions", amt: "$3,000", note: "Attribution, CRM, AI tools, design, productivity, campaign tooling" },
+        { cat: "Printing, QR materials & event supplies", amt: "$1,500", note: "QR cards, posters, table materials, handouts" }
       ],
       m1Budget: [
         { cat: "Founder salaries", amt: "$15,000", note: "One month — two founders @ $7,500" },
@@ -495,23 +497,23 @@ class Component extends DCLogic {
         { cat: "Tools / support systems", amt: "$3,000", note: "" }
       ],
       totalSummary: [
-        { cat: "Founder salaries (18 months, two founders)", m: "$270,000", sep: "—", tot: "$270,000" },
+        { cat: "Operations / founder execution", m: "$269,000", sep: "—", tot: "$269,000" },
         { cat: "Town halls, road campaign & community events", m: "$168,000", sep: "—", tot: "$168,000" },
-        { cat: "Paid advertising (digital, radio, podcasts, print)", m: "$167,000", sep: "—", tot: "$167,000" },
+        { cat: "Paid advertising (digital, radio, podcasts, print)", m: "$158,000", sep: "—", tot: "$158,000" },
         { cat: "Campaign team, ambassadors & community management", m: "$104,000", sep: "—", tot: "$104,000" },
-        { cat: "App, dashboard & technical updates", m: "$86,000", sep: "—", tot: "$86,000" },
-        { cat: "Legal, compliance & privacy", m: "$34,000", sep: "—", tot: "$34,000" },
-        { cat: "Content, creative & video", m: "$33,000", sep: "—", tot: "$33,000" },
-        { cat: "Creator partnerships", m: "$25,500", sep: "—", tot: "$25,500" },
+        { cat: "App, dashboard & technical updates", m: "$89,500", sep: "—", tot: "$89,500" },
+        { cat: "Content, creative & video", m: "$34,500", sep: "—", tot: "$34,500" },
+        { cat: "Legal, compliance & investment docs", m: "$33,000", sep: "—", tot: "$33,000" },
+        { cat: "Creator partnerships", m: "$23,000", sep: "—", tot: "$23,000" },
         { cat: "PR & media", m: "$23,000", sep: "—", tot: "$23,000" },
         { cat: "First hire (Milestone 5)", m: "$20,000", sep: "—", tot: "$20,000" },
+        { cat: "Contingency", m: "$19,500", sep: "—", tot: "$19,500" },
         { cat: "Reports, data & analysis", m: "$15,000", sep: "—", tot: "$15,000" },
-        { cat: "Contingency", m: "$15,000", sep: "—", tot: "$15,000" },
-        { cat: "Tools, software & infrastructure", m: "$12,500", sep: "—", tot: "$12,500" },
+        { cat: "Tools, software & infrastructure", m: "$15,000", sep: "—", tot: "$15,000" },
         { cat: "Series Seed preparation", m: "$10,000", sep: "—", tot: "$10,000" },
         { cat: "Government sales & materials", m: "$10,000", sep: "—", tot: "$10,000" },
         { cat: "Android development", m: "$5,000", sep: "—", tot: "$5,000" },
-        { cat: "Print & posters", m: "$2,000", sep: "—", tot: "$2,000" }
+        { cat: "Print & posters", m: "$3,500", sep: "—", tot: "$3,500" }
       ],
       events: [
         { ev: "Calgary Stampede street presence", loc: "Calgary", date: "Jul 3–12, 2026", bud: "$2,500", pur: "Guerrilla QR presence at Alberta’s largest event", hot: false },
