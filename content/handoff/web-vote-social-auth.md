@@ -228,6 +228,55 @@ social, generate smart wallet best-effort, `jwt.sign({sub,email}, JWT_SECRET)`).
 Factor it out and call it from all auth paths so social and email return identical
 `{ token, user }` objects (so `checkAuthAndAdvance()` works unchanged).
 
+### Account linking — one account per email (REQUIRED)
+
+Google and Apple sign-in must resolve to the **same account** as an existing
+email/password user when the email matches. Do NOT create a second user. The
+lookup order inside `findOrCreateUserAndIssueJwt`:
+
+1. **Match by email first.** `storage.getUserByEmail(email)` — if a user exists
+   (email/password OR a prior social user), use that user. Record the provider
+   sub on it (e.g. `googleSub` / `appleSub`) so future logins also match by sub.
+2. **Else create** a new user from the social profile.
+
+```ts
+async function findOrCreateUserAndIssueJwt({ provider, providerSub, email, name }) {
+  const normEmail = String(email).trim().toLowerCase();
+
+  // 1. Same email = same account. Links Google/Apple onto an existing
+  //    email/password (or earlier social) user instead of duplicating.
+  let user = await storage.getUserByEmail(normEmail);
+
+  if (user) {
+    if (user.deleted) throw new Error("account deleted");
+    // Stamp the provider id so subsequent logins match by sub too.
+    await storage.linkAuthProvider(user.id, provider, providerSub); // googleSub/appleSub
+  } else {
+    // 2. New user — same creation path the email/social signups already use.
+    user = await storage.createSocialUser({ email: normEmail, name, provider, providerSub });
+    await generateSmartWalletBestEffort(user.id);
+  }
+
+  const token = jwt.sign({ sub: user.id, email: user.email }, process.env.JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+  return { token, user: publicUser(user) };
+}
+```
+
+**Security guardrail — only link on a verified email.** Linking by email is safe
+*because* both providers assert the email:
+- Google: we already reject unless `email_verified === true` (see handler above).
+- Apple: Apple only returns verified emails.
+
+Never link an account using an unverified email from any future provider — that
+would let someone claim another person's account by signing up with their address.
+For the **email/password** path specifically, this means: if you don't already
+verify email ownership at signup, a Google login that lands on an existing
+password account is still safe (Google proved the email), but be aware the reverse
+(password signup on an email that belongs to a Google user) should require the
+Google login or a password reset to take over — i.e. don't let an unverified
+password signup silently seize a social account's email. Current behaviour is fine
+as long as social → existing-email always *joins* rather than *replaces*.
+
 ---
 
 ## 5. Replit config checklist (must do before this works in prod)
@@ -256,5 +305,7 @@ Factor it out and call it from all auth paths so social and email return identic
 1. Click Continue with Google → popup → consent → lands back, advances to verify/vote.
 2. Same for Apple.
 3. Confirm a `users` row is created and the returned JWT authorizes `/api/voting/submit`.
-4. Confirm an existing email user who later uses Google with the same address is
-   matched, not duplicated (decide policy: link by verified email).
+4. **Account linking (required):** create an email/password account, then sign in
+   with Google using the **same email** → must resolve to the *same* user (same
+   user id, same wallet, same vote history), NOT a duplicate. Repeat for Apple.
+   Then sign in with Google again → still the same account (matched by sub).
