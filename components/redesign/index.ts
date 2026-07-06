@@ -6,3 +6,4 @@ export { TrustChip } from './TrustChip';
 export { TallyBar } from './TallyBar';
 export { ProposalCard } from './ProposalCard';
 export type { ProposalCardData } from './ProposalCard';
+export { VoteReceipt } from './VoteReceipt';

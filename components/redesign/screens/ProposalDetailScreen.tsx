@@ -7,14 +7,14 @@
 //
 // Trust copy is honest: the ledger is PUBLIC + tamper-evident + one-per-person,
 // not "secret" (the mockup's "secret until sealed" line is deliberately dropped).
-import React, { useRef, useState } from 'react';
-import { View, ScrollView, Animated, Pressable } from 'react-native';
+import React, { useState } from 'react';
+import { View, ScrollView, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useTheme } from '../../../lib/theme';
 import { proposalsApi } from '../../../lib/api';
-import { T, Eyebrow, Button, TrustChip, TallyBar } from '../index';
-import { SPACE, RADIUS, SIDE, FONTS, MOTION } from '../../../lib/redesign';
+import { T, Eyebrow, Button, TrustChip, TallyBar, VoteReceipt } from '../index';
+import { SPACE, RADIUS, SIDE, FONTS } from '../../../lib/redesign';
 
 type Side = 'support' | 'oppose';
 
@@ -30,6 +30,7 @@ export function ProposalDetailScreen() {
     support?: string;
     oppose?: string;
     closed?: string;
+    options?: string;
   }>();
 
   const proposalId = params.proposalId ?? '';
@@ -47,9 +48,6 @@ export function ProposalDetailScreen() {
   const [error, setError] = useState<string | null>(null);
   const [needsVerify, setNeedsVerify] = useState(false);
   const [receipt, setReceipt] = useState<{ side: Side; ref?: string; at: string } | null>(null);
-
-  const checkScale = useRef(new Animated.Value(0.5)).current;
-  const checkOpacity = useRef(new Animated.Value(0)).current;
 
   const cast = async (side: Side) => {
     if (busy || closed) return;
@@ -74,85 +72,18 @@ export function ProposalDetailScreen() {
       ref: res.data?.txHash,
       at: `${now.toISOString().slice(0, 16).replace('T', ' ')} UTC`,
     });
-    Animated.parallel([
-      Animated.spring(checkScale, { toValue: 1, useNativeDriver: true, friction: 6 }),
-      Animated.timing(checkOpacity, { toValue: 1, duration: MOTION.tick, useNativeDriver: true }),
-    ]).start();
   };
 
   // ─── RECEIPT STATE (screen 08) ───
   if (receipt) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
-        <ScrollView contentContainerStyle={{ padding: SPACE.xl, gap: SPACE.xl, flexGrow: 1, justifyContent: 'center' }}>
-          <View style={{ alignItems: 'center', gap: SPACE.lg }}>
-            <Animated.View
-              style={{
-                width: 84,
-                height: 84,
-                borderRadius: 42,
-                backgroundColor: colors.goldSurface,
-                borderWidth: 1,
-                borderColor: colors.gold,
-                alignItems: 'center',
-                justifyContent: 'center',
-                transform: [{ scale: checkScale }],
-                opacity: checkOpacity,
-              }}
-            >
-              <T variant="heroSerif" color={colors.gold} style={{ fontSize: 40, lineHeight: 44 }}>✓</T>
-            </Animated.View>
-            <T variant="resultSerif" color={colors.text} style={{ textAlign: 'center' }}>
-              Ballot recorded
-            </T>
-            <T variant="body" color={colors.textSecondary} style={{ textAlign: 'center', maxWidth: 300 }}>
-              Recorded on the public ledger · one person, one ballot · verifiable by anyone.
-            </T>
-          </View>
-
-          {/* receipt block */}
-          <View
-            style={{
-              backgroundColor: colors.surface,
-              borderRadius: RADIUS.card,
-              borderWidth: 1,
-              borderColor: colors.border,
-              padding: SPACE.xl,
-              gap: SPACE.md,
-            }}
-          >
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-              <T variant="monoLabel" color={colors.textTertiary}>Your ballot</T>
-              <T variant="monoData" color={receipt.side === 'support' ? SIDE.supportInk : colors.textSecondary}>
-                {receipt.side === 'support' ? 'SUPPORT' : 'OPPOSE'}
-              </T>
-            </View>
-            <View style={{ height: 1, backgroundColor: colors.border }} />
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-              <T variant="monoLabel" color={colors.textTertiary}>Recorded</T>
-              <T variant="monoData" color={colors.textSecondary}>{receipt.at}</T>
-            </View>
-            {receipt.ref ? (
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: SPACE.md }}>
-                <T variant="monoLabel" color={colors.textTertiary}>Ledger ref</T>
-                <T variant="monoData" color={colors.textSecondary} numberOfLines={1} style={{ flex: 1, textAlign: 'right' }}>
-                  {receipt.ref.slice(0, 10)}…{receipt.ref.slice(-6)}
-                </T>
-              </View>
-            ) : (
-              <T variant="caption" color={colors.textTertiary}>Confirming on the ledger…</T>
-            )}
-          </View>
-
-          {/* live tally after voting */}
-          {isYesNo && <TallyBar support={support} oppose={oppose} />}
-
-          <View style={{ gap: SPACE.sm }}>
-            <Button label="Keep voting" onPress={() => router.back()} />
-            <Button label="Done" variant="ghost" onPress={() => router.back()} />
-          </View>
-        </ScrollView>
-      </SafeAreaView>
+      <VoteReceipt
+        choiceRows={[{ label: 'Your ballot', value: receipt.side === 'support' ? 'SUPPORT' : 'OPPOSE', emphasize: receipt.side === 'support' }]}
+        ledgerRef={receipt.ref}
+        recordedAt={receipt.at}
+      >
+        {isYesNo ? <TallyBar support={support} oppose={oppose} /> : null}
+      </VoteReceipt>
     );
   }
 
@@ -263,7 +194,7 @@ export function ProposalDetailScreen() {
             <Button
               label="Open the full ballot"
               onPress={() =>
-                router.push({ pathname: '/redesign-ballot', params: { proposalId, title, voteType } })
+                router.push({ pathname: '/redesign-ballot', params: { proposalId, title, voteType, options: params.options ?? '[]' } })
               }
             />
           </View>

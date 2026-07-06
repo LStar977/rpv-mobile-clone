@@ -79,6 +79,7 @@ export function FeedScreen() {
         support: String(p.supportVotes ?? 0),
         oppose: String(p.opposeVotes ?? 0),
         closed: closed ? 'true' : 'false',
+        options: JSON.stringify(Array.isArray(p.options) ? p.options : []),
       },
     });
   };
