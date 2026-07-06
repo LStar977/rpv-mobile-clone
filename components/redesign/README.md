@@ -21,6 +21,23 @@ fonts, tokens, and the reusable component kit. Screens are built on top of it.
   - `TallyBar` — the signature results viz; handles the 0-ballot launch state.
   - `ProposalCard` — the workhorse card (yes-no / ranked / multi).
 
+## Preview routes (test on-device before IA cutover)
+
+These render the finished redesign screens against **real data**, without touching
+the live tabs. Open them in Expo (deep-link or a temp button):
+
+| Route | Screen |
+|---|---|
+| `/redesign-home` | 04 · Home / Vote (verified status, Oct-19 countdown, open proposals) |
+| `/redesign-feed` | 05 · Proposal Feed |
+| `/redesign-proposal` | 06/08 · Proposal detail + yes/no vote + receipt |
+| `/redesign-ballot` | 07 · Ranked / multiple-choice ballot |
+| `/redesign-results` | 09 · Results (yes-no / multi / ranked) |
+
+Flow works end-to-end: Home/Feed → tap a proposal → detail → vote → recorded
+receipt (or → full ballot for ranked/multi). All calls hit the real
+`proposalsApi`. Start at `/redesign-home` or `/redesign-feed`.
+
 ## How to run it locally (you, in Expo)
 
 ```bash
