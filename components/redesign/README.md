@@ -34,9 +34,29 @@ the live tabs. Open them in Expo (deep-link or a temp button):
 | `/redesign-ballot` | 07 · Ranked / multiple-choice ballot |
 | `/redesign-results` | 09 · Results (yes-no / multi / ranked) |
 
+| `/redesign-identity` | 10 · Identity credential + badges |
+| `/redesign-create` | 12 · Create a proposal |
+| `/redesign-sentinel` | 13 · Sentinel paywall |
+
 Flow works end-to-end: Home/Feed → tap a proposal → detail → vote → recorded
 receipt (or → full ballot for ranked/multi). All calls hit the real
 `proposalsApi`. Start at `/redesign-home` or `/redesign-feed`.
+
+## The 4-tab redesign app (IA cutover)
+
+The consolidated tab experience lives at **`app/(redesign)/`** — four tabs:
+**Vote · Results · Organizations · Identity** (screens 04 / 09b / 11 / 10). It's
+registered in the root Stack and reachable at **`/(redesign)/vote`**.
+
+**To make the redesign the app's primary experience (the final flip):** change
+the post-authentication redirect in `app/index.tsx` from `/(tabs)/...` to
+`/(redesign)/vote`. That's the single cutover line. The old `(tabs)` stay in the
+tree until you delete them, so you can flip back instantly if needed.
+
+### Still on the old screens (not yet rebuilt)
+Onboarding + verification capture (01–03), org detail/admin internals (11b),
+and the secondary set (14–22, e.g. settings/notifications/analytics) still use
+the existing screens — the redesign links into them so nothing is dead.
 
 ## How to run it locally (you, in Expo)
 

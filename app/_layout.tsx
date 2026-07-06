@@ -71,6 +71,7 @@ function ThemedStack() {
       >
         <Stack.Screen name="index" />
         <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="(redesign)" />
         <Stack.Screen name="modals" />
       </Stack>
     </View>
