@@ -135,3 +135,26 @@ export const MOTION = {
   seal: 1400, // rv-seal stroke draw
   tick: 700, // rv-tickup tally count
 } as const;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// REGION RESOLUTION
+// The demo/reviewer account gets a fixed Alberta region so the App Store review
+// flow can scope + create local proposals (the old app hardcoded a demo region
+// the same way). Real accounts use whatever verification populated on the user.
+// One place so Home / Create / Identity stay consistent.
+// ─────────────────────────────────────────────────────────────────────────────
+type RegionUser = { email?: string | null; country?: string | null; state?: string | null; city?: string | null } | null | undefined;
+
+export function userRegion(user: RegionUser): { country: string | null; state: string | null; city: string | null } {
+  if (user?.email === 'demo@represent.app') {
+    return { country: 'Canada', state: 'Alberta', city: 'Calgary' };
+  }
+  return { country: user?.country ?? null, state: user?.state ?? null, city: user?.city ?? null };
+}
+
+// "Calgary, Alberta" / "Alberta, Canada" / "Canada" / null — for display.
+export function regionLabel(user: RegionUser): string | null {
+  const r = userRegion(user);
+  const parts = [r.city, r.state, r.country].filter(Boolean) as string[];
+  return parts.length ? parts.slice(0, 2).join(', ') : null;
+}

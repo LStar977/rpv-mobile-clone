@@ -10,7 +10,7 @@ import { useTheme } from '../../../lib/theme';
 import { proposalsApi } from '../../../lib/api';
 import { useAuthStore } from '../../../lib/auth';
 import { T, Eyebrow, Button, BackBar } from '../index';
-import { SPACE, RADIUS, FONTS } from '../../../lib/redesign';
+import { SPACE, RADIUS, FONTS, userRegion } from '../../../lib/redesign';
 
 const CATEGORIES = ['General', 'Governance', 'Local', 'Economy', 'Environment', 'Rights'];
 type VType = 'yes-no' | 'multiple-choice' | 'ranked';
@@ -31,12 +31,12 @@ export function CreateProposalScreen() {
   // parts (["Canada","Ontario","Toronto"]) — most-specific last.
   const scopeOptions = useMemo(() => {
     const opts: { label: string; geo: string[] | undefined }[] = [{ label: 'Global — anyone verified', geo: undefined }];
-    const c = user?.country, s = user?.state, ci = user?.city;
+    const { country: c, state: s, city: ci } = userRegion(user);
     if (c) opts.push({ label: c, geo: [c] });
     if (c && s) opts.push({ label: s, geo: [c, s] });
     if (c && s && ci) opts.push({ label: ci, geo: [c, s, ci] });
     return opts;
-  }, [user?.country, user?.state, user?.city]);
+  }, [user]);
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');

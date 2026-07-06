@@ -11,7 +11,7 @@ import { useTheme } from '../../../lib/theme';
 import { useAuthStore } from '../../../lib/auth';
 import { proposalsApi, type Proposal } from '../../../lib/api';
 import { T, Eyebrow, Button, TrustChip, ProposalCard, type ProposalCardData } from '../index';
-import { SPACE, RADIUS, FONTS } from '../../../lib/redesign';
+import { SPACE, RADIUS, FONTS, regionLabel } from '../../../lib/redesign';
 
 // The launch moment. Countdown is illustrative brand furniture, not a hard gate.
 const REFERENDUM = new Date('2026-10-19T00:00:00-06:00'); // Alberta (MDT)
@@ -52,7 +52,7 @@ export function HomeScreen() {
   const [refreshing, setRefreshing] = useState(false);
 
   const verified = !!user?.verified;
-  const region = [user?.city, user?.state].filter(Boolean).join(', ') || user?.country || 'Your region';
+  const region = regionLabel(user) || (verified ? 'Region not set — verify your location' : 'Your region');
   const days = daysUntil(REFERENDUM);
 
   const load = useCallback(async () => {

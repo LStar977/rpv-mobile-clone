@@ -11,7 +11,7 @@ import { useTheme } from '../../../lib/theme';
 import { useAuthStore } from '../../../lib/auth';
 import { userApi, badgesApi } from '../../../lib/api';
 import { T, Eyebrow, TrustChip, Button } from '../index';
-import { SPACE, RADIUS, FONTS } from '../../../lib/redesign';
+import { SPACE, RADIUS, FONTS, regionLabel } from '../../../lib/redesign';
 
 export function IdentityScreen() {
   const { colors } = useTheme();
@@ -21,7 +21,7 @@ export function IdentityScreen() {
 
   const verified = !!user?.verified;
   const citizen = !!user?.citizenshipVerified;
-  const region = [user?.city, user?.state, user?.country].filter(Boolean).join(', ') || 'Region on file';
+  const region = regionLabel(user) || 'Region not set';
 
   const load = useCallback(async () => {
     const voted = await userApi.getVotedProposals();

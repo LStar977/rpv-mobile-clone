@@ -305,6 +305,28 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           const data = await response.json();
           
           if (data.valid && data.user) {
+            // Diagnostic (temporary): what keys does /api/auth/verify return, and
+            // where is the region? Some accounts show "no region" because the
+            // backend surfaces it under a non-obvious key. Logged once so we can
+            // pin the exact field, then this can be removed.
+            try {
+              const u: any = data.user;
+              console.log('[auth] verify user keys:', Object.keys(u).join(','));
+              console.log('[auth] region probe:', JSON.stringify({
+                country: u.country, state: u.state, city: u.city,
+                province: u.province, region: u.region, location: u.location,
+                verifiedCountry: u.verifiedCountry, nationality: u.nationality,
+              }));
+            } catch {}
+            const du: any = data.user;
+            const loc: any = du.location || du.verifiedLocation || {};
+            const pick = (...keys: string[]): string | null => {
+              for (const k of keys) {
+                if (du[k]) return du[k];
+                if (loc[k]) return loc[k];
+              }
+              return null;
+            };
             // Use FRESH user data from API (includes updated location after verification)
             const freshUser: User = {
               id: data.user.id,
@@ -312,9 +334,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
               name: data.user.name || null,
               profileImageUrl: data.user.profileImageUrl || null,
               walletAddress: data.user.walletAddress || null,
-              country: data.user.country || null,
-              state: data.user.state || null,
-              city: data.user.city || null,
+              country: pick('country', 'country_name', 'countryName', 'verifiedCountry', 'nationality'),
+              state: pick('state', 'province', 'region', 'verifiedState'),
+              city: pick('city', 'town', 'locality', 'verifiedCity'),
               verified: !!(data.user.verified || data.user.isVerified || data.user.is_verified || data.user.kycVerified || data.user.kyc_verified || data.user.passport_verified),
               citizenshipVerified: !!(data.user.citizenshipVerified || data.user.citizenship_verified),
               subscriptionStatus: data.user.subscriptionStatus ?? null,
