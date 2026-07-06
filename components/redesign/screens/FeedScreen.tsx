@@ -64,16 +64,24 @@ export function FeedScreen() {
     setRefreshing(false);
   }, [load]);
 
-  const openProposal = (p: Proposal) =>
+  const openProposal = (p: Proposal) => {
+    const geo = Array.isArray(p.geoRestrictions) ? p.geoRestrictions : [];
+    const { closed } = deadlineLabel(p.deadline);
     router.push({
-      pathname: '/modals/proposal-detail',
+      pathname: '/redesign-proposal',
       params: {
         proposalId: String(p.id),
         title: p.title,
         description: p.description,
-        category: p.category,
+        scope: geo.length ? geo[geo.length - 1] : 'Global',
+        voteType: (p.voteType as string) ?? 'yes-no',
+        requiresCitizenship: p.requiresCitizenship ? 'true' : 'false',
+        support: String(p.supportVotes ?? 0),
+        oppose: String(p.opposeVotes ?? 0),
+        closed: closed ? 'true' : 'false',
       },
     });
+  };
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={['top']}>
