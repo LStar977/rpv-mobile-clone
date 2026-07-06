@@ -11,14 +11,7 @@ import { useTheme } from '../../../lib/theme';
 import { useAuthStore } from '../../../lib/auth';
 import { proposalsApi, type Proposal } from '../../../lib/api';
 import { T, Eyebrow, Button, TrustChip, ProposalCard, type ProposalCardData } from '../index';
-import { SPACE, RADIUS, FONTS, regionLabel, userRegion } from '../../../lib/redesign';
-
-// The launch moment. Countdown is illustrative brand furniture, not a hard gate.
-const REFERENDUM = new Date('2026-10-19T00:00:00-06:00'); // Alberta (MDT)
-
-function daysUntil(target: Date): number {
-  return Math.max(0, Math.ceil((target.getTime() - Date.now()) / 86400000));
-}
+import { SPACE, RADIUS, FONTS, regionLabel } from '../../../lib/redesign';
 
 function deadlineLabel(deadline: string | null): { label: string; closed: boolean } {
   if (!deadline) return { label: 'Open', closed: false };
@@ -54,10 +47,6 @@ export function HomeScreen() {
 
   const verified = !!user?.verified;
   const region = regionLabel(user) || (verified ? 'Region not set — verify your location' : 'Your region');
-  const days = daysUntil(REFERENDUM);
-  // The Alberta referendum hero only makes sense for Alberta users; everyone
-  // else gets a region-neutral "proposals open for you" hero.
-  const isAlberta = (userRegion(user).state || '').toLowerCase().includes('alberta');
 
   const isOpen = (p: Proposal) => !(p.deadline && new Date(p.deadline).getTime() < Date.now());
 
@@ -144,33 +133,18 @@ export function HomeScreen() {
             gap: SPACE.sm,
           }}
         >
-          {isAlberta ? (
-            <>
-              <Eyebrow>Alberta votes in</Eyebrow>
-              <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: SPACE.md }}>
-                <T variant="heroSerif" color={colors.gold} style={{ fontFamily: FONTS.monoMedium }}>{days}</T>
-                <T variant="h2" color={colors.text}>days</T>
-              </View>
-              <T variant="body" color={colors.textSecondary}>
-                The Shadow Referendum is live — all 10 official questions, verified Albertans only.
-              </T>
-            </>
-          ) : (
-            <>
-              <Eyebrow>Your civic inbox</Eyebrow>
-              <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: SPACE.md }}>
-                <T variant="heroSerif" color={colors.gold} style={{ fontFamily: FONTS.monoMedium }}>
-                  {openCount ?? '—'}
-                </T>
-                <T variant="h2" color={colors.text}>{openCount === 1 ? 'proposal' : 'proposals'}</T>
-              </View>
-              <T variant="body" color={colors.textSecondary}>
-                {openCount === 0
-                  ? 'Nothing open in your region right now. New proposals appear here as they open.'
-                  : 'Open for your verified voice right now.'}
-              </T>
-            </>
-          )}
+          <Eyebrow>Your civic inbox</Eyebrow>
+          <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: SPACE.md }}>
+            <T variant="heroSerif" color={colors.gold} style={{ fontFamily: FONTS.monoMedium }}>
+              {openCount ?? '—'}
+            </T>
+            <T variant="h2" color={colors.text}>{openCount === 1 ? 'proposal' : 'proposals'}</T>
+          </View>
+          <T variant="body" color={colors.textSecondary}>
+            {openCount === 0
+              ? 'Nothing open in your region right now. New proposals appear here as they open.'
+              : 'Open for your verified voice right now.'}
+          </T>
         </View>
 
         {/* open for you */}
