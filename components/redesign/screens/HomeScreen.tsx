@@ -163,6 +163,8 @@ export function HomeScreen() {
         {!verified && (
           <Button label="Verify to start voting" onPress={() => router.push('/modals/verification-payment')} />
         )}
+
+        <Button label="Propose something" variant="secondary" onPress={() => router.push('/redesign-create')} />
       </ScrollView>
     </SafeAreaView>
   );

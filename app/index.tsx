@@ -1007,7 +1007,7 @@ export default function AuthScreen() {
   useEffect(() => {
     if (!rootNavState?.key) return;
     if (isAuthenticated) {
-      router.replace('/(tabs)/dashboard');
+      router.replace('/(redesign)/vote');
     }
   }, [isAuthenticated, rootNavState?.key]);
 
@@ -1024,7 +1024,7 @@ export default function AuthScreen() {
       haptics.success();
       await checkAuth();
       if (useAuthStore.getState().isAuthenticated) {
-        router.replace('/(tabs)/dashboard');
+        router.replace('/(redesign)/vote');
       } else {
         haptics.error();
         Alert.alert('Session Expired', 'Please sign in again.');
@@ -1048,7 +1048,7 @@ export default function AuthScreen() {
 
       if (success) {
         haptics.success();
-        router.replace('/(tabs)/dashboard');
+        router.replace('/(redesign)/vote');
       } else {
         haptics.error();
         Alert.alert('Login Failed', 'Could not authenticate. Please try again.');
@@ -1090,7 +1090,7 @@ export default function AuthScreen() {
 
       if (success) {
         haptics.success();
-        router.replace('/(tabs)/dashboard');
+        router.replace('/(redesign)/vote');
       } else {
         haptics.error();
         Alert.alert('Login Failed', 'Could not authenticate. Please try again.');
@@ -1132,7 +1132,7 @@ export default function AuthScreen() {
       if (isSignup && referralCode.trim()) {
         referralsApi.redeem(referralCode).catch(() => {});
       }
-      router.replace('/(tabs)/dashboard');
+      router.replace('/(redesign)/vote');
     } else {
       haptics.error();
       setError(result.error || 'Authentication failed. Please try again.');
@@ -1195,7 +1195,7 @@ export default function AuthScreen() {
 
       if (success) {
         haptics.success();
-        router.replace('/(tabs)/dashboard');
+        router.replace('/(redesign)/vote');
       } else {
         haptics.error();
         Alert.alert('Demo Login Failed', 'Could not authenticate demo account.');

@@ -124,8 +124,9 @@ export function IdentityScreen() {
 
         {/* ── entries ── */}
         <View style={{ gap: SPACE.sm }}>
-          <Button label="Voting history" variant="secondary" onPress={() => router.push('/modals/voting-history')} />
-          <Button label="Settings" variant="secondary" onPress={() => router.push('/modals/legal')} />
+          <Button label="Voting history" variant="secondary" onPress={() => router.push('/redesign-history')} />
+          <Button label="Civic analytics" variant="secondary" onPress={() => router.push('/redesign-analytics')} />
+          <Button label="Settings" variant="secondary" onPress={() => router.push('/redesign-settings')} />
         </View>
       </ScrollView>
     </SafeAreaView>

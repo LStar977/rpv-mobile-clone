@@ -48,10 +48,18 @@ The consolidated tab experience lives at **`app/(redesign)/`** — four tabs:
 **Vote · Results · Organizations · Identity** (screens 04 / 09b / 11 / 10). It's
 registered in the root Stack and reachable at **`/(redesign)/vote`**.
 
-**To make the redesign the app's primary experience (the final flip):** change
-the post-authentication redirect in `app/index.tsx` from `/(tabs)/...` to
-`/(redesign)/vote`. That's the single cutover line. The old `(tabs)` stay in the
-tree until you delete them, so you can flip back instantly if needed.
+**DONE — the redesign is now the app's primary experience.** The post-auth
+redirects in `app/index.tsx` all point at `/(redesign)/vote`, so signing in lands
+on the new 4-tab app. The old `(tabs)` group still exists in the tree.
+
+**To roll back** (if something misbehaves on device): revert the redirect in
+`app/index.tsx` — `sed -i "s#/(redesign)/vote#/(tabs)/dashboard#g" app/index.tsx`.
+Instant, no other change needed.
+
+**Known gap after the flip:** the notification-tap → proposal routing lived in
+the old `(tabs)/_layout`; the redesign layout doesn't yet re-implement it, so a
+push tap opens the app but doesn't deep-link to the specific proposal. Low
+priority; wire into `app/(redesign)/_layout.tsx` when convenient.
 
 ### Still on the old screens (not yet rebuilt)
 Onboarding + verification capture (01–03), org detail/admin internals (11b),
