@@ -8,6 +8,17 @@ import { initIAP, endIAP } from '../lib/iap';
 import { soundEffects } from '../lib/sounds';
 import { useSyncBallotTier } from '../lib/ballots';
 import { useAuthStore } from '../lib/auth';
+import { FONT_ASSETS } from '../lib/redesign';
+
+// Redesign fonts (Newsreader / Onest / JetBrains Mono). Loaded via expo-font.
+// We do NOT block the app on font load — components fall back to the system font
+// until these are ready, so a slow/failed font load never shows a blank app.
+let useFonts: (map: any) => [boolean, Error | null] = () => [true, null];
+try {
+  useFonts = require('expo-font').useFonts;
+} catch (e) {
+  // expo-font unavailable (e.g. bare Expo Go without the module) — system fonts.
+}
 
 // Conditionally import StripeProvider to handle missing native module
 let StripeProvider: any = null;
@@ -21,6 +32,10 @@ function ThemedStack() {
   const { colors, isDark } = useTheme();
   const hydrated = useAuthStore((s) => s.hydrated);
   const hydrate = useAuthStore((s) => s.hydrate);
+
+  // Load the redesign fonts. Non-blocking: `fontsLoaded` gates nothing — it's
+  // here so a re-render happens once the fonts are ready and text re-lays out.
+  useFonts(FONT_ASSETS);
 
   // Keeps the ballot store's tier ('free' | 'verified' | 'premium') in sync
   // with the user's auth + subscription state. Without this, premium subscribers
