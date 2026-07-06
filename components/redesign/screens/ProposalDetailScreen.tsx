@@ -133,7 +133,7 @@ export function ProposalDetailScreen() {
         {needsVerify && (
           <View style={{ backgroundColor: colors.goldSurface, borderRadius: RADIUS.card, borderWidth: 1, borderColor: colors.gold, padding: SPACE.xl, gap: SPACE.md }}>
             <T variant="bodyMedium" color={colors.text}>Verify your identity to cast a verified ballot.</T>
-            <Button label="Verify to vote" onPress={() => router.push('/modals/verification-payment')} />
+            <Button label="Verify to vote" onPress={() => router.push('/redesign-verify')} />
           </View>
         )}
 

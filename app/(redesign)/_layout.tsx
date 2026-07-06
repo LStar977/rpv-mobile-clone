@@ -2,19 +2,31 @@
 // Consolidates the old 5-tabs-+-21-modals into the brief's four. Reachable at
 // /(redesign)/vote. To make this the app's primary experience, point the
 // post-auth redirect (app/index.tsx) at '/(redesign)/vote' — see README.
+import { useEffect, useState } from 'react';
 import { Tabs } from 'expo-router';
-import { Platform } from 'react-native';
+import { Platform, Modal } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useTheme, SHADOWS } from '../../lib/theme';
 import { FONTS } from '../../lib/redesign';
+import { hasCompletedOnboarding } from '../../components/Onboarding';
+import { OnboardingScreen } from '../../components/redesign/screens/OnboardingScreen';
 
 export default function RedesignTabLayout() {
   const { colors, isDark } = useTheme();
   const insets = useSafeAreaInsets();
 
+  // First-time onboarding (the cutover retired the old tabs-layout modal).
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  useEffect(() => {
+    hasCompletedOnboarding().then((done) => {
+      if (!done) setShowOnboarding(true);
+    });
+  }, []);
+
   return (
+    <>
     <Tabs
       key={isDark ? 'dark' : 'light'}
       screenListeners={{ tabPress: () => Haptics.selectionAsync() }}
@@ -52,5 +64,10 @@ export default function RedesignTabLayout() {
         options={{ title: 'Identity', tabBarIcon: ({ color, focused }) => <Ionicons name={focused ? 'shield-checkmark' : 'shield-checkmark-outline'} size={23} color={color} /> }}
       />
     </Tabs>
+
+    <Modal visible={showOnboarding} animationType="fade" statusBarTranslucent presentationStyle="fullScreen">
+      <OnboardingScreen onComplete={() => setShowOnboarding(false)} />
+    </Modal>
+    </>
   );
 }
