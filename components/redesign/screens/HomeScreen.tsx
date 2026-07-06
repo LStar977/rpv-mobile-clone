@@ -56,12 +56,16 @@ export function HomeScreen() {
   const days = daysUntil(REFERENDUM);
 
   const load = useCallback(async () => {
-    const res = await proposalsApi.getFeatured();
-    if (!res.error && res.data) setFeatured(res.data.slice(0, 3));
-    else {
-      // fall back to the full list if there's no featured endpoint data
+    // Use getAll(): it safely unwraps the backend's array/{proposals} shapes and
+    // handles the demo seed content. (getFeatured returned a raw shape that could
+    // be an object, and .slice() on it threw — leaving this stuck on "Loading…".)
+    // try/catch guarantees we always resolve to an array, never a permanent spinner.
+    try {
       const all = await proposalsApi.getAll();
-      setFeatured(all.data ? all.data.slice(0, 3) : []);
+      const list = Array.isArray(all.data) ? all.data : [];
+      setFeatured(list.slice(0, 3));
+    } catch {
+      setFeatured([]);
     }
   }, []);
 
