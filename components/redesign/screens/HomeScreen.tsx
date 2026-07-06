@@ -11,7 +11,7 @@ import { useTheme } from '../../../lib/theme';
 import { useAuthStore } from '../../../lib/auth';
 import { proposalsApi, type Proposal } from '../../../lib/api';
 import { T, Eyebrow, Button, TrustChip, ProposalCard, type ProposalCardData } from '../index';
-import { SPACE, RADIUS, FONTS, regionLabel } from '../../../lib/redesign';
+import { SPACE, RADIUS, FONTS, regionLabel, userRegion } from '../../../lib/redesign';
 
 // The launch moment. Countdown is illustrative brand furniture, not a hard gate.
 const REFERENDUM = new Date('2026-10-19T00:00:00-06:00'); // Alberta (MDT)
@@ -49,11 +49,17 @@ export function HomeScreen() {
   const { colors } = useTheme();
   const user = useAuthStore((s) => s.user);
   const [featured, setFeatured] = useState<Proposal[] | null>(null);
+  const [openCount, setOpenCount] = useState<number | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
   const verified = !!user?.verified;
   const region = regionLabel(user) || (verified ? 'Region not set — verify your location' : 'Your region');
   const days = daysUntil(REFERENDUM);
+  // The Alberta referendum hero only makes sense for Alberta users; everyone
+  // else gets a region-neutral "proposals open for you" hero.
+  const isAlberta = (userRegion(user).state || '').toLowerCase().includes('alberta');
+
+  const isOpen = (p: Proposal) => !(p.deadline && new Date(p.deadline).getTime() < Date.now());
 
   const load = useCallback(async () => {
     // Use getAll(): it safely unwraps the backend's array/{proposals} shapes and
@@ -63,8 +69,11 @@ export function HomeScreen() {
     try {
       const all = await proposalsApi.getAll();
       const list = Array.isArray(all.data) ? all.data : [];
-      setFeatured(list.slice(0, 3));
+      const open = list.filter(isOpen); // "Open for you" must actually be open
+      setOpenCount(open.length);
+      setFeatured(open.slice(0, 3));
     } catch {
+      setOpenCount(0);
       setFeatured([]);
     }
   }, []);
@@ -123,7 +132,8 @@ export function HomeScreen() {
           <T variant="body" color={colors.textTertiary}>{region}</T>
         </View>
 
-        {/* countdown card */}
+        {/* hero — Alberta users get the referendum countdown; everyone else gets
+            a region-neutral "proposals open for you" card */}
         <View
           style={{
             backgroundColor: colors.surface,
@@ -134,16 +144,33 @@ export function HomeScreen() {
             gap: SPACE.sm,
           }}
         >
-          <Eyebrow>Alberta votes in</Eyebrow>
-          <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: SPACE.md }}>
-            <T variant="heroSerif" color={colors.gold} style={{ fontFamily: FONTS.monoMedium }}>
-              {days}
-            </T>
-            <T variant="h2" color={colors.text}>days</T>
-          </View>
-          <T variant="body" color={colors.textSecondary}>
-            The Shadow Referendum is live — all 10 official questions, verified Albertans only.
-          </T>
+          {isAlberta ? (
+            <>
+              <Eyebrow>Alberta votes in</Eyebrow>
+              <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: SPACE.md }}>
+                <T variant="heroSerif" color={colors.gold} style={{ fontFamily: FONTS.monoMedium }}>{days}</T>
+                <T variant="h2" color={colors.text}>days</T>
+              </View>
+              <T variant="body" color={colors.textSecondary}>
+                The Shadow Referendum is live — all 10 official questions, verified Albertans only.
+              </T>
+            </>
+          ) : (
+            <>
+              <Eyebrow>Your civic inbox</Eyebrow>
+              <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: SPACE.md }}>
+                <T variant="heroSerif" color={colors.gold} style={{ fontFamily: FONTS.monoMedium }}>
+                  {openCount ?? '—'}
+                </T>
+                <T variant="h2" color={colors.text}>{openCount === 1 ? 'proposal' : 'proposals'}</T>
+              </View>
+              <T variant="body" color={colors.textSecondary}>
+                {openCount === 0
+                  ? 'Nothing open in your region right now. New proposals appear here as they open.'
+                  : 'Open for your verified voice right now.'}
+              </T>
+            </>
+          )}
         </View>
 
         {/* open for you */}
