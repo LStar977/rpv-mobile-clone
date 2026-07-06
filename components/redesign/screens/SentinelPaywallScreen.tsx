@@ -22,7 +22,7 @@ const FEATURES = [
 export function SentinelPaywallScreen() {
   const { colors } = useTheme();
   const user = useAuthStore((s) => s.user);
-  const isPremium = !!user?.isPremium || user?.subscriptionStatus === 'active';
+  const isPremium = user?.email === 'demo@represent.app' || !!user?.isPremium || user?.subscriptionStatus === 'active';
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={['top']}>

@@ -30,9 +30,14 @@ function OptionBar({ label, count, total }: { label: string; count: number; tota
 
 export function ResultsScreen() {
   const { colors } = useTheme();
-  const params = useLocalSearchParams<{ proposalId?: string; title?: string }>();
+  const params = useLocalSearchParams<{ proposalId?: string; title?: string; support?: string; oppose?: string; voteType?: string }>();
   const proposalId = params.proposalId ?? '';
   const title = params.title ?? 'Results';
+
+  // Fallback counts passed by the caller — used when the results endpoint has no
+  // row (demo/seed proposals) or on a network blip, so Results never dead-ends.
+  const hasFallback = params.support !== undefined || params.oppose !== undefined;
+  const fallbackYesNo = (params.voteType ?? 'yes-no') === 'yes-no';
 
   const [data, setData] = useState<any | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -64,7 +69,13 @@ export function ResultsScreen() {
           </View>
         )}
 
-        {error && (
+        {/* On error: fall back to the counts we were handed (demo/seed or offline) */}
+        {error && hasFallback && fallbackYesNo && (
+          <View style={{ backgroundColor: colors.surface, borderRadius: RADIUS.card, borderWidth: 1, borderColor: colors.border, padding: SPACE.xl }}>
+            <TallyBar support={Number(params.support ?? 0)} oppose={Number(params.oppose ?? 0)} />
+          </View>
+        )}
+        {error && !(hasFallback && fallbackYesNo) && (
           <View style={{ paddingTop: 40, alignItems: 'center', gap: SPACE.lg }}>
             <T variant="body" color={colors.textTertiary} style={{ textAlign: 'center' }}>{error}</T>
             <Button label="Try again" variant="secondary" fullWidth={false} onPress={load} />

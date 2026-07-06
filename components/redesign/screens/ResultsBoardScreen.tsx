@@ -50,7 +50,16 @@ export function ResultsBoardScreen() {
   }, [load]);
 
   const openResults = (p: Proposal) =>
-    router.push({ pathname: '/redesign-results', params: { proposalId: String(p.id), title: p.title } });
+    router.push({
+      pathname: '/redesign-results',
+      params: {
+        proposalId: String(p.id),
+        title: p.title,
+        support: String(p.supportVotes ?? 0),
+        oppose: String(p.opposeVotes ?? 0),
+        voteType: (p.voteType as string) ?? 'yes-no',
+      },
+    });
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={['top']}>

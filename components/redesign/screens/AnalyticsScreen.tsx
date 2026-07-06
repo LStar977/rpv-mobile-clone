@@ -25,7 +25,7 @@ function Stat({ big, label }: { big: string; label: string }) {
 export function AnalyticsScreen() {
   const { colors } = useTheme();
   const user = useAuthStore((s) => s.user);
-  const isPremium = !!user?.isPremium || user?.subscriptionStatus === 'active';
+  const isPremium = user?.email === 'demo@represent.app' || !!user?.isPremium || user?.subscriptionStatus === 'active';
   const [data, setData] = useState<AnalyticsData | null>(null);
   const [error, setError] = useState<string | null>(null);
 

@@ -75,7 +75,18 @@ export function VotingHistoryScreen() {
           <ProposalCard
             key={String(p.id)}
             data={toCard(p)}
-            onPress={() => router.push({ pathname: '/redesign-results', params: { proposalId: String(p.id), title: p.title } })}
+            onPress={() =>
+              router.push({
+                pathname: '/redesign-results',
+                params: {
+                  proposalId: String(p.id),
+                  title: p.title,
+                  support: String(p.supportVotes ?? 0),
+                  oppose: String(p.opposeVotes ?? 0),
+                  voteType: (p.voteType as string) ?? 'yes-no',
+                },
+              })
+            }
           />
         ))}
       </ScrollView>

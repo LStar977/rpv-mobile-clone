@@ -10,19 +10,25 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useTheme, SHADOWS } from '../../lib/theme';
 import { FONTS } from '../../lib/redesign';
-import { hasCompletedOnboarding } from '../../components/Onboarding';
+import { hasCompletedOnboarding, resetOnboarding } from '../../components/Onboarding';
 import { OnboardingScreen } from '../../components/redesign/screens/OnboardingScreen';
+import { useAuthStore } from '../../lib/auth';
 
 export default function RedesignTabLayout() {
   const { colors, isDark } = useTheme();
   const insets = useSafeAreaInsets();
 
   // First-time onboarding (the cutover retired the old tabs-layout modal).
+  // The demo/reviewer account always re-sees onboarding (matches old behavior).
   const [showOnboarding, setShowOnboarding] = useState(false);
   useEffect(() => {
-    hasCompletedOnboarding().then((done) => {
+    (async () => {
+      if (useAuthStore.getState().user?.email === 'demo@represent.app') {
+        await resetOnboarding();
+      }
+      const done = await hasCompletedOnboarding();
       if (!done) setShowOnboarding(true);
-    });
+    })();
   }, []);
 
   return (
