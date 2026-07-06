@@ -9,7 +9,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useTheme } from '../../../lib/theme';
 import { proposalsApi, type Proposal } from '../../../lib/api';
-import { T, Eyebrow, Button, ProposalCard, type ProposalCardData } from '../index';
+import { T, Eyebrow, Button, ProposalCard, type ProposalCardData, BackBar } from '../index';
 import { SPACE } from '../../../lib/redesign';
 
 function deadlineLabel(deadline: string | null): { label: string; closed: boolean } {
@@ -86,6 +86,7 @@ export function FeedScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={['top']}>
+      <BackBar />
       <ScrollView
         contentContainerStyle={{ padding: SPACE.xl, gap: SPACE.lg, paddingBottom: 120 }}
         refreshControl={

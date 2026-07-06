@@ -7,3 +7,4 @@ export { TallyBar } from './TallyBar';
 export { ProposalCard } from './ProposalCard';
 export type { ProposalCardData } from './ProposalCard';
 export { VoteReceipt } from './VoteReceipt';
+export { BackBar } from './BackBar';

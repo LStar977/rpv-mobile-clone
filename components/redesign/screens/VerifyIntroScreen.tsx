@@ -9,7 +9,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useTheme } from '../../../lib/theme';
 import { useAuthStore } from '../../../lib/auth';
-import { T, Eyebrow, Button, TrustChip } from '../index';
+import { T, Eyebrow, Button, TrustChip, BackBar } from '../index';
 import { SPACE, RADIUS } from '../../../lib/redesign';
 
 const STEPS = [
@@ -25,6 +25,7 @@ export function VerifyIntroScreen() {
   if (verified) {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
+        <BackBar />
         <View style={{ flex: 1, padding: SPACE.xxl, justifyContent: 'center', gap: SPACE.lg }}>
           <TrustChip label="Verified" kind="gold" dot />
           <T variant="heroSerif" color={colors.text} style={{ fontSize: 34, lineHeight: 38 }}>You're verified</T>
@@ -37,6 +38,7 @@ export function VerifyIntroScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={['top']}>
+      <BackBar />
       <ScrollView contentContainerStyle={{ padding: SPACE.xl, gap: SPACE.xl, paddingBottom: 40 }}>
         <View style={{ gap: SPACE.md }}>
           <Eyebrow>Verify your identity</Eyebrow>

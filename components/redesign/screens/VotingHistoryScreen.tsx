@@ -8,7 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useTheme } from '../../../lib/theme';
 import { userApi, proposalsApi, type Proposal } from '../../../lib/api';
-import { T, Eyebrow, Button, ProposalCard, type ProposalCardData } from '../index';
+import { T, Eyebrow, Button, ProposalCard, type ProposalCardData, BackBar } from '../index';
 import { SPACE } from '../../../lib/redesign';
 
 function toCard(p: Proposal): ProposalCardData {
@@ -49,6 +49,7 @@ export function VotingHistoryScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={['top']}>
+      <BackBar />
       <ScrollView contentContainerStyle={{ padding: SPACE.xl, gap: SPACE.lg, paddingBottom: 60 }}>
         <View style={{ gap: SPACE.xs, marginBottom: SPACE.sm }}>
           <Eyebrow>History</Eyebrow>

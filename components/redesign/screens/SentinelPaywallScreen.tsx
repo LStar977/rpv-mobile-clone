@@ -9,7 +9,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useTheme } from '../../../lib/theme';
 import { useAuthStore } from '../../../lib/auth';
-import { T, Eyebrow, Button, TrustChip } from '../index';
+import { T, Eyebrow, Button, TrustChip, BackBar } from '../index';
 import { SPACE, RADIUS } from '../../../lib/redesign';
 
 const FEATURES = [
@@ -26,6 +26,7 @@ export function SentinelPaywallScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={['top']}>
+      <BackBar />
       <ScrollView contentContainerStyle={{ padding: SPACE.xl, gap: SPACE.xl, paddingBottom: 60 }}>
         <View style={{ gap: SPACE.md }}>
           <Eyebrow>Sentinel</Eyebrow>

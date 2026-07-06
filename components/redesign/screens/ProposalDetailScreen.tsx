@@ -13,7 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useTheme } from '../../../lib/theme';
 import { proposalsApi } from '../../../lib/api';
-import { T, Eyebrow, Button, TrustChip, TallyBar, VoteReceipt } from '../index';
+import { T, Eyebrow, Button, TrustChip, TallyBar, VoteReceipt, BackBar } from '../index';
 import { SPACE, RADIUS, SIDE, FONTS } from '../../../lib/redesign';
 
 type Side = 'support' | 'oppose';
@@ -90,11 +90,8 @@ export function ProposalDetailScreen() {
   // ─── PRE-VOTE STATE (screen 06a) ───
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={['top']}>
+      <BackBar />
       <ScrollView contentContainerStyle={{ padding: SPACE.xl, gap: SPACE.lg, paddingBottom: 40 }}>
-        {/* back */}
-        <Pressable onPress={() => router.back()} hitSlop={12} style={{ alignSelf: 'flex-start' }}>
-          <T variant="bodyMedium" color={colors.textTertiary}>← Back</T>
-        </Pressable>
 
         {/* chips */}
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: SPACE.sm }}>

@@ -10,7 +10,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useTheme } from '../../../lib/theme';
 import { proposalsApi } from '../../../lib/api';
-import { T, Eyebrow, Button, VoteReceipt } from '../index';
+import { T, Eyebrow, Button, VoteReceipt, BackBar } from '../index';
 import { SPACE, RADIUS, FONTS } from '../../../lib/redesign';
 
 export function BallotScreen() {
@@ -70,10 +70,8 @@ export function BallotScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={['top']}>
+      <BackBar />
       <ScrollView contentContainerStyle={{ padding: SPACE.xl, gap: SPACE.lg, paddingBottom: 40 }}>
-        <Pressable onPress={() => router.back()} hitSlop={12} style={{ alignSelf: 'flex-start' }}>
-          <T variant="bodyMedium" color={colors.textTertiary}>← Back</T>
-        </Pressable>
 
         <View style={{ gap: SPACE.sm }}>
           <Eyebrow>{isRanked ? 'Rank your choices' : 'Choose one'}</Eyebrow>

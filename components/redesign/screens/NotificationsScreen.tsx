@@ -6,7 +6,7 @@ import React from 'react';
 import { View, ScrollView, Linking, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../../../lib/theme';
-import { T, Eyebrow, Button } from '../index';
+import { T, Eyebrow, Button, BackBar } from '../index';
 import { SPACE, RADIUS } from '../../../lib/redesign';
 
 const KINDS = [
@@ -20,6 +20,7 @@ export function NotificationsScreen() {
   const { colors } = useTheme();
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={['top']}>
+      <BackBar />
       <ScrollView contentContainerStyle={{ padding: SPACE.xl, gap: SPACE.xl, paddingBottom: 60 }}>
         <View style={{ gap: SPACE.xs }}>
           <Eyebrow>Notifications</Eyebrow>

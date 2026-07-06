@@ -8,7 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useTheme } from '../../../lib/theme';
 import { proposalsApi } from '../../../lib/api';
-import { T, Eyebrow, Button } from '../index';
+import { T, Eyebrow, Button, BackBar } from '../index';
 import { SPACE, RADIUS, FONTS } from '../../../lib/redesign';
 
 const CATEGORIES = ['General', 'Governance', 'Local', 'Economy', 'Environment', 'Rights'];
@@ -70,6 +70,7 @@ export function CreateProposalScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={['top']}>
+      <BackBar />
       <ScrollView contentContainerStyle={{ padding: SPACE.xl, gap: SPACE.xl, paddingBottom: 60 }} keyboardShouldPersistTaps="handled">
         <View style={{ gap: SPACE.sm }}>
           <Eyebrow>New proposal</Eyebrow>

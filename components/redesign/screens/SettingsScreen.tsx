@@ -8,7 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useTheme, type ThemePreference } from '../../../lib/theme';
 import { useAuthStore } from '../../../lib/auth';
-import { T, Eyebrow, Button } from '../index';
+import { T, Eyebrow, Button, BackBar } from '../index';
 import { SPACE, RADIUS } from '../../../lib/redesign';
 
 function Row({ label, onPress, danger }: { label: string; onPress: () => void; danger?: boolean }) {
@@ -35,6 +35,7 @@ export function SettingsScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={['top']}>
+      <BackBar />
       <ScrollView contentContainerStyle={{ padding: SPACE.xl, gap: SPACE.xxl, paddingBottom: 60 }}>
         <View style={{ gap: SPACE.xs }}>
           <Eyebrow>Settings</Eyebrow>

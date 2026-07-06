@@ -9,7 +9,7 @@ import { router } from 'expo-router';
 import { useTheme } from '../../../lib/theme';
 import { useAuthStore } from '../../../lib/auth';
 import { analyticsApi, type AnalyticsData } from '../../../lib/api';
-import { T, Eyebrow, Button, TallyBar } from '../index';
+import { T, Eyebrow, Button, TallyBar, BackBar } from '../index';
 import { SPACE, RADIUS } from '../../../lib/redesign';
 
 function Stat({ big, label }: { big: string; label: string }) {
@@ -43,6 +43,7 @@ export function AnalyticsScreen() {
   if (!isPremium) {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={['top']}>
+        <BackBar />
         <View style={{ flex: 1, padding: SPACE.xl, justifyContent: 'center', gap: SPACE.lg }}>
           <Eyebrow>Civic analytics</Eyebrow>
           <T variant="titleSerif" color={colors.text}>See how your region is trending</T>
@@ -55,6 +56,7 @@ export function AnalyticsScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={['top']}>
+      <BackBar />
       <ScrollView contentContainerStyle={{ padding: SPACE.xl, gap: SPACE.xl, paddingBottom: 60 }}>
         <View style={{ gap: SPACE.xs }}>
           <Eyebrow>Civic analytics</Eyebrow>
