@@ -35,7 +35,7 @@ export function OrganizationsScreen() {
   }, [load]);
 
   const open = (o: Organization) =>
-    router.push({ pathname: '/modals/organization-detail', params: { organizationId: o.id } });
+    router.push({ pathname: '/redesign-org', params: { organizationId: o.id } });
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={['top']}>
