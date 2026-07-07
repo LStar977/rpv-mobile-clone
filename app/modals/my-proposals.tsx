@@ -6,7 +6,7 @@ import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { useAuthStore } from '../../lib/auth';
 import { proposalsApi, Proposal } from '../../lib/api';
-import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS } from '../../lib/theme';
+import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS, FONTS } from '../../lib/theme';
 
 export default function MyProposalsScreen() {
   const { colors } = useTheme();
@@ -218,14 +218,14 @@ export default function MyProposalsScreen() {
                     {/* Vote Stats */}
                     <View style={styles.voteStats}>
                       <View style={styles.voteStat}>
-                        <Ionicons name="thumbs-up" size={14} color={colors.success} />
-                        <Text style={[styles.voteCount, { color: colors.success }]}>
+                        <Ionicons name="thumbs-up" size={14} color={colors.support} />
+                        <Text style={[styles.voteCount, { color: colors.support }]}>
                           {proposal.supportVotes || 0}
                         </Text>
                       </View>
                       <View style={styles.voteStat}>
-                        <Ionicons name="thumbs-down" size={14} color={colors.error} />
-                        <Text style={[styles.voteCount, { color: colors.error }]}>
+                        <Ionicons name="thumbs-down" size={14} color={colors.oppose} />
+                        <Text style={[styles.voteCount, { color: colors.oppose }]}>
                           {proposal.opposeVotes || 0}
                         </Text>
                       </View>
@@ -237,12 +237,12 @@ export default function MyProposalsScreen() {
                     {/* Progress Bar */}
                     {totalVotes > 0 && (
                       <View style={styles.progressContainer}>
-                        <View style={[styles.progressBar, { backgroundColor: `${colors.error}30` }]}>
+                        <View style={[styles.progressBar, { backgroundColor: colors.oppose }]}>
                           <View
                             style={[
                               styles.progressFill,
                               {
-                                backgroundColor: colors.success,
+                                backgroundColor: colors.support,
                                 width: `${((proposal.supportVotes || 0) / totalVotes) * 100}%`,
                               },
                             ]}
@@ -281,9 +281,8 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.lg,
   },
   title: {
-    fontFamily: 'Georgia',
+    fontFamily: FONTS.serif,
     fontSize: 26,
-    fontWeight: '500',
     marginBottom: SPACING.xs,
   },
   subtitle: {
@@ -309,9 +308,9 @@ const styles = StyleSheet.create({
     height: 30,
   },
   statsNumber: {
-    fontFamily: 'Georgia',
+    fontFamily: FONTS.mono,
     fontSize: 28,
-    fontWeight: '500',
+    fontVariant: ['tabular-nums'],
   },
   statsLabel: {
     ...TYPOGRAPHY.labelSmall,
@@ -332,9 +331,8 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.md,
   },
   emptyTitle: {
-    fontFamily: 'Georgia',
+    fontFamily: FONTS.serif,
     fontSize: 20,
-    fontWeight: '500',
     marginBottom: SPACING.xs,
   },
   emptySubtitle: {
@@ -357,7 +355,6 @@ const styles = StyleSheet.create({
   createButtonText: {
     ...TYPOGRAPHY.labelLarge,
     color: '#000',
-    fontWeight: '600',
   },
   proposalsList: {
     gap: SPACING.md,
@@ -388,15 +385,13 @@ const styles = StyleSheet.create({
   },
   statusText: {
     ...TYPOGRAPHY.labelSmall,
-    fontWeight: '600',
   },
   proposalDate: {
     ...TYPOGRAPHY.labelSmall,
   },
   proposalTitle: {
-    fontFamily: 'Georgia',
+    fontFamily: FONTS.serif,
     fontSize: 18,
-    fontWeight: '500',
     marginBottom: SPACING.sm,
   },
   categoryBadge: {
@@ -408,7 +403,6 @@ const styles = StyleSheet.create({
   },
   categoryText: {
     ...TYPOGRAPHY.labelSmall,
-    fontWeight: '600',
   },
   voteStats: {
     flexDirection: 'row',
@@ -423,7 +417,8 @@ const styles = StyleSheet.create({
   },
   voteCount: {
     ...TYPOGRAPHY.labelMedium,
-    fontWeight: '600',
+    fontFamily: FONTS.monoSemiBold,
+    fontVariant: ['tabular-nums'],
   },
   totalVotes: {
     ...TYPOGRAPHY.labelSmall,

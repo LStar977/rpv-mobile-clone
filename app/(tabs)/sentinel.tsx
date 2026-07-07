@@ -28,7 +28,7 @@ import Animated, {
 import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuthStore } from '../../lib/auth';
-import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS, responsive } from '../../lib/theme';
+import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS, responsive, FONTS } from '../../lib/theme';
 import { UpgradeModal } from '../../components/ui';
 import { useTutorialTarget } from '../../components/tutorial';
 import Svg, { Circle, Path, Line } from 'react-native-svg';
@@ -296,9 +296,8 @@ function ScoreDial({ score = 50, color = SN_RED, size = 56 }: { score?: number; 
         justifyContent: 'center',
       }}>
         <Text style={{
-          fontFamily: 'Georgia',
+          fontFamily: FONTS.serif,
           fontSize: size * 0.32,
-          fontWeight: '500',
           color: color,
           letterSpacing: -0.5,
         }}>{score}</Text>
@@ -312,9 +311,8 @@ function SnEyebrow({ children, color }: { children: React.ReactNode; color?: str
   const sn = useSentinelColors();
   return (
     <Text style={{
-      fontFamily: 'System',
+      fontFamily: FONTS.sansSemiBold,
       fontSize: 10,
-      fontWeight: '600',
       letterSpacing: 2.2,
       textTransform: 'uppercase',
       color: color || sn.FG_FAINT,
@@ -617,7 +615,7 @@ function SubmissionDesk({
       <View style={snStyles.deskHeader}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 }}>
           <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: sn.LINE, justifyContent: 'center', alignItems: 'center' }}>
-            <Text style={{ color: sn.FG, fontSize: 18 }}>+</Text>
+            <Text style={{ color: sn.FG, fontSize: 18, fontFamily: FONTS.sans }}>+</Text>
           </View>
           <Text style={[snStyles.deskTitle, { color: sn.FG }]}>New Analysis</Text>
         </View>
@@ -751,9 +749,8 @@ const snStyles = StyleSheet.create({
     shadowRadius: 4,
   },
   sessionText: {
-    fontFamily: 'System',
+    fontFamily: FONTS.sansSemiBold,
     fontSize: 10,
-    fontWeight: '600',
     letterSpacing: 2.2,
     textTransform: 'uppercase',
     color: SN_FG_FAINT,
@@ -770,9 +767,8 @@ const snStyles = StyleSheet.create({
     backgroundColor: `${SN_G}15`,
   },
   premiumText: {
-    fontFamily: 'System',
+    fontFamily: FONTS.sansSemiBold,
     fontSize: 9.5,
-    fontWeight: '600',
     letterSpacing: 1.8,
     textTransform: 'uppercase',
     color: SN_G,
@@ -793,24 +789,22 @@ const snStyles = StyleSheet.create({
     justifyContent: 'center',
   },
   headerTitle: {
-    fontFamily: 'Georgia',
+    fontFamily: FONTS.serif,
     fontSize: 26,
-    fontWeight: '500',
     letterSpacing: -0.6,
     lineHeight: 28,
     color: SN_FG,
     marginBottom: 2,
   },
   headerSubtitle: {
-    fontFamily: 'System',
+    fontFamily: FONTS.sans,
     fontSize: 11.5,
     color: SN_FG_MUTED,
     letterSpacing: -0.1,
   },
   headerSubtitleItalic: {
-    fontFamily: 'Georgia',
+    fontFamily: FONTS.serifMediumItalic,
     fontSize: 12,
-    fontStyle: 'italic',
   },
 
   // Tribunal
@@ -825,7 +819,7 @@ const snStyles = StyleSheet.create({
     marginBottom: 12,
   },
   sessionCode: {
-    fontFamily: 'Courier',
+    fontFamily: FONTS.mono,
     fontSize: 9,
     color: SN_FG_FAINT,
     letterSpacing: 0.8,
@@ -847,22 +841,20 @@ const snStyles = StyleSheet.create({
     borderRightColor: SN_LINE,
   },
   tribunalNumber: {
-    fontFamily: 'Georgia',
+    fontFamily: FONTS.serif,
     fontSize: 30,
-    fontWeight: '500',
     letterSpacing: -0.5,
     marginBottom: 4,
   },
   tribunalLabel: {
-    fontFamily: 'System',
+    fontFamily: FONTS.sansMedium,
     fontSize: 11,
-    fontWeight: '500',
     color: SN_FG_MUTED,
     letterSpacing: -0.1,
     marginBottom: 2,
   },
   tribunalTag: {
-    fontFamily: 'System',
+    fontFamily: FONTS.sans,
     fontSize: 9,
     color: SN_FG_FAINT,
     letterSpacing: 0.8,
@@ -894,7 +886,7 @@ const snStyles = StyleSheet.create({
     marginBottom: 4,
   },
   dossierCode: {
-    fontFamily: 'Courier',
+    fontFamily: FONTS.mono,
     fontSize: 9,
     color: SN_FG_FAINT,
     letterSpacing: 1,
@@ -906,16 +898,14 @@ const snStyles = StyleSheet.create({
     backgroundColor: SN_LINE_STRONG,
   },
   dossierScope: {
-    fontFamily: 'System',
+    fontFamily: FONTS.sansMedium,
     fontSize: 10,
-    fontWeight: '500',
     color: SN_FG_FAINT,
     letterSpacing: 0.4,
   },
   dossierTitle: {
-    fontFamily: 'Georgia',
+    fontFamily: FONTS.serif,
     fontSize: 19,
-    fontWeight: '500',
     color: SN_FG,
     letterSpacing: -0.1,
     marginBottom: 6,
@@ -932,14 +922,13 @@ const snStyles = StyleSheet.create({
     borderWidth: 1,
   },
   verdictChipText: {
-    fontFamily: 'System',
+    fontFamily: FONTS.sansSemiBold,
     fontSize: 9,
-    fontWeight: '600',
     letterSpacing: 1.6,
     textTransform: 'uppercase',
   },
   dossierDate: {
-    fontFamily: 'System',
+    fontFamily: FONTS.sans,
     fontSize: 11,
     color: SN_FG_MUTED,
   },
@@ -958,14 +947,13 @@ const snStyles = StyleSheet.create({
     backgroundColor: `${SN_G}1A`,
   },
   issueChipText: {
-    fontFamily: 'System',
+    fontFamily: FONTS.sansMedium,
     fontSize: 11,
-    fontWeight: '500',
     color: SN_FG_MUTED,
     letterSpacing: -0.1,
   },
   issueChipTextActive: {
-    fontWeight: '600',
+    fontFamily: FONTS.sansSemiBold,
     color: SN_G,
   },
 
@@ -985,7 +973,7 @@ const snStyles = StyleSheet.create({
     position: 'absolute',
     top: 14,
     right: 14,
-    fontFamily: 'Courier',
+    fontFamily: FONTS.mono,
     fontSize: 8.5,
     color: SN_FG_FAINT,
     letterSpacing: 1.2,
@@ -994,9 +982,8 @@ const snStyles = StyleSheet.create({
     marginBottom: 24,
   },
   deskTitle: {
-    fontFamily: 'Georgia',
+    fontFamily: FONTS.serif,
     fontSize: 30,
-    fontWeight: '500',
     color: SN_FG,
     letterSpacing: -0.4,
     marginTop: 8,
@@ -1007,7 +994,7 @@ const snStyles = StyleSheet.create({
     color: SN_GL,
   },
   deskSubtitle: {
-    fontFamily: 'System',
+    fontFamily: FONTS.sans,
     fontSize: 13,
     color: SN_FG_MUTED,
     letterSpacing: -0.1,
@@ -1018,9 +1005,8 @@ const snStyles = StyleSheet.create({
     marginBottom: 22,
   },
   fieldLabel: {
-    fontFamily: 'System',
+    fontFamily: FONTS.sansSemiBold,
     fontSize: 9.5,
-    fontWeight: '600',
     color: SN_FG_FAINT,
     letterSpacing: 2,
     marginBottom: 8,
@@ -1032,15 +1018,14 @@ const snStyles = StyleSheet.create({
     marginBottom: 8,
   },
   charCount: {
-    fontFamily: 'Courier',
+    fontFamily: FONTS.mono,
     fontSize: 9,
     color: SN_FG_FAINT,
     letterSpacing: 0.5,
   },
   titleInput: {
-    fontFamily: 'Georgia',
+    fontFamily: FONTS.serifMediumItalic,
     fontSize: 18,
-    fontStyle: 'italic',
     color: SN_FG,
     borderBottomWidth: 1,
     borderBottomColor: SN_LINE_STRONG,
@@ -1069,9 +1054,8 @@ const snStyles = StyleSheet.create({
     opacity: 0.35,
   },
   textArea: {
-    fontFamily: 'Georgia',
+    fontFamily: FONTS.serifMediumItalic,
     fontSize: 15,
-    fontStyle: 'italic',
     color: SN_FG,
     lineHeight: 24,
     padding: 16,
@@ -1089,9 +1073,8 @@ const snStyles = StyleSheet.create({
     marginTop: 4,
   },
   submitText: {
-    fontFamily: 'System',
+    fontFamily: FONTS.sansSemiBold,
     fontSize: 15,
-    fontWeight: '600',
     color: '#1A1308',
     letterSpacing: 0.3,
   },
@@ -1105,7 +1088,7 @@ const snStyles = StyleSheet.create({
     alignItems: 'center',
   },
   provenanceText: {
-    fontFamily: 'System',
+    fontFamily: FONTS.sans,
     fontSize: 10,
     color: SN_FG_FAINT,
     letterSpacing: -0.1,
@@ -1116,7 +1099,7 @@ const snStyles = StyleSheet.create({
     textDecorationLine: 'underline',
   },
   versionText: {
-    fontFamily: 'Courier',
+    fontFamily: FONTS.mono,
     fontSize: 8.5,
     color: SN_FG_FAINT,
     letterSpacing: 1,
@@ -1130,15 +1113,14 @@ const snStyles = StyleSheet.create({
     alignItems: 'center',
   },
   footerQuote: {
-    fontFamily: 'Georgia',
+    fontFamily: FONTS.serifMediumItalic,
     fontSize: 13,
-    fontStyle: 'italic',
     color: SN_FG_FAINT,
     letterSpacing: -0.1,
     marginBottom: 4,
   },
   footerEstablished: {
-    fontFamily: 'Courier',
+    fontFamily: FONTS.mono,
     fontSize: 8.5,
     color: SN_FG_FAINT,
     letterSpacing: 2.2,
@@ -1156,9 +1138,8 @@ const snStyles = StyleSheet.create({
     marginBottom: 14,
   },
   verdictSectionTitle: {
-    fontFamily: 'Georgia',
+    fontFamily: FONTS.serif,
     fontSize: 22,
-    fontWeight: '500',
     color: SN_FG,
     letterSpacing: -0.2,
     lineHeight: 24,
@@ -1170,9 +1151,8 @@ const snStyles = StyleSheet.create({
     gap: 4,
   },
   archiveLinkText: {
-    fontFamily: 'System',
+    fontFamily: FONTS.sansMedium,
     fontSize: 11,
-    fontWeight: '500',
     color: SN_FG_FAINT,
   },
 });
@@ -1241,7 +1221,7 @@ function CategoryScoreBar({ category, score, index }: { category: string; score:
         <Text style={[styles.scoreBarCategory, { color: colors.text }]} numberOfLines={1}>
           {category}
         </Text>
-        <Text style={[styles.scoreBarValue, { color: scoreColor, fontWeight: '700' }]}>{score}</Text>
+        <Text style={[styles.scoreBarValue, { color: scoreColor, fontFamily: FONTS.monoSemiBold, fontVariant: ['tabular-nums'] }]}>{score}</Text>
       </View>
       <View style={[styles.scoreBarTrack, { backgroundColor: `${colors.border}80` }]}>
         <Animated.View style={[styles.scoreBarFill, { width: `${score}%`, backgroundColor: scoreColor }]} />
@@ -1448,7 +1428,7 @@ function ReportCard({
           marginTop: 4,
         }}
       >
-        <Text style={{ fontSize: 12, color: colors.textSecondary, textDecorationLine: 'underline' }}>
+        <Text style={{ fontSize: 12, fontFamily: FONTS.sans, color: colors.textSecondary, textDecorationLine: 'underline' }}>
           Flag this analysis
         </Text>
       </TouchableOpacity>
@@ -1736,7 +1716,7 @@ export default function SentinelScreen() {
           <Text style={[styles.consentTitle, { color: colors.text }]}>AI Data Disclosure</Text>
           <Text style={[styles.consentBody, { color: colors.textSecondary }]}>
             When you use Sentinel, the title, text, and category you enter are sent to our servers and processed using{' '}
-            <Text style={{ fontWeight: '700', color: colors.text }}>OpenAI</Text> to generate your governance analysis.
+            <Text style={{ fontFamily: FONTS.sansBold, color: colors.text }}>OpenAI</Text> to generate your governance analysis.
           </Text>
           <Text style={[styles.consentBody, { color: colors.textSecondary }]}>
             This data is used solely for analysis and is not sold or shared with third parties. Your analysis history is stored locally on your device.
@@ -1913,7 +1893,6 @@ const styles = StyleSheet.create({
   premiumBadgeText: {
     ...TYPOGRAPHY.labelSmall,
     color: '#000',
-    fontWeight: '700',
   },
 
   // Stats Row
@@ -1931,7 +1910,6 @@ const styles = StyleSheet.create({
   },
   statValue: {
     ...TYPOGRAPHY.headlineLarge,
-    fontWeight: '700',
   },
   statLabel: {
     ...TYPOGRAPHY.labelSmall,
@@ -1991,7 +1969,6 @@ const styles = StyleSheet.create({
   },
   verdictPillText: {
     ...TYPOGRAPHY.labelSmall,
-    fontWeight: '600',
   },
   historyDate: {
     ...TYPOGRAPHY.labelSmall,
@@ -2014,7 +1991,8 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
   gradeText: {
-    fontWeight: '700',
+    fontFamily: FONTS.monoSemiBold,
+    fontVariant: ['tabular-nums'],
   },
   gradeTextLarge: {
     fontSize: 36,
@@ -2110,7 +2088,6 @@ const styles = StyleSheet.create({
   analyzeButtonText: {
     ...TYPOGRAPHY.labelLarge,
     color: '#000',
-    fontWeight: '600',
   },
   buttonDisabled: {
     opacity: 0.6,
@@ -2172,7 +2149,6 @@ const styles = StyleSheet.create({
   demoBadgeText: {
     ...TYPOGRAPHY.labelSmall,
     color: '#000',
-    fontWeight: '700',
     fontSize: 10,
   },
 
@@ -2187,11 +2163,10 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   scoreHeroLabel: {
-    fontFamily: 'Georgia',
+    fontFamily: FONTS.serif,
     fontSize: 14,
     letterSpacing: 1,
     marginBottom: SPACING.lg,
-    fontWeight: '500',
     textTransform: 'uppercase',
   },
 
@@ -2226,7 +2201,8 @@ const styles = StyleSheet.create({
   },
   gaugeScore: {
     fontSize: responsive(40, 44, 48),
-    fontWeight: '700',
+    fontFamily: FONTS.monoSemiBold,
+    fontVariant: ['tabular-nums'],
   },
   gaugeLabel: {
     ...TYPOGRAPHY.labelSmall,
@@ -2247,7 +2223,6 @@ const styles = StyleSheet.create({
   },
   scoreLabelText: {
     ...TYPOGRAPHY.labelMedium,
-    fontWeight: '700',
     letterSpacing: 1,
   },
 
@@ -2262,7 +2237,8 @@ const styles = StyleSheet.create({
   },
   scoreBadgeText: {
     ...TYPOGRAPHY.labelMedium,
-    fontWeight: '700',
+    fontFamily: FONTS.monoSemiBold,
+    fontVariant: ['tabular-nums'],
   },
   scoreGaugeSmall: {
     width: 44,
@@ -2274,7 +2250,8 @@ const styles = StyleSheet.create({
   },
   scoreGaugeSmallText: {
     ...TYPOGRAPHY.labelMedium,
-    fontWeight: '700',
+    fontFamily: FONTS.monoSemiBold,
+    fontVariant: ['tabular-nums'],
   },
 
   // Legacy Grade Hero (kept for reference)
@@ -2294,7 +2271,8 @@ const styles = StyleSheet.create({
   },
   gradeHeroGrade: {
     fontSize: 72,
-    fontWeight: '700',
+    fontFamily: FONTS.monoSemiBold,
+    fontVariant: ['tabular-nums'],
     marginBottom: SPACING.md,
   },
   verdictBadge: {
@@ -2308,7 +2286,6 @@ const styles = StyleSheet.create({
   },
   verdictBadgeText: {
     ...TYPOGRAPHY.labelMedium,
-    fontWeight: '600',
   },
 
   // Report Sections
@@ -2326,9 +2303,8 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.lg,
   },
   sectionTitle: {
-    fontFamily: 'Georgia',
+    fontFamily: FONTS.serif,
     fontSize: 18,
-    fontWeight: '500',
   },
 
   // Score Bars
@@ -2353,7 +2329,8 @@ const styles = StyleSheet.create({
   },
   scoreBarGrade: {
     ...TYPOGRAPHY.labelMedium,
-    fontWeight: '700',
+    fontFamily: FONTS.monoSemiBold,
+    fontVariant: ['tabular-nums'],
   },
   scoreBarValue: {
     ...TYPOGRAPHY.labelSmall,
@@ -2411,7 +2388,8 @@ const styles = StyleSheet.create({
   fixNumberText: {
     ...TYPOGRAPHY.labelSmall,
     color: '#fff',
-    fontWeight: '700',
+    fontFamily: FONTS.monoSemiBold,
+    fontVariant: ['tabular-nums'],
   },
   fixText: {
     ...TYPOGRAPHY.bodyMedium,
@@ -2441,7 +2419,6 @@ const styles = StyleSheet.create({
   createProposalText: {
     ...TYPOGRAPHY.labelLarge,
     color: '#000',
-    fontWeight: '600',
   },
   successBanner: {
     flexDirection: 'row',
@@ -2454,7 +2431,6 @@ const styles = StyleSheet.create({
   },
   successText: {
     ...TYPOGRAPHY.labelLarge,
-    fontWeight: '600',
   },
 
   // Empty States
@@ -2523,7 +2499,6 @@ const styles = StyleSheet.create({
   consentAcceptText: {
     ...TYPOGRAPHY.labelLarge,
     color: '#000',
-    fontWeight: '600',
   },
   aiDisclosure: {
     ...TYPOGRAPHY.labelSmall,

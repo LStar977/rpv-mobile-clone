@@ -98,7 +98,7 @@ export function TierBadge({ tier, size = 'md', onPress, showLabel = true }: Tier
     >
       <Ionicons name={config.icon} size={sizeStyles.iconSize} color={tierColors.text} />
       {showLabel && (
-        <Text style={[sizeStyles.textStyle, { color: tierColors.text, fontWeight: '600' }]}>
+        <Text style={[sizeStyles.textStyle, { color: tierColors.text }]}>
           {config.label}
         </Text>
       )}
@@ -228,7 +228,6 @@ const styles = StyleSheet.create({
   upgradeButtonText: {
     ...TYPOGRAPHY.labelSmall,
     color: '#000',
-    fontWeight: '600',
   },
 });
 

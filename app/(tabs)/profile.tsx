@@ -16,7 +16,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import Svg, { Circle } from 'react-native-svg';
 import { useAuthStore } from '../../lib/auth';
-import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS, ThemePreference, responsive } from '../../lib/theme';
+import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS, FONTS, ThemePreference, responsive } from '../../lib/theme';
 import { Button, TierBadge } from '../../components/ui';
 import { adminApi, organizationsApi, userApi, veriffApi } from '../../lib/api';
 import { restorePurchases } from '../../lib/iap';
@@ -171,9 +171,8 @@ function PrEyebrow({ children, color }: { children: React.ReactNode; color?: str
   const pr = useProfileColors();
   return (
     <Text style={{
-      fontFamily: 'System',
+      fontFamily: FONTS.sansSemiBold,
       fontSize: 10,
-      fontWeight: '600',
       letterSpacing: 2.2,
       textTransform: 'uppercase',
       color: color || pr.FG_FAINT,
@@ -275,7 +274,7 @@ function PrAppearance({
     <Animated.View entering={FadeInUp.delay(400).duration(400)} style={prStyles.section}>
       <View style={[prStyles.appearanceCard, { backgroundColor: pr.BG_CARD, borderColor: pr.LINE }]}>
         <Text style={[prStyles.appearanceLabel, { color: pr.FG_MUTED, marginBottom: 14 }]}>
-          Currently set to <Text style={{ color: pr.GL, fontWeight: '600' }}>{themeLabel}</Text>
+          Currently set to <Text style={{ color: pr.GL, fontFamily: FONTS.sansSemiBold }}>{themeLabel}</Text>
         </Text>
         <View style={prStyles.appearanceRow}>
           {(['system', 'dark', 'light'] as ThemePreference[]).map((mode) => {
@@ -295,7 +294,7 @@ function PrAppearance({
                 <Text style={[
                   prStyles.appearanceChipText,
                   { color: active ? pr.GL : pr.FG_MUTED },
-                  active && { fontWeight: '600' }
+                  active && { fontFamily: FONTS.sansSemiBold }
                 ]}>
                   {label}
                 </Text>
@@ -336,7 +335,8 @@ const prStyles = StyleSheet.create({
     alignItems: 'center',
   },
   folioCode: {
-    fontFamily: 'Courier',
+    fontFamily: FONTS.mono,
+    fontVariant: ['tabular-nums'],
     fontSize: 9,
     color: PR_FG_FAINT,
     letterSpacing: 1,
@@ -377,9 +377,8 @@ const prStyles = StyleSheet.create({
     borderRadius: 32,
   },
   monogramText: {
-    fontFamily: 'Georgia',
+    fontFamily: FONTS.serif,
     fontSize: 28,
-    fontWeight: '500',
     color: '#1A1308',
     letterSpacing: 0.5,
   },
@@ -389,16 +388,16 @@ const prStyles = StyleSheet.create({
     left: -5,
   },
   portraitName: {
-    fontFamily: 'Georgia',
+    fontFamily: FONTS.serif,
     fontSize: 28,
-    fontWeight: '500',
     color: PR_FG,
     letterSpacing: -0.4,
     marginTop: 4,
     marginBottom: 4,
   },
   portraitEmail: {
-    fontFamily: 'Courier',
+    fontFamily: FONTS.mono,
+    fontVariant: ['tabular-nums'],
     fontSize: 11,
     color: PR_FG_MUTED,
     letterSpacing: 0.2,
@@ -416,22 +415,20 @@ const prStyles = StyleSheet.create({
     flex: 1,
   },
   membershipLabel: {
-    fontFamily: 'System',
+    fontFamily: FONTS.sansSemiBold,
     fontSize: 8.5,
-    fontWeight: '600',
     color: PR_FG_FAINT,
     letterSpacing: 2,
     marginBottom: 4,
   },
   membershipValue: {
-    fontFamily: 'Georgia',
+    fontFamily: FONTS.serif,
     fontSize: 16,
-    fontWeight: '500',
     color: PR_FG,
     letterSpacing: -0.1,
   },
   tierValue: {
-    fontStyle: 'italic',
+    fontFamily: FONTS.serifMediumItalic,
     color: PR_GL,
   },
   standingRow: {
@@ -461,20 +458,20 @@ const prStyles = StyleSheet.create({
     marginBottom: 10,
   },
   sectionRoman: {
-    fontFamily: 'Courier',
+    fontFamily: FONTS.mono,
+    fontVariant: ['tabular-nums'],
     fontSize: 9,
     color: PR_FG_FAINT,
     letterSpacing: 1.8,
   },
   sectionTitle: {
-    fontFamily: 'Georgia',
+    fontFamily: FONTS.serif,
     fontSize: 18,
-    fontWeight: '500',
     color: PR_FG,
     letterSpacing: -0.1,
   },
   sectionSub: {
-    fontFamily: 'System',
+    fontFamily: FONTS.sans,
     fontSize: 10.5,
     color: PR_FG_FAINT,
     marginTop: 3,
@@ -510,22 +507,20 @@ const prStyles = StyleSheet.create({
     justifyContent: 'center',
   },
   rowLabel: {
-    fontFamily: 'System',
+    fontFamily: FONTS.sansMedium,
     fontSize: 16,
-    fontWeight: '500',
     color: PR_FG,
     letterSpacing: -0.1,
   },
   rowSub: {
-    fontFamily: 'System',
+    fontFamily: FONTS.sans,
     fontSize: 12.5,
     color: PR_FG_FAINT,
     marginTop: 2,
   },
   rowValue: {
-    fontFamily: 'System',
+    fontFamily: FONTS.sansMedium,
     fontSize: 14,
-    fontWeight: '500',
   },
 
   // Appearance
@@ -543,12 +538,13 @@ const prStyles = StyleSheet.create({
     marginBottom: 12,
   },
   appearanceLabel: {
-    fontFamily: 'System',
+    fontFamily: FONTS.sans,
     fontSize: 12,
     color: PR_FG_MUTED,
   },
   appearanceVersion: {
-    fontFamily: 'Courier',
+    fontFamily: FONTS.mono,
+    fontVariant: ['tabular-nums'],
     fontSize: 9,
     color: PR_FG_FAINT,
     letterSpacing: 1,
@@ -570,14 +566,13 @@ const prStyles = StyleSheet.create({
     backgroundColor: `${PR_G}2E`,
   },
   appearanceChipText: {
-    fontFamily: 'System',
+    fontFamily: FONTS.sansMedium,
     fontSize: 13,
-    fontWeight: '500',
     color: PR_FG_MUTED,
     letterSpacing: -0.1,
   },
   appearanceChipTextActive: {
-    fontWeight: '600',
+    fontFamily: FONTS.sansSemiBold,
     color: PR_GL,
   },
 
@@ -598,21 +593,20 @@ const prStyles = StyleSheet.create({
     borderRadius: 999,
   },
   signOutText: {
-    fontFamily: 'Georgia',
+    fontFamily: FONTS.serifItalic,
     fontSize: 16,
-    fontStyle: 'italic',
     color: PR_FG_MUTED,
     letterSpacing: -0.1,
   },
   footerVersion: {
     marginTop: 18,
-    fontFamily: 'Georgia',
+    fontFamily: FONTS.serifItalic,
     fontSize: 12,
-    fontStyle: 'italic',
     color: PR_FG_FAINT,
   },
   footerVersionMono: {
-    fontFamily: 'Courier',
+    fontFamily: FONTS.mono,
+    fontVariant: ['tabular-nums'],
     fontStyle: 'normal',
   },
 });
@@ -951,7 +945,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: SPACING.lg,
   },
-  avatarText: { fontSize: 36, fontWeight: '700' },
+  avatarText: { fontFamily: FONTS.serif, fontSize: 36 },
   userName: { ...TYPOGRAPHY.headlineLarge, fontSize: responsive(20, 22, 24), marginBottom: SPACING.xs },
   userEmail: { ...TYPOGRAPHY.bodyMedium, marginBottom: SPACING.sm },
   tierBadgeContainer: {
@@ -992,7 +986,6 @@ const styles = StyleSheet.create({
   menuLabel: {
     ...TYPOGRAPHY.bodyLarge,
     flex: 1,
-    fontWeight: '500',
   },
 
   // Theme Card
@@ -1018,7 +1011,6 @@ const styles = StyleSheet.create({
   },
   themeTitle: {
     ...TYPOGRAPHY.labelLarge,
-    fontWeight: '700',
   },
   themeSubtitle: {
     ...TYPOGRAPHY.bodySmall,
@@ -1038,7 +1030,6 @@ const styles = StyleSheet.create({
   },
   themeChipText: {
     ...TYPOGRAPHY.labelMedium,
-    fontWeight: '700',
   },
 
   // Logout

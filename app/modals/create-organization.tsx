@@ -21,7 +21,7 @@ import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import { useAuthStore } from '../../lib/auth';
 import { organizationsApi, uploadsApi } from '../../lib/api';
-import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS } from '../../lib/theme';
+import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS, FONTS } from '../../lib/theme';
 import { showPaymentError, showPaymentSuccess } from '../../lib/stripe';
 import { processOrganizationPayment } from '../../lib/payment';
 import { ORG_TIERS, type OrgTier } from '../../lib/org-tiers';
@@ -366,7 +366,7 @@ export default function CreateOrganizationScreen() {
         }}
         style={{ paddingVertical: SPACING.md, alignItems: 'center' }}
       >
-        <Text style={{ color: colors.gold, ...TYPOGRAPHY.bodySmall, fontWeight: '600' }}>
+        <Text style={{ color: colors.gold, ...TYPOGRAPHY.bodySmall }}>
           Need more than Business? Contact sales →
         </Text>
       </TouchableOpacity>
@@ -568,9 +568,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   headerTitle: {
-    fontFamily: 'Georgia',
+    fontFamily: FONTS.serif,
     fontSize: 20,
-    fontWeight: '500',
   },
   stepIndicator: {
     flexDirection: 'row',
@@ -593,12 +592,10 @@ const styles = StyleSheet.create({
   },
   stepNumber: {
     ...TYPOGRAPHY.labelSmall,
-    fontWeight: '600',
   },
   stepLabel: {
     ...TYPOGRAPHY.labelSmall,
     marginLeft: SPACING.xs,
-    fontWeight: '500',
   },
   stepLine: {
     width: 40,
@@ -618,9 +615,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   stepTitle: {
-    fontFamily: 'Georgia',
+    fontFamily: FONTS.serif,
     fontSize: 22,
-    fontWeight: '500',
     marginBottom: SPACING.xs,
   },
   stepSubtitle: {
@@ -716,7 +712,6 @@ const styles = StyleSheet.create({
   popularText: {
     ...TYPOGRAPHY.labelSmall,
     color: '#000',
-    fontWeight: '700',
     fontSize: 10,
   },
   tierHeader: {
@@ -736,18 +731,17 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   tierName: {
-    fontFamily: 'Georgia',
+    fontFamily: FONTS.serif,
     fontSize: 16,
-    fontWeight: '500',
   },
   tierPriceRow: {
     flexDirection: 'row',
     alignItems: 'baseline',
   },
   tierPrice: {
-    fontFamily: 'Georgia',
+    fontFamily: FONTS.mono,
+    fontVariant: ['tabular-nums'],
     fontSize: 20,
-    fontWeight: '500',
   },
   tierPeriod: {
     ...TYPOGRAPHY.labelSmall,
@@ -812,9 +806,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   summaryName: {
-    fontFamily: 'Georgia',
+    fontFamily: FONTS.serif,
     fontSize: 16,
-    fontWeight: '500',
     marginBottom: SPACING.xxs,
   },
   summaryDescription: {
@@ -841,16 +834,14 @@ const styles = StyleSheet.create({
   },
   summaryValueText: {
     ...TYPOGRAPHY.labelMedium,
-    fontWeight: '500',
   },
   summaryTotalLabel: {
     ...TYPOGRAPHY.labelLarge,
-    fontWeight: '600',
   },
   summaryTotalValue: {
-    fontFamily: 'Georgia',
+    fontFamily: FONTS.mono,
+    fontVariant: ['tabular-nums'],
     fontSize: 20,
-    fontWeight: '500',
   },
 
   // Info Note
@@ -888,7 +879,6 @@ const styles = StyleSheet.create({
   },
   backStepText: {
     ...TYPOGRAPHY.labelMedium,
-    fontWeight: '500',
   },
   actionButton: {
     flex: 1,
@@ -907,7 +897,6 @@ const styles = StyleSheet.create({
   actionButtonText: {
     ...TYPOGRAPHY.labelLarge,
     color: '#000',
-    fontWeight: '600',
   },
 
   bottomSpacer: {

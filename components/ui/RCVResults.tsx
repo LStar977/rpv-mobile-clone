@@ -2,7 +2,7 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, { FadeIn, LinearTransition } from 'react-native-reanimated';
-import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY } from '../../lib/theme';
+import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, FONTS } from '../../lib/theme';
 
 interface RCVRound {
   round: number;
@@ -190,16 +190,16 @@ const styles = StyleSheet.create({
   },
   winnerLabel: {
     ...TYPOGRAPHY.labelSmall,
-    fontWeight: '800',
     letterSpacing: 2,
   },
   winnerName: {
     ...TYPOGRAPHY.headlineMedium,
-    fontWeight: '700',
     marginBottom: 4,
   },
   winnerSub: {
     ...TYPOGRAPHY.bodySmall,
+    fontFamily: FONTS.mono,
+    fontVariant: ['tabular-nums'],
   },
   roundCard: {
     borderRadius: BORDER_RADIUS.xl,
@@ -214,7 +214,6 @@ const styles = StyleSheet.create({
   },
   roundTitle: {
     ...TYPOGRAPHY.labelLarge,
-    fontWeight: '700',
   },
   roundMeta: {
     ...TYPOGRAPHY.bodySmall,
@@ -236,10 +235,11 @@ const styles = StyleSheet.create({
   optionLabel: {
     ...TYPOGRAPHY.bodyMedium,
     flex: 1,
-    fontWeight: '500',
+    fontFamily: FONTS.sansMedium,
   },
   optionCount: {
     ...TYPOGRAPHY.bodySmall,
+    fontFamily: FONTS.mono,
     fontVariant: ['tabular-nums'],
   },
   barTrack: {

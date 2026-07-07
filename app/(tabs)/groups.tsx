@@ -9,6 +9,7 @@ import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle, Line, Path, Rect, Defs, Pattern, G } from 'react-native-svg';
 import { useAuthStore } from '../../lib/auth';
+import { FONTS } from '../../lib/theme';
 import { organizationsApi, Organization } from '../../lib/api';
 import { UpgradeModal } from '../../components/ui/UpgradeModal';
 
@@ -26,8 +27,8 @@ const G_FG_MUTED = '#C7CACD';
 const G_FG_FAINT = '#8E9297';
 const G_GREEN = '#34C759';
 
-const SERIF = 'Georgia';
-const MONO = 'JetBrainsMono-Regular';
+const SERIF = FONTS.serif;
+const MONO = FONTS.mono;
 
 // ─── helpers ──────────────────────────────────────────────────────────
 function monogramFromName(name: string): string {
@@ -84,8 +85,8 @@ function CornerTicks({ color = G_GOLD, size = 8, weight = 1.2 }: { color?: strin
 function GEyebrow({ children, color = G_FG_FAINT, style }: { children: React.ReactNode; color?: string; style?: any }) {
   return (
     <Text style={[{
+      fontFamily: FONTS.sansSemiBold,
       fontSize: 9.5,
-      fontWeight: '600',
       letterSpacing: 2,
       textTransform: 'uppercase',
       color,
@@ -108,11 +109,11 @@ function GHeader({ stat, admins, onAddPress, insetTop }: { stat: number; admins:
     <Animated.View entering={FadeInDown.duration(400)} style={{ paddingTop: insetTop + 12, paddingHorizontal: 24, paddingBottom: 18 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 10 }}>
         <Text style={{
-          fontFamily: SERIF, fontSize: 38, fontWeight: '500',
+          fontFamily: SERIF, fontSize: 38,
           letterSpacing: -0.8, lineHeight: 40, color: G_FG, flex: 1,
         }}>
           My{' '}
-          <Text style={{ fontStyle: 'italic', color: G_GOLD_L, fontWeight: '400' }}>groups</Text>
+          <Text style={{ fontFamily: FONTS.serifItalic, color: G_GOLD_L }}>groups</Text>
         </Text>
         <TouchableOpacity
           onPress={onAddPress}
@@ -128,7 +129,7 @@ function GHeader({ stat, admins, onAddPress, insetTop }: { stat: number; admins:
         </TouchableOpacity>
       </View>
       {stat > 0 && (
-        <Text style={{ fontSize: 13, color: G_FG_MUTED, letterSpacing: -0.05 }}>
+        <Text style={{ fontFamily: FONTS.mono, fontVariant: ['tabular-nums'], fontSize: 13, color: G_FG_MUTED, letterSpacing: -0.05 }}>
           {stat} {stat === 1 ? 'organization' : 'organizations'}
           {admins > 0 && (
             <Text style={{ color: G_FG_FAINT }}> · admin in {admins}</Text>
@@ -158,7 +159,7 @@ function OrgLogo({ name, logoUrl, size = 48 }: { name: string; logoUrl?: string;
       alignItems: 'center', justifyContent: 'center',
     }}>
       <Text style={{
-        fontFamily: SERIF, fontSize: size * 0.46, fontWeight: '500', fontStyle: 'italic',
+        fontFamily: FONTS.serifMediumItalic, fontSize: size * 0.46,
         color: G_GOLD_L, letterSpacing: -0.5,
       }}>
         {monogramFromName(name)}
@@ -188,7 +189,7 @@ function OrgCard({ org, onPress, index }: { org: Organization; onPress: () => vo
                 numberOfLines={1}
                 style={{
                   flex: 1,
-                  fontFamily: SERIF, fontSize: 17, fontWeight: '500',
+                  fontFamily: SERIF, fontSize: 17,
                   color: G_FG, lineHeight: 21, letterSpacing: -0.2,
                 }}
               >
@@ -200,6 +201,7 @@ function OrgCard({ org, onPress, index }: { org: Organization; onPress: () => vo
               <Text
                 numberOfLines={2}
                 style={{
+                  fontFamily: FONTS.sans,
                   fontSize: 12.5, color: G_FG_MUTED,
                   letterSpacing: -0.05, lineHeight: 17,
                   marginBottom: 6,
@@ -208,12 +210,12 @@ function OrgCard({ org, onPress, index }: { org: Organization; onPress: () => vo
                 {org.description}
               </Text>
             )}
-            <Text style={{ fontSize: 12, color: G_FG_FAINT, letterSpacing: -0.05 }}>
+            <Text style={{ fontFamily: FONTS.mono, fontVariant: ['tabular-nums'], fontSize: 12, color: G_FG_FAINT, letterSpacing: -0.05 }}>
               {memberLabel}
               {isAdmin && (
                 <Text>
                   <Text style={{ color: G_FG_FAINT }}>  ·  </Text>
-                  <Text style={{ color: G_GOLD_L, fontWeight: '500' }}>Admin</Text>
+                  <Text style={{ fontFamily: FONTS.sansMedium, color: G_GOLD_L }}>Admin</Text>
                 </Text>
               )}
             </Text>
@@ -248,13 +250,14 @@ function EmptyLedger({ onJoinPress, onCreatePress }: { onJoinPress: () => void; 
         </View>
 
         <Text style={{
-          fontFamily: SERIF, fontSize: 24, fontWeight: '500',
+          fontFamily: SERIF, fontSize: 24,
           color: G_FG, letterSpacing: -0.3, lineHeight: 28,
           textAlign: 'center', marginBottom: 8,
         }}>
           No groups yet
         </Text>
         <Text style={{
+          fontFamily: FONTS.sans,
           fontSize: 13, color: G_FG_MUTED, letterSpacing: -0.05, lineHeight: 19,
           textAlign: 'center', maxWidth: 280, alignSelf: 'center', marginBottom: 22,
         }}>
@@ -272,7 +275,7 @@ function EmptyLedger({ onJoinPress, onCreatePress }: { onJoinPress: () => void; 
           }}
         >
           <Ionicons name="key-outline" size={15} color="#0A0C0F" />
-          <Text style={{ fontSize: 14, fontWeight: '600', color: '#0A0C0F' }}>
+          <Text style={{ fontFamily: FONTS.sansSemiBold, fontSize: 14, color: '#0A0C0F' }}>
             Enter invite code
           </Text>
         </TouchableOpacity>
@@ -288,7 +291,7 @@ function EmptyLedger({ onJoinPress, onCreatePress }: { onJoinPress: () => void; 
             alignItems: 'center', justifyContent: 'center',
           }}
         >
-          <Text style={{ fontSize: 14, fontWeight: '600', color: G_GOLD }}>
+          <Text style={{ fontFamily: FONTS.sansSemiBold, fontSize: 14, color: G_GOLD }}>
             Start your own
           </Text>
         </TouchableOpacity>
@@ -380,11 +383,11 @@ function InviteSheet({
         <View style={{ paddingHorizontal: 22, paddingBottom: 14, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <View style={{ flex: 1 }}>
             <Text style={{
-              fontFamily: SERIF, fontSize: 24, fontWeight: '500',
+              fontFamily: SERIF, fontSize: 24,
               color: G_FG, letterSpacing: -0.3, lineHeight: 28,
             }}>
               Join with an{' '}
-              <Text style={{ fontStyle: 'italic', color: G_GOLD_L }}>invite code</Text>
+              <Text style={{ fontFamily: FONTS.serifMediumItalic, color: G_GOLD_L }}>invite code</Text>
             </Text>
           </View>
           <TouchableOpacity
@@ -403,7 +406,7 @@ function InviteSheet({
 
         {/* copy */}
         <Text style={{
-          paddingHorizontal: 22, fontSize: 13, color: G_FG_MUTED,
+          paddingHorizontal: 22, fontFamily: FONTS.sans, fontSize: 13, color: G_FG_MUTED,
           letterSpacing: -0.05, lineHeight: 19, marginBottom: 18,
         }}>
           Ask an admin of your union, school, or community group for their invite code.
@@ -431,7 +434,7 @@ function InviteSheet({
             </View>
             <TextInput
               style={{
-                fontFamily: MONO, fontSize: 22, fontWeight: '500',
+                fontFamily: MONO, fontVariant: ['tabular-nums'], fontSize: 22,
                 letterSpacing: 6, color: G_GOLD_L,
                 padding: 0,
               }}
@@ -445,7 +448,7 @@ function InviteSheet({
               selectionColor={G_GOLD}
             />
           </View>
-          <Text style={{ fontFamily: MONO, fontSize: 10, color: G_FG_FAINT, letterSpacing: 0.6, marginTop: 8, textAlign: 'right' }}>
+          <Text style={{ fontFamily: MONO, fontVariant: ['tabular-nums'], fontSize: 10, color: G_FG_FAINT, letterSpacing: 0.6, marginTop: 8, textAlign: 'right' }}>
             {codeLen} / 12
           </Text>
         </View>
@@ -468,7 +471,7 @@ function InviteSheet({
               <ActivityIndicator size="small" color="#0A0C0F" />
             ) : (
               <>
-                <Text style={{ fontSize: 14, fontWeight: '600', color: '#0A0C0F' }}>
+                <Text style={{ fontFamily: FONTS.sansSemiBold, fontSize: 14, color: '#0A0C0F' }}>
                   Join organization
                 </Text>
                 <Ionicons name="arrow-forward" size={14} color="#0A0C0F" />
@@ -567,7 +570,7 @@ export default function GroupsScreen() {
     return (
       <View style={[styles.container, { backgroundColor: G_BG, alignItems: 'center', justifyContent: 'center' }]}>
         <ActivityIndicator size="small" color={G_GOLD} />
-        <Text style={{ fontFamily: MONO, fontSize: 10, color: G_FG_FAINT, letterSpacing: 1.4, marginTop: 12, textTransform: 'uppercase' }}>
+        <Text style={{ fontFamily: MONO, fontVariant: ['tabular-nums'], fontSize: 10, color: G_FG_FAINT, letterSpacing: 1.4, marginTop: 12, textTransform: 'uppercase' }}>
           Loading
         </Text>
       </View>

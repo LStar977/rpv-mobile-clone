@@ -7,7 +7,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuthStore } from '../../lib/auth';
-import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS, responsive } from '../../lib/theme';
+import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS, responsive, FONTS } from '../../lib/theme';
 import { showPaymentError, showPaymentSuccess } from '../../lib/stripe';
 import { processPremiumPayment } from '../../lib/payment';
 import { restorePurchases } from '../../lib/iap';
@@ -505,9 +505,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   headerTitle: {
-    fontFamily: 'Georgia',
+    fontFamily: FONTS.serif,
     fontSize: 20,
-    fontWeight: '500',
   },
   content: {
     flex: 1,
@@ -524,9 +523,8 @@ const styles = StyleSheet.create({
     paddingTop: SPACING.md,
   },
   heroTitle: {
-    fontFamily: 'Georgia',
+    fontFamily: FONTS.serif,
     fontSize: responsive(24, 26, 28),
-    fontWeight: '500',
     textAlign: 'center',
     marginBottom: SPACING.xs,
   },
@@ -551,7 +549,8 @@ const styles = StyleSheet.create({
   bestValueText: {
     ...TYPOGRAPHY.labelSmall,
     color: '#000',
-    fontWeight: '700',
+    fontFamily: FONTS.sansSemiBold,
+    letterSpacing: 1,
   },
   tierHeader: {
     flexDirection: 'row',
@@ -570,9 +569,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   tierName: {
-    fontFamily: 'Georgia',
+    fontFamily: FONTS.serif,
     fontSize: 18,
-    fontWeight: '500',
     marginBottom: 2,
   },
   tierDescription: {
@@ -584,9 +582,9 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.lg,
   },
   tierPrice: {
-    fontFamily: 'Georgia',
+    fontFamily: FONTS.mono,
     fontSize: responsive(28, 32, 36),
-    fontWeight: '500',
+    fontVariant: ['tabular-nums'],
   },
   tierPeriod: {
     ...TYPOGRAPHY.bodyMedium,
@@ -615,7 +613,6 @@ const styles = StyleSheet.create({
   },
   currentText: {
     ...TYPOGRAPHY.labelMedium,
-    fontWeight: '600',
   },
   tierButton: {
     marginTop: SPACING.xs,
@@ -632,7 +629,6 @@ const styles = StyleSheet.create({
   gradientButtonText: {
     ...TYPOGRAPHY.labelLarge,
     color: '#000',
-    fontWeight: '600',
   },
   outlineButton: {
     flexDirection: 'row',
@@ -645,7 +641,6 @@ const styles = StyleSheet.create({
   },
   outlineButtonText: {
     ...TYPOGRAPHY.labelMedium,
-    fontWeight: '600',
   },
   restoreButton: {
     alignItems: 'center',
@@ -654,7 +649,7 @@ const styles = StyleSheet.create({
   },
   restoreText: {
     ...TYPOGRAPHY.labelMedium,
-    fontWeight: '500',
+    fontFamily: FONTS.sansMedium,
   },
   legalFooter: {
     paddingHorizontal: SPACING.md,
@@ -662,13 +657,14 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.md,
   },
   legalFooterText: {
+    fontFamily: FONTS.sans,
     fontSize: 11.5,
     lineHeight: 17,
     textAlign: 'center',
   },
   legalLink: {
     textDecorationLine: 'underline',
-    fontWeight: '500',
+    fontFamily: FONTS.sansMedium,
   },
   faqSection: {
     borderRadius: BORDER_RADIUS['2xl'],
@@ -677,9 +673,8 @@ const styles = StyleSheet.create({
     marginTop: SPACING.md,
   },
   faqTitle: {
-    fontFamily: 'Georgia',
+    fontFamily: FONTS.serif,
     fontSize: 20,
-    fontWeight: '500',
     marginBottom: SPACING.lg,
   },
   faqItem: {
@@ -687,7 +682,6 @@ const styles = StyleSheet.create({
   },
   faqQuestion: {
     ...TYPOGRAPHY.labelMedium,
-    fontWeight: '600',
     marginBottom: SPACING.xs,
   },
   faqAnswer: {

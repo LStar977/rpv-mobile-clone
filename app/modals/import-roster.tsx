@@ -16,7 +16,7 @@ import * as Haptics from 'expo-haptics';
 import Animated, { FadeIn, FadeInUp } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Papa from 'papaparse';
-import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY } from '../../lib/theme';
+import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, FONTS } from '../../lib/theme';
 import { organizationsApi } from '../../lib/api';
 import { UpgradeModal } from '../../components/ui/UpgradeModal';
 
@@ -293,7 +293,7 @@ export default function ImportRosterScreen() {
         <Text style={[styles.requirementsTitle, { color: colors.text }]}>Your CSV needs:</Text>
         <View style={styles.requirementRow}>
           <Ionicons name="checkmark-circle" size={16} color={colors.success} />
-          <Text style={[styles.requirementText, { color: colors.text }]}>An <Text style={{ fontWeight: '700' }}>Email</Text> column (required)</Text>
+          <Text style={[styles.requirementText, { color: colors.text }]}>An <Text style={{ fontFamily: FONTS.sansBold }}>Email</Text> column (required)</Text>
         </View>
         <View style={styles.requirementRow}>
           <Ionicons name="checkmark-circle" size={16} color={colors.textSecondary} />
@@ -375,7 +375,7 @@ export default function ImportRosterScreen() {
           <View style={[styles.warningBox, { backgroundColor: `${colors.warning}15`, borderColor: colors.warning }]}>
             <Ionicons name="warning-outline" size={18} color={colors.warning} />
             <Text style={[styles.warningText, { color: colors.text }]}>
-              Tap a column to mark it as <Text style={{ fontWeight: '700' }}>Email</Text>. At least one email column is required.
+              Tap a column to mark it as <Text style={{ fontFamily: FONTS.sansBold }}>Email</Text>. At least one email column is required.
             </Text>
           </View>
         )}
@@ -538,7 +538,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
   },
   backButton: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { fontFamily: 'Georgia', fontSize: 20, fontWeight: '500' },
+  headerTitle: { fontFamily: FONTS.serif, fontSize: 20 },
   centerContent: {
     flex: 1,
     alignItems: 'center',
@@ -552,9 +552,8 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.md,
   },
   title: {
-    fontFamily: 'Georgia',
+    fontFamily: FONTS.serif,
     fontSize: 22,
-    fontWeight: '500',
     textAlign: 'center',
   },
   subtitle: {
@@ -572,7 +571,6 @@ const styles = StyleSheet.create({
   },
   requirementsTitle: {
     ...TYPOGRAPHY.labelMedium,
-    fontWeight: '600',
     marginBottom: SPACING.xs,
   },
   requirementRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm },
@@ -590,7 +588,6 @@ const styles = StyleSheet.create({
   primaryButtonText: {
     ...TYPOGRAPHY.labelLarge,
     color: '#000',
-    fontWeight: '600',
   },
   secondaryButton: {
     alignItems: 'center',
@@ -618,9 +615,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   countNumber: {
-    fontFamily: 'Georgia',
+    fontFamily: FONTS.mono,
+    fontVariant: ['tabular-nums'],
     fontSize: 28,
-    fontWeight: '500',
   },
   countLabel: {
     ...TYPOGRAPHY.labelSmall,
@@ -628,9 +625,9 @@ const styles = StyleSheet.create({
   },
   sectionLabel: {
     ...TYPOGRAPHY.labelSmall,
-    fontWeight: '600',
+    fontFamily: FONTS.sansSemiBold,
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: 1,
     marginBottom: SPACING.sm,
   },
   columnsList: {
@@ -647,7 +644,6 @@ const styles = StyleSheet.create({
   columnHeaderInfo: { flex: 1 },
   columnHeaderName: {
     ...TYPOGRAPHY.labelMedium,
-    fontWeight: '600',
   },
   columnSample: {
     ...TYPOGRAPHY.bodySmall,
@@ -664,7 +660,6 @@ const styles = StyleSheet.create({
   },
   columnRoleText: {
     ...TYPOGRAPHY.labelSmall,
-    fontWeight: '600',
   },
   warningBox: {
     flexDirection: 'row',
@@ -708,7 +703,7 @@ const styles = StyleSheet.create({
   },
   summaryValue: {
     ...TYPOGRAPHY.labelLarge,
-    fontFamily: 'Georgia',
-    fontWeight: '600',
+    fontFamily: FONTS.monoSemiBold,
+    fontVariant: ['tabular-nums'],
   },
 });

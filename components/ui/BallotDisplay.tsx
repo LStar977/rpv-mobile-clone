@@ -5,7 +5,7 @@ import * as Haptics from 'expo-haptics';
 import Animated, { FadeIn, useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
 import { BallotIcon } from '../icons';
 import { useBallotStore, DAILY_BALLOT_CAP } from '../../lib/ballots';
-import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY } from '../../lib/theme';
+import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, FONTS } from '../../lib/theme';
 
 interface BallotDisplayProps {
   size?: 'sm' | 'md' | 'lg';
@@ -101,7 +101,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   count: {
-    fontWeight: '700',
+    fontFamily: FONTS.monoSemiBold,
+    fontVariant: ['tabular-nums'],
   },
 });
 

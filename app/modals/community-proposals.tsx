@@ -14,7 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { proposalsApi, Proposal } from '../../lib/api';
-import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS } from '../../lib/theme';
+import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS, FONTS } from '../../lib/theme';
 import { SkeletonProposal, EmptyState } from '../../components/ui';
 
 type Scope = 'country' | 'state' | 'city' | 'ward';
@@ -152,24 +152,24 @@ export default function CommunityProposalsScreen() {
           <View style={styles.voteBarContainer}>
             <View style={styles.voteBarLabels}>
               <View style={styles.voteLabelLeft}>
-                <Ionicons name="thumbs-up" size={12} color={colors.success} />
-                <Text style={[styles.voteLabelText, { color: colors.success }]}>
+                <Ionicons name="thumbs-up" size={12} color={colors.support} />
+                <Text style={[styles.voteLabelText, { color: colors.support }]}>
                   {support} ({Math.round(supportPct)}%)
                 </Text>
               </View>
               <View style={styles.voteLabelRight}>
-                <Text style={[styles.voteLabelText, { color: colors.error }]}>
+                <Text style={[styles.voteLabelText, { color: colors.oppose }]}>
                   ({Math.round(100 - supportPct)}%) {oppose}
                 </Text>
-                <Ionicons name="thumbs-down" size={12} color={colors.error} />
+                <Ionicons name="thumbs-down" size={12} color={colors.oppose} />
               </View>
             </View>
-            <View style={[styles.voteBar, { backgroundColor: `${colors.error}30` }]}>
+            <View style={[styles.voteBar, { backgroundColor: colors.oppose }]}>
               <View
                 style={[
                   styles.voteBarFill,
                   {
-                    backgroundColor: colors.success,
+                    backgroundColor: colors.support,
                     width: total > 0 ? `${supportPct}%` : '0%',
                   },
                 ]}
@@ -312,7 +312,6 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     ...TYPOGRAPHY.headlineSmall,
-    fontWeight: '600',
     maxWidth: 200,
   },
   readOnlyPill: {
@@ -325,7 +324,6 @@ const styles = StyleSheet.create({
   },
   readOnlyText: {
     ...TYPOGRAPHY.labelSmall,
-    fontWeight: '600',
     fontSize: 11,
   },
   listContent: {
@@ -367,7 +365,6 @@ const styles = StyleSheet.create({
   },
   statusText: {
     ...TYPOGRAPHY.labelSmall,
-    fontWeight: '600',
   },
   timeText: {
     ...TYPOGRAPHY.labelSmall,
@@ -390,7 +387,6 @@ const styles = StyleSheet.create({
   },
   categoryText: {
     ...TYPOGRAPHY.labelSmall,
-    fontWeight: '600',
   },
   voteBarContainer: {
     gap: 6,
@@ -411,7 +407,8 @@ const styles = StyleSheet.create({
   },
   voteLabelText: {
     ...TYPOGRAPHY.labelSmall,
-    fontWeight: '600',
+    fontFamily: FONTS.monoSemiBold,
+    fontVariant: ['tabular-nums'],
   },
   voteBar: {
     height: 6,

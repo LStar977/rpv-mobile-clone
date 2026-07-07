@@ -36,7 +36,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import Svg, { Circle, Defs, LinearGradient as SvgLinearGradient, Stop } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useTheme, SPACING, RADIUS, TYPOGRAPHY, SHADOWS, EASING, responsive } from '../lib/theme';
+import { useTheme, SPACING, RADIUS, TYPOGRAPHY, SHADOWS, EASING, responsive, FONTS } from '../lib/theme';
 import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { useAuthStore } from '../lib/auth';
@@ -1452,7 +1452,7 @@ export default function AuthScreen() {
               accessibilityRole="button"
               accessibilityLabel="Forgot password"
             >
-              <Text style={{ color: colors.textSecondary, fontSize: 13.5, fontWeight: '500' }}>
+              <Text style={{ color: colors.textSecondary, fontSize: 13.5, fontFamily: FONTS.sansMedium}}>
                 Forgot password?
               </Text>
             </TouchableOpacity>
@@ -1639,7 +1639,7 @@ const styles = StyleSheet.create({
   },
   brandName: {
     fontSize: responsive(32, 36, 48),
-    fontWeight: '700',
+    fontFamily: FONTS.sansBold,
     letterSpacing: -1.5,
     marginBottom: SPACING.md,
   },
@@ -1876,7 +1876,6 @@ const styles = StyleSheet.create({
   },
   switchAuthLink: {
     ...TYPOGRAPHY.body,
-    fontWeight: '600',
   },
   termsContainer: {
     marginTop: SPACING.xl,
@@ -1888,7 +1887,6 @@ const styles = StyleSheet.create({
   },
   termsLink: {
     ...TYPOGRAPHY.captionSmall,
-    fontWeight: '600',
     textDecorationLine: 'underline',
   },
   // Premium CTA Button styles
@@ -1914,7 +1912,6 @@ const styles = StyleSheet.create({
   },
   premiumCTAText: {
     ...TYPOGRAPHY.labelLarge,
-    fontWeight: '700',
   },
   premiumCTAShimmerContainer: {
     position: 'absolute',

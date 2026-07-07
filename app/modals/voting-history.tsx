@@ -6,7 +6,7 @@ import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuthStore } from '../../lib/auth';
-import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS } from '../../lib/theme';
+import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS, FONTS } from '../../lib/theme';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://representportal.com';
 
@@ -190,7 +190,7 @@ export default function VotingHistoryScreen() {
         <TouchableOpacity onPress={() => router.back()} style={{ width: 40, height: 40, alignItems: 'center', justifyContent: 'center' }}>
           <Ionicons name="chevron-back" size={24} color={colors.text} />
         </TouchableOpacity>
-        <Text style={{ fontFamily: 'Georgia', fontSize: 20, fontWeight: '600', color: colors.text }}>Voting History</Text>
+        <Text style={{ fontFamily: FONTS.serif, fontSize: 20, color: colors.text }}>Voting History</Text>
         <View style={{ width: 40 }} />
       </View>
       <ScrollView
@@ -220,12 +220,12 @@ export default function VotingHistoryScreen() {
             </View>
             <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
             <View style={styles.statItem}>
-              <Text style={[styles.statsNumber, { color: colors.success }]}>{supportCount}</Text>
+              <Text style={[styles.statsNumber, { color: colors.support }]}>{supportCount}</Text>
               <Text style={[styles.statsLabel, { color: colors.textSecondary }]}>Supported</Text>
             </View>
             <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
             <View style={styles.statItem}>
-              <Text style={[styles.statsNumber, { color: colors.error }]}>{opposeCount}</Text>
+              <Text style={[styles.statsNumber, { color: colors.oppose }]}>{opposeCount}</Text>
               <Text style={[styles.statsLabel, { color: colors.textSecondary }]}>Opposed</Text>
             </View>
           </View>
@@ -305,16 +305,16 @@ export default function VotingHistoryScreen() {
                   <View
                     style={[
                       styles.voteBadge,
-                      { backgroundColor: isSupport ? `${colors.success}15` : `${colors.error}15` },
+                      { backgroundColor: isSupport ? colors.supportSurface : colors.opposeSurface },
                     ]}
                   >
                     <Ionicons
                       name={isSupport ? 'thumbs-up' : 'thumbs-down'}
                       size={12}
-                      color={isSupport ? colors.success : colors.error}
+                      color={isSupport ? colors.support : colors.oppose}
                     />
                     <Text
-                      style={[styles.voteBadgeText, { color: isSupport ? colors.success : colors.error }]}
+                      style={[styles.voteBadgeText, { color: isSupport ? colors.support : colors.oppose }]}
                     >
                       {isSupport ? 'SUPPORTED' : 'OPPOSED'}
                     </Text>
@@ -322,11 +322,11 @@ export default function VotingHistoryScreen() {
                 </View>
 
                 <View style={styles.progressContainer}>
-                  <View style={[styles.progressBar, { backgroundColor: colors.error }]}>
+                  <View style={[styles.progressBar, { backgroundColor: colors.oppose }]}>
                     <View
                       style={[
                         styles.progressFill,
-                        { width: `${supportPercent}%`, backgroundColor: colors.success },
+                        { width: `${supportPercent}%`, backgroundColor: colors.support },
                       ]}
                     />
                   </View>
@@ -337,14 +337,14 @@ export default function VotingHistoryScreen() {
 
                 <View style={styles.cardFooter}>
                   <View style={styles.stat}>
-                    <Ionicons name="thumbs-up-outline" size={14} color={colors.success} />
-                    <Text style={[styles.statText, { color: colors.success }]}>
+                    <Ionicons name="thumbs-up-outline" size={14} color={colors.support} />
+                    <Text style={[styles.statText, { color: colors.support }]}>
                       {proposal.supportVotes || 0}
                     </Text>
                   </View>
                   <View style={styles.stat}>
-                    <Ionicons name="thumbs-down-outline" size={14} color={colors.error} />
-                    <Text style={[styles.statText, { color: colors.error }]}>
+                    <Ionicons name="thumbs-down-outline" size={14} color={colors.oppose} />
+                    <Text style={[styles.statText, { color: colors.oppose }]}>
                       {proposal.opposeVotes || 0}
                     </Text>
                   </View>
@@ -423,9 +423,8 @@ const styles = StyleSheet.create({
     height: 40,
   },
   statsNumber: {
-    fontFamily: 'Georgia',
+    fontFamily: FONTS.serif,
     fontSize: 28,
-    fontWeight: '500',
   },
   statsLabel: {
     ...TYPOGRAPHY.labelSmall,
@@ -461,7 +460,6 @@ const styles = StyleSheet.create({
   },
   filterChipText: {
     ...TYPOGRAPHY.labelSmall,
-    fontWeight: '500',
   },
 
   // Card
@@ -479,9 +477,8 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.md,
   },
   proposalTitle: {
-    fontFamily: 'Georgia',
+    fontFamily: FONTS.serif,
     fontSize: 16,
-    fontWeight: '500',
     flex: 1,
     marginRight: SPACING.md,
   },
@@ -496,7 +493,6 @@ const styles = StyleSheet.create({
   voteBadgeText: {
     ...TYPOGRAPHY.labelSmall,
     fontSize: 10,
-    fontWeight: '700',
   },
   progressContainer: {
     marginBottom: SPACING.md,
@@ -526,7 +522,6 @@ const styles = StyleSheet.create({
   },
   statText: {
     ...TYPOGRAPHY.labelMedium,
-    fontWeight: '600',
   },
   dateText: {
     ...TYPOGRAPHY.bodySmall,
@@ -569,6 +564,5 @@ const styles = StyleSheet.create({
   emptyCtaText: {
     ...TYPOGRAPHY.labelLarge,
     color: '#000',
-    fontWeight: '600',
   },
 });

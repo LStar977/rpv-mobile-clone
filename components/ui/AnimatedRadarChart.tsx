@@ -11,7 +11,7 @@ import Animated, {
   useAnimatedStyle,
 } from 'react-native-reanimated';
 import Svg, { Polygon, Circle, Line, G, Text as SvgText } from 'react-native-svg';
-import { useTheme } from '../../lib/theme';
+import { useTheme, FONTS } from '../../lib/theme';
 
 const AnimatedPolygon = Animated.createAnimatedComponent(Polygon);
 
@@ -221,11 +221,11 @@ const styles = StyleSheet.create({
   },
   centerScore: {
     fontSize: 28,
-    fontWeight: '700',
+    fontFamily: FONTS.sansBold,
   },
   centerText: {
     fontSize: 10,
-    fontWeight: '600',
+    fontFamily: FONTS.sansSemiBold,
     letterSpacing: 1,
   },
 });

@@ -30,6 +30,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import Svg, { Circle, Path, G, Defs, RadialGradient, Stop } from 'react-native-svg';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
+import { FONTS } from '../lib/theme';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const ONBOARDING_KEY = '@represent_onboarding_complete';
@@ -43,7 +44,7 @@ const BG_ELEVATED = '#0D0F12';
 const FG = '#F4F5F6';
 const FG_MUTED = '#A0A4A8';
 const FG_FAINT = '#6B6F73';
-const SERIF_FONT = Platform.OS === 'ios' ? 'Georgia' : 'serif';
+const SERIF_FONT = FONTS.serif;
 
 interface Slide {
   id: string;
@@ -507,10 +508,9 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   logoText: {
-    fontFamily: SERIF_FONT,
+    fontFamily: FONTS.serifMediumItalic,
     fontSize: 18,
-    fontWeight: '600',
-    fontStyle: 'italic',
+    
     color: GOLD,
     marginTop: 8,
     letterSpacing: 0.5,
@@ -528,9 +528,8 @@ const styles = StyleSheet.create({
     backgroundColor: `${FG}10`,
   },
   skipText: {
-    fontFamily: 'System',
+    fontFamily: FONTS.sansMedium,
     fontSize: 15,
-    fontWeight: '500',
     color: FG_MUTED,
   },
   flatList: {
@@ -546,9 +545,8 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   eyebrow: {
-    fontFamily: 'System',
+    fontFamily: FONTS.sansSemiBold,
     fontSize: 11,
-    fontWeight: '600',
     color: GOLD,
     letterSpacing: 2.5,
     textTransform: 'uppercase',
@@ -557,24 +555,21 @@ const styles = StyleSheet.create({
     marginBottom: 40,
   },
   title: {
-    fontFamily: 'System',
+    fontFamily: FONTS.sans,
     fontSize: 38,
-    fontWeight: '300',
     color: FG,
     textAlign: 'center',
     lineHeight: 48,
   },
   titleAccent: {
-    fontFamily: SERIF_FONT,
+    fontFamily: FONTS.serifMediumItalic,
     fontSize: 42,
-    fontWeight: '400',
-    fontStyle: 'italic',
+    
     color: GOLD,
   },
   subtitle: {
-    fontFamily: 'System',
+    fontFamily: FONTS.sans,
     fontSize: 17,
-    fontWeight: '400',
     color: FG_MUTED,
     textAlign: 'center',
     lineHeight: 26,
@@ -612,9 +607,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   primaryButtonText: {
-    fontFamily: 'System',
+    fontFamily: FONTS.sansSemiBold,
     fontSize: 17,
-    fontWeight: '600',
     color: BG,
     letterSpacing: 0.3,
   },
@@ -624,9 +618,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   secondaryButtonText: {
-    fontFamily: 'System',
+    fontFamily: FONTS.sansMedium,
     fontSize: 16,
-    fontWeight: '500',
     color: FG_FAINT,
   },
   footer: {
@@ -634,9 +627,9 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
   },
   footerText: {
-    fontFamily: SERIF_FONT,
+    fontFamily: FONTS.serifMediumItalic,
     fontSize: 12,
-    fontStyle: 'italic',
+    
     color: FG_FAINT,
     letterSpacing: 0.5,
   },

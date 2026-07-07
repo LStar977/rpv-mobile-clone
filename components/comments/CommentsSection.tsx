@@ -13,7 +13,7 @@ import * as Haptics from 'expo-haptics';
 import { commentsApi, type ProposalComment } from '../../lib/api';
 import { useAuthStore } from '../../lib/auth';
 import { useModerationStore } from '../../lib/moderation';
-import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY } from '../../lib/theme';
+import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, FONTS } from '../../lib/theme';
 
 const MAX_LEN = 500;
 
@@ -201,7 +201,7 @@ export function CommentsSection({ proposalId }: { proposalId: number | string })
 const styles = StyleSheet.create({
   wrap: { marginTop: SPACING.xl },
   header: { flexDirection: 'row', alignItems: 'center', marginBottom: SPACING.md },
-  title: { ...TYPOGRAPHY.headlineSmall, fontFamily: 'Georgia', fontWeight: '500' },
+  title: { ...TYPOGRAPHY.headlineSmall, fontFamily: FONTS.serif },
   composer: {
     flexDirection: 'row',
     alignItems: 'flex-end',
@@ -226,12 +226,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: 3,
   },
-  counter: { ...TYPOGRAPHY.labelSmall, marginTop: 4, textAlign: 'right' },
+  counter: { ...TYPOGRAPHY.labelSmall, fontFamily: FONTS.mono, fontVariant: ['tabular-nums'], marginTop: 4, textAlign: 'right' },
   empty: { ...TYPOGRAPHY.bodyMedium, textAlign: 'center', marginVertical: SPACING.xl },
   comment: { paddingVertical: SPACING.md, borderBottomWidth: 1 },
   commentHeader: { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 4 },
-  author: { ...TYPOGRAPHY.labelMedium, fontWeight: '600', maxWidth: '60%' },
-  time: { ...TYPOGRAPHY.labelSmall, marginLeft: 'auto' },
+  author: { ...TYPOGRAPHY.labelMedium, maxWidth: '60%' },
+  time: { ...TYPOGRAPHY.labelSmall, fontFamily: FONTS.mono, fontVariant: ['tabular-nums'], marginLeft: 'auto' },
   body: { ...TYPOGRAPHY.bodyMedium, lineHeight: 21 },
 });
 

@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import Animated, { LinearTransition, FadeIn, FadeOut } from 'react-native-reanimated';
-import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY } from '../../lib/theme';
+import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, FONTS } from '../../lib/theme';
 
 interface RCVBallotInputProps {
   options: string[];
@@ -153,7 +153,6 @@ const styles = StyleSheet.create({
   },
   label: {
     ...TYPOGRAPHY.labelSmall,
-    fontWeight: '700',
     letterSpacing: 1.5,
     marginBottom: SPACING.sm,
   },
@@ -177,14 +176,15 @@ const styles = StyleSheet.create({
   },
   rankBadgeText: {
     ...TYPOGRAPHY.labelSmall,
-    fontWeight: '800',
+    fontFamily: FONTS.monoSemiBold,
+    fontVariant: ['tabular-nums'],
     color: '#000',
     fontSize: 13,
   },
   rankedOption: {
     ...TYPOGRAPHY.bodyMedium,
     flex: 1,
-    fontWeight: '500',
+    fontFamily: FONTS.sansMedium,
   },
   removeButton: {
     width: 28,
@@ -215,7 +215,6 @@ const styles = StyleSheet.create({
   },
   submitButtonText: {
     ...TYPOGRAPHY.labelLarge,
-    fontWeight: '700',
     color: '#000',
   },
 });

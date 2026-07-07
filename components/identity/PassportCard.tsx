@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import Animated, { FadeInUp } from 'react-native-reanimated';
 import Svg, { Circle, Path, Rect, Defs, Pattern } from 'react-native-svg';
 
-import { useTheme } from '../../lib/theme';
+import { useTheme, FONTS } from '../../lib/theme';
 import { Button } from '../ui';
 import { useTutorialTarget } from '../tutorial';
 
@@ -218,8 +218,8 @@ const styles = StyleSheet.create({
     borderBottomColor: ID_STATIC.LINE,
   },
   passportLogo: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  passportBrand: { fontWeight: '600', fontSize: 10, letterSpacing: 2.8, color: ID_STATIC.G },
-  passportEst: { fontFamily: ID_STATIC.MONO, fontSize: 9, color: ID_STATIC.FG_FAINT, letterSpacing: 1 },
+  passportBrand: { fontFamily: FONTS.sansSemiBold, fontSize: 10, letterSpacing: 2.8, color: ID_STATIC.G },
+  passportEst: { fontFamily: FONTS.monoRegular, fontVariant: ['tabular-nums'], fontSize: 9, color: ID_STATIC.FG_FAINT, letterSpacing: 1 },
   passportMain: { flexDirection: 'row', alignItems: 'flex-start', padding: 20, gap: 16 },
   portraitFrame: {
     width: 88,
@@ -232,7 +232,7 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   cornerTick: { position: 'absolute', width: 8, height: 8, borderTopWidth: 1.5, borderLeftWidth: 1.5, borderColor: ID_STATIC.G },
-  initialsText: { fontFamily: ID_STATIC.SERIF, fontSize: 42, fontWeight: '500', fontStyle: 'italic', color: ID_STATIC.GL, letterSpacing: -0.8 },
+  initialsText: { fontFamily: FONTS.serifMediumItalic, fontSize: 42, color: ID_STATIC.GL, letterSpacing: -0.8 },
   biometricTick: {
     position: 'absolute',
     bottom: -8,
@@ -247,16 +247,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   passportInfo: { flex: 1, paddingTop: 4 },
-  registeredLabel: { fontWeight: '600', fontSize: 9, letterSpacing: 2.2, textTransform: 'uppercase', color: ID_STATIC.FG_FAINT, marginBottom: 4 },
-  passportName: { fontFamily: ID_STATIC.SERIF, fontSize: 24, fontWeight: '500', letterSpacing: -0.4, color: ID_STATIC.FG, lineHeight: 26, marginBottom: 8 },
+  registeredLabel: { fontFamily: FONTS.sansSemiBold, fontSize: 9, letterSpacing: 2.2, textTransform: 'uppercase', color: ID_STATIC.FG_FAINT, marginBottom: 4 },
+  passportName: { fontFamily: FONTS.serif, fontSize: 24, letterSpacing: -0.4, color: ID_STATIC.FG, lineHeight: 26, marginBottom: 8 },
   locationRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  locationText: { fontSize: 11.5, color: ID_STATIC.FG_MUTED, letterSpacing: -0.05 },
+  locationText: { fontFamily: FONTS.sans, fontSize: 11.5, color: ID_STATIC.FG_MUTED, letterSpacing: -0.05 },
   registerStrip: { flexDirection: 'row', borderTopWidth: 1, borderTopColor: ID_STATIC.LINE },
   registerCell: { flex: 1, padding: 12, paddingHorizontal: 14 },
   registerCellMid: { borderLeftWidth: 1, borderRightWidth: 1, borderColor: ID_STATIC.LINE },
-  registerLabel: { fontWeight: '600', fontSize: 9, letterSpacing: 2, textTransform: 'uppercase', color: ID_STATIC.FG_FAINT, marginBottom: 4 },
-  registerValue: { fontFamily: ID_STATIC.SERIF, fontSize: 14, fontWeight: '500', fontStyle: 'italic', color: ID_STATIC.FG },
-  registerMono: { fontFamily: ID_STATIC.MONO, fontSize: 11, fontWeight: '500', color: ID_STATIC.FG, letterSpacing: 0.4 },
+  registerLabel: { fontFamily: FONTS.sansSemiBold, fontSize: 9, letterSpacing: 2, textTransform: 'uppercase', color: ID_STATIC.FG_FAINT, marginBottom: 4 },
+  registerValue: { fontFamily: FONTS.serifMediumItalic, fontSize: 14, color: ID_STATIC.FG },
+  registerMono: { fontFamily: FONTS.mono, fontVariant: ['tabular-nums'], fontSize: 11, color: ID_STATIC.FG, letterSpacing: 0.4 },
 
   verifyCta: {
     borderRadius: 18,
@@ -269,6 +269,6 @@ const styles = StyleSheet.create({
   verifyCtaContent: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16 },
   verifyCtaIcon: { width: 48, height: 48, borderRadius: 24, justifyContent: 'center', alignItems: 'center' },
   verifyCtaText: { flex: 1 },
-  verifyCtaTitle: { fontSize: 15, fontWeight: '600', marginBottom: 2 },
-  verifyCtaSubtitle: { fontSize: 13 },
+  verifyCtaTitle: { fontFamily: FONTS.sansSemiBold, fontSize: 15, marginBottom: 2 },
+  verifyCtaSubtitle: { fontFamily: FONTS.sans, fontSize: 13 },
 });

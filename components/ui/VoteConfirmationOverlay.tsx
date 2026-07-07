@@ -43,7 +43,7 @@ export function VoteConfirmationOverlay({
   const ringOpacity = useSharedValue(0);
 
   const isSupport = voteType === 'support';
-  const iconColor = isSupport ? colors.success : colors.error;
+  const iconColor = isSupport ? colors.support : colors.oppose;
   const iconName = isSupport ? 'checkmark-circle' : 'close-circle';
   const voteText = isSupport ? 'Vote Supported' : 'Vote Opposed';
 
@@ -152,7 +152,7 @@ export function VoteConfirmationOverlay({
 
         {/* Text */}
         <Animated.View style={[styles.textContainer, textStyle]}>
-          <Text style={[styles.title, { color: colors.text }]}>
+          <Text style={[styles.title, { color: colors.gold }]}>
             {voteText}
           </Text>
           <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
@@ -223,7 +223,6 @@ const styles = StyleSheet.create({
   },
   title: {
     ...TYPOGRAPHY.headlineLarge,
-    fontWeight: '700',
     marginBottom: SPACING.xs,
   },
   subtitle: {
@@ -241,7 +240,6 @@ const styles = StyleSheet.create({
   },
   shareText: {
     ...TYPOGRAPHY.labelMedium,
-    fontWeight: '600',
   },
 });
 

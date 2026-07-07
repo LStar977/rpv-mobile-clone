@@ -99,7 +99,6 @@ const styles = StyleSheet.create({
   ctaText: {
     ...TYPOGRAPHY.labelLarge,
     color: '#000',
-    fontWeight: '600',
   },
 });
 

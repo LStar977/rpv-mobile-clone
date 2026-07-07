@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, Linking, Platform } from 'react-native';
-import { useTheme, SPACING, TYPOGRAPHY } from '../../lib/theme';
+import { useTheme, SPACING, TYPOGRAPHY, FONTS } from '../../lib/theme';
 
 /**
  * Apple Guideline 3.1.2(c) disclosure block. Required on any screen where a
@@ -97,10 +97,10 @@ const styles = StyleSheet.create({
   wrap: { gap: SPACING.md, marginTop: SPACING.lg },
   summary: { borderWidth: 1, borderRadius: 12, padding: SPACING.md, gap: 8 },
   row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  k: { ...TYPOGRAPHY.bodySmall, fontWeight: '500' },
-  v: { ...TYPOGRAPHY.bodyMedium, fontWeight: '600' },
+  k: { ...TYPOGRAPHY.bodySmall,},
+  v: { ...TYPOGRAPHY.bodyMedium,},
   body: { ...TYPOGRAPHY.bodySmall, lineHeight: 18, textAlign: 'left' },
-  link: { fontWeight: '600', textDecorationLine: 'underline' },
+  link: { fontFamily: FONTS.sansSemiBold, textDecorationLine: 'underline' },
 });
 
 export default SubscriptionLegal;

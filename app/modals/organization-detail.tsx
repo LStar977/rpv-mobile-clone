@@ -11,6 +11,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuthStore } from '../../lib/auth';
 import { organizationsApi, Organization, OrganizationProposal } from '../../lib/api';
 import { UpgradeModal } from '../../components/ui/UpgradeModal';
+import { FONTS } from '../../lib/theme';
 
 // ─── design tokens (matches PassportCard / Groups dossier) ────────────
 const O_GOLD = '#EABA58';
@@ -27,8 +28,8 @@ const O_FG_FAINT = '#8E9297';
 const O_GREEN = '#34C759';
 const O_RED = '#FF6B5B';
 
-const SERIF = 'Georgia';
-const MONO = 'JetBrainsMono-Regular';
+const SERIF = FONTS.serif;
+const MONO = FONTS.mono;
 
 const CATEGORIES = ['Transportation', 'Environment', 'Housing', 'Education', 'Healthcare', 'Economy', 'Public Safety', 'Infrastructure', 'Other'];
 const ORG_TYPES: Array<{ value: string; label: string }> = [
@@ -121,7 +122,7 @@ function CornerTicks({ color = O_GOLD, size = 8, weight = 1.2 }: { color?: strin
 
 function Eyebrow({ children, color = O_FG_FAINT, size = 9.5, ls = 2, style }: { children: React.ReactNode; color?: string; size?: number; ls?: number; style?: any }) {
   return (
-    <Text style={[{ fontSize: size, fontWeight: '600', letterSpacing: ls, textTransform: 'uppercase', color }, style]}>{children}</Text>
+    <Text style={[{ fontSize: size, fontFamily: FONTS.sansSemiBold, letterSpacing: ls, textTransform: 'uppercase', color }, style]}>{children}</Text>
   );
 }
 
@@ -161,7 +162,7 @@ function TierSeal({ tier, size = 36 }: { tier: Organization['tier']; size?: numb
           />
         );
       })}
-      <SvgText x="18" y="22" textAnchor="middle" fontFamily={SERIF} fontSize="11" fontStyle="italic" fontWeight="500" fill={glyph}>
+      <SvgText x="18" y="22" textAnchor="middle" fontFamily={FONTS.serifMediumItalic} fontSize="11" fill={glyph}>
         {isCommunity ? 'I' : 'II'}
       </SvgText>
     </Svg>
@@ -187,7 +188,7 @@ function OrgPortrait({ name, logoUrl, size = 72 }: { name: string; logoUrl?: str
       alignItems: 'center', justifyContent: 'center', flexShrink: 0,
     }}>
       <Text style={{
-        fontFamily: SERIF, fontSize: size * 0.46, fontWeight: '500', fontStyle: 'italic',
+        fontFamily: FONTS.serifMediumItalic, fontSize: size * 0.46, 
         color: O_GOLD_L, letterSpacing: -0.5,
       }}>{monogramFromName(name)}</Text>
     </View>
@@ -214,7 +215,7 @@ function Pill({ kind, children }: { kind: PillKind; children: React.ReactNode })
     }}>
       <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: m.dot }} />
       <Text style={{
-        fontSize: 8.5, fontWeight: '600', letterSpacing: 1.6,
+        fontSize: 8.5, fontFamily: FONTS.sansSemiBold, letterSpacing: 1.6,
         textTransform: 'uppercase', color: m.color,
       }}>{children}</Text>
     </View>
@@ -282,7 +283,7 @@ function Hero({ org, proposalCount, actualMemberCount }: { org: Organization; pr
               numberOfLines={1}
               style={{
                 flex: 1,
-                fontFamily: SERIF, fontSize: 18, fontWeight: '500',
+                fontFamily: SERIF, fontSize: 18,
                 color: O_FG, lineHeight: 22, letterSpacing: -0.2,
               }}
             >{org.name}</Text>
@@ -293,7 +294,7 @@ function Hero({ org, proposalCount, actualMemberCount }: { org: Organization; pr
             {isAdmin && (
               <Text>
                 <Text style={{ color: O_FG_FAINT }}>  ·  </Text>
-                <Text style={{ color: O_GOLD_L, fontWeight: '500' }}>Admin</Text>
+                <Text style={{ color: O_GOLD_L, fontFamily: FONTS.sansMedium}}>Admin</Text>
               </Text>
             )}
           </Text>
@@ -333,7 +334,7 @@ function SectionTabs({ active, onChange, isAdmin, hasSubOrgs }: { active: TabTyp
               }}
             >
               <Text style={{
-                fontSize: 11, fontWeight: '600', letterSpacing: 2.2,
+                fontSize: 11, fontFamily: FONTS.sansSemiBold, letterSpacing: 2.2,
                 textTransform: 'uppercase',
                 color: isActive ? O_GOLD : O_FG_FAINT,
               }}>{t.label}</Text>
@@ -402,7 +403,7 @@ function FilterChip({ children, active, onPress }: { children: React.ReactNode; 
       borderRadius: 999, marginRight: 6,
     }}>
       <Text style={{
-        fontSize: 12, fontWeight: '500',
+        fontSize: 12, fontFamily: FONTS.sansMedium,
         color: active ? O_GOLD : O_FG_MUTED,
       }}>{children}</Text>
     </TouchableOpacity>
@@ -425,7 +426,7 @@ function ProposalsEmpty() {
         }}>
           <Ionicons name="document-text-outline" size={24} color={O_GOLD_L} />
         </View>
-        <Text style={{ fontFamily: SERIF, fontSize: 19, fontWeight: '500', color: O_FG, letterSpacing: -0.1, marginBottom: 6 }}>
+        <Text style={{ fontFamily: SERIF, fontSize: 19, color: O_FG, letterSpacing: -0.1, marginBottom: 6 }}>
           No proposals yet
         </Text>
         <Text style={{ fontSize: 13, color: O_FG_MUTED, lineHeight: 18, textAlign: 'center', maxWidth: 260 }}>
@@ -447,20 +448,18 @@ function SettingsRow({ label, value, mono, gold, onPress, action }: {
       flexDirection: 'row', alignItems: 'center', gap: 10,
     }}>
       <View style={{ flex: 1, minWidth: 0 }}>
-        <Text style={{ fontSize: 8.5, fontWeight: '600', letterSpacing: 2, textTransform: 'uppercase', color: O_FG_FAINT, marginBottom: 3 }}>
+        <Text style={{ fontSize: 8.5, fontFamily: FONTS.sansSemiBold, letterSpacing: 2, textTransform: 'uppercase', color: O_FG_FAINT, marginBottom: 3 }}>
           {label}
         </Text>
         <Text numberOfLines={1} style={{
-          fontFamily: mono ? MONO : SERIF,
+          fontFamily: mono ? MONO : FONTS.serifMediumItalic,
           fontSize: mono ? 12 : 14,
-          fontStyle: mono ? 'normal' : 'italic',
-          fontWeight: '500',
           color: gold ? O_GOLD : O_FG,
           letterSpacing: mono ? 0.5 : -0.05,
         }}>{value}</Text>
       </View>
       {action && (
-        <Text style={{ fontSize: 9, fontWeight: '600', letterSpacing: 1.6, textTransform: 'uppercase', color: O_FG_FAINT }}>
+        <Text style={{ fontSize: 9, fontFamily: FONTS.sansSemiBold, letterSpacing: 1.6, textTransform: 'uppercase', color: O_FG_FAINT }}>
           {action}
         </Text>
       )}
@@ -526,14 +525,14 @@ function VerificationSettingsCard({ org, onUpgradePrompt, onOrgUpdated }: {
   return (
     <View style={{ backgroundColor: O_BG_CARD, borderWidth: 1, borderColor: O_LINE, borderRadius: 12, overflow: 'hidden', marginBottom: 14 }}>
       <View style={{ paddingHorizontal: 14, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: O_LINE, backgroundColor: O_BG_RAISED }}>
-        <Text style={{ fontSize: 11, color: O_FG_MUTED, letterSpacing: -0.05, fontWeight: '600' }}>Verification</Text>
+        <Text style={{ fontSize: 11, color: O_FG_MUTED, letterSpacing: -0.05, fontFamily: FONTS.sansSemiBold}}>Verification</Text>
       </View>
       <View style={{
         paddingHorizontal: 14, paddingVertical: 13,
         flexDirection: 'row', alignItems: 'center', gap: 12,
       }}>
         <View style={{ flex: 1, minWidth: 0 }}>
-          <Text style={{ fontSize: 8.5, fontWeight: '600', letterSpacing: 2, textTransform: 'uppercase', color: O_FG_FAINT, marginBottom: 3 }}>
+          <Text style={{ fontSize: 8.5, fontFamily: FONTS.sansSemiBold, letterSpacing: 2, textTransform: 'uppercase', color: O_FG_FAINT, marginBottom: 3 }}>
             Require verification
           </Text>
           <Text style={{ fontSize: 13, color: O_FG, lineHeight: 18 }}>
@@ -598,7 +597,7 @@ function SettingsSection({
       }}>
         <View style={{ paddingHorizontal: 16, paddingTop: 14, paddingBottom: 16 }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 10 }}>
-            <Text style={{ fontSize: 11, color: O_GOLD, letterSpacing: -0.05, fontWeight: '500' }}>Active invite code</Text>
+            <Text style={{ fontSize: 11, color: O_GOLD, letterSpacing: -0.05, fontFamily: FONTS.sansMedium}}>Active invite code</Text>
             {expRoman && (
               <Text style={{ fontSize: 11, color: O_FG_FAINT, letterSpacing: -0.05 }}>Expires {expRoman}</Text>
             )}
@@ -609,7 +608,7 @@ function SettingsSection({
             alignItems: 'center',
           }}>
             <Text style={{
-              fontFamily: MONO, fontSize: 22, fontWeight: '500',
+              fontFamily: MONO, fontSize: 22,
               color: O_GOLD_L, letterSpacing: 4, textAlign: 'center',
             }}>{codeText.replace(/(.{4})/g, '$1·').replace(/·$/, '')}</Text>
           </View>
@@ -625,7 +624,7 @@ function SettingsSection({
               flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
             }}>
               <Ionicons name="checkmark" size={11} color={O_GOLD} />
-              <Text style={{ fontSize: 13, fontWeight: '600', color: O_GOLD }}>Copy</Text>
+              <Text style={{ fontSize: 13, fontFamily: FONTS.sansSemiBold, color: O_GOLD }}>Copy</Text>
             </TouchableOpacity>
             <TouchableOpacity activeOpacity={0.75} onPress={onGenerate} disabled={generating} style={{
               flex: 1, paddingVertical: 10,
@@ -636,7 +635,7 @@ function SettingsSection({
             }}>
               {generating
                 ? <ActivityIndicator size="small" color={O_FG_MUTED} />
-                : <Text style={{ fontSize: 13, fontWeight: '600', color: O_FG_MUTED }}>New code</Text>
+                : <Text style={{ fontSize: 13, fontFamily: FONTS.sansSemiBold, color: O_FG_MUTED }}>New code</Text>
               }
             </TouchableOpacity>
           </View>
@@ -653,7 +652,7 @@ function SettingsSection({
       {/* Organization details */}
       <View style={{ backgroundColor: O_BG_CARD, borderWidth: 1, borderColor: O_LINE, borderRadius: 12, overflow: 'hidden', marginBottom: 14 }}>
         <View style={{ paddingHorizontal: 14, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: O_LINE, backgroundColor: O_BG_RAISED }}>
-          <Text style={{ fontSize: 11, color: O_FG_MUTED, letterSpacing: -0.05, fontWeight: '600' }}>Organization details</Text>
+          <Text style={{ fontSize: 11, color: O_FG_MUTED, letterSpacing: -0.05, fontFamily: FONTS.sansSemiBold}}>Organization details</Text>
         </View>
         <SettingsRow label="Name" value={org.name} />
         <SettingsRow label="Description" value={org.description || '—'} />
@@ -678,7 +677,7 @@ function SettingsSection({
       {/* Members & roles */}
       <View style={{ backgroundColor: O_BG_CARD, borderWidth: 1, borderColor: O_LINE, borderRadius: 12, overflow: 'hidden', marginBottom: 14 }}>
         <View style={{ paddingHorizontal: 14, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: O_LINE, backgroundColor: O_BG_RAISED }}>
-          <Text style={{ fontSize: 11, color: O_FG_MUTED, letterSpacing: -0.05, fontWeight: '600' }}>Members & roles</Text>
+          <Text style={{ fontSize: 11, color: O_FG_MUTED, letterSpacing: -0.05, fontFamily: FONTS.sansSemiBold}}>Members & roles</Text>
         </View>
         <SettingsRow label="Total members" value={Math.max(org.memberCount ?? 0, actualMemberCount).toLocaleString()} mono />
         <SettingsRow label="Active invite codes" value={`${inviteCodes.filter((c) => !c.revokedAt).length}`} mono />
@@ -696,7 +695,7 @@ function SettingsSection({
       {org.role === 'admin' && (
         <View style={{ backgroundColor: O_BG_CARD, borderWidth: 1, borderColor: O_LINE, borderRadius: 12, overflow: 'hidden', marginBottom: 14 }}>
           <View style={{ paddingHorizontal: 14, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: O_LINE, backgroundColor: O_BG_RAISED }}>
-            <Text style={{ fontSize: 11, color: O_FG_MUTED, letterSpacing: -0.05, fontWeight: '600' }}>Reports & exports</Text>
+            <Text style={{ fontSize: 11, color: O_FG_MUTED, letterSpacing: -0.05, fontFamily: FONTS.sansSemiBold}}>Reports & exports</Text>
           </View>
           <SettingsRow
             label="Audit log"
@@ -712,7 +711,7 @@ function SettingsSection({
       {/* Manage */}
       <View style={{ backgroundColor: O_BG_CARD, borderWidth: 1, borderColor: O_LINE, borderRadius: 12, overflow: 'hidden', marginBottom: 14 }}>
         <View style={{ paddingHorizontal: 14, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: O_LINE, backgroundColor: O_BG_RAISED }}>
-          <Text style={{ fontSize: 11, color: O_RED, letterSpacing: -0.05, fontWeight: '600' }}>Manage</Text>
+          <Text style={{ fontSize: 11, color: O_RED, letterSpacing: -0.05, fontFamily: FONTS.sansSemiBold}}>Manage</Text>
         </View>
         <SettingsRow label="Leave" value="Leave this organization" onPress={onLeave} />
         {canDelete && (
@@ -767,7 +766,7 @@ function InsightsSection({ insights, subOrgs, loading, sealedAt }: { insights: O
   if (!insights) {
     return (
       <View style={{ paddingHorizontal: 14, paddingVertical: 24, alignItems: 'center' }}>
-        <Text style={{ fontFamily: SERIF, fontSize: 14, fontStyle: 'italic', color: O_FG_MUTED }}>
+        <Text style={{ fontFamily: FONTS.serifMediumItalic, fontSize: 14,  color: O_FG_MUTED }}>
           No data yet
         </Text>
       </View>
@@ -815,7 +814,7 @@ function InsightsSection({ insights, subOrgs, loading, sealedAt }: { insights: O
         <LinearGradient colors={['rgba(234,186,88,0.04)', 'transparent']} style={StyleSheet.absoluteFill} start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }} />
         <View>
           <Text style={{ fontSize: 11, color: O_GOLD, letterSpacing: -0.05, marginBottom: 2 }}>This quarter</Text>
-          <Text style={{ fontFamily: SERIF, fontSize: 14, fontStyle: 'italic', fontWeight: '500', color: O_FG }}>
+          <Text style={{ fontFamily: FONTS.serifMediumItalic, fontSize: 14, color: O_FG }}>
             {quarter} {new Date().getFullYear()}
           </Text>
         </View>
@@ -836,7 +835,7 @@ function InsightsSection({ insights, subOrgs, loading, sealedAt }: { insights: O
             Last {insights.periodDays} days
           </Text>
         </View>
-        <Text style={{ fontFamily: SERIF, fontSize: 36, fontStyle: 'italic', fontWeight: '500', color: O_FG, letterSpacing: -1, lineHeight: 36, marginBottom: 4 }}>
+        <Text style={{ fontFamily: FONTS.serifMediumItalic, fontSize: 36, color: O_FG, letterSpacing: -1, lineHeight: 36, marginBottom: 4 }}>
           {totalVotes.toLocaleString()}
         </Text>
         <Text style={{ fontSize: 11, color: O_FG_FAINT, letterSpacing: -0.05, marginBottom: 12 }}>
@@ -867,7 +866,7 @@ function InsightsSection({ insights, subOrgs, loading, sealedAt }: { insights: O
           borderRadius: 10, padding: 12,
         }}>
           <Text style={{ fontSize: 11, color: O_FG_MUTED, letterSpacing: -0.05 }}>Participation</Text>
-          <Text style={{ fontFamily: SERIF, fontSize: 26, fontStyle: 'italic', fontWeight: '500', color: O_FG, letterSpacing: -0.5, lineHeight: 26, marginTop: 6 }}>
+          <Text style={{ fontFamily: FONTS.serifMediumItalic, fontSize: 26, color: O_FG, letterSpacing: -0.5, lineHeight: 26, marginTop: 6 }}>
             {participationDisplay.split('.')[0]}
             <Text style={{ fontSize: 16, color: O_FG_FAINT }}>.{participationDisplay.split('.')[1] || '0'}%</Text>
           </Text>
@@ -893,7 +892,7 @@ function InsightsSection({ insights, subOrgs, loading, sealedAt }: { insights: O
           borderRadius: 10, padding: 12,
         }}>
           <Text style={{ fontSize: 11, color: O_FG_MUTED, letterSpacing: -0.05 }}>Quorum</Text>
-          <Text style={{ fontFamily: SERIF, fontSize: 26, fontStyle: 'italic', fontWeight: '500', color: quorumMet ? O_GREEN : O_FG_MUTED, letterSpacing: -0.5, lineHeight: 26, marginTop: 6 }}>
+          <Text style={{ fontFamily: FONTS.serifMediumItalic, fontSize: 26, color: quorumMet ? O_GREEN : O_FG_MUTED, letterSpacing: -0.5, lineHeight: 26, marginTop: 6 }}>
             {quorumMet ? 'Met' : 'Below'}
           </Text>
           <Text style={{ fontSize: 11, color: O_FG_MUTED, letterSpacing: -0.05, marginTop: 4 }}>
@@ -936,7 +935,7 @@ function InsightsSection({ insights, subOrgs, loading, sealedAt }: { insights: O
               paddingVertical: 6,
               borderBottomWidth: i < wardData.length - 1 ? 1 : 0, borderBottomColor: O_LINE,
             }}>
-              <Text numberOfLines={1} style={{ flex: 1, fontFamily: SERIF, fontSize: 11.5, fontStyle: 'italic', color: O_FG, letterSpacing: -0.05 }}>
+              <Text numberOfLines={1} style={{ flex: 1, fontFamily: FONTS.serifMediumItalic, fontSize: 11.5,  color: O_FG, letterSpacing: -0.05 }}>
                 {r.ward}
               </Text>
               <View style={{ width: 60, height: 3, backgroundColor: O_LINE_STRONG, position: 'relative', overflow: 'hidden' }}>
@@ -1001,13 +1000,13 @@ function SubOrdersSection({ subOrgs, totalMembers, onPress, onLongPress, isAdmin
                 backgroundColor: O_BG_RAISED,
                 alignItems: 'center', justifyContent: 'center',
               }}>
-                <Text style={{ fontFamily: SERIF, fontSize: 16, fontStyle: 'italic', color: O_GOLD_L, letterSpacing: -0.5 }}>
+                <Text style={{ fontFamily: FONTS.serifMediumItalic, fontSize: 16,  color: O_GOLD_L, letterSpacing: -0.5 }}>
                   {monogram}
                 </Text>
               </View>
               <View style={{ flex: 1, minWidth: 0 }}>
                 <Text numberOfLines={1} style={{
-                  fontFamily: SERIF, fontSize: 14, fontWeight: '500',
+                  fontFamily: SERIF, fontSize: 14,
                   color: O_FG, letterSpacing: -0.05, lineHeight: 16, marginBottom: 3,
                 }}>{c.name || 'Untitled sub-org'}</Text>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
@@ -1108,7 +1107,7 @@ function MembersSection({ members, totalCount, search, onSearch, isAdmin, onMemb
 
       {!showList ? (
         <View style={{ paddingHorizontal: 14, paddingVertical: 24, alignItems: 'center' }}>
-          <Text style={{ fontFamily: SERIF, fontSize: 15, fontStyle: 'italic', color: O_FG_MUTED, textAlign: 'center', marginBottom: 6 }}>
+          <Text style={{ fontFamily: FONTS.serifMediumItalic, fontSize: 15,  color: O_FG_MUTED, textAlign: 'center', marginBottom: 6 }}>
             No members yet
           </Text>
           <Text style={{ fontSize: 12, color: O_FG_FAINT, textAlign: 'center' }}>
@@ -1154,19 +1153,19 @@ function MembersSection({ members, totalCount, search, onSearch, isAdmin, onMemb
                     backgroundColor: O_BG_RAISED,
                     alignItems: 'center', justifyContent: 'center',
                   }}>
-                    <Text style={{ fontFamily: SERIF, fontSize: 13, fontStyle: 'italic', color: isAdminRow ? O_GOLD_L : O_FG_MUTED }}>
+                    <Text style={{ fontFamily: FONTS.serifMediumItalic, fontSize: 13,  color: isAdminRow ? O_GOLD_L : O_FG_MUTED }}>
                       {monogram}
                     </Text>
                   </View>
                   <View style={{ flex: 1, minWidth: 0 }}>
-                    <Text numberOfLines={1} style={{ fontSize: 14, fontWeight: '500', color: O_FG, letterSpacing: -0.05, lineHeight: 18 }}>
+                    <Text numberOfLines={1} style={{ fontSize: 14, fontFamily: FONTS.sansMedium, color: O_FG, letterSpacing: -0.05, lineHeight: 18 }}>
                       {fullName}
                     </Text>
                     <Text style={{ fontSize: 11, color: O_FG_FAINT, letterSpacing: -0.05, marginTop: 2 }}>
                       Joined {joined}
                     </Text>
                   </View>
-                  <Text style={{ fontSize: 12, fontWeight: '500', color: roleColor }}>
+                  <Text style={{ fontSize: 12, fontFamily: FONTS.sansMedium, color: roleColor }}>
                     {isAdminRow ? 'Admin' : 'Member'}
                   </Text>
                 </TouchableOpacity>
@@ -1196,7 +1195,7 @@ function AnnouncementsEmpty() {
         }}>
           <Ionicons name="megaphone-outline" size={24} color={O_GOLD_L} />
         </View>
-        <Text style={{ fontFamily: SERIF, fontSize: 18, fontWeight: '500', color: O_FG, letterSpacing: -0.1, marginBottom: 6 }}>
+        <Text style={{ fontFamily: SERIF, fontSize: 18, color: O_FG, letterSpacing: -0.1, marginBottom: 6 }}>
           No announcements yet
         </Text>
         <Text style={{ fontSize: 13, color: O_FG_MUTED, textAlign: 'center', maxWidth: 240, lineHeight: 18 }}>
@@ -1247,7 +1246,7 @@ function AnnouncementsSection({ announcements, isAdmin, onDelete }: { announceme
               )}
             </View>
             <Text style={{
-              fontFamily: SERIF, fontSize: 16, fontWeight: '500',
+              fontFamily: SERIF, fontSize: 16,
               color: O_FG, letterSpacing: -0.1, lineHeight: 20, marginBottom: 6,
             }}>{headline}</Text>
             {!!body && (
@@ -1311,7 +1310,7 @@ function ProposalsSection({ proposals, onPress }: { proposals: OrganizationPropo
                   {/* header: category + time */}
                   <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 10 }}>
                     <View style={{ paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, backgroundColor: 'rgba(234,186,88,0.15)' }}>
-                      <Text style={{ fontSize: 11, fontWeight: '600', color: O_GOLD, letterSpacing: 0.2 }}>
+                      <Text style={{ fontSize: 11, fontFamily: FONTS.sansSemiBold, color: O_GOLD, letterSpacing: 0.2 }}>
                         {p.category || 'General'}
                       </Text>
                     </View>
@@ -1322,7 +1321,7 @@ function ProposalsSection({ proposals, onPress }: { proposals: OrganizationPropo
                         backgroundColor: timeBg,
                       }}>
                         <Ionicons name="time-outline" size={11} color={timeColor} />
-                        <Text style={{ fontSize: 11, fontWeight: '500', color: timeColor }}>
+                        <Text style={{ fontSize: 11, fontFamily: FONTS.sansMedium, color: timeColor }}>
                           {timeText}
                         </Text>
                       </View>
@@ -1331,7 +1330,7 @@ function ProposalsSection({ proposals, onPress }: { proposals: OrganizationPropo
 
                   {/* title + description */}
                   <Text numberOfLines={2} style={{
-                    fontFamily: SERIF, fontSize: 17, fontWeight: '500',
+                    fontFamily: SERIF, fontSize: 17,
                     color: O_FG, letterSpacing: -0.2, lineHeight: 22, marginBottom: 6,
                   }}>
                     {p.title}
@@ -1425,7 +1424,7 @@ function InviteCodeModal({ visible, onClose, onConfirm, generating }: { visible:
             <Circle cx={7} cy={7} r={6.4} fill="none" stroke={O_GOLD} strokeWidth={0.5} />
             <Path d="M7 3v8M3 7h8" stroke={O_GOLD} strokeWidth={0.6} fill="none" />
           </Svg>
-          <Text style={{ fontSize: 12, color: O_GOLD, letterSpacing: -0.05, fontWeight: '600' }}>New invite code</Text>
+          <Text style={{ fontSize: 12, color: O_GOLD, letterSpacing: -0.05, fontFamily: FONTS.sansSemiBold}}>New invite code</Text>
         </View>
         <Text style={{ fontSize: 13, color: O_FG_MUTED, lineHeight: 19, marginBottom: 16, maxWidth: 320 }}>
           Anyone with this code can join your organization.
@@ -1440,14 +1439,14 @@ function InviteCodeModal({ visible, onClose, onConfirm, generating }: { visible:
             Your new code
           </Text>
           <Text style={{
-            fontFamily: MONO, fontSize: 18, fontWeight: '500',
+            fontFamily: MONO, fontSize: 18,
             color: O_GOLD_L, letterSpacing: 3,
           }}>
             {generating ? 'Generating…' : 'Tap to create'}
           </Text>
         </View>
 
-        <Text style={{ fontSize: 11, color: O_FG_MUTED, letterSpacing: -0.05, fontWeight: '600', marginBottom: 8 }}>Expires after</Text>
+        <Text style={{ fontSize: 11, color: O_FG_MUTED, letterSpacing: -0.05, fontFamily: FONTS.sansSemiBold, marginBottom: 8 }}>Expires after</Text>
         <View style={{ flexDirection: 'row', gap: 6, marginBottom: 14 }}>
           {(['24h', '07d', '30d', '90d'] as const).map((p) => (
             <TouchableOpacity
@@ -1461,14 +1460,14 @@ function InviteCodeModal({ visible, onClose, onConfirm, generating }: { visible:
                 borderRadius: 3,
               }}
             >
-              <Text style={{ fontFamily: MONO, fontSize: 11, fontWeight: '500', color: validity === p ? O_GOLD : O_FG_MUTED, letterSpacing: 0.9 }}>
+              <Text style={{ fontFamily: MONO, fontSize: 11, color: validity === p ? O_GOLD : O_FG_MUTED, letterSpacing: 0.9 }}>
                 {p}
               </Text>
             </TouchableOpacity>
           ))}
         </View>
 
-        <Text style={{ fontSize: 11, color: O_FG_MUTED, letterSpacing: -0.05, fontWeight: '600', marginBottom: 8 }}>Single use</Text>
+        <Text style={{ fontSize: 11, color: O_FG_MUTED, letterSpacing: -0.05, fontFamily: FONTS.sansSemiBold, marginBottom: 8 }}>Single use</Text>
         <View style={{
           paddingHorizontal: 12, paddingVertical: 11,
           borderWidth: 1, borderColor: O_LINE_STRONG, borderRadius: 6,
@@ -1490,7 +1489,7 @@ function InviteCodeModal({ visible, onClose, onConfirm, generating }: { visible:
             flex: 1, paddingVertical: 13,
             borderWidth: 1, borderColor: O_LINE_STRONG, borderRadius: 4, alignItems: 'center',
           }}>
-            <Text style={{ fontSize: 10, fontWeight: '600', letterSpacing: 2.2, textTransform: 'uppercase', color: O_FG_MUTED }}>
+            <Text style={{ fontSize: 10, fontFamily: FONTS.sansSemiBold, letterSpacing: 2.2, textTransform: 'uppercase', color: O_FG_MUTED }}>
               Cancel
             </Text>
           </TouchableOpacity>
@@ -1510,7 +1509,7 @@ function InviteCodeModal({ visible, onClose, onConfirm, generating }: { visible:
             {generating ? (
               <ActivityIndicator size="small" color={O_GOLD_L} />
             ) : (
-              <Text style={{ fontSize: 10, fontWeight: '700', letterSpacing: 2.2, textTransform: 'uppercase', color: O_GOLD_L }}>
+              <Text style={{ fontSize: 10, fontFamily: FONTS.sansBold, letterSpacing: 2.2, textTransform: 'uppercase', color: O_GOLD_L }}>
                 Generate code
               </Text>
             )}
@@ -1554,11 +1553,11 @@ function MemberRoleModal({ visible, onClose, member, onConfirm }: { visible: boo
             borderWidth: 1, borderColor: O_GOLD_D, backgroundColor: '#0A0C0F',
             alignItems: 'center', justifyContent: 'center', position: 'relative',
           }}>
-            <Text style={{ fontFamily: SERIF, fontSize: 16, fontStyle: 'italic', color: O_GOLD_L }}>{monogram}</Text>
+            <Text style={{ fontFamily: FONTS.serifMediumItalic, fontSize: 16,  color: O_GOLD_L }}>{monogram}</Text>
           </View>
           <View style={{ flex: 1, minWidth: 0 }}>
             <Text style={{ fontSize: 11, color: O_FG_FAINT, letterSpacing: -0.05 }}>Edit role</Text>
-            <Text style={{ fontFamily: SERIF, fontSize: 16, fontWeight: '500', color: O_FG, fontStyle: 'italic', letterSpacing: -0.05, marginTop: 2 }}>
+            <Text style={{ fontFamily: FONTS.serifMediumItalic, fontSize: 16, color: O_FG,  letterSpacing: -0.05, marginTop: 2 }}>
               {fullName}
             </Text>
             <Text style={{ fontSize: 11, color: O_FG_FAINT, letterSpacing: -0.05, marginTop: 1 }}>
@@ -1567,7 +1566,7 @@ function MemberRoleModal({ visible, onClose, member, onConfirm }: { visible: boo
           </View>
         </View>
 
-        <Text style={{ fontSize: 11, color: O_FG_MUTED, letterSpacing: -0.05, fontWeight: '600', marginBottom: 10 }}>Choose a role</Text>
+        <Text style={{ fontSize: 11, color: O_FG_MUTED, letterSpacing: -0.05, fontFamily: FONTS.sansSemiBold, marginBottom: 10 }}>Choose a role</Text>
         <View style={{ gap: 8, marginBottom: 16 }}>
           {options.map((opt) => {
             const active = selected === opt.role;
@@ -1598,10 +1597,10 @@ function MemberRoleModal({ visible, onClose, member, onConfirm }: { visible: boo
                   )}
                 </View>
                 <View style={{ flex: 1, minWidth: 0 }}>
-                  <Text style={{ fontSize: 9.5, fontWeight: '700', letterSpacing: 2.2, textTransform: 'uppercase', color: active ? O_GOLD : O_FG_MUTED, marginBottom: 3 }}>
+                  <Text style={{ fontSize: 9.5, fontFamily: FONTS.sansBold, letterSpacing: 2.2, textTransform: 'uppercase', color: active ? O_GOLD : O_FG_MUTED, marginBottom: 3 }}>
                     {opt.label}
                   </Text>
-                  <Text style={{ fontFamily: SERIF, fontSize: 12, fontStyle: 'italic', color: O_FG, lineHeight: 16 }}>
+                  <Text style={{ fontFamily: FONTS.serifMediumItalic, fontSize: 12,  color: O_FG, lineHeight: 16 }}>
                     {opt.desc}
                   </Text>
                 </View>
@@ -1615,7 +1614,7 @@ function MemberRoleModal({ visible, onClose, member, onConfirm }: { visible: boo
             flex: 1, paddingVertical: 13,
             borderWidth: 1, borderColor: O_LINE_STRONG, borderRadius: 4, alignItems: 'center',
           }}>
-            <Text style={{ fontSize: 10, fontWeight: '600', letterSpacing: 2.2, textTransform: 'uppercase', color: O_FG_MUTED }}>
+            <Text style={{ fontSize: 10, fontFamily: FONTS.sansSemiBold, letterSpacing: 2.2, textTransform: 'uppercase', color: O_FG_MUTED }}>
               Cancel
             </Text>
           </TouchableOpacity>
@@ -1630,7 +1629,7 @@ function MemberRoleModal({ visible, onClose, member, onConfirm }: { visible: boo
               shadowColor: O_GOLD, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.25, shadowRadius: 12,
             }}
           >
-            <Text style={{ fontSize: 10, fontWeight: '700', letterSpacing: 2.2, textTransform: 'uppercase', color: O_GOLD_L }}>
+            <Text style={{ fontSize: 10, fontFamily: FONTS.sansBold, letterSpacing: 2.2, textTransform: 'uppercase', color: O_GOLD_L }}>
               Save changes
             </Text>
           </TouchableOpacity>
@@ -2315,7 +2314,7 @@ export default function OrganizationDetailScreen() {
             <TouchableOpacity onPress={() => setShowCreateModal(false)} style={styles.modalCloseBtn}>
               <Ionicons name="close" size={22} color={O_FG} />
             </TouchableOpacity>
-            <Text style={[styles.modalTitle, { color: O_FG, fontFamily: SERIF, fontStyle: 'italic' }]}>New proposal</Text>
+            <Text style={[styles.modalTitle, { color: O_FG, fontFamily: FONTS.serifMediumItalic,  }]}>New proposal</Text>
             <TouchableOpacity
               style={[styles.modalSubmitBtn, { backgroundColor: creating ? O_FG_FAINT : O_GOLD }]}
               onPress={handleCreateProposal} disabled={creating}
@@ -2395,7 +2394,7 @@ export default function OrganizationDetailScreen() {
                         alignItems: 'center',
                       }}
                     >
-                      <Text style={{ color: active ? '#000' : O_FG_MUTED, fontSize: 12, fontWeight: '600' }}>
+                      <Text style={{ color: active ? '#000' : O_FG_MUTED, fontSize: 12, fontFamily: FONTS.sansSemiBold}}>
                         {label}
                       </Text>
                     </TouchableOpacity>
@@ -2443,7 +2442,7 @@ export default function OrganizationDetailScreen() {
                     style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 8 }}
                   >
                     <Ionicons name="add-circle-outline" size={16} color={O_GOLD} />
-                    <Text style={{ color: O_GOLD, fontSize: 12, fontWeight: '600' }}>Add option</Text>
+                    <Text style={{ color: O_GOLD, fontSize: 12, fontFamily: FONTS.sansSemiBold}}>Add option</Text>
                   </TouchableOpacity>
                 )}
               </View>
@@ -2504,7 +2503,7 @@ export default function OrganizationDetailScreen() {
             <TouchableOpacity onPress={() => setShowAnnouncementModal(false)} style={styles.modalCloseBtn}>
               <Ionicons name="close" size={22} color={O_FG} />
             </TouchableOpacity>
-            <Text style={[styles.modalTitle, { color: O_FG, fontFamily: SERIF, fontStyle: 'italic' }]}>New announcement</Text>
+            <Text style={[styles.modalTitle, { color: O_FG, fontFamily: FONTS.serifMediumItalic,  }]}>New announcement</Text>
             <TouchableOpacity
               style={[styles.modalSubmitBtn, { backgroundColor: creatingAnnouncement ? O_FG_FAINT : O_GOLD }]}
               onPress={handleCreateAnnouncement} disabled={creatingAnnouncement}
@@ -2564,7 +2563,7 @@ export default function OrganizationDetailScreen() {
             <TouchableOpacity onPress={() => setShowCreateSubOrgModal(false)} disabled={creatingSubOrg}>
               <Text style={[styles.modalCancel, { color: O_FG_MUTED }]}>Cancel</Text>
             </TouchableOpacity>
-            <Text style={[styles.modalTitle, { color: O_FG, fontFamily: SERIF, fontStyle: 'italic' }]}>New sub-org</Text>
+            <Text style={[styles.modalTitle, { color: O_FG, fontFamily: FONTS.serifMediumItalic,  }]}>New sub-org</Text>
             <TouchableOpacity onPress={handleCreateSubOrg} disabled={creatingSubOrg || !newSubOrg.name.trim()}>
               {creatingSubOrg ? <ActivityIndicator size="small" color={O_GOLD} /> : <Text style={[styles.modalSubmit, { color: newSubOrg.name.trim() ? O_GOLD : O_FG_FAINT }]}>Create</Text>}
             </TouchableOpacity>
@@ -2656,34 +2655,34 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16, paddingTop: 14, paddingBottom: 12, borderBottomWidth: 1,
   },
   modalCloseBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
-  modalTitle: { fontSize: 18, fontWeight: '500' },
+  modalTitle: { fontSize: 18, fontFamily: FONTS.sansMedium},
   modalSubmitBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 4 },
-  modalSubmitBtnText: { color: '#000', fontWeight: '600', fontSize: 13, letterSpacing: 1 },
+  modalSubmitBtnText: { color: '#000', fontFamily: FONTS.sansSemiBold, fontSize: 13, letterSpacing: 1 },
   modalContent: { flex: 1, padding: 16 },
-  modalCancel: { fontSize: 14, fontWeight: '500' },
-  modalSubmit: { fontSize: 14, fontWeight: '600' },
-  modalLabel: { fontSize: 12, fontWeight: '600', letterSpacing: 1.4, textTransform: 'uppercase', marginBottom: 6 },
+  modalCancel: { fontSize: 14, fontFamily: FONTS.sansMedium},
+  modalSubmit: { fontSize: 14, fontFamily: FONTS.sansSemiBold},
+  modalLabel: { fontSize: 12, fontFamily: FONTS.sansSemiBold, letterSpacing: 1.4, textTransform: 'uppercase', marginBottom: 6 },
   modalInput: { borderWidth: 1, borderRadius: 4, padding: 12, fontSize: 15 },
   modalInputMultiline: { minHeight: 96, textAlignVertical: 'top' },
   limitsCard: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 10, borderRadius: 4, borderWidth: 1, marginBottom: 14 },
   limitsText: { fontSize: 12 },
   inputGroup: { marginBottom: 18 },
-  inputLabel: { fontSize: 11, fontWeight: '600', letterSpacing: 1.4, textTransform: 'uppercase', marginBottom: 6 },
+  inputLabel: { fontSize: 11, fontFamily: FONTS.sansSemiBold, letterSpacing: 1.4, textTransform: 'uppercase', marginBottom: 6 },
   textInput: { borderWidth: 1, borderRadius: 4, padding: 12, fontSize: 15 },
   textArea: { borderWidth: 1, borderRadius: 4, padding: 12, fontSize: 15, minHeight: 110 },
   charCount: { fontSize: 10, textAlign: 'right', marginTop: 4, fontFamily: MONO, letterSpacing: 1 },
   categoryScroll: { flexDirection: 'row' },
   categoryChip: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 2, borderWidth: 1, marginRight: 6 },
-  categoryChipText: { fontSize: 11, fontWeight: '600', letterSpacing: 1.5, textTransform: 'uppercase' },
+  categoryChipText: { fontSize: 11, fontFamily: FONTS.sansSemiBold, letterSpacing: 1.5, textTransform: 'uppercase' },
   officialToggleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 14, borderRadius: 6, borderWidth: 1 },
   officialToggleInfo: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
   officialToggleIcon: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   officialToggleText: { flex: 1 },
-  officialToggleTitle: { fontSize: 14, fontWeight: '600' },
+  officialToggleTitle: { fontSize: 14, fontFamily: FONTS.sansSemiBold},
   officialToggleSubtitle: { fontSize: 11, marginTop: 2 },
   pinToggleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 14, borderRadius: 6, borderWidth: 1 },
   pinToggleInfo: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
-  pinToggleLabel: { fontSize: 14, fontWeight: '600' },
+  pinToggleLabel: { fontSize: 14, fontFamily: FONTS.sansSemiBold},
   pinToggleHint: { fontSize: 11, marginTop: 2 },
   typeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   typeChip: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 4, borderWidth: 1 },

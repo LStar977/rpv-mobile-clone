@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { moderationApi, proposalsApi, type ReportReason } from '../../lib/api';
 import { useModerationStore } from '../../lib/moderation';
+import { FONTS } from '../../lib/theme';
 
 const O_GOLD = '#EABA58';
 const O_BG_CARD = '#0D0F12';
@@ -25,7 +26,7 @@ const O_FG = '#F4F5F6';
 const O_FG_MUTED = '#C7CACD';
 const O_FG_FAINT = '#8E9297';
 const O_RED = '#FF6B5B';
-const SERIF = 'Georgia';
+const SERIF = FONTS.serif;
 
 const REASONS: Array<{ key: ReportReason; label: string; sub: string }> = [
   { key: 'spam', label: 'Spam or scam', sub: 'Repetitive, commercial, or fraudulent' },
@@ -365,7 +366,6 @@ const styles = StyleSheet.create({
     color: O_FG,
     fontFamily: SERIF,
     fontSize: 22,
-    fontWeight: '600',
     letterSpacing: -0.4,
     marginBottom: 4,
   },
@@ -397,7 +397,7 @@ const styles = StyleSheet.create({
   rowLabel: {
     color: O_FG,
     fontSize: 14,
-    fontWeight: '600',
+    fontFamily: FONTS.sansSemiBold,
     marginBottom: 2,
   },
   rowSub: {
@@ -412,7 +412,7 @@ const styles = StyleSheet.create({
   cancelText: {
     color: O_FG_MUTED,
     fontSize: 14,
-    fontWeight: '500',
+    fontFamily: FONTS.sansMedium,
   },
   reportHeader: {
     flexDirection: 'row',
@@ -424,7 +424,6 @@ const styles = StyleSheet.create({
     color: O_FG,
     fontFamily: SERIF,
     fontSize: 18,
-    fontWeight: '600',
   },
   reasonRow: {
     flexDirection: 'row',
@@ -440,7 +439,7 @@ const styles = StyleSheet.create({
   reasonLabel: {
     color: O_FG,
     fontSize: 14,
-    fontWeight: '500',
+    fontFamily: FONTS.sansMedium,
     marginBottom: 2,
   },
   reasonSub: {
@@ -450,7 +449,7 @@ const styles = StyleSheet.create({
   noteHint: {
     color: O_GOLD,
     fontSize: 11.5,
-    fontWeight: '600',
+    fontFamily: FONTS.sansSemiBold,
     letterSpacing: 0.4,
     marginBottom: 8,
     marginTop: 4,
@@ -483,7 +482,7 @@ const styles = StyleSheet.create({
   submitText: {
     color: '#040707',
     fontSize: 15,
-    fontWeight: '700',
+    fontFamily: FONTS.sansBold,
     letterSpacing: 0.3,
   },
 });

@@ -8,7 +8,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import Svg, { Circle, Line, Path, Defs, LinearGradient as SvgLinearGradient, Stop, G as SvgG } from 'react-native-svg';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
-import { SPACING, useTheme } from '../../lib/theme';
+import { FONTS, SPACING, useTheme } from '../../lib/theme';
 import { useAuthStore } from '../../lib/auth';
 import { proposalsApi, userApi, organizationsApi, veriffApi, type Proposal, type Organization, type OrganizationProposal } from '../../lib/api';
 import { useModerationStore, useSyncMutes } from '../../lib/moderation';
@@ -30,10 +30,6 @@ const FG_MUTED = '#C7CACD';
 const FG_FAINT = '#8E9297';
 const GREEN = '#34C759';
 
-const SERIF = 'Georgia';
-const SANS = 'Onest';
-const MONO = 'JetBrains Mono';
-
 // Dynamic hook for components to get theme-aware colors
 function useDashboardColors() {
   const { colors, isDark } = useTheme();
@@ -50,6 +46,8 @@ function useDashboardColors() {
     FG_MUTED: colors.textSecondary,
     FG_FAINT: colors.textTertiary,
     GREEN: colors.success,
+    SUPPORT: colors.support,
+    OPPOSE: colors.oppose,
     isDark,
   };
 }
@@ -481,8 +479,8 @@ function Featured({ proposal, onPress }: { proposal?: Proposal; onPress: () => v
             <View style={[styles.sentimentBar, { backgroundColor: dc.LINE }]}>
               {totalVotes > 0 ? (
                 <>
-                  <View style={{ flex: supportPct, backgroundColor: dc.GREEN }} />
-                  <View style={{ flex: opposePct, backgroundColor: '#FF6B6B', opacity: 0.7 }} />
+                  <View style={{ flex: supportPct, backgroundColor: dc.SUPPORT }} />
+                  <View style={{ flex: opposePct, backgroundColor: dc.OPPOSE, opacity: 0.7 }} />
                 </>
               ) : (
                 <View style={{ flex: 1, backgroundColor: dc.LINE }} />
@@ -611,7 +609,7 @@ function Communities({ proposals, votedIds, country, state, city, isVerified, on
       >
         <Text style={[styles.eyebrow, { color: dc.GOLD }]}>Your Communities</Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-          <Text style={{ fontSize: 11, color: dc.FG_FAINT, letterSpacing: 0.5 }}>Details</Text>
+          <Text style={{ fontFamily: FONTS.sans, fontSize: 11, color: dc.FG_FAINT, letterSpacing: 0.5 }}>Details</Text>
           <Ionicons name="chevron-forward" size={12} color={dc.FG_FAINT} />
         </View>
       </TouchableOpacity>
@@ -891,7 +889,7 @@ const styles = StyleSheet.create({
   scrollContent: { paddingHorizontal: 0 },
 
   eyebrow: {
-    fontFamily: SANS, fontSize: 11, fontWeight: '600',
+    fontFamily: FONTS.sansSemiBold, fontSize: 11, 
     letterSpacing: 2.2, textTransform: 'uppercase',
   },
   hairline: { height: 1, backgroundColor: LINE },
@@ -906,10 +904,10 @@ const styles = StyleSheet.create({
   },
   greenDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: GREEN },
   topBarStatus: {
-    fontFamily: SANS, fontSize: 11, fontWeight: '500',
+    fontFamily: FONTS.sansMedium, fontSize: 11, 
     letterSpacing: 1.98, textTransform: 'uppercase', color: FG_FAINT,
   },
-  topBarDate: { fontFamily: SANS, fontSize: 13, color: FG_MUTED, fontWeight: '400' },
+  topBarDate: { fontFamily: FONTS.sans, fontSize: 13, color: FG_MUTED, },
   avatarOuter: {
     width: 40, height: 40, borderRadius: 20,
     padding: 1.5, alignItems: 'center', justifyContent: 'center',
@@ -918,7 +916,7 @@ const styles = StyleSheet.create({
     width: '100%', height: '100%', borderRadius: 20,
     backgroundColor: BG_RAISED, alignItems: 'center', justifyContent: 'center',
   },
-  avatarLetter: { fontFamily: SERIF, fontSize: 16, fontWeight: '600', color: G_GOLD },
+  avatarLetter: { fontFamily: FONTS.serifSemiBold, fontSize: 16,  color: G_GOLD },
   avatarVerifiedDot: {
     position: 'absolute', bottom: -1, right: -1,
     width: 11, height: 11, borderRadius: 5.5,
@@ -937,24 +935,23 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     marginBottom: 24,
   },
-  heroDate: { fontFamily: MONO, fontSize: 10, color: FG_FAINT, letterSpacing: 1 },
+  heroDate: { fontFamily: FONTS.mono, fontSize: 10, color: FG_FAINT, letterSpacing: 1 },
   heroNumberRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 16, marginBottom: 8 },
   heroNumber: {
-    fontFamily: SERIF, fontSize: 88, fontWeight: '500', color: FG,
+    fontFamily: FONTS.serif, fontSize: 88,  color: FG,
     letterSpacing: -3.5, lineHeight: 75,
   },
   heroNumberLabel: { paddingBottom: 12 },
   heroNumberLabelText: {
-    fontFamily: SERIF, fontSize: 22, fontWeight: '400', color: FG_MUTED,
-    fontStyle: 'italic', lineHeight: 24,
+    fontFamily: FONTS.serifItalic, fontSize: 22,  color: FG_MUTED, lineHeight: 24,
   },
-  heroNumberLabelSub: { fontFamily: SANS, fontSize: 13, color: FG_FAINT, marginTop: 2 },
+  heroNumberLabelSub: { fontFamily: FONTS.sans, fontSize: 13, color: FG_FAINT, marginTop: 2 },
   unverifiedHeadline: {
-    fontFamily: SERIF, fontSize: 32, lineHeight: 38,
-    marginTop: 12, marginBottom: 10, fontWeight: '500',
+    fontFamily: FONTS.serif, fontSize: 32, lineHeight: 38,
+    marginTop: 12, marginBottom: 10, 
   },
   unverifiedSubhead: {
-    fontFamily: SANS, fontSize: 14, lineHeight: 20,
+    fontFamily: FONTS.sans, fontSize: 14, lineHeight: 20,
     marginBottom: 22,
   },
   unverifiedTease: {
@@ -962,7 +959,7 @@ const styles = StyleSheet.create({
     marginTop: 14, paddingTop: 14,
     borderTopWidth: StyleSheet.hairlineWidth,
   },
-  unverifiedTeaseText: { fontFamily: SANS, fontSize: 12, fontWeight: '500' },
+  unverifiedTeaseText: { fontFamily: FONTS.sansMedium, fontSize: 12, },
   breakdownBarTrack: {
     flexDirection: 'row', height: 4, borderRadius: 2, overflow: 'hidden',
     backgroundColor: LINE, marginTop: 22,
@@ -971,13 +968,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row', justifyContent: 'space-between', marginTop: 10,
     marginBottom: 18,
   },
-  breakdownLegendItem: { fontFamily: SANS, fontSize: 11, color: FG_FAINT },
+  breakdownLegendItem: { fontFamily: FONTS.sans, fontSize: 11, color: FG_FAINT },
   ctaBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 18, paddingVertical: 14, borderRadius: 14,
   },
   ctaBtnText: {
-    fontFamily: SANS, fontSize: 15, fontWeight: '600', color: '#1A1206', letterSpacing: -0.15,
+    fontFamily: FONTS.sansSemiBold, fontSize: 15,  color: '#1A1206', letterSpacing: -0.15,
   },
   ctaArrowCircle: {
     width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center',
@@ -990,14 +987,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 22, paddingBottom: 14,
   },
   sectionPad: { paddingHorizontal: 16, paddingBottom: 28 },
-  sectionMeta: { fontFamily: SANS, fontSize: 11, color: FG_FAINT },
+  sectionMeta: { fontFamily: FONTS.sans, fontSize: 11, color: FG_FAINT },
   sectionMetaMono: {
-    fontFamily: MONO, fontSize: 9.5, color: FG_FAINT,
+    fontFamily: FONTS.mono, fontSize: 9.5, color: FG_FAINT,
     letterSpacing: 1.3, textTransform: 'uppercase',
   },
-  sectionMetaGold: { fontFamily: SANS, fontSize: 11, fontWeight: '500', color: G_GOLD },
+  sectionMetaGold: { fontFamily: FONTS.sansMedium, fontSize: 11,  color: G_GOLD },
   eyebrowMeta: {
-    fontFamily: SANS, fontSize: 11, color: FG_FAINT,
+    fontFamily: FONTS.sans, fontSize: 11, color: FG_FAINT,
     letterSpacing: 0.3,
   },
   orgExpandRow: {
@@ -1005,7 +1002,7 @@ const styles = StyleSheet.create({
     gap: 8, paddingVertical: 14, paddingHorizontal: 16,
     borderTopWidth: StyleSheet.hairlineWidth,
   },
-  orgExpandText: { fontFamily: SANS, fontSize: 13, fontWeight: '500' },
+  orgExpandText: { fontFamily: FONTS.sansMedium, fontSize: 13, },
 
   // Featured
   featuredCard: {
@@ -1026,16 +1023,16 @@ const styles = StyleSheet.create({
   },
   featuredPillDot: { width: 5, height: 5, borderRadius: 2.5, backgroundColor: GREEN },
   featuredPillText: {
-    fontFamily: MONO, fontSize: 9.5, fontWeight: '500', color: FG,
+    fontFamily: FONTS.mono, fontSize: 9.5,  color: FG,
     letterSpacing: 1.3, textTransform: 'uppercase',
   },
   featuredBody: { padding: 18 },
   featuredTitle: {
-    fontFamily: SERIF, fontSize: 22, fontWeight: '500', color: FG,
+    fontFamily: FONTS.serif, fontSize: 22,  color: FG,
     letterSpacing: -0.33, lineHeight: 26, marginBottom: 8,
   },
   featuredDesc: {
-    fontFamily: SANS, fontSize: 13, color: FG_MUTED, lineHeight: 19, marginBottom: 16,
+    fontFamily: FONTS.sans, fontSize: 13, color: FG_MUTED, lineHeight: 19, marginBottom: 16,
   },
   sentimentBar: {
     flexDirection: 'row', height: 3, borderRadius: 2, overflow: 'hidden',
@@ -1045,7 +1042,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row', justifyContent: 'space-between', marginTop: 6,
   },
   sentimentLegendText: {
-    fontFamily: MONO, fontSize: 9.5, color: FG_FAINT, letterSpacing: 0.6,
+    fontFamily: FONTS.mono, fontSize: 9.5, color: FG_FAINT, letterSpacing: 0.6,
   },
 
   // Impact ring
@@ -1060,12 +1057,12 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   impactRingPct: {
-    fontFamily: SERIF, fontSize: 32, fontWeight: '500', color: FG,
+    fontFamily: FONTS.serif, fontSize: 32,  color: FG,
     letterSpacing: -0.96, lineHeight: 32,
   },
   impactRingPctSign: { fontSize: 16, color: FG_FAINT },
   impactRingLabel: {
-    fontFamily: SANS, fontSize: 9.5, fontWeight: '500',
+    fontFamily: FONTS.sansMedium, fontSize: 9.5, 
     letterSpacing: 1.5, color: FG_FAINT, marginTop: 4,
     textTransform: 'uppercase',
   },
@@ -1073,9 +1070,9 @@ const styles = StyleSheet.create({
   ledgerRow: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' },
   ledgerLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   ledgerDot: { width: 5, height: 5, borderRadius: 2.5 },
-  ledgerLabel: { fontFamily: SANS, fontSize: 12, color: FG_FAINT, letterSpacing: 0.48 },
+  ledgerLabel: { fontFamily: FONTS.sans, fontSize: 12, color: FG_FAINT, letterSpacing: 0.48 },
   ledgerValue: {
-    fontFamily: SERIF, fontSize: 22, fontWeight: '500', color: FG,
+    fontFamily: FONTS.serif, fontSize: 22,  color: FG,
     letterSpacing: -0.44, lineHeight: 22,
   },
 
@@ -1100,19 +1097,19 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   communityFlagText: {
-    fontFamily: MONO, fontSize: 10, fontWeight: '600', letterSpacing: 0.8,
+    fontFamily: FONTS.monoSemiBold, fontSize: 10,  letterSpacing: 0.8,
   },
   communityNameRow: {
     flexDirection: 'row', alignItems: 'baseline', gap: 8, marginBottom: 2,
   },
   communityName: {
-    fontFamily: SANS, fontSize: 15, fontWeight: '600', color: FG, letterSpacing: -0.15,
+    fontFamily: FONTS.sansSemiBold, fontSize: 15,  color: FG, letterSpacing: -0.15,
   },
   communityTier: {
-    fontFamily: MONO, fontSize: 9, color: FG_FAINT,
+    fontFamily: FONTS.mono, fontSize: 9, color: FG_FAINT,
     letterSpacing: 1.26, textTransform: 'uppercase',
   },
-  communityMeta: { fontFamily: SANS, fontSize: 12, color: FG_FAINT },
+  communityMeta: { fontFamily: FONTS.sans, fontSize: 12, color: FG_FAINT },
 
   // Sentinel
   digestRow: {
@@ -1120,20 +1117,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18, paddingVertical: 14,
   },
   digestTime: {
-    fontFamily: MONO, fontSize: 10, color: FG_FAINT,
+    fontFamily: FONTS.mono, fontSize: 10, color: FG_FAINT,
     letterSpacing: 0.6, paddingTop: 3, width: 38,
   },
   digestTag: {
-    fontFamily: MONO, fontSize: 9, fontWeight: '600',
+    fontFamily: FONTS.monoSemiBold, fontSize: 9, 
     letterSpacing: 1.26, paddingHorizontal: 7, paddingVertical: 3,
     borderRadius: 4, marginTop: 2, overflow: 'hidden',
   },
   digestHeadline: {
-    fontFamily: SANS, fontSize: 13.5, fontWeight: '500', color: FG,
+    fontFamily: FONTS.sansMedium, fontSize: 13.5,  color: FG,
     letterSpacing: -0.135, lineHeight: 18, marginBottom: 3,
   },
   digestMeta: {
-    fontFamily: SANS, fontSize: 11, color: FG_FAINT, letterSpacing: 0.22,
+    fontFamily: FONTS.sans, fontSize: 11, color: FG_FAINT, letterSpacing: 0.22,
   },
 
   // Footer
@@ -1143,11 +1140,11 @@ const styles = StyleSheet.create({
   },
   footerLine: { width: 24, height: 1, backgroundColor: LINE_STRONG },
   footerTagline: {
-    fontFamily: SERIF, fontSize: 13, fontStyle: 'italic',
+    fontFamily: FONTS.serifMediumItalic, fontSize: 13,
     color: FG_FAINT, letterSpacing: -0.065,
   },
   footerMark: {
-    fontFamily: MONO, fontSize: 8.5, color: FG_FAINT,
+    fontFamily: FONTS.mono, fontSize: 8.5, color: FG_FAINT,
     letterSpacing: 2.04, textTransform: 'uppercase', marginTop: 2,
   },
 });
@@ -1251,7 +1248,7 @@ function CommunitiesDetailPage({
         <TouchableOpacity onPress={onClose} hitSlop={{ top: 8, left: 8, right: 8, bottom: 8 }}>
           <Ionicons name="chevron-back" size={26} color={dc.FG} />
         </TouchableOpacity>
-        <Text style={{ flex: 1, textAlign: 'center', fontSize: 16, fontWeight: '600', color: dc.FG, marginRight: 26 }}>
+        <Text style={{ flex: 1, textAlign: 'center', fontSize: 16, fontFamily: FONTS.sansSemiBold, color: dc.FG, marginRight: 26 }}>
           Where you can vote
         </Text>
       </View>
@@ -1264,10 +1261,10 @@ function CommunitiesDetailPage({
           borderRadius: 14, padding: 20, alignItems: 'center',
           marginBottom: 18,
         }}>
-          <Text style={{ fontSize: 10.5, fontWeight: '700', letterSpacing: 2, textTransform: 'uppercase', color: dc.FG_MUTED, marginBottom: 6 }}>
+          <Text style={{ fontSize: 10.5, fontFamily: FONTS.sansBold, letterSpacing: 2, textTransform: 'uppercase', color: dc.FG_MUTED, marginBottom: 6 }}>
             Your civic reach
           </Text>
-          <Text style={{ fontSize: 44, fontWeight: '700', color: dc.GOLD, letterSpacing: -1, lineHeight: 50 }}>
+          <Text style={{ fontSize: 44, fontFamily: FONTS.sansBold, color: dc.GOLD, letterSpacing: -1, lineHeight: 50 }}>
             {totalEligibleActive}
           </Text>
           <Text style={{ fontSize: 13, color: dc.FG_MUTED, marginTop: 4 }}>
@@ -1276,7 +1273,7 @@ function CommunitiesDetailPage({
           {isVerified ? (
             <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 12, gap: 6 }}>
               <Ionicons name="shield-checkmark" size={14} color={dc.GOLD} />
-              <Text style={{ fontSize: 11.5, color: dc.GOLD, fontWeight: '600' }}>
+              <Text style={{ fontSize: 11.5, color: dc.GOLD, fontFamily: FONTS.sansSemiBold}}>
                 Verified resident of {[city, state, country].filter(Boolean).join(', ')}
               </Text>
             </View>
@@ -1289,7 +1286,7 @@ function CommunitiesDetailPage({
               borderRadius: 100,
             }}>
               <Ionicons name="lock-closed" size={12} color={dc.GOLD} />
-              <Text style={{ fontSize: 11.5, color: dc.GOLD, fontWeight: '600' }}>
+              <Text style={{ fontSize: 11.5, color: dc.GOLD, fontFamily: FONTS.sansSemiBold}}>
                 Unverified — global only
               </Text>
             </View>
@@ -1297,7 +1294,7 @@ function CommunitiesDetailPage({
         </Animated.View>
 
         {/* Section label */}
-        <Text style={{ fontSize: 10.5, fontWeight: '700', letterSpacing: 2, textTransform: 'uppercase', color: dc.FG_MUTED, marginBottom: 10, paddingHorizontal: 2 }}>
+        <Text style={{ fontSize: 10.5, fontFamily: FONTS.sansBold, letterSpacing: 2, textTransform: 'uppercase', color: dc.FG_MUTED, marginBottom: 10, paddingHorizontal: 2 }}>
           Your eligibility
         </Text>
 
@@ -1332,7 +1329,7 @@ function CommunitiesDetailPage({
               }}>
                 <Text style={{
                   fontSize: flag.length === 2 ? 13 : 22,
-                  fontWeight: '700',
+                  fontFamily: FONTS.sansBold,
                   color: accent,
                   letterSpacing: 0.5,
                 }}>
@@ -1340,11 +1337,11 @@ function CommunitiesDetailPage({
                 </Text>
               </View>
               <View style={{ flex: 1, minWidth: 0 }}>
-                <Text style={{ fontSize: 15, fontWeight: '700', color: isMuted ? dc.FG_FAINT : dc.FG, letterSpacing: -0.1 }} numberOfLines={1}>
+                <Text style={{ fontSize: 15, fontFamily: FONTS.sansBold, color: isMuted ? dc.FG_FAINT : dc.FG, letterSpacing: -0.1 }} numberOfLines={1}>
                   {tier.locationName ?? '—'}
                 </Text>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 2 }}>
-                  <Text style={{ fontSize: 10, fontWeight: '700', letterSpacing: 1.5, textTransform: 'uppercase', color: accent }}>
+                  <Text style={{ fontSize: 10, fontFamily: FONTS.sansBold, letterSpacing: 1.5, textTransform: 'uppercase', color: accent }}>
                     {tier.label}
                   </Text>
                   <View style={{ width: 3, height: 3, borderRadius: 1.5, backgroundColor: dc.FG_FAINT }} />
@@ -1352,7 +1349,7 @@ function CommunitiesDetailPage({
                 </View>
                 {tier.eligible ? (
                   <Text style={{ fontSize: 12, color: dc.FG_MUTED, marginTop: 6 }}>
-                    <Text style={{ color: dc.FG, fontWeight: '600' }}>{tier.active}</Text> active
+                    <Text style={{ color: dc.FG, fontFamily: FONTS.sansSemiBold}}>{tier.active}</Text> active
                     <Text style={{ color: dc.FG_FAINT }}> · {tier.total} total</Text>
                   </Text>
                 ) : (
@@ -1381,7 +1378,7 @@ function CommunitiesDetailPage({
         }}>
           <Ionicons name="information-circle-outline" size={20} color={dc.GOLD} style={{ marginTop: 1 }} />
           <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 13, fontWeight: '600', color: dc.FG, marginBottom: 4 }}>
+            <Text style={{ fontSize: 13, fontFamily: FONTS.sansSemiBold, color: dc.FG, marginBottom: 4 }}>
               How geo-gating works
             </Text>
             <Text style={{ fontSize: 12, color: dc.FG_MUTED, lineHeight: 17 }}>
@@ -1402,7 +1399,7 @@ function CommunitiesDetailPage({
               backgroundColor: dc.GOLD,
             }}
           >
-            <Text style={{ fontSize: 15, fontWeight: '700', color: '#000' }}>
+            <Text style={{ fontSize: 15, fontFamily: FONTS.sansBold, color: '#000' }}>
               Verify identity to unlock
             </Text>
           </TouchableOpacity>

@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useTheme } from '../../lib/theme';
+import { useTheme, FONTS } from '../../lib/theme';
 import { veriffApi, kycApi } from '../../lib/api';
 import { useAuthStore } from '../../lib/auth';
 
@@ -230,15 +230,15 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1 },
   closeButton: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { fontSize: 18, fontWeight: '600' },
+  headerTitle: { fontFamily: FONTS.serif, fontSize: 18 },
   webview: { flex: 1 },
   loading: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
-  loadingText: { marginTop: 12, fontSize: 14 },
+  loadingText: { marginTop: 12, fontFamily: FONTS.sans, fontSize: 14 },
   errorContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
-  errorTitle: { fontSize: 20, fontWeight: '600', marginTop: 20, textAlign: 'center' },
-  errorSubtitle: { fontSize: 14, lineHeight: 20, marginTop: 8, textAlign: 'center', paddingHorizontal: 16 },
+  errorTitle: { fontFamily: FONTS.serif, fontSize: 20, marginTop: 20, textAlign: 'center' },
+  errorSubtitle: { fontFamily: FONTS.sans, fontSize: 14, lineHeight: 20, marginTop: 8, textAlign: 'center', paddingHorizontal: 16 },
   button: { marginTop: 32, paddingHorizontal: 32, paddingVertical: 14, borderRadius: 12, minWidth: 160, alignItems: 'center' },
-  buttonText: { color: '#000', fontSize: 16, fontWeight: '600' },
+  buttonText: { color: '#000', fontFamily: FONTS.sansSemiBold, fontSize: 16 },
   secondaryButton: { marginTop: 16, paddingHorizontal: 24, paddingVertical: 10 },
-  secondaryButtonText: { fontSize: 14, fontWeight: '500' },
+  secondaryButtonText: { fontFamily: FONTS.sansMedium, fontSize: 14 },
 });

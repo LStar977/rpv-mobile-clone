@@ -206,7 +206,6 @@ const styles = StyleSheet.create({
   },
   skipText: {
     ...TYPOGRAPHY.bodyMedium,
-    fontWeight: '500',
   },
   bottomContainer: {
     paddingHorizontal: SPACING.xl,
@@ -252,7 +251,6 @@ const styles = StyleSheet.create({
   },
   primaryButtonText: {
     ...TYPOGRAPHY.bodyLarge,
-    fontWeight: '700',
     color: '#000',
   },
   hintContainer: {
@@ -268,7 +266,6 @@ const styles = StyleSheet.create({
   },
   hintText: {
     ...TYPOGRAPHY.bodyMedium,
-    fontWeight: '600',
   },
 });
 

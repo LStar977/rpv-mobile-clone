@@ -48,7 +48,7 @@ import { proposalsApi, userApi, uploadsApi, limitsApi, Proposal, UsageLimits } f
 import { useAuthStore } from '../../lib/auth';
 import { useBallotStore } from '../../lib/ballots';
 import { shareProposal, shareVoteAchievement } from '../../lib/share';
-import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS, ANIMATION, responsive } from '../../lib/theme';
+import { useTheme, FONTS, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS, ANIMATION, responsive } from '../../lib/theme';
 import { getTierLabel, getLocationLabel, canUserVoteOnProposal, meetsCitizenshipRequirement } from '../../lib/proposalGeo';
 import { useModerationStore, useSyncMutes } from '../../lib/moderation';
 import { ProposalModerationMenu } from '../../components/moderation/ProposalModerationMenu';
@@ -72,8 +72,8 @@ const FG_FAINT = '#8E9297';
 const GREEN = '#34C759';
 const RED = '#FF6B6B';
 const BLUE = '#5B8FF9';
-const SERIF_FONT = Platform.OS === 'ios' ? 'Georgia' : 'serif';
-const MONO_FONT = Platform.OS === 'ios' ? 'Menlo' : 'monospace';
+const SERIF_FONT = FONTS.serif;
+const MONO_FONT = FONTS.mono;
 
 // Dynamic hook for components to get theme-aware colors
 function useProposalColors() {
@@ -92,12 +92,14 @@ function useProposalColors() {
     FG_FAINT: colors.textTertiary,
     GREEN: colors.success,
     RED: colors.error,
+    SUPPORT: colors.support,
+    OPPOSE: colors.oppose,
     BLUE: '#5B8FF9',
     isDark,
   };
 }
 import { showVoteConfirmation } from '../../lib/notifications';
-import { VoteConfirmationOverlay, UpgradeModal, BallotDisplay } from '../../components/ui';
+import { VoteConfirmationOverlay, UpgradeModal, BallotDisplay, TallyBar } from '../../components/ui';
 import { checkForNewBadges } from '../../lib/badgeNotification';
 import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -335,15 +337,15 @@ function SwipeHintOverlay({ visible, onDismiss }: { visible: boolean; onDismiss:
         <Text style={[styles.swipeHintTitle, { color: pc.GOLD }]}>How to Vote</Text>
 
         <View style={styles.swipeHintRow}>
-          <View style={[styles.swipeHintIcon, { borderColor: pc.GREEN }]}>
-            <Ionicons name="arrow-forward" size={20} color={pc.GREEN} />
+          <View style={[styles.swipeHintIcon, { borderColor: pc.SUPPORT }]}>
+            <Ionicons name="arrow-forward" size={20} color={pc.SUPPORT} />
           </View>
           <Text style={[styles.swipeHintText, { color: pc.FG }]}>Swipe right to support</Text>
         </View>
 
         <View style={styles.swipeHintRow}>
-          <View style={[styles.swipeHintIcon, { borderColor: pc.RED }]}>
-            <Ionicons name="arrow-back" size={20} color={pc.RED} />
+          <View style={[styles.swipeHintIcon, { borderColor: pc.OPPOSE }]}>
+            <Ionicons name="arrow-back" size={20} color={pc.OPPOSE} />
           </View>
           <Text style={[styles.swipeHintText, { color: pc.FG }]}>Swipe left to oppose</Text>
         </View>
@@ -519,18 +521,18 @@ const voteHeaderStyles = StyleSheet.create({
     borderRadius: 3,
   },
   statusText: {
-    fontFamily: Platform.OS === 'ios' ? 'System' : 'sans-serif',
+    fontFamily: FONTS.sansSemiBold,
     fontSize: 11,
-    fontWeight: '500',
     letterSpacing: 1.5,
     textTransform: 'uppercase',
     color: FG_FAINT,
   },
   dateText: {
-    fontFamily: MONO_FONT,
+    fontFamily: FONTS.mono,
     fontSize: 9.5,
     color: FG_FAINT,
     letterSpacing: 1,
+    fontVariant: ['tabular-nums'],
   },
   titleBlock: {
     paddingHorizontal: 24,
@@ -538,9 +540,8 @@ const voteHeaderStyles = StyleSheet.create({
     paddingBottom: 18,
   },
   serifTitle: {
-    fontFamily: SERIF_FONT,
+    fontFamily: FONTS.serif,
     fontSize: 38,
-    fontWeight: '500',
     color: FG,
     letterSpacing: -1,
   },
@@ -551,6 +552,7 @@ const voteHeaderStyles = StyleSheet.create({
     marginTop: 8,
   },
   subtitleText: {
+    fontFamily: FONTS.sans,
     fontSize: 12,
     color: FG_FAINT,
     letterSpacing: -0.2,
@@ -573,8 +575,8 @@ const voteHeaderStyles = StyleSheet.create({
     borderWidth: 1,
   },
   filterChipText: {
+    fontFamily: FONTS.sansMedium,
     fontSize: 11,
-    fontWeight: '500',
     letterSpacing: 0.3,
   },
   progressSection: {
@@ -593,24 +595,25 @@ const voteHeaderStyles = StyleSheet.create({
     gap: 8,
   },
   counterNum: {
-    fontFamily: MONO_FONT,
+    fontFamily: FONTS.mono,
     fontSize: 10.5,
-    fontWeight: '500',
     color: FG,
     letterSpacing: 0.5,
+    fontVariant: ['tabular-nums'],
   },
   counterLabel: {
+    fontFamily: FONTS.sansSemiBold,
     fontSize: 10,
-    fontWeight: '600',
     letterSpacing: 1.5,
     textTransform: 'uppercase',
     color: GOLD,
   },
   percentText: {
-    fontFamily: MONO_FONT,
+    fontFamily: FONTS.mono,
     fontSize: 9,
     color: FG_FAINT,
     letterSpacing: 0.8,
+    fontVariant: ['tabular-nums'],
   },
   progressBar: {
     height: 2,
@@ -899,14 +902,14 @@ function SwipeCard({ proposal, onSwipeLeft, onSwipeRight, onSwipeUp, onTap, isTo
         {/* Swipe Indicators */}
         {isTopCard && !isEnded && (
           <>
-            <Animated.View style={[premiumCardStyles.swipeVeil, { backgroundColor: `${pc.GREEN}20` }, supportIndicatorStyle]}>
-              <View style={[premiumCardStyles.swipeStamp, { borderColor: pc.GREEN }]}>
-                <Text style={[premiumCardStyles.swipeStampText, { color: pc.GREEN }]}>SUPPORT</Text>
+            <Animated.View style={[premiumCardStyles.swipeVeil, { backgroundColor: `${pc.SUPPORT}20` }, supportIndicatorStyle]}>
+              <View style={[premiumCardStyles.swipeStamp, { borderColor: pc.SUPPORT }]}>
+                <Text style={[premiumCardStyles.swipeStampText, { color: pc.SUPPORT }]}>SUPPORT</Text>
               </View>
             </Animated.View>
-            <Animated.View style={[premiumCardStyles.swipeVeil, { backgroundColor: `${pc.RED}20` }, opposeIndicatorStyle]}>
-              <View style={[premiumCardStyles.swipeStamp, { borderColor: pc.RED, right: 24, left: undefined }]}>
-                <Text style={[premiumCardStyles.swipeStampText, { color: pc.RED }]}>OPPOSE</Text>
+            <Animated.View style={[premiumCardStyles.swipeVeil, { backgroundColor: `${pc.OPPOSE}20` }, opposeIndicatorStyle]}>
+              <View style={[premiumCardStyles.swipeStamp, { borderColor: pc.OPPOSE, right: 24, left: undefined }]}>
+                <Text style={[premiumCardStyles.swipeStampText, { color: pc.OPPOSE }]}>OPPOSE</Text>
               </View>
             </Animated.View>
             <Animated.View style={[premiumCardStyles.swipeVeilTop, skipIndicatorStyle]}>
@@ -947,32 +950,13 @@ function SwipeCard({ proposal, onSwipeLeft, onSwipeRight, onSwipeUp, onTap, isTo
           <Text style={[premiumCardStyles.description, { color: pc.FG_MUTED }]}>{proposal.description}</Text>
 
           {/* Sentiment ledger */}
-          {totalVotes === 0 ? (
-            <View style={premiumCardStyles.sentimentSection}>
-              <View style={[premiumCardStyles.sentimentBarEmpty, { backgroundColor: pc.LINE }]} />
-              <Text style={[premiumCardStyles.noVotesText, { color: pc.FG_FAINT }]}>No votes yet</Text>
-            </View>
-          ) : (
-            <View style={premiumCardStyles.sentimentSection}>
-              <View style={[premiumCardStyles.sentimentBar, { backgroundColor: pc.LINE }]}>
-                <View style={[premiumCardStyles.sentimentFillSupport, { width: `${supportPercent}%`, backgroundColor: pc.GREEN }]} />
-                <View style={[premiumCardStyles.sentimentFillOppose, { width: `${100 - supportPercent}%`, backgroundColor: pc.RED }]} />
-              </View>
-              <View style={premiumCardStyles.sentimentStats}>
-                <View style={premiumCardStyles.sentimentStat}>
-                  <Text style={[premiumCardStyles.sentimentNum, { color: pc.GREEN }]}>{(proposal.supportVotes || 0).toLocaleString()}</Text>
-                  <Text style={[premiumCardStyles.sentimentLabel, { color: pc.FG_FAINT }]}>SUPPORT</Text>
-                </View>
-                <View style={premiumCardStyles.sentimentPct}>
-                  <Text style={[premiumCardStyles.sentimentPctText, { color: pc.FG_FAINT }]}>{supportPercent}%</Text>
-                </View>
-                <View style={premiumCardStyles.sentimentStatRight}>
-                  <Text style={[premiumCardStyles.sentimentNum, { color: pc.RED }]}>{(proposal.opposeVotes || 0).toLocaleString()}</Text>
-                  <Text style={[premiumCardStyles.sentimentLabel, { color: pc.FG_FAINT }]}>OPPOSE</Text>
-                </View>
-              </View>
-            </View>
-          )}
+          <TallyBar
+            supportCount={proposal.supportVotes || 0}
+            opposeCount={proposal.opposeVotes || 0}
+            variant="compact"
+            applyThreshold={!isEnded}
+            style={premiumCardStyles.sentimentSection}
+          />
 
           {/* Ended Banner */}
           {isEnded && (
@@ -1025,8 +1009,8 @@ const premiumCardStyles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.12)',
   },
   locationText: {
+    fontFamily: FONTS.sansMedium,
     fontSize: 11,
-    fontWeight: '500',
     color: FG,
     letterSpacing: -0.2,
   },
@@ -1045,10 +1029,11 @@ const premiumCardStyles = StyleSheet.create({
     borderColor: `${GOLD}55`,
   },
   timePillText: {
+    fontFamily: FONTS.monoSemiBold,
     fontSize: 10.5,
-    fontWeight: '600',
     color: GOLD,
     letterSpacing: 0.3,
+    fontVariant: ['tabular-nums'],
   },
   categoryTag: {
     position: 'absolute',
@@ -1069,9 +1054,8 @@ const premiumCardStyles = StyleSheet.create({
     borderRadius: 2,
   },
   categoryText: {
-    fontFamily: MONO_FONT,
+    fontFamily: FONTS.sansSemiBold,
     fontSize: 9,
-    fontWeight: '600',
     letterSpacing: 1.3,
   },
   swipeVeil: {
@@ -1099,8 +1083,8 @@ const premiumCardStyles = StyleSheet.create({
     transform: [{ rotate: '-8deg' }],
   },
   swipeStampText: {
+    fontFamily: FONTS.sansBold,
     fontSize: 14,
-    fontWeight: '700',
     letterSpacing: 3,
   },
   cardBody: {
@@ -1114,7 +1098,7 @@ const premiumCardStyles = StyleSheet.create({
     marginBottom: 10,
   },
   refText: {
-    fontFamily: MONO_FONT,
+    fontFamily: FONTS.mono,
     fontSize: 9,
     color: FG_FAINT,
     letterSpacing: 1.4,
@@ -1127,16 +1111,16 @@ const premiumCardStyles = StyleSheet.create({
     gap: 6,
   },
   timeText: {
+    fontFamily: FONTS.mono,
     fontSize: 9.5,
-    fontWeight: '500',
     letterSpacing: 1.3,
     textTransform: 'uppercase',
     color: GOLD,
+    fontVariant: ['tabular-nums'],
   },
   serifTitle: {
-    fontFamily: SERIF_FONT,
-    fontSize: 24,
-    fontWeight: '500',
+    fontFamily: FONTS.serif,
+    fontSize: 22,
     color: FG,
     lineHeight: 28,
     letterSpacing: -0.5,
@@ -1159,17 +1143,18 @@ const premiumCardStyles = StyleSheet.create({
     justifyContent: 'center',
   },
   proposerDot: {
-    fontFamily: SERIF_FONT,
+    fontFamily: FONTS.serifSemiBold,
     fontSize: 9,
-    fontWeight: '600',
     color: GOLD,
   },
   proposerText: {
+    fontFamily: FONTS.sans,
     fontSize: 11.5,
     color: FG_MUTED,
     letterSpacing: -0.2,
   },
   description: {
+    fontFamily: FONTS.sans,
     fontSize: 12.5,
     color: FG_MUTED,
     lineHeight: 18,
@@ -1195,7 +1180,7 @@ const premiumCardStyles = StyleSheet.create({
   },
   noVotesText: {
     fontSize: 11,
-    fontWeight: '500',
+    fontFamily: FONTS.sansMedium,
     color: FG_FAINT,
     letterSpacing: 0.4,
     textAlign: 'center',
@@ -1227,12 +1212,11 @@ const premiumCardStyles = StyleSheet.create({
   sentimentNum: {
     fontFamily: SERIF_FONT,
     fontSize: 18,
-    fontWeight: '500',
     letterSpacing: -0.5,
   },
   sentimentLabel: {
     fontSize: 10,
-    fontWeight: '500',
+    fontFamily: FONTS.sansMedium,
     color: FG_FAINT,
     letterSpacing: 1.2,
     textTransform: 'uppercase',
@@ -1248,7 +1232,6 @@ const premiumCardStyles = StyleSheet.create({
   sentimentPctText: {
     fontFamily: MONO_FONT,
     fontSize: 11,
-    fontWeight: '500',
     color: FG,
     letterSpacing: 0.3,
   },
@@ -1277,7 +1260,7 @@ const premiumCardStyles = StyleSheet.create({
   },
   metaChipText: {
     fontSize: 10.5,
-    fontWeight: '500',
+    fontFamily: FONTS.sansMedium,
     color: FG_MUTED,
     letterSpacing: -0.2,
   },
@@ -1288,7 +1271,7 @@ const premiumCardStyles = StyleSheet.create({
   },
   dossierLinkText: {
     fontSize: 10,
-    fontWeight: '600',
+    fontFamily: FONTS.sansSemiBold,
     letterSpacing: 0.3,
     color: GOLD,
   },
@@ -1304,7 +1287,7 @@ const premiumCardStyles = StyleSheet.create({
   },
   endedText: {
     fontSize: 12,
-    fontWeight: '600',
+    fontFamily: FONTS.sansSemiBold,
     color: '#fff',
   },
 });
@@ -3169,7 +3152,7 @@ export default function ProposalsScreen() {
                         alignItems: 'center',
                       }}
                     >
-                      <Text style={{ color: active ? '#000' : colors.textSecondary, fontSize: 12, fontWeight: '600' }}>
+                      <Text style={{ color: active ? '#000' : colors.textSecondary, fontSize: 12, fontFamily: FONTS.sansSemiBold}}>
                         {label}
                       </Text>
                     </TouchableOpacity>
@@ -3225,7 +3208,7 @@ export default function ProposalsScreen() {
                     style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 8 }}
                   >
                     <Ionicons name="add-circle-outline" size={16} color={colors.gold} />
-                    <Text style={{ color: colors.gold, fontSize: 12, fontWeight: '600' }}>Add option</Text>
+                    <Text style={{ color: colors.gold, fontSize: 12, fontFamily: FONTS.sansSemiBold}}>Add option</Text>
                   </TouchableOpacity>
                 )}
               </View>
@@ -3541,7 +3524,7 @@ const detailStyles = StyleSheet.create({
   },
   heroLocationText: {
     fontSize: 11,
-    fontWeight: '500',
+    fontFamily: FONTS.sansMedium,
     color: FG,
     letterSpacing: -0.2,
   },
@@ -3561,7 +3544,7 @@ const detailStyles = StyleSheet.create({
   },
   heroTimePillText: {
     fontSize: 10.5,
-    fontWeight: '600',
+    fontFamily: FONTS.sansSemiBold,
     color: GOLD,
     letterSpacing: 0.3,
   },
@@ -3586,7 +3569,6 @@ const detailStyles = StyleSheet.create({
   heroCategoryText: {
     fontFamily: MONO_FONT,
     fontSize: 9.5,
-    fontWeight: '600',
     letterSpacing: 1.4,
   },
   // Body
@@ -3605,7 +3587,6 @@ const detailStyles = StyleSheet.create({
   title: {
     fontFamily: SERIF_FONT,
     fontSize: 30,
-    fontWeight: '500',
     lineHeight: 36,
     color: FG,
     letterSpacing: -0.5,
@@ -3694,12 +3675,11 @@ const detailStyles = StyleSheet.create({
   sentimentNum: {
     fontFamily: SERIF_FONT,
     fontSize: 22,
-    fontWeight: '500',
     letterSpacing: -0.5,
   },
   sentimentLabel: {
     fontSize: 10.5,
-    fontWeight: '500',
+    fontFamily: FONTS.sansMedium,
     color: FG_FAINT,
     letterSpacing: 1.4,
     textTransform: 'uppercase',
@@ -3715,13 +3695,12 @@ const detailStyles = StyleSheet.create({
   sentimentPctText: {
     fontFamily: MONO_FONT,
     fontSize: 11,
-    fontWeight: '600',
     color: FG,
     letterSpacing: 0.3,
   },
   noVotesText: {
     fontSize: 12,
-    fontWeight: '500',
+    fontFamily: FONTS.sansMedium,
     color: FG_FAINT,
     letterSpacing: 0.4,
     textAlign: 'center',
@@ -3765,7 +3744,7 @@ const detailStyles = StyleSheet.create({
   },
   voteBtnText: {
     fontSize: 14,
-    fontWeight: '600',
+    fontFamily: FONTS.sansSemiBold,
     letterSpacing: 0.3,
   },
   statusBanner: {
@@ -3781,7 +3760,7 @@ const detailStyles = StyleSheet.create({
   },
   statusBannerText: {
     fontSize: 13,
-    fontWeight: '600',
+    fontFamily: FONTS.sansSemiBold,
     letterSpacing: 0.3,
   },
 });
@@ -3807,7 +3786,6 @@ const styles = StyleSheet.create({
   swipeHintTitle: {
     fontFamily: SERIF_FONT,
     fontSize: 24,
-    fontWeight: '600',
     textAlign: 'center',
     marginBottom: SPACING.lg,
   },
@@ -3827,7 +3805,7 @@ const styles = StyleSheet.create({
   },
   swipeHintText: {
     fontSize: 16,
-    fontWeight: '500',
+    fontFamily: FONTS.sansMedium,
   },
   swipeHintDismiss: {
     textAlign: 'center',
@@ -3899,7 +3877,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     overflow: 'hidden',
   },
-  filterChipText: { ...TYPOGRAPHY.labelSmall, fontWeight: '500' },
+  filterChipText: { ...TYPOGRAPHY.labelSmall,},
   clearBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -3942,7 +3920,7 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.xs,
     borderRadius: BORDER_RADIUS.full,
   },
-  categoryText: { ...TYPOGRAPHY.labelSmall, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5 },
+  categoryText: { ...TYPOGRAPHY.labelSmall, textTransform: 'uppercase', letterSpacing: 0.5 },
   headerBadges: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -3957,7 +3935,7 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.xs,
     borderRadius: BORDER_RADIUS.full,
   },
-  civicDeskText: { ...TYPOGRAPHY.labelSmall, fontWeight: '500', fontSize: 10 },
+  civicDeskText: { ...TYPOGRAPHY.labelSmall, fontSize: 10 },
   timeBadge: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -3966,7 +3944,7 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.xs,
     borderRadius: BORDER_RADIUS.full,
   },
-  timeText: { ...TYPOGRAPHY.labelSmall, fontWeight: '500' },
+  timeText: { ...TYPOGRAPHY.labelSmall,},
   shareBtn: {
     width: 32,
     height: 32,
@@ -4042,7 +4020,7 @@ const styles = StyleSheet.create({
     borderRadius: BORDER_RADIUS.xl,
     gap: SPACING.sm,
   },
-  statusText: { ...TYPOGRAPHY.labelMedium, fontWeight: '500' },
+  statusText: { ...TYPOGRAPHY.labelMedium,},
   voteActions: { flexDirection: 'row', gap: SPACING.md },
   voteBtn: {
     flex: 1,
@@ -4053,7 +4031,7 @@ const styles = StyleSheet.create({
     borderRadius: BORDER_RADIUS.xl,
     gap: SPACING.xs,
   },
-  voteBtnText: { color: '#fff', ...TYPOGRAPHY.labelMedium, fontWeight: '600' },
+  voteBtnText: { color: '#fff', ...TYPOGRAPHY.labelMedium,},
   btnDisabled: { opacity: 0.6 },
 
   // Skeleton
@@ -4083,7 +4061,7 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.md,
     gap: SPACING.sm,
   },
-  emptyBtnText: { color: '#000', ...TYPOGRAPHY.labelLarge, fontWeight: '600' },
+  emptyBtnText: { color: '#000', ...TYPOGRAPHY.labelLarge,},
 
   // Modal
   modalContainer: { flex: 1 },
@@ -4128,7 +4106,7 @@ const styles = StyleSheet.create({
     minWidth: 80,
     alignItems: 'center',
   },
-  submitBtnText: { color: '#000', ...TYPOGRAPHY.labelMedium, fontWeight: '600' },
+  submitBtnText: { color: '#000', ...TYPOGRAPHY.labelMedium,},
   formScroll: { flex: 1, padding: SPACING.lg },
   formSection: { marginBottom: SPACING.lg },
   formLabel: { ...TYPOGRAPHY.labelMedium, marginBottom: SPACING.sm },
@@ -4174,7 +4152,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     marginBottom: SPACING.lg,
   },
-  locationText: { ...TYPOGRAPHY.bodyMedium, fontWeight: '500' },
+  locationText: { ...TYPOGRAPHY.bodyMedium,},
   scopeGrid: { gap: SPACING.md },
   scopeCard: {
     alignItems: 'center',
@@ -4242,7 +4220,6 @@ const styles = StyleSheet.create({
   },
   upgradeChipText: {
     ...TYPOGRAPHY.labelSmall,
-    fontWeight: '600',
   },
 
   // View Mode Toggle
@@ -4315,7 +4292,6 @@ const styles = StyleSheet.create({
   },
   swipeCategoryText: {
     ...TYPOGRAPHY.labelSmall,
-    fontWeight: '600',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
@@ -4329,7 +4305,6 @@ const styles = StyleSheet.create({
   },
   swipeTimeText: {
     ...TYPOGRAPHY.labelSmall,
-    fontWeight: '500',
   },
   swipeGeoTags: {
     flexDirection: 'row',
@@ -4392,7 +4367,6 @@ const styles = StyleSheet.create({
   },
   swipeVoteCount: {
     ...TYPOGRAPHY.labelMedium,
-    fontWeight: '600',
   },
   swipeVotePercent: {
     ...TYPOGRAPHY.labelSmall,
@@ -4407,7 +4381,6 @@ const styles = StyleSheet.create({
   },
   swipeEndedText: {
     ...TYPOGRAPHY.labelMedium,
-    fontWeight: '500',
   },
   swipeInstructions: {
     flexDirection: 'row',
@@ -4458,7 +4431,6 @@ const styles = StyleSheet.create({
   swipeIndicatorText: {
     color: '#fff',
     ...TYPOGRAPHY.labelLarge,
-    fontWeight: '700',
     letterSpacing: 1,
   },
 
@@ -4497,7 +4469,6 @@ const styles = StyleSheet.create({
   },
   swipeRefreshText: {
     ...TYPOGRAPHY.labelMedium,
-    fontWeight: '500',
   },
 
   // Full-Screen Swipe Card Styles
@@ -4551,7 +4522,6 @@ const styles = StyleSheet.create({
   swipeCategoryTextLight: {
     color: '#fff',
     ...TYPOGRAPHY.labelSmall,
-    fontWeight: '600',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
@@ -4566,7 +4536,6 @@ const styles = StyleSheet.create({
   swipeTimeTextLight: {
     color: '#fff',
     ...TYPOGRAPHY.labelSmall,
-    fontWeight: '500',
   },
   swipeGeoBadge: {
     flexDirection: 'row',
@@ -4579,7 +4548,6 @@ const styles = StyleSheet.create({
   swipeGeoText: {
     color: '#fff',
     ...TYPOGRAPHY.labelSmall,
-    fontWeight: '500',
   },
   swipeGeoBadgeTopLeft: {
     position: 'absolute',
@@ -4597,7 +4565,6 @@ const styles = StyleSheet.create({
     color: '#fff',
     ...TYPOGRAPHY.headlineMedium,
     fontSize: responsive(20, 22, 24),
-    fontWeight: '700',
     marginBottom: SPACING.sm,
     textShadowColor: 'rgba(0,0,0,0.5)',
     textShadowOffset: { width: 0, height: 1 },
@@ -4643,12 +4610,10 @@ const styles = StyleSheet.create({
   },
   swipeVoteCountLarge: {
     ...TYPOGRAPHY.labelMedium,
-    fontWeight: '600',
   },
   swipeVotePercentLarge: {
     color: '#fff',
     ...TYPOGRAPHY.labelSmall,
-    fontWeight: '500',
   },
   swipeEndedBannerLarge: {
     flexDirection: 'row',
@@ -4662,7 +4627,6 @@ const styles = StyleSheet.create({
   swipeEndedTextLarge: {
     color: '#fff',
     ...TYPOGRAPHY.labelMedium,
-    fontWeight: '500',
   },
   swipeInstructionsLarge: {
     flexDirection: 'row',
@@ -4678,7 +4642,6 @@ const styles = StyleSheet.create({
   swipeInstructionTextLarge: {
     color: 'rgba(255,255,255,0.8)',
     ...TYPOGRAPHY.labelSmall,
-    fontWeight: '500',
   },
   swipeTapHintLarge: {
     color: 'rgba(255,255,255,0.6)',
@@ -4717,7 +4680,6 @@ const styles = StyleSheet.create({
   },
   swipeIndicatorTextLarge: {
     ...TYPOGRAPHY.labelLarge,
-    fontWeight: '800',
     letterSpacing: 2,
     textShadowColor: 'rgba(0,0,0,0.5)',
     textShadowOffset: { width: 0, height: 1 },

@@ -299,7 +299,6 @@ const styles = StyleSheet.create({
   backButton: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   headerTitle: {
     ...TYPOGRAPHY.headlineSmall,
-    fontWeight: '600',
     flex: 1,
     textAlign: 'center',
   },
@@ -313,12 +312,10 @@ const styles = StyleSheet.create({
   },
   categoryText: {
     ...TYPOGRAPHY.labelSmall,
-    fontWeight: '700',
     letterSpacing: 0.5,
   },
   title: {
     ...TYPOGRAPHY.headlineLarge,
-    fontWeight: '700',
     marginBottom: SPACING.md,
   },
   description: {
@@ -338,6 +335,5 @@ const styles = StyleSheet.create({
   },
   deadlineText: {
     ...TYPOGRAPHY.bodySmall,
-    fontWeight: '500',
   },
 });

@@ -5,7 +5,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { useState } from 'react';
-import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS } from '../../lib/theme';
+import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS, FONTS } from '../../lib/theme';
 
 const VERIFICATION_BENEFITS = [
   { icon: 'checkmark-circle', text: 'Vote on all proposals (global + geo-restricted)' },
@@ -141,7 +141,7 @@ export default function VerificationPaymentScreen() {
                 <Ionicons name="chevron-forward" size={20} color={colors.gold} />
               </View>
               <Text style={[styles.pickerDesc, { color: colors.textSecondary }]}>
-                Everything Standard unlocks, <Text style={{ color: colors.gold, fontWeight: '600' }}>plus citizens-only proposals</Text> like the Alberta separation referendum.
+                Everything Standard unlocks, <Text style={{ color: colors.gold, fontFamily: FONTS.sansSemiBold}}>plus citizens-only proposals</Text> like the Alberta separation referendum.
               </Text>
             </TouchableOpacity>
           </Animated.View>
@@ -313,9 +313,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   headerTitle: {
-    fontFamily: 'Georgia',
+    fontFamily: FONTS.serif,
     fontSize: 20,
-    fontWeight: '500',
   },
   content: {
     flex: 1,
@@ -332,9 +331,8 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.lg,
   },
   priceAmount: {
-    fontFamily: 'Georgia',
+    fontFamily: FONTS.serif,
     fontSize: 36,
-    fontWeight: '500',
     textAlign: 'center',
   },
   priceLabel: {
@@ -343,9 +341,8 @@ const styles = StyleSheet.create({
     marginTop: SPACING.xxs,
   },
   heroTitle: {
-    fontFamily: 'Georgia',
+    fontFamily: FONTS.serif,
     fontSize: 24,
-    fontWeight: '500',
     textAlign: 'center',
     marginBottom: SPACING.sm,
   },
@@ -362,9 +359,8 @@ const styles = StyleSheet.create({
     ...SHADOWS.md,
   },
   benefitsTitle: {
-    fontFamily: 'Georgia',
+    fontFamily: FONTS.serif,
     fontSize: 18,
-    fontWeight: '500',
     marginBottom: SPACING.lg,
   },
   benefitRow: {
@@ -411,9 +407,8 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.sm,
   },
   upsellTitle: {
-    fontFamily: 'Georgia',
+    fontFamily: FONTS.serif,
     fontSize: 16,
-    fontWeight: '500',
   },
   upsellBadge: {
     paddingHorizontal: SPACING.sm,
@@ -423,7 +418,6 @@ const styles = StyleSheet.create({
   upsellBadgeText: {
     ...TYPOGRAPHY.labelSmall,
     color: '#000',
-    fontWeight: '700',
     fontSize: 9,
   },
   upsellText: {
@@ -438,7 +432,6 @@ const styles = StyleSheet.create({
   },
   upsellLinkText: {
     ...TYPOGRAPHY.labelMedium,
-    fontWeight: '600',
   },
   ctaContainer: {
     position: 'absolute',
@@ -461,7 +454,6 @@ const styles = StyleSheet.create({
   ctaButtonText: {
     ...TYPOGRAPHY.labelLarge,
     color: '#000',
-    fontWeight: '600',
   },
   ctaDisclaimer: {
     ...TYPOGRAPHY.labelSmall,
@@ -504,9 +496,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   pickerTitle: {
-    fontFamily: 'Georgia',
+    fontFamily: FONTS.serif,
     fontSize: 18,
-    fontWeight: '500',
   },
   pickerSubtitle: {
     ...TYPOGRAPHY.bodySmall,
@@ -524,7 +515,6 @@ const styles = StyleSheet.create({
   pickerBadgeText: {
     ...TYPOGRAPHY.labelSmall,
     color: '#000',
-    fontWeight: '700',
     fontSize: 9,
   },
 });

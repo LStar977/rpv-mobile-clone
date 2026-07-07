@@ -21,7 +21,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
-import { useTheme, SPACING, RADIUS, TYPOGRAPHY, SHADOWS } from '../../lib/theme';
+import { useTheme, SPACING, RADIUS, TYPOGRAPHY, SHADOWS, FONTS } from '../../lib/theme';
 import { Button } from '../../components/ui';
 import { haptics } from '../../lib/haptics';
 
@@ -92,7 +92,7 @@ function ReceiptRow({
       </Text>
       <Text style={[
         styles.receiptValue,
-        { color: highlight ? colors.gold : colors.text }
+        { color: highlight ? colors.support : colors.text }
       ]}>
         {value}
       </Text>
@@ -313,15 +313,14 @@ const styles = StyleSheet.create({
     ...SHADOWS.glow,
   },
   successTitle: {
-    fontFamily: 'Georgia',
+    fontFamily: FONTS.serif,
     fontSize: 24,
-    fontWeight: '500',
     marginBottom: SPACING.sm,
   },
   amount: {
-    fontFamily: 'Georgia',
+    fontFamily: FONTS.mono,
     fontSize: 40,
-    fontWeight: '500',
+    fontVariant: ['tabular-nums'],
     marginBottom: SPACING['2xl'],
   },
   receiptCard: {
@@ -348,9 +347,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   productTitle: {
-    fontFamily: 'Georgia',
+    fontFamily: FONTS.serif,
     fontSize: 16,
-    fontWeight: '500',
     marginBottom: SPACING.xs,
   },
   productDescription: {
@@ -371,7 +369,8 @@ const styles = StyleSheet.create({
     ...TYPOGRAPHY.body,
   },
   receiptValue: {
-    ...TYPOGRAPHY.label,
+    ...TYPOGRAPHY.mono,
+    fontSize: 13,
   },
   footerNote: {
     ...TYPOGRAPHY.caption,

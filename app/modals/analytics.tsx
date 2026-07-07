@@ -19,7 +19,7 @@ import Animated, {
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuthStore } from '../../lib/auth';
-import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS, responsive } from '../../lib/theme';
+import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS, responsive, FONTS } from '../../lib/theme';
 import { analyticsApi, AnalyticsData, ProposalAnalytics } from '../../lib/api';
 import { FeaturedStat, StatsGrid, ProgressStat, UpgradeModal } from '../../components/ui';
 
@@ -200,22 +200,22 @@ function ProposalAnalyticsCard({ proposal, index }: { proposal: ProposalAnalytic
           </Text>
         </View>
         <View style={styles.proposalStat}>
-          <Ionicons name="thumbs-up-outline" size={14} color={colors.success} />
-          <Text style={[styles.proposalStatText, { color: colors.success }]}>
+          <Ionicons name="thumbs-up-outline" size={14} color={colors.support} />
+          <Text style={[styles.proposalStatText, { color: colors.support }]}>
             {proposal.supportVotes}
           </Text>
         </View>
         <View style={styles.proposalStat}>
-          <Ionicons name="thumbs-down-outline" size={14} color={colors.error} />
-          <Text style={[styles.proposalStatText, { color: colors.error }]}>
+          <Ionicons name="thumbs-down-outline" size={14} color={colors.oppose} />
+          <Text style={[styles.proposalStatText, { color: colors.oppose }]}>
             {proposal.opposeVotes}
           </Text>
         </View>
       </View>
 
       <View style={styles.voteBarContainer}>
-        <View style={[styles.voteBarBg, { backgroundColor: colors.error }]}>
-          <View style={[styles.voteBarFill, { width: `${supportPercent}%`, backgroundColor: colors.success }]} />
+        <View style={[styles.voteBarBg, { backgroundColor: colors.oppose }]}>
+          <View style={[styles.voteBarFill, { width: `${supportPercent}%`, backgroundColor: colors.support }]} />
         </View>
         <Text style={[styles.voteBarLabel, { color: colors.textSecondary }]}>
           {supportPercent}% support
@@ -389,7 +389,7 @@ export default function AnalyticsScreen() {
         <TouchableOpacity onPress={() => router.back()} style={{ width: 40, height: 40, alignItems: 'center', justifyContent: 'center' }}>
           <Ionicons name="chevron-back" size={24} color={colors.text} />
         </TouchableOpacity>
-        <Text style={{ fontFamily: 'Georgia', fontSize: 20, fontWeight: '600', color: colors.text }}>Analytics</Text>
+        <Text style={{ fontFamily: FONTS.serif, fontSize: 20, color: colors.text }}>Analytics</Text>
         <View style={{ width: 40 }} />
       </View>
       <ScrollView
@@ -448,13 +448,13 @@ export default function AnalyticsScreen() {
                 value: displayData?.supportVotes || 0,
                 label: 'Support',
                 icon: 'thumbs-up-outline',
-                iconColor: colors.success,
+                iconColor: colors.support,
               },
               {
                 value: displayData?.opposeVotes || 0,
                 label: 'Oppose',
                 icon: 'thumbs-down-outline',
-                iconColor: colors.error,
+                iconColor: colors.oppose,
               },
             ]}
             columns={3}
@@ -473,18 +473,18 @@ export default function AnalyticsScreen() {
             value={displayData?.supportVotes || 0}
             max={displayData?.totalVotes || 1}
             label="Support vs Total Votes"
-            color={colors.success}
+            color={colors.support}
             size="lg"
           />
           <View style={styles.ratioLegend}>
             <View style={styles.legendItem}>
-              <View style={[styles.legendDot, { backgroundColor: colors.success }]} />
+              <View style={[styles.legendDot, { backgroundColor: colors.support }]} />
               <Text style={[styles.legendText, { color: colors.textSecondary }]}>
                 Support ({supportPercent}%)
               </Text>
             </View>
             <View style={styles.legendItem}>
-              <View style={[styles.legendDot, { backgroundColor: colors.error }]} />
+              <View style={[styles.legendDot, { backgroundColor: colors.oppose }]} />
               <Text style={[styles.legendText, { color: colors.textSecondary }]}>
                 Oppose ({100 - supportPercent}%)
               </Text>
@@ -584,7 +584,6 @@ const styles = StyleSheet.create({
   premiumBannerText: {
     ...TYPOGRAPHY.labelMedium,
     color: '#000',
-    fontWeight: '600',
     flex: 1,
   },
 
@@ -604,9 +603,8 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.lg,
   },
   premiumTitle: {
-    fontFamily: 'Georgia',
+    fontFamily: FONTS.serif,
     fontSize: responsive(28, 32, 36),
-    fontWeight: '600',
     marginBottom: SPACING.xs,
   },
   premiumSubtitle: {
@@ -619,9 +617,8 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.lg,
   },
   descriptionTitle: {
-    fontFamily: 'Georgia',
+    fontFamily: FONTS.serif,
     fontSize: 18,
-    fontWeight: '500',
     marginBottom: SPACING.md,
   },
   descriptionText: {
@@ -636,9 +633,8 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   featuresTitle: {
-    fontFamily: 'Georgia',
+    fontFamily: FONTS.serif,
     fontSize: 18,
-    fontWeight: '500',
     marginBottom: SPACING.lg,
   },
   featureRow: {
@@ -681,10 +677,10 @@ const styles = StyleSheet.create({
     alignItems: 'baseline',
   },
   priceAmount: {
-    fontFamily: 'Georgia',
+    fontFamily: FONTS.monoSemiBold,
+    fontVariant: ['tabular-nums'],
     fontSize: responsive(28, 32, 36),
     color: '#000',
-    fontWeight: '600',
   },
   pricePeriod: {
     ...TYPOGRAPHY.bodyMedium,
@@ -704,7 +700,6 @@ const styles = StyleSheet.create({
   upgradeButtonText: {
     ...TYPOGRAPHY.labelLarge,
     color: '#fff',
-    fontWeight: '600',
   },
   pricingNote: {
     ...TYPOGRAPHY.bodySmall,
@@ -721,9 +716,8 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.xl,
   },
   ratioTitle: {
-    fontFamily: 'Georgia',
+    fontFamily: FONTS.serif,
     fontSize: 18,
-    fontWeight: '500',
     marginBottom: SPACING.lg,
   },
   ratioLegend: {
@@ -746,9 +740,8 @@ const styles = StyleSheet.create({
     ...TYPOGRAPHY.labelSmall,
   },
   sectionTitle: {
-    fontFamily: 'Georgia',
+    fontFamily: FONTS.serif,
     fontSize: 18,
-    fontWeight: '500',
     marginBottom: SPACING.lg,
   },
   proposalCard: {
@@ -758,9 +751,8 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.md,
   },
   proposalTitle: {
-    fontFamily: 'Georgia',
+    fontFamily: FONTS.serif,
     fontSize: 16,
-    fontWeight: '500',
     marginBottom: SPACING.md,
   },
   proposalStats: {
@@ -802,7 +794,8 @@ const styles = StyleSheet.create({
   },
   engagementValue: {
     ...TYPOGRAPHY.labelMedium,
-    fontWeight: '700',
+    fontFamily: FONTS.monoSemiBold,
+    fontVariant: ['tabular-nums'],
   },
 
   // Empty State
@@ -819,9 +812,8 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.lg,
   },
   emptyTitle: {
-    fontFamily: 'Georgia',
+    fontFamily: FONTS.serif,
     fontSize: 22,
-    fontWeight: '500',
     marginBottom: SPACING.sm,
   },
   emptyText: {
@@ -840,7 +832,6 @@ const styles = StyleSheet.create({
   createBtnText: {
     ...TYPOGRAPHY.labelLarge,
     color: '#000',
-    fontWeight: '600',
   },
 
   bottomPadding: {

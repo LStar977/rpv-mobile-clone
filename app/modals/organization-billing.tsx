@@ -17,7 +17,7 @@ import Animated, { FadeIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuthStore } from '../../lib/auth';
 import { organizationsApi, type OrgUsage } from '../../lib/api';
-import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS } from '../../lib/theme';
+import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS, FONTS } from '../../lib/theme';
 import { ORG_TIERS, type OrgTier } from '../../lib/org-tiers';
 import { TierCard } from '../../components/ui/TierCard';
 import { processOrganizationPayment, cancelOrganizationStripe } from '../../lib/payment';
@@ -199,7 +199,7 @@ export default function OrganizationBillingScreen() {
             <View style={[styles.legacyBanner, { backgroundColor: `${colors.gold}10`, borderColor: colors.gold }]}>
               <Ionicons name="information-circle-outline" size={18} color={colors.gold} />
               <Text style={[styles.legacyBannerText, { color: colors.text }]}>
-                You're on a legacy plan from before our new pricing. Your features and caps stay unchanged. Contact <Text style={{ color: colors.gold, fontWeight: '600' }}>support@representvote.com</Text> when you'd like to migrate to a current plan.
+                You're on a legacy plan from before our new pricing. Your features and caps stay unchanged. Contact <Text style={{ color: colors.gold, fontFamily: FONTS.sansSemiBold}}>support@representvote.com</Text> when you'd like to migrate to a current plan.
               </Text>
             </View>
           )}
@@ -380,7 +380,6 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     ...TYPOGRAPHY.headlineSmall,
-    fontWeight: '600',
     flex: 1,
     textAlign: 'center',
   },
@@ -415,7 +414,6 @@ const styles = StyleSheet.create({
   },
   summaryValue: {
     ...TYPOGRAPHY.bodyMedium,
-    fontWeight: '600',
   },
   progressTrack: {
     height: 6,
@@ -429,7 +427,6 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     ...TYPOGRAPHY.headlineSmall,
-    fontWeight: '700',
     marginBottom: SPACING.md,
     marginTop: SPACING.sm,
   },
@@ -443,7 +440,6 @@ const styles = StyleSheet.create({
   },
   primaryButtonText: {
     ...TYPOGRAPHY.labelLarge,
-    fontWeight: '700',
     color: '#000',
   },
   secondaryButton: {
@@ -458,7 +454,6 @@ const styles = StyleSheet.create({
   },
   secondaryButtonText: {
     ...TYPOGRAPHY.labelMedium,
-    fontWeight: '600',
   },
   helpText: {
     ...TYPOGRAPHY.bodySmall,
