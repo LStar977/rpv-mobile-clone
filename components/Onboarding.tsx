@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -8,278 +8,86 @@ import {
   FlatList,
   ViewToken,
   Image,
-  Platform,
 } from 'react-native';
 import Animated, {
   FadeIn,
   FadeInUp,
-  FadeInDown,
-  FadeOut,
-  useSharedValue,
   useAnimatedStyle,
   withTiming,
-  withRepeat,
-  withSequence,
-  withDelay,
-  interpolate,
-  Easing,
 } from 'react-native-reanimated';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import Svg, { Circle, Path, G, Defs, RadialGradient, Stop } from 'react-native-svg';
+import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import { FONTS } from '../lib/theme';
+import { useTheme, FONTS, RADIUS } from '../lib/theme';
+import { TrustChip } from './ui';
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const ONBOARDING_KEY = '@represent_onboarding_complete';
-
-// Premium design tokens
-const GOLD = '#EABA58';
-const GOLD_DARK = '#C89A3E';
-const GOLD_LIGHT = '#F4D28C';
-const BG = '#040707';
-const BG_ELEVATED = '#0D0F12';
-const FG = '#F4F5F6';
-const FG_MUTED = '#A0A4A8';
-const FG_FAINT = '#6B6F73';
-const SERIF_FONT = FONTS.serif;
 
 interface Slide {
   id: string;
   eyebrow: string;
   title: string;
-  titleAccent: string;
   subtitle: string;
-  icon: 'voice' | 'swipe' | 'verify';
+  icon: keyof typeof Ionicons.glyphMap;
+  /** Trust chips shown under the copy (design-language pills). */
+  chips?: { label: string; variant: 'gold' | 'neutral'; icon?: keyof typeof Ionicons.glyphMap }[];
+  /** Gold-surface trust note card ("Checked, never kept." on the verify step). */
+  note?: { lead: string; body: string };
 }
 
 const SLIDES: Slide[] = [
   {
     id: '1',
     eyebrow: 'CIVIC DEMOCRACY',
-    title: 'Your voice,',
-    titleAccent: 'verified.',
-    subtitle: 'One person, one vote. Real proposals from your community. Your opinion shapes policy.',
-    icon: 'voice',
+    title: 'Your voice, on the record.',
+    subtitle:
+      'One person, one vote. Real proposals from your community — your opinion shapes policy.',
+    icon: 'megaphone-outline',
+    chips: [
+      { label: 'VERIFIED CITIZENS', variant: 'gold', icon: 'checkmark' },
+      { label: 'PUBLIC COUNT', variant: 'neutral' },
+    ],
   },
   {
     id: '2',
     eyebrow: 'INSTANT VOTING',
-    title: 'Swipe to',
-    titleAccent: 'decide.',
-    subtitle: 'Support or oppose in seconds. Track outcomes. Watch your civic impact grow.',
-    icon: 'swipe',
+    title: 'Swipe to decide.',
+    subtitle:
+      'Support or oppose in seconds. Track outcomes. Watch your civic impact grow.',
+    icon: 'swap-horizontal-outline',
+    chips: [
+      { label: 'COUNTED, NOT ESTIMATED', variant: 'neutral' },
+    ],
   },
   {
     id: '3',
     eyebrow: 'VERIFIED IDENTITY',
-    title: 'Unlock',
-    titleAccent: 'voting.',
-    subtitle: 'Verify once to vote everywhere. Your data stays private. Your voice gets heard.',
-    icon: 'verify',
+    title: 'Unlock voting.',
+    subtitle:
+      'Verify once to vote everywhere. Your ballot becomes impossible to fake — and impossible to ignore.',
+    icon: 'shield-checkmark-outline',
+    note: {
+      lead: 'Checked, never kept.',
+      body: ' Your documents are verified, then discarded. Represent stores only the fact that you are verified — never your ID.',
+    },
   },
 ];
 
-// Floating particle for premium ambient effect
-function Particle({ delay }: { delay: number }) {
-  const translateY = useSharedValue(SCREEN_HEIGHT + 50);
-  const opacity = useSharedValue(0);
-  const startX = useMemo(() => Math.random() * SCREEN_WIDTH, []);
-  const size = useMemo(() => 2 + Math.random() * 3, []);
-  const duration = useMemo(() => 6000 + Math.random() * 4000, []);
-
-  useEffect(() => {
-    const timeout = setTimeout(() => {
-      translateY.value = withRepeat(
-        withTiming(-50, { duration, easing: Easing.linear }),
-        -1,
-        false
-      );
-      opacity.value = withRepeat(
-        withSequence(
-          withTiming(0.4 + Math.random() * 0.3, { duration: duration * 0.15 }),
-          withTiming(0.4 + Math.random() * 0.3, { duration: duration * 0.7 }),
-          withTiming(0, { duration: duration * 0.15 })
-        ),
-        -1,
-        false
-      );
-    }, delay);
-    return () => clearTimeout(timeout);
-  }, []);
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: translateY.value }],
-    opacity: opacity.value,
-  }));
-
-  return (
-    <Animated.View
-      style={[
-        {
-          position: 'absolute',
-          left: startX,
-          width: size,
-          height: size,
-          borderRadius: size / 2,
-          backgroundColor: GOLD,
-        },
-        animatedStyle,
-      ]}
-    />
-  );
-}
-
-function ParticleField() {
-  const particles = useMemo(
-    () => Array.from({ length: 12 }, (_, i) => ({ id: i, delay: i * 400 })),
-    []
-  );
-  return (
-    <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
-      {particles.map((p) => (
-        <Particle key={p.id} delay={p.delay} />
-      ))}
-    </View>
-  );
-}
-
-function VoiceIcon() {
-  return (
-    <Svg width={140} height={140} viewBox="0 0 140 140">
-      <Defs>
-        <RadialGradient id="glow" cx="50%" cy="50%" r="50%">
-          <Stop offset="0%" stopColor={GOLD} stopOpacity={0.3} />
-          <Stop offset="100%" stopColor={GOLD} stopOpacity={0} />
-        </RadialGradient>
-      </Defs>
-      <Circle cx={70} cy={70} r={65} fill="url(#glow)" />
-      <Circle cx={70} cy={70} r={55} stroke={GOLD} strokeWidth={1} fill="none" opacity={0.2} />
-      <Circle cx={70} cy={70} r={40} stroke={GOLD} strokeWidth={0.5} fill="none" opacity={0.4} />
-      <G opacity={1}>
-        <Path d="M70 30 L70 110" stroke={GOLD} strokeWidth={2.5} strokeLinecap="round" />
-        <Path d="M50 45 L50 95" stroke={GOLD} strokeWidth={2} strokeLinecap="round" opacity={0.8} />
-        <Path d="M90 45 L90 95" stroke={GOLD} strokeWidth={2} strokeLinecap="round" opacity={0.8} />
-        <Path d="M30 60 L30 80" stroke={GOLD} strokeWidth={1.5} strokeLinecap="round" opacity={0.6} />
-        <Path d="M110 60 L110 80" stroke={GOLD} strokeWidth={1.5} strokeLinecap="round" opacity={0.6} />
-      </G>
-    </Svg>
-  );
-}
-
-function SwipeIcon() {
-  return (
-    <Svg width={140} height={140} viewBox="0 0 140 140">
-      <Defs>
-        <RadialGradient id="glowSwipe" cx="50%" cy="50%" r="50%">
-          <Stop offset="0%" stopColor={GOLD} stopOpacity={0.25} />
-          <Stop offset="100%" stopColor={GOLD} stopOpacity={0} />
-        </RadialGradient>
-      </Defs>
-      <Circle cx={70} cy={70} r={65} fill="url(#glowSwipe)" />
-      {/* Stacked cards */}
-      <G transform="translate(70, 70) rotate(-12) translate(-70, -70)">
-        <Path
-          d="M35 30 H105 Q110 30 110 35 V105 Q110 110 105 110 H35 Q30 110 30 105 V35 Q30 30 35 30"
-          stroke={GOLD}
-          strokeWidth={1}
-          fill="none"
-          opacity={0.3}
-        />
-      </G>
-      <G transform="translate(70, 70) rotate(0) translate(-70, -70)">
-        <Path
-          d="M35 30 H105 Q110 30 110 35 V105 Q110 110 105 110 H35 Q30 110 30 105 V35 Q30 30 35 30"
-          stroke={GOLD}
-          strokeWidth={1.5}
-          fill={`${BG_ELEVATED}`}
-          opacity={0.9}
-        />
-      </G>
-      {/* Left arrow */}
-      <Path
-        d="M70 70 L45 70 M58 57 L45 70 L58 83"
-        stroke={GOLD}
-        strokeWidth={3}
-        fill="none"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        opacity={0.6}
-      />
-      {/* Right arrow */}
-      <Path
-        d="M70 70 L95 70 M82 57 L95 70 L82 83"
-        stroke={GOLD}
-        strokeWidth={3}
-        fill="none"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </Svg>
-  );
-}
-
-function VerifyIcon() {
-  return (
-    <Svg width={140} height={140} viewBox="0 0 140 140">
-      <Defs>
-        <RadialGradient id="glowVerify" cx="50%" cy="50%" r="50%">
-          <Stop offset="0%" stopColor={GOLD} stopOpacity={0.25} />
-          <Stop offset="100%" stopColor={GOLD} stopOpacity={0} />
-        </RadialGradient>
-      </Defs>
-      <Circle cx={70} cy={70} r={65} fill="url(#glowVerify)" />
-      {/* Shield */}
-      <Path
-        d="M70 15 L115 35 L115 65 Q115 100 70 125 Q25 100 25 65 L25 35 Z"
-        stroke={GOLD}
-        strokeWidth={1}
-        fill="none"
-        opacity={0.3}
-      />
-      <Path
-        d="M70 28 L100 43 L100 65 Q100 90 70 110 Q40 90 40 65 L40 43 Z"
-        stroke={GOLD}
-        strokeWidth={1.5}
-        fill={`${GOLD}10`}
-      />
-      {/* Checkmark */}
-      <Path
-        d="M50 68 L63 81 L90 54"
-        stroke={GOLD}
-        strokeWidth={4}
-        fill="none"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </Svg>
-  );
-}
-
-function SlideIcon({ type }: { type: Slide['icon'] }) {
-  switch (type) {
-    case 'voice':
-      return <VoiceIcon />;
-    case 'swipe':
-      return <SwipeIcon />;
-    case 'verify':
-      return <VerifyIcon />;
-  }
-}
-
+// Page dot per mock 01a/01b — active is a 22×6 gold pill.
 function Dot({ active }: { active: boolean }) {
+  const { colors } = useTheme();
   const animatedStyle = useAnimatedStyle(() => ({
-    width: withTiming(active ? 28 : 8, { duration: 250 }),
-    opacity: withTiming(active ? 1 : 0.35, { duration: 250 }),
+    width: withTiming(active ? 22 : 6, { duration: 240 }),
   }));
 
   return (
     <Animated.View
       style={[
         styles.dot,
-        { backgroundColor: GOLD },
+        { backgroundColor: active ? colors.goldFill : colors.surfaceHighlight },
         animatedStyle,
       ]}
     />
@@ -287,6 +95,7 @@ function Dot({ active }: { active: boolean }) {
 }
 
 export function Onboarding({ onComplete }: { onComplete: () => void }) {
+  const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const [currentIndex, setCurrentIndex] = useState(0);
   const flatListRef = useRef<FlatList>(null);
@@ -337,59 +146,87 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
 
   const renderSlide = ({ item }: { item: Slide }) => (
     <View style={styles.slide}>
-      <Animated.View entering={FadeInUp.duration(500).delay(50)} style={styles.eyebrowContainer}>
-        <Text style={styles.eyebrow}>{item.eyebrow}</Text>
+      <Animated.View entering={FadeInUp.duration(450).delay(50)}>
+        <View style={[styles.slideIconTile, { backgroundColor: colors.goldSurface, borderColor: 'rgba(234, 186, 88, 0.3)' }]}>
+          <Ionicons name={item.icon} size={28} color={colors.gold} />
+        </View>
       </Animated.View>
 
-      <Animated.View entering={FadeInUp.duration(600).delay(100)} style={styles.iconContainer}>
-        <SlideIcon type={item.icon} />
-      </Animated.View>
+      <Animated.Text
+        entering={FadeInUp.duration(450).delay(120)}
+        style={[styles.eyebrow, { color: colors.gold }]}
+      >
+        {item.eyebrow}
+      </Animated.Text>
 
-      <Animated.View entering={FadeInUp.duration(600).delay(200)}>
-        <Text style={styles.title}>
-          {item.title}
-          {'\n'}
-          <Text style={styles.titleAccent}>{item.titleAccent}</Text>
-        </Text>
-      </Animated.View>
+      <Animated.Text
+        entering={FadeInUp.duration(450).delay(190)}
+        style={[styles.title, { color: colors.text }]}
+      >
+        {item.title}
+      </Animated.Text>
 
-      <Animated.View entering={FadeInUp.duration(600).delay(300)}>
-        <Text style={styles.subtitle}>{item.subtitle}</Text>
-      </Animated.View>
+      <Animated.Text
+        entering={FadeInUp.duration(450).delay(260)}
+        style={[styles.subtitle, { color: colors.textSecondary }]}
+      >
+        {item.subtitle}
+      </Animated.Text>
+
+      {item.chips && (
+        <Animated.View entering={FadeInUp.duration(450).delay(330)} style={styles.chipsRow}>
+          {item.chips.map((chip) => (
+            <TrustChip key={chip.label} label={chip.label} variant={chip.variant} icon={chip.icon} />
+          ))}
+        </Animated.View>
+      )}
+
+      {item.note && (
+        <Animated.View
+          entering={FadeInUp.duration(450).delay(330)}
+          style={[styles.noteCard, { backgroundColor: colors.goldSurface, borderColor: 'rgba(234, 186, 88, 0.18)' }]}
+        >
+          <Ionicons name="shield-outline" size={18} color={colors.gold} style={styles.noteIcon} />
+          <Text style={[styles.noteText, { color: colors.textSecondary }]}>
+            <Text style={[styles.noteLead, { color: colors.text }]}>{item.note.lead}</Text>
+            {item.note.body}
+          </Text>
+        </Animated.View>
+      )}
     </View>
   );
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
-      {/* Background gradients */}
-      <LinearGradient
-        colors={[`${GOLD}12`, 'transparent', 'transparent', `${GOLD}08`]}
-        style={StyleSheet.absoluteFillObject}
-        start={{ x: 0.5, y: 0 }}
-        end={{ x: 0.5, y: 1 }}
-      />
-
-      {/* Ambient particles */}
-      <ParticleField />
-
-      {/* Logo at top */}
-      <Animated.View entering={FadeIn.duration(600)} style={[styles.logoContainer, { marginTop: insets.top + 20 }]}>
-        <Image
-          source={require('../assets/logo.png')}
-          style={styles.logo}
-          resizeMode="contain"
-        />
-        <Text style={styles.logoText}>Represent</Text>
-      </Animated.View>
-
-      {/* Skip button */}
-      {!isLastSlide && (
-        <Animated.View entering={FadeIn.duration(400)} style={styles.skipContainer}>
-          <TouchableOpacity onPress={handleSkip} activeOpacity={0.7} style={styles.skipButton}>
-            <Text style={styles.skipText}>Skip</Text>
-          </TouchableOpacity>
+    <View
+      style={[
+        styles.container,
+        { backgroundColor: colors.background, paddingTop: insets.top + 8, paddingBottom: Math.max(insets.bottom, 24) + 8 },
+      ]}
+    >
+      {/* Top bar — the Represent mark + Skip */}
+      <View style={styles.topBar}>
+        <Animated.View entering={FadeIn.duration(500)} style={styles.brandRow}>
+          <Image
+            source={require('../assets/logo.png')}
+            style={styles.logo}
+            resizeMode="cover"
+          />
+          <Text style={[styles.brandText, { color: colors.gold }]}>REPRESENT</Text>
         </Animated.View>
-      )}
+
+        {!isLastSlide && (
+          <Animated.View entering={FadeIn.duration(400)}>
+            <TouchableOpacity
+              onPress={handleSkip}
+              activeOpacity={0.7}
+              style={styles.skipButton}
+              accessibilityRole="button"
+            >
+              <Text style={[styles.skipText, { color: colors.textSecondary }]}>Skip</Text>
+            </TouchableOpacity>
+          </Animated.View>
+        )}
+      </View>
 
       {/* Slides */}
       <FlatList
@@ -411,61 +248,54 @@ export function Onboarding({ onComplete }: { onComplete: () => void }) {
         })}
       />
 
-      {/* Pagination dots */}
+      {/* Pagination dots — left-aligned per mock */}
       <View style={styles.pagination}>
         {SLIDES.map((_, index) => (
           <Dot key={index} active={index === currentIndex} />
         ))}
       </View>
 
-      {/* Bottom buttons */}
+      {/* Bottom actions — one gold moment per screen */}
       <View style={styles.bottomContainer}>
         {isLastSlide ? (
           <>
             <TouchableOpacity
               onPress={handleVerifyNow}
               activeOpacity={0.9}
-              style={styles.primaryButton}
+              accessibilityRole="button"
+              style={[styles.primaryButton, { backgroundColor: colors.goldFill }]}
             >
-              <LinearGradient
-                colors={[GOLD, GOLD_DARK]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.primaryButtonGradient}
-              >
-                <Text style={styles.primaryButtonText}>Verify My Identity</Text>
-              </LinearGradient>
+              <Text style={styles.primaryButtonText}>Verify My Identity</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
               onPress={handleComplete}
               activeOpacity={0.7}
+              accessibilityRole="button"
               style={styles.secondaryButton}
             >
-              <Text style={styles.secondaryButtonText}>Explore first</Text>
+              <Text style={[styles.secondaryButtonText, { color: colors.textSecondary }]}>
+                Explore first
+              </Text>
             </TouchableOpacity>
           </>
         ) : (
           <TouchableOpacity
             onPress={handleNext}
             activeOpacity={0.9}
-            style={styles.primaryButton}
+            accessibilityRole="button"
+            style={[styles.primaryButton, { backgroundColor: colors.goldFill }]}
           >
-            <LinearGradient
-              colors={[GOLD, GOLD_DARK]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.primaryButtonGradient}
-            >
-              <Text style={styles.primaryButtonText}>Continue</Text>
-            </LinearGradient>
+            <Text style={styles.primaryButtonText}>Continue</Text>
           </TouchableOpacity>
         )}
       </View>
 
-      {/* Footer tagline */}
-      <Animated.View entering={FadeIn.duration(800).delay(400)} style={styles.footer}>
-        <Text style={styles.footerText}>Verified civic infrastructure.</Text>
+      {/* Footer — trust copy, mono and recorded */}
+      <Animated.View entering={FadeIn.duration(700).delay(300)} style={styles.footer}>
+        <Text style={[styles.footerText, { color: colors.textTertiary }]}>
+          ONE PERSON · ONE BALLOT
+        </Text>
       </Animated.View>
     </View>
   );
@@ -492,45 +322,36 @@ export async function resetOnboarding(): Promise<void> {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: BG,
   },
-  logoContainer: {
+  topBar: {
+    flexDirection: 'row',
     alignItems: 'center',
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    zIndex: 10,
+    justifyContent: 'space-between',
+    paddingHorizontal: 30,
+    minHeight: 44,
+  },
+  brandRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
   },
   logo: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
   },
-  logoText: {
-    fontFamily: FONTS.serifMediumItalic,
-    fontSize: 18,
-    
-    color: GOLD,
-    marginTop: 8,
-    letterSpacing: 0.5,
-  },
-  skipContainer: {
-    position: 'absolute',
-    top: 60,
-    right: 24,
-    zIndex: 10,
+  brandText: {
+    fontFamily: FONTS.sansSemiBold,
+    fontSize: 11,
+    letterSpacing: 1.98, // .18em
   },
   skipButton: {
     paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 20,
-    backgroundColor: `${FG}10`,
+    paddingHorizontal: 8,
   },
   skipText: {
     fontFamily: FONTS.sansMedium,
-    fontSize: 15,
-    color: FG_MUTED,
+    fontSize: 14,
   },
   flatList: {
     flex: 1,
@@ -538,99 +359,107 @@ const styles = StyleSheet.create({
   slide: {
     width: SCREEN_WIDTH,
     justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 36,
+    paddingHorizontal: 30,
   },
-  eyebrowContainer: {
-    marginBottom: 24,
+  slideIconTile: {
+    width: 64,
+    height: 64,
+    borderRadius: 20,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 22,
   },
   eyebrow: {
     fontFamily: FONTS.sansSemiBold,
     fontSize: 11,
-    color: GOLD,
-    letterSpacing: 2.5,
-    textTransform: 'uppercase',
-  },
-  iconContainer: {
-    marginBottom: 40,
+    letterSpacing: 1.98, // .18em
+    marginBottom: 14,
   },
   title: {
-    fontFamily: FONTS.sans,
-    fontSize: 38,
-    color: FG,
-    textAlign: 'center',
-    lineHeight: 48,
-  },
-  titleAccent: {
-    fontFamily: FONTS.serifMediumItalic,
-    fontSize: 42,
-    
-    color: GOLD,
+    fontFamily: FONTS.serif,
+    fontSize: 40,
+    lineHeight: 44,
+    letterSpacing: -0.48,
+    marginBottom: 14,
   },
   subtitle: {
     fontFamily: FONTS.sans,
-    fontSize: 17,
-    color: FG_MUTED,
-    textAlign: 'center',
-    lineHeight: 26,
-    marginTop: 24,
-    paddingHorizontal: 8,
+    fontSize: 15,
+    lineHeight: 23,
+    maxWidth: 320,
+  },
+  chipsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 20,
+  },
+  noteCard: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+    borderRadius: 16,
+    borderWidth: 1,
+    paddingVertical: 15,
+    paddingHorizontal: 16,
+    marginTop: 20,
+  },
+  noteIcon: {
+    marginTop: 1,
+  },
+  noteText: {
+    fontFamily: FONTS.sans,
+    fontSize: 13,
+    lineHeight: 20,
+    flex: 1,
+  },
+  noteLead: {
+    fontFamily: FONTS.sansSemiBold,
   },
   pagination: {
     flexDirection: 'row',
-    justifyContent: 'center',
     alignItems: 'center',
-    gap: 10,
-    marginBottom: 28,
+    gap: 7,
+    paddingHorizontal: 30,
+    marginBottom: 26,
   },
   dot: {
-    height: 8,
-    borderRadius: 4,
+    height: 6,
+    borderRadius: 3,
   },
   bottomContainer: {
-    paddingHorizontal: 24,
-    paddingBottom: 16,
-    gap: 14,
+    paddingHorizontal: 30,
+    gap: 10,
   },
   primaryButton: {
+    height: 56,
     borderRadius: 16,
-    overflow: 'hidden',
-    shadowColor: GOLD,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    elevation: 8,
-  },
-  primaryButtonGradient: {
-    paddingVertical: 18,
     alignItems: 'center',
     justifyContent: 'center',
   },
   primaryButtonText: {
     fontFamily: FONTS.sansSemiBold,
     fontSize: 17,
-    color: BG,
-    letterSpacing: 0.3,
+    color: '#040707',
   },
   secondaryButton: {
-    paddingVertical: 14,
+    height: 48,
     alignItems: 'center',
     justifyContent: 'center',
   },
   secondaryButtonText: {
     fontFamily: FONTS.sansMedium,
-    fontSize: 16,
-    color: FG_FAINT,
+    fontSize: 15,
   },
   footer: {
     alignItems: 'center',
-    paddingBottom: 8,
+    marginTop: 14,
   },
   footerText: {
-    fontFamily: FONTS.serifMediumItalic,
-    fontSize: 12,
-    
-    color: FG_FAINT,
-    letterSpacing: 0.5,
+    fontFamily: FONTS.mono,
+    fontSize: 10,
+    letterSpacing: 2.2, // .22em
+    fontVariant: ['tabular-nums'],
   },
 });
