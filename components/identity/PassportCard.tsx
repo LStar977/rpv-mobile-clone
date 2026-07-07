@@ -1,47 +1,12 @@
-import React, { useMemo } from 'react';
+import React from 'react';
 import { View, Text, StyleSheet, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, { FadeInUp } from 'react-native-reanimated';
-import Svg, { Circle, Path, Rect, Defs, Pattern } from 'react-native-svg';
+import { LinearGradient } from 'expo-linear-gradient';
 
 import { useTheme, FONTS } from '../../lib/theme';
 import { Button } from '../ui';
 import { useTutorialTarget } from '../tutorial';
-
-const ID_STATIC = {
-  G: '#EABA58',
-  GD: '#C89A3E',
-  GL: '#F4D28C',
-  BG: '#040707',
-  BG_CARD: '#0D0F12',
-  BG_RAISED: '#15181C',
-  LINE: '#1E2228',
-  LINE_STRONG: '#2A2F37',
-  FG: '#F4F5F6',
-  FG_MUTED: '#C7CACD',
-  FG_FAINT: '#8E9297',
-  GREEN: '#34C759',
-  SERIF: 'Georgia',
-  MONO: 'JetBrainsMono-Regular',
-};
-
-function useIdentityColors() {
-  const { colors } = useTheme();
-  return {
-    G: colors.gold,
-    GD: colors.goldDark,
-    GL: colors.goldLight,
-    BG: colors.background,
-    BG_CARD: colors.surface,
-    BG_RAISED: colors.surfaceElevated,
-    LINE: colors.border,
-    LINE_STRONG: colors.borderStrong,
-    FG: colors.text,
-    FG_MUTED: colors.textSecondary,
-    FG_FAINT: colors.textTertiary,
-    GREEN: colors.success,
-  };
-}
 
 export type PassportStatus = 'unverified' | 'pending' | 'verified' | 'failed';
 
@@ -52,9 +17,19 @@ type PassportCardProps = {
   status: PassportStatus;
   folio: string;
   memberSince?: string;
+  /** Country used for the credential's scope line, e.g. "Canada". */
+  country?: string;
   onVerify: () => void;
   startingKyc?: boolean;
 };
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Civic credential card — mock 10 "Identity · Civic Credential".
+// Gold-accented gradient card: mono scope eyebrow, serif holder name,
+// verification status line, constituency/member-since grid, and a mono
+// credential-ID + ledger footer. Below it, unverified users get the verify
+// prompt (gold CTA + "Checked, never kept").
+// ═══════════════════════════════════════════════════════════════════════════
 
 export function PassportCard({
   name,
@@ -63,122 +38,123 @@ export function PassportCard({
   status,
   folio,
   memberSince,
+  country,
   onVerify,
   startingKyc = false,
 }: PassportCardProps) {
-  const id = useIdentityColors();
   const { colors } = useTheme();
   const idCardRef = useTutorialTarget('id-card');
   const verifyButtonRef = useTutorialTarget('verify-button');
 
-  const initials = useMemo(() => {
-    if (!name) return 'RW';
-    const parts = name.split(' ').filter(Boolean);
-    if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-    return name.slice(0, 2).toUpperCase();
-  }, [name]);
+  const statusLine = verified
+    ? { icon: 'shield-checkmark' as const, label: 'VERIFIED CITIZEN', color: colors.gold }
+    : status === 'pending'
+      ? { icon: 'time-outline' as const, label: 'VERIFICATION PENDING', color: colors.warning }
+      : status === 'failed'
+        ? { icon: 'alert-circle-outline' as const, label: 'VERIFICATION FAILED', color: colors.error }
+        : { icon: 'shield-outline' as const, label: 'UNVERIFIED', color: colors.textTertiary };
+
+  const ledgerLine = verified ? 'ON THE PUBLIC LEDGER' : 'NOT YET ON THE LEDGER';
+  const eyebrow = `CIVIC IDENTITY${country ? ` · ${country.toUpperCase()}` : ''}`;
 
   return (
     <>
       <View ref={idCardRef} collapsable={false}>
         <Animated.View entering={FadeInUp.delay(100).duration(400)}>
-          <View style={[styles.passportCard, { backgroundColor: id.BG_CARD, borderColor: id.LINE_STRONG }]}>
-            {/* Guilloché pattern */}
-            <View style={styles.guilloche}>
-              <Svg width="100%" height="100%" viewBox="0 0 400 260" preserveAspectRatio="none">
-                <Defs>
-                  <Pattern id="passport-guilloche" x="0" y="0" width="40" height="40" patternUnits="userSpaceOnUse">
-                    <Path d="M 0 20 Q 10 0, 20 20 T 40 20" stroke={id.G} fill="none" strokeWidth={0.5} opacity={0.07} />
-                    <Path d="M 0 20 Q 10 40, 20 20 T 40 20" stroke={id.G} fill="none" strokeWidth={0.5} opacity={0.07} />
-                  </Pattern>
-                </Defs>
-                <Rect width="400" height="260" fill="url(#passport-guilloche)" />
-              </Svg>
+          <View style={[styles.card, { borderColor: `${colors.gold}66` }]}>
+            <LinearGradient
+              colors={[colors.surface, colors.backgroundSecondary, colors.background]}
+              locations={[0, 0.55, 1]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 0.55, y: 1 }}
+              style={StyleSheet.absoluteFill}
+            />
+
+            {/* Eyebrow + seal */}
+            <View style={styles.topRow}>
+              <Text style={[styles.eyebrow, { color: colors.gold }]}>{eyebrow}</Text>
+              <Image
+                source={require('../../assets/logo.png')}
+                style={styles.seal}
+                resizeMode="contain"
+              />
             </View>
 
-            {/* Top strip */}
-            <View style={[styles.passportTop, { borderBottomColor: id.LINE }]}>
-              <View style={styles.passportLogo}>
-                <Image source={require('../../assets/logo.png')} style={{ width: 22, height: 22 }} resizeMode="contain" />
-                <Text style={[styles.passportBrand, { color: id.G }]}>REPRESENT</Text>
-              </View>
-              <Text style={[styles.passportEst, { color: id.FG_FAINT }]}>EST 2026</Text>
-            </View>
-
-            {/* Main section */}
-            <View style={styles.passportMain}>
-              {/* Portrait frame */}
-              <View style={[styles.portraitFrame, { borderColor: id.GD }]}>
-                <View style={[styles.cornerTick, { top: -1, left: -1, borderColor: id.G }]} />
-                <View style={[styles.cornerTick, { top: -1, right: -1, borderLeftWidth: 0, borderRightWidth: 1.5, borderColor: id.G }]} />
-                <View style={[styles.cornerTick, { bottom: -1, left: -1, borderTopWidth: 0, borderBottomWidth: 1.5, borderColor: id.G }]} />
-                <View style={[styles.cornerTick, { bottom: -1, right: -1, borderTopWidth: 0, borderBottomWidth: 1.5, borderLeftWidth: 0, borderRightWidth: 1.5, borderColor: id.G }]} />
-                <Text style={[styles.initialsText, { color: id.GL }]} numberOfLines={1} adjustsFontSizeToFit>{initials}</Text>
-                {verified && (
-                  <View style={[styles.biometricTick, { backgroundColor: id.GREEN }]}>
-                    <Ionicons name="checkmark" size={10} color={id.BG} />
-                  </View>
-                )}
-              </View>
-
-              {/* Info */}
-              <View style={styles.passportInfo}>
-                <Text style={[styles.registeredLabel, { color: id.FG_FAINT }]}>Registered name</Text>
-                <Text style={[styles.passportName, { color: id.FG }]}>{name || 'Your Name'}</Text>
-                <View style={styles.locationRow}>
-                  <Svg width={10} height={10} viewBox="0 0 12 12">
-                    <Path d="M6 11s4-3.5 4-7a4 4 0 1 0-8 0c0 3.5 4 7 4 7z" stroke={id.G} strokeWidth={1} fill="none" />
-                    <Circle cx="6" cy="4" r="1.2" fill={id.G} />
-                  </Svg>
-                  <Text style={[styles.locationText, { color: id.FG_MUTED }]}>{location || 'Location not set'}</Text>
-                </View>
+            {/* Holder */}
+            <View style={styles.holder}>
+              <Text style={[styles.name, { color: colors.text }]} numberOfLines={2}>
+                {name || 'Your Name'}
+              </Text>
+              <View style={styles.statusRow}>
+                <Ionicons name={statusLine.icon} size={13} color={statusLine.color} />
+                <Text style={[styles.statusLabel, { color: statusLine.color }]}>{statusLine.label}</Text>
               </View>
             </View>
 
-            {/* Register strip */}
-            <View style={[styles.registerStrip, { borderTopColor: id.LINE }]}>
-              <View style={styles.registerCell}>
-                <Text style={[styles.registerLabel, { color: id.FG_FAINT }]}>Joined</Text>
-                <Text style={[styles.registerValue, { color: id.FG }]}>{memberSince || 'Apr 2026'}</Text>
-              </View>
-              <View style={[styles.registerCell, styles.registerCellMid, { borderColor: id.LINE }]}>
-                <Text style={[styles.registerLabel, { color: id.FG_FAINT }]}>Folio</Text>
-                <Text style={[styles.registerMono, { color: id.FG }]}>RW·{folio}</Text>
-              </View>
-              <View style={styles.registerCell}>
-                <Text style={[styles.registerLabel, { color: id.FG_FAINT }]}>Status</Text>
-                <Text style={[styles.registerValue, { color: verified ? id.GREEN : id.FG_MUTED }]}>
-                  {verified ? 'Active' : 'Pending'}
+            {/* Constituency / member since */}
+            <View style={styles.metaGrid}>
+              <View style={styles.metaCell}>
+                <Text style={[styles.metaLabel, { color: colors.textTertiary }]}>CONSTITUENCY</Text>
+                <Text style={[styles.metaValue, { color: colors.textSecondary }]} numberOfLines={1}>
+                  {location || 'Not set'}
                 </Text>
               </View>
+              <View style={styles.metaCell}>
+                <Text style={[styles.metaLabel, { color: colors.textTertiary }]}>MEMBER SINCE</Text>
+                <Text style={[styles.metaValue, { color: colors.textSecondary }]} numberOfLines={1}>
+                  {memberSince || 'Apr 2026'}
+                </Text>
+              </View>
+            </View>
+
+            {/* Credential footer */}
+            <View style={[styles.footer, { borderTopColor: colors.borderSubtle }]}>
+              <Text style={[styles.footerMono, { color: colors.textTertiary }]}>{folio}</Text>
+              <Text style={[styles.footerMono, { color: colors.textTertiary }]}>{ledgerLine}</Text>
             </View>
           </View>
         </Animated.View>
       </View>
 
+      {/* Verify prompt — unverified / pending / failed */}
       {!verified && (
         <Animated.View
           entering={FadeInUp.delay(200).duration(400)}
-          style={[styles.verifyCta, { backgroundColor: colors.surface, borderColor: colors.border }]}
+          style={[styles.verifyCta, { backgroundColor: colors.surface, borderColor: colors.borderSubtle }]}
         >
           <View style={styles.verifyCtaContent}>
-            <View style={[styles.verifyCtaIcon, { backgroundColor: `${colors.gold}15` }]}>
-              <Ionicons name="shield-checkmark-outline" size={24} color={colors.gold} />
+            <View
+              style={[
+                styles.verifyCtaIcon,
+                { backgroundColor: status === 'failed' ? colors.errorSurface : colors.goldSurface },
+              ]}
+            >
+              <Ionicons
+                name={status === 'failed' ? 'alert-circle-outline' : 'shield-checkmark-outline'}
+                size={20}
+                color={status === 'failed' ? colors.error : colors.gold}
+              />
             </View>
             <View style={styles.verifyCtaText}>
               <Text style={[styles.verifyCtaTitle, { color: colors.text }]}>
-                {status === 'pending' ? 'Verification Pending' : 'Verify Your Identity'}
+                {status === 'pending'
+                  ? 'Verification Pending'
+                  : status === 'failed'
+                    ? 'Verification Failed'
+                    : 'Verify Your Identity'}
               </Text>
               <Text style={[styles.verifyCtaSubtitle, { color: colors.textSecondary }]}>
                 {status === 'pending'
                   ? 'Your verification is being processed'
-                  : 'Unlock voting and earn the Verified badge'}
+                  : status === 'failed'
+                    ? 'Something went wrong — you can try again'
+                    : 'Unlock voting and earn the Verified badge'}
               </Text>
             </View>
           </View>
           <View ref={verifyButtonRef} collapsable={false}>
             <Button
-              title={startingKyc ? 'Starting...' : status === 'pending' ? 'Refresh' : 'Verify Now'}
+              title={startingKyc ? 'Starting...' : status === 'pending' ? 'Refresh' : status === 'failed' ? 'Try Again' : 'Verify Now'}
               onPress={onVerify}
               variant="primary"
               size="md"
@@ -186,6 +162,9 @@ export function PassportCard({
               disabled={startingKyc}
             />
           </View>
+          <Text style={[styles.trustNote, { color: colors.textTertiary }]}>
+            Your ID is confirmed, then discarded. Checked, never kept.
+          </Text>
         </Animated.View>
       )}
     </>
@@ -193,82 +172,110 @@ export function PassportCard({
 }
 
 const styles = StyleSheet.create({
-  passportCard: {
+  card: {
     position: 'relative',
-    borderRadius: 20,
-    backgroundColor: ID_STATIC.BG_CARD,
+    borderRadius: 22,
     borderWidth: 1,
-    borderColor: ID_STATIC.LINE_STRONG,
     overflow: 'hidden',
-    marginBottom: 22,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 18 },
-    shadowOpacity: 0.4,
-    shadowRadius: 36,
-    elevation: 20,
+    padding: 22,
+    gap: 16,
+    marginBottom: 16,
   },
-  guilloche: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, opacity: 0.07 },
-  passportTop: {
+  topRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 14,
-    paddingHorizontal: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: ID_STATIC.LINE,
   },
-  passportLogo: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  passportBrand: { fontFamily: FONTS.sansSemiBold, fontSize: 10, letterSpacing: 2.8, color: ID_STATIC.G },
-  passportEst: { fontFamily: FONTS.monoRegular, fontVariant: ['tabular-nums'], fontSize: 9, color: ID_STATIC.FG_FAINT, letterSpacing: 1 },
-  passportMain: { flexDirection: 'row', alignItems: 'flex-start', padding: 20, gap: 16 },
-  portraitFrame: {
-    width: 88,
-    height: 110,
-    borderWidth: 1,
-    borderColor: ID_STATIC.GD,
-    backgroundColor: '#0A0C0F',
-    justifyContent: 'center',
+  eyebrow: {
+    fontFamily: FONTS.monoSemiBold,
+    fontVariant: ['tabular-nums'],
+    fontSize: 9.5,
+    letterSpacing: 1.9,
+  },
+  seal: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+  },
+  holder: {
+    gap: 4,
+  },
+  name: {
+    fontFamily: FONTS.serif,
+    fontSize: 29,
+    lineHeight: 32,
+    letterSpacing: -0.29,
+  },
+  statusRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    position: 'relative',
+    gap: 6,
   },
-  cornerTick: { position: 'absolute', width: 8, height: 8, borderTopWidth: 1.5, borderLeftWidth: 1.5, borderColor: ID_STATIC.G },
-  initialsText: { fontFamily: FONTS.serifMediumItalic, fontSize: 42, color: ID_STATIC.GL, letterSpacing: -0.8 },
-  biometricTick: {
-    position: 'absolute',
-    bottom: -8,
-    right: -8,
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    backgroundColor: ID_STATIC.GREEN,
-    borderWidth: 2,
-    borderColor: '#0B0D10',
-    justifyContent: 'center',
+  statusLabel: {
+    fontFamily: FONTS.sansSemiBold,
+    fontSize: 11,
+    letterSpacing: 1.32,
+  },
+  metaGrid: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  metaCell: {
+    flex: 1,
+    gap: 2,
+  },
+  metaLabel: {
+    fontFamily: FONTS.mono,
+    fontVariant: ['tabular-nums'],
+    fontSize: 8.5,
+    letterSpacing: 1.36,
+  },
+  metaValue: {
+    fontFamily: FONTS.sansMedium,
+    fontSize: 12.5,
+  },
+  footer: {
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    borderTopWidth: 1,
+    paddingTop: 13,
   },
-  passportInfo: { flex: 1, paddingTop: 4 },
-  registeredLabel: { fontFamily: FONTS.sansSemiBold, fontSize: 9, letterSpacing: 2.2, textTransform: 'uppercase', color: ID_STATIC.FG_FAINT, marginBottom: 4 },
-  passportName: { fontFamily: FONTS.serif, fontSize: 24, letterSpacing: -0.4, color: ID_STATIC.FG, lineHeight: 26, marginBottom: 8 },
-  locationRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  locationText: { fontFamily: FONTS.sans, fontSize: 11.5, color: ID_STATIC.FG_MUTED, letterSpacing: -0.05 },
-  registerStrip: { flexDirection: 'row', borderTopWidth: 1, borderTopColor: ID_STATIC.LINE },
-  registerCell: { flex: 1, padding: 12, paddingHorizontal: 14 },
-  registerCellMid: { borderLeftWidth: 1, borderRightWidth: 1, borderColor: ID_STATIC.LINE },
-  registerLabel: { fontFamily: FONTS.sansSemiBold, fontSize: 9, letterSpacing: 2, textTransform: 'uppercase', color: ID_STATIC.FG_FAINT, marginBottom: 4 },
-  registerValue: { fontFamily: FONTS.serifMediumItalic, fontSize: 14, color: ID_STATIC.FG },
-  registerMono: { fontFamily: FONTS.mono, fontVariant: ['tabular-nums'], fontSize: 11, color: ID_STATIC.FG, letterSpacing: 0.4 },
+  footerMono: {
+    fontFamily: FONTS.mono,
+    fontVariant: ['tabular-nums'],
+    fontSize: 10,
+    letterSpacing: 1,
+  },
 
+  // Verify prompt
   verifyCta: {
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: ID_STATIC.LINE,
-    padding: 16,
+    padding: 18,
     marginBottom: 16,
-    backgroundColor: ID_STATIC.BG_CARD,
   },
-  verifyCtaContent: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16 },
-  verifyCtaIcon: { width: 48, height: 48, borderRadius: 24, justifyContent: 'center', alignItems: 'center' },
+  verifyCtaContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 14,
+  },
+  verifyCtaIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   verifyCtaText: { flex: 1 },
   verifyCtaTitle: { fontFamily: FONTS.sansSemiBold, fontSize: 15, marginBottom: 2 },
-  verifyCtaSubtitle: { fontFamily: FONTS.sans, fontSize: 13 },
+  verifyCtaSubtitle: { fontFamily: FONTS.sans, fontSize: 12.5, lineHeight: 17 },
+  trustNote: {
+    fontFamily: FONTS.sans,
+    fontSize: 11.5,
+    lineHeight: 16,
+    textAlign: 'center',
+    marginTop: 12,
+  },
 });
