@@ -32,6 +32,10 @@ export {
   VerificationBadge,
 } from './Badge';
 
+// Redesign signature components
+export { TallyBar, TALLY_THRESHOLD } from './TallyBar';
+export { TrustChip } from './TrustChip';
+
 // Skeletons (Loading States)
 export {
   Skeleton,

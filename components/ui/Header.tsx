@@ -18,7 +18,7 @@ import Animated, {
   useSharedValue,
   withSpring,
 } from 'react-native-reanimated';
-import { useTheme, SPACING, TYPOGRAPHY, SHADOWS, RADIUS, EASING } from '../../lib/theme';
+import { useTheme, SPACING, TYPOGRAPHY, SHADOWS, RADIUS, EASING, FONTS } from '../../lib/theme';
 import { haptics } from '../../lib/haptics';
 import { StatusDot } from './Badge';
 import { BallotDisplay } from './BallotDisplay';
@@ -455,8 +455,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
   },
   notificationCount: {
+    fontFamily: FONTS.monoSemiBold,
     fontSize: 10,
-    fontWeight: '700',
+    fontVariant: ['tabular-nums'],
   },
   avatarContainer: {
     position: 'relative',
@@ -474,8 +475,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   avatarText: {
+    fontFamily: FONTS.serifSemiBold,
     fontSize: 18,
-    fontWeight: '700',
   },
   // Section Header
   sectionHeader: {
@@ -506,8 +507,9 @@ const styles = StyleSheet.create({
     marginLeft: 4,
   },
   sectionCountText: {
-    fontSize: 11,
-    fontWeight: '600',
+    fontFamily: FONTS.monoSemiBold,
+    fontSize: 10.5,
+    fontVariant: ['tabular-nums'],
   },
   sectionAction: {
     ...TYPOGRAPHY.label,

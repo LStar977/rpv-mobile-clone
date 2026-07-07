@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { useColorScheme, Dimensions, Platform } from 'react-native';
+import { useColorScheme, Dimensions } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 
 const THEME_KEY = 'represent_theme_preference';
@@ -51,6 +51,7 @@ export const DARK_COLORS = {
   gold: '#EABA58',                 // Sovereign Gold - primary brand
   goldLight: '#F0CB7A',            // Light gold for highlights
   goldDark: '#C99A38',             // Dark gold for depth
+  goldFill: '#EABA58',             // Gold as a fill (CTAs) — same in both themes
 
   // Gold surfaces (for backgrounds, highlights)
   goldSurface: 'rgba(234, 186, 88, 0.08)',     // Subtle gold tint
@@ -61,6 +62,15 @@ export const DARK_COLORS = {
   goldGradientStart: '#F0CB7A',
   goldGradientMiddle: '#EABA58',
   goldGradientEnd: '#C99A38',
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // SIDE COLORS - Green = Support, Red = Oppose
+  // ALWAYS paired with a text label + exact count (colorblind/grayscale safe)
+  // ─────────────────────────────────────────────────────────────────────────────
+  support: '#34D399',
+  supportSurface: 'rgba(52, 211, 153, 0.12)',
+  oppose: '#F87171',
+  opposeSurface: 'rgba(248, 113, 113, 0.12)',
 
   // ─────────────────────────────────────────────────────────────────────────────
   // SEMANTIC COLORS - Clear, accessible status indicators
@@ -156,48 +166,57 @@ export const DARK_COLORS = {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export const LIGHT_COLORS = {
-  // Backgrounds - Warm ivory/cream, not clinical white
+  // Backgrounds - Warm ivory per redesign spec
   background: '#FAF8F5',
   backgroundElevated: '#FFFDF9',
   backgroundSecondary: '#F5F2ED',
 
-  // Surfaces - White cards for contrast against warm background
-  surface: '#FFFFFF',
+  // Surfaces - warm paper, highlight #F0EBE2 per spec
+  surface: '#FFFDF9',
   surfaceElevated: '#FFFFFF',
-  surfaceHighlight: '#FBF9F6',
-  surfacePressed: '#F5F2ED',
+  surfaceHighlight: '#F0EBE2',
+  surfacePressed: '#EBE5D9',
 
-  // Borders - Warm undertones
-  border: 'rgba(30, 25, 20, 0.10)',
-  borderSubtle: 'rgba(30, 25, 20, 0.06)',
-  borderStrong: 'rgba(30, 25, 20, 0.15)',
-  borderFocus: 'rgba(30, 25, 20, 0.25)',
+  // Borders - warm ink at spec alphas (.10 / .07 / .16)
+  border: 'rgba(24, 21, 16, 0.10)',
+  borderSubtle: 'rgba(24, 21, 16, 0.07)',
+  borderStrong: 'rgba(24, 21, 16, 0.16)',
+  borderFocus: 'rgba(24, 21, 16, 0.25)',
 
-  // Text - Warm near-black, not pure black
-  text: '#1A1A1A',
-  textPrimary: '#1A1A1A',
-  textSecondary: '#5C5856',
-  textTertiary: '#8A8582',
-  textDisabled: '#B8B5B2',
-  textInverse: '#FFFFFF',
+  // Text - warm ink #181510 per spec
+  text: '#181510',
+  textPrimary: '#181510',
+  textSecondary: '#57534A',
+  textTertiary: '#8B8578',
+  textDisabled: '#B5AFA3',
+  textInverse: '#FAF8F5',
 
-  // Brand Gold - Rich antique gold for light backgrounds
-  gold: '#B8941C',
-  goldLight: '#D4A82E',
-  goldDark: '#8A700F',
-  goldSurface: 'rgba(184, 148, 28, 0.10)',
-  goldSurfaceStrong: 'rgba(184, 148, 28, 0.18)',
-  goldSurfaceIntense: 'rgba(184, 148, 28, 0.28)',
-  goldGradientStart: '#D4A82E',
-  goldGradientMiddle: '#B8941C',
-  goldGradientEnd: '#8A700F',
+  // Brand Gold - fills stay #EABA58; gold-as-text uses #C99A38 for contrast.
+  // `gold` is used as a text/icon color throughout the app, so it carries
+  // the darker value; use gradientGold / goldLight for large fills.
+  gold: '#C99A38',
+  goldLight: '#EABA58',
+  goldDark: '#A87C24',
+  goldFill: '#EABA58',             // Gold as a fill (CTAs) — same in both themes
+  goldSurface: 'rgba(234, 186, 88, 0.14)',
+  goldSurfaceStrong: 'rgba(234, 186, 88, 0.24)',
+  goldSurfaceIntense: 'rgba(234, 186, 88, 0.34)',
+  goldGradientStart: '#F0CB7A',
+  goldGradientMiddle: '#EABA58',
+  goldGradientEnd: '#C99A38',
 
-  // Semantic - Darker for light backgrounds
-  success: '#059669',
+  // Side colors - Support/Oppose per light spec
+  support: '#0E9F6E',
+  supportSurface: 'rgba(14, 159, 110, 0.10)',
+  oppose: '#DC2626',
+  opposeSurface: 'rgba(220, 38, 38, 0.08)',
+
+  // Semantic - per light spec
+  success: '#0E9F6E',
   successLight: '#34D399',
   successDark: '#047857',
-  successSurface: 'rgba(5, 150, 105, 0.08)',
-  successSurfaceStrong: 'rgba(5, 150, 105, 0.15)',
+  successSurface: 'rgba(14, 159, 110, 0.10)',
+  successSurfaceStrong: 'rgba(14, 159, 110, 0.16)',
 
   error: '#DC2626',
   errorLight: '#F87171',
@@ -205,17 +224,17 @@ export const LIGHT_COLORS = {
   errorSurface: 'rgba(220, 38, 38, 0.08)',
   errorSurfaceStrong: 'rgba(220, 38, 38, 0.15)',
 
-  warning: '#D97706',
+  warning: '#B45309',
   warningLight: '#FBBF24',
-  warningDark: '#B45309',
-  warningSurface: 'rgba(217, 119, 6, 0.08)',
-  warningSurfaceStrong: 'rgba(217, 119, 6, 0.15)',
+  warningDark: '#92400E',
+  warningSurface: 'rgba(180, 83, 9, 0.08)',
+  warningSurfaceStrong: 'rgba(180, 83, 9, 0.15)',
 
-  info: '#2563EB',
+  info: '#1D4ED8',
   infoLight: '#60A5FA',
-  infoDark: '#1D4ED8',
-  infoSurface: 'rgba(37, 99, 235, 0.08)',
-  infoSurfaceStrong: 'rgba(37, 99, 235, 0.15)',
+  infoDark: '#1E40AF',
+  infoSurface: 'rgba(29, 78, 216, 0.08)',
+  infoSurfaceStrong: 'rgba(29, 78, 216, 0.15)',
 
   // Accent
   accent: '#7C3AED',
@@ -228,31 +247,31 @@ export const LIGHT_COLORS = {
   black: '#000000',
   transparent: 'transparent',
 
-  overlay: 'rgba(0, 0, 0, 0.50)',
-  overlayLight: 'rgba(0, 0, 0, 0.30)',
-  overlayUltraLight: 'rgba(0, 0, 0, 0.15)',
+  overlay: 'rgba(24, 21, 16, 0.55)',
+  overlayLight: 'rgba(24, 21, 16, 0.30)',
+  overlayUltraLight: 'rgba(24, 21, 16, 0.15)',
 
-  glass: 'rgba(255, 255, 255, 0.70)',
-  glassMedium: 'rgba(255, 255, 255, 0.85)',
-  glassStrong: 'rgba(255, 255, 255, 0.95)',
+  glass: 'rgba(255, 253, 249, 0.70)',
+  glassMedium: 'rgba(255, 253, 249, 0.85)',
+  glassStrong: 'rgba(255, 253, 249, 0.95)',
 
-  shimmer: 'rgba(0, 0, 0, 0.04)',
-  shimmerHighlight: 'rgba(0, 0, 0, 0.08)',
+  shimmer: 'rgba(24, 21, 16, 0.05)',
+  shimmerHighlight: 'rgba(24, 21, 16, 0.09)',
 
-  tabBar: 'rgba(255, 255, 255, 0.90)',
-  tabBarBorder: 'rgba(0, 0, 0, 0.08)',
+  tabBar: 'rgba(250, 248, 245, 0.96)',
+  tabBarBorder: 'rgba(24, 21, 16, 0.08)',
 
-  inputBg: 'rgba(0, 0, 0, 0.03)',
-  inputBgFocus: 'rgba(0, 0, 0, 0.06)',
+  inputBg: 'rgba(24, 21, 16, 0.03)',
+  inputBgFocus: 'rgba(24, 21, 16, 0.06)',
 
   // Legacy aliases for backward compatibility
-  cardBg: '#FFFFFF',
-  cardBgLight: '#FBF9F6',
-  textMuted: '#8A8582',
-  surfaceHover: '#FBF9F6',
-  borderLight: 'rgba(30, 25, 20, 0.06)',
+  cardBg: '#FFFDF9',
+  cardBgLight: '#F5F2ED',
+  textMuted: '#8B8578',
+  surfaceHover: '#F0EBE2',
+  borderLight: 'rgba(24, 21, 16, 0.07)',
 
-  gradientGold: ['#D4A82E', '#B8941C', '#8A700F'],
+  gradientGold: ['#F0CB7A', '#EABA58', '#C99A38'],
   gradientDark: ['#FAF8F5', '#F5F2ED', '#EDE9E3'],
   gradientCard: ['rgba(30,25,20,0.02)', 'rgba(30,25,20,0.05)'],
   gradientHero: ['#FAF8F5', '#F5F2ED', '#EDE9E3'],
@@ -264,226 +283,259 @@ export const LIGHT_COLORS = {
 export const COLORS = DARK_COLORS;
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// TYPOGRAPHY - Premium, refined type scale
-// Inspired by: Apple Human Interface Guidelines, Material Design 3
+// TYPOGRAPHY - Redesign type system
+// Newsreader (serif): civic moments — display, screen titles, ballot questions
+// Onest (sans): all UI — buttons, body, labels, eyebrows
+// JetBrains Mono: EVERYTHING counted or recorded — tallies, IDs, timestamps
 // ═══════════════════════════════════════════════════════════════════════════════
 
-const fontFamily = Platform.select({
-  ios: 'System',
-  android: 'Roboto',
-  default: 'System',
-});
+// Weight-specific static font families (loaded in app/_layout.tsx). Do not
+// pair these with a fontWeight override — Android will substitute a
+// synthesized face instead of the loaded file.
+export const FONTS = {
+  // Newsreader — civic serif
+  serifRegular: 'Newsreader_400Regular',
+  serif: 'Newsreader_500Medium',
+  serifSemiBold: 'Newsreader_600SemiBold',
+  serifItalic: 'Newsreader_400Regular_Italic',
+  serifMediumItalic: 'Newsreader_500Medium_Italic',
+  // Onest — UI sans
+  sans: 'Onest_400Regular',
+  sansMedium: 'Onest_500Medium',
+  sansSemiBold: 'Onest_600SemiBold',
+  sansBold: 'Onest_700Bold',
+  // JetBrains Mono — counted & recorded
+  monoRegular: 'JetBrainsMono_400Regular',
+  mono: 'JetBrainsMono_500Medium',
+  monoSemiBold: 'JetBrainsMono_600SemiBold',
+};
+
+// Tabular numerals — apply to every mono style so counts never shift width.
+const TNUM = { fontVariant: ['tabular-nums'] as any };
 
 export const TYPOGRAPHY = {
   // ─────────────────────────────────────────────────────────────────────────────
-  // DISPLAY - Hero headlines, splash screens
+  // DISPLAY - Newsreader 500 · 42–45 / 1.1 · -0.012em — hero civic moments
   // ─────────────────────────────────────────────────────────────────────────────
   displayLarge: {
-    fontFamily,
-    fontSize: 56,
-    lineHeight: 64,
-    fontWeight: '700' as const,
-    letterSpacing: -1.5,
+    fontFamily: FONTS.serif,
+    fontSize: 45,
+    lineHeight: 50,
+    letterSpacing: -0.54,
   },
   displayMedium: {
-    fontFamily,
-    fontSize: 44,
-    lineHeight: 52,
-    fontWeight: '600' as const,
-    letterSpacing: -1,
+    fontFamily: FONTS.serif,
+    fontSize: 42,
+    lineHeight: 46,
+    letterSpacing: -0.5,
   },
   displaySmall: {
-    fontFamily,
+    fontFamily: FONTS.serif,
     fontSize: 36,
-    lineHeight: 44,
-    fontWeight: '600' as const,
-    letterSpacing: -0.5,
+    lineHeight: 41,
+    letterSpacing: -0.43,
   },
 
   // ─────────────────────────────────────────────────────────────────────────────
-  // HEADLINES - Section headers, card titles
+  // HEADLINES - Screen titles (serif 32–34) & ballot questions (serif 18–24)
   // ─────────────────────────────────────────────────────────────────────────────
   h1: {
-    fontFamily,
-    fontSize: 32,
-    lineHeight: 40,
-    fontWeight: '700' as const,
-    letterSpacing: -0.5,
+    fontFamily: FONTS.serif,
+    fontSize: 34,
+    lineHeight: 39,
+    letterSpacing: -0.3,
   },
   h2: {
-    fontFamily,
-    fontSize: 28,
-    lineHeight: 36,
-    fontWeight: '600' as const,
+    fontFamily: FONTS.serif,
+    fontSize: 32,
+    lineHeight: 37,
     letterSpacing: -0.25,
   },
   h3: {
-    fontFamily,
-    fontSize: 24,
+    fontFamily: FONTS.serif,
+    fontSize: 26,
     lineHeight: 32,
-    fontWeight: '600' as const,
     letterSpacing: 0,
   },
   h4: {
-    fontFamily,
-    fontSize: 20,
+    fontFamily: FONTS.serif,
+    fontSize: 22,
     lineHeight: 28,
-    fontWeight: '600' as const,
     letterSpacing: 0,
   },
   h5: {
-    fontFamily,
-    fontSize: 18,
-    lineHeight: 26,
-    fontWeight: '600' as const,
+    fontFamily: FONTS.serif,
+    fontSize: 19,
+    lineHeight: 25,
     letterSpacing: 0,
   },
   h6: {
-    fontFamily,
+    fontFamily: FONTS.sansSemiBold,
     fontSize: 16,
-    lineHeight: 24,
-    fontWeight: '600' as const,
+    lineHeight: 22,
+    letterSpacing: 0,
+  },
+
+  // Ballot question — serif 500, 18–24 / 1.25–1.32
+  ballotQuestion: {
+    fontFamily: FONTS.serif,
+    fontSize: 21,
+    lineHeight: 27,
     letterSpacing: 0,
   },
 
   // ─────────────────────────────────────────────────────────────────────────────
-  // BODY - Main content text
+  // BODY - Onest 400 · 13–15 / 1.5–1.6
   // ─────────────────────────────────────────────────────────────────────────────
   bodyLarge: {
-    fontFamily,
-    fontSize: 17,
-    lineHeight: 26,
-    fontWeight: '400' as const,
+    fontFamily: FONTS.sans,
+    fontSize: 16,
+    lineHeight: 25,
     letterSpacing: 0,
   },
   body: {
-    fontFamily,
+    fontFamily: FONTS.sans,
     fontSize: 15,
-    lineHeight: 22,
-    fontWeight: '400' as const,
+    lineHeight: 23,
     letterSpacing: 0,
   },
   bodySmall: {
-    fontFamily,
+    fontFamily: FONTS.sans,
     fontSize: 13,
-    lineHeight: 18,
-    fontWeight: '400' as const,
+    lineHeight: 20,
     letterSpacing: 0,
   },
 
   // ─────────────────────────────────────────────────────────────────────────────
-  // LABELS - Buttons, tags, small UI elements
+  // LABELS - Onest 600 · buttons & emphasis 13–17
   // ─────────────────────────────────────────────────────────────────────────────
   labelLarge: {
-    fontFamily,
+    fontFamily: FONTS.sansSemiBold,
     fontSize: 16,
     lineHeight: 22,
-    fontWeight: '600' as const,
-    letterSpacing: 0.25,
+    letterSpacing: 0.1,
   },
   label: {
-    fontFamily,
+    fontFamily: FONTS.sansSemiBold,
     fontSize: 14,
     lineHeight: 20,
-    fontWeight: '600' as const,
-    letterSpacing: 0.25,
+    letterSpacing: 0.1,
   },
   labelSmall: {
-    fontFamily,
+    fontFamily: FONTS.sansSemiBold,
     fontSize: 12,
     lineHeight: 16,
-    fontWeight: '600' as const,
-    letterSpacing: 0.25,
+    letterSpacing: 0.15,
   },
 
   // ─────────────────────────────────────────────────────────────────────────────
-  // CAPTIONS & OVERLINES
+  // CAPTIONS & EYEBROWS - eyebrow: Onest 600 10–11 · +0.14em · uppercase
   // ─────────────────────────────────────────────────────────────────────────────
   caption: {
-    fontFamily,
+    fontFamily: FONTS.sans,
     fontSize: 12,
-    lineHeight: 16,
-    fontWeight: '400' as const,
-    letterSpacing: 0.25,
+    lineHeight: 17,
+    letterSpacing: 0.2,
   },
   captionSmall: {
-    fontFamily,
+    fontFamily: FONTS.sans,
     fontSize: 11,
-    lineHeight: 14,
-    fontWeight: '400' as const,
-    letterSpacing: 0.25,
+    lineHeight: 15,
+    letterSpacing: 0.2,
   },
   overline: {
-    fontFamily,
+    fontFamily: FONTS.sansSemiBold,
     fontSize: 11,
     lineHeight: 16,
-    fontWeight: '700' as const,
-    letterSpacing: 1.5,
+    letterSpacing: 1.54,
+    textTransform: 'uppercase' as const,
+  },
+  eyebrow: {
+    fontFamily: FONTS.sansSemiBold,
+    fontSize: 10.5,
+    lineHeight: 15,
+    letterSpacing: 1.47,
     textTransform: 'uppercase' as const,
   },
 
   // ─────────────────────────────────────────────────────────────────────────────
-  // NUMBERS - For stats, metrics, prices
+  // NUMBERS - JetBrains Mono, always tabular — tallies, stats, metrics
   // ─────────────────────────────────────────────────────────────────────────────
   numberLarge: {
-    fontFamily,
-    fontSize: 48,
-    lineHeight: 56,
-    fontWeight: '700' as const,
-    letterSpacing: -1,
-    fontVariant: ['tabular-nums'] as any,
+    fontFamily: FONTS.monoSemiBold,
+    fontSize: 44,
+    lineHeight: 52,
+    letterSpacing: -0.5,
+    ...TNUM,
   },
   numberMedium: {
-    fontFamily,
-    fontSize: 32,
-    lineHeight: 40,
-    fontWeight: '600' as const,
-    letterSpacing: -0.5,
-    fontVariant: ['tabular-nums'] as any,
+    fontFamily: FONTS.monoSemiBold,
+    fontSize: 30,
+    lineHeight: 38,
+    letterSpacing: -0.3,
+    ...TNUM,
   },
   numberSmall: {
-    fontFamily,
+    fontFamily: FONTS.monoSemiBold,
     fontSize: 24,
     lineHeight: 32,
-    fontWeight: '600' as const,
     letterSpacing: 0,
-    fontVariant: ['tabular-nums'] as any,
+    ...TNUM,
+  },
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // MONO - JetBrains Mono 500 · 10–12 — IDs, timestamps, hashes, ledger rows
+  // ─────────────────────────────────────────────────────────────────────────────
+  mono: {
+    fontFamily: FONTS.mono,
+    fontSize: 12,
+    lineHeight: 17,
+    ...TNUM,
+  },
+  monoSmall: {
+    fontFamily: FONTS.mono,
+    fontSize: 10.5,
+    lineHeight: 15,
+    ...TNUM,
+  },
+  monoLabel: {
+    fontFamily: FONTS.monoSemiBold,
+    fontSize: 10,
+    lineHeight: 14,
+    letterSpacing: 1.6,
+    textTransform: 'uppercase' as const,
+    ...TNUM,
   },
 
   // Legacy aliases for backward compatibility
   headlineLarge: {
-    fontFamily,
+    fontFamily: FONTS.serif,
     fontSize: 24,
-    lineHeight: 32,
-    fontWeight: '600' as const,
+    lineHeight: 30,
     letterSpacing: 0,
   },
   headlineMedium: {
-    fontFamily,
+    fontFamily: FONTS.sansSemiBold,
     fontSize: 20,
     lineHeight: 28,
-    fontWeight: '600' as const,
     letterSpacing: 0,
   },
   headlineSmall: {
-    fontFamily,
+    fontFamily: FONTS.sansSemiBold,
     fontSize: 18,
     lineHeight: 26,
-    fontWeight: '600' as const,
     letterSpacing: 0,
   },
   bodyMedium: {
-    fontFamily,
+    fontFamily: FONTS.sans,
     fontSize: 14,
-    lineHeight: 20,
-    fontWeight: '400' as const,
+    lineHeight: 21,
     letterSpacing: 0.1,
   },
   labelMedium: {
-    fontFamily,
+    fontFamily: FONTS.sansSemiBold,
     fontSize: 12,
     lineHeight: 16,
-    fontWeight: '600' as const,
     letterSpacing: 0.5,
   },
 };
@@ -508,13 +560,13 @@ export const SPACING = {
   '7xl': 80,
   '8xl': 96,
 
-  // Semantic aliases
+  // Semantic aliases — redesign spec: 24px horizontal screen padding
   none: 0,
   px: 1,
-  gutter: 20,           // Standard page gutter
+  gutter: 24,           // Standard page gutter
   cardPadding: 20,      // Standard card padding
   sectionGap: 32,       // Gap between sections
-  screenPadding: 20,    // Screen edge padding
+  screenPadding: 24,    // Screen edge padding
 
   // Legacy aliases
   xxs: 2,
@@ -550,12 +602,13 @@ export const RADIUS = {
   '3xl': 32,
   full: 9999,
 
-  // Semantic
-  button: 12,
-  card: 16,
+  // Semantic — redesign spec: cards 16–22, buttons 14–16, chips pill (100)
+  button: 14,
+  card: 18,
   modal: 24,
-  input: 12,
+  input: 14,
   badge: 8,
+  chip: 100,
   avatar: 9999,
 };
 
@@ -706,6 +759,18 @@ export const ANIMATION = {
   slow: 350,
   verySlow: 500,
 
+  // Redesign motion tokens:
+  // Instant — press feedback (scale .965 + light haptic)
+  // Quick — sheets, tab/screen transitions
+  // Deliberate — tally re-fill (never from zero), odometer roll, card commit
+  // Momentous — the ballot seal (gold ring draws with the ledger write)
+  motion: {
+    instant: 120,
+    quick: 240,
+    deliberate: 480,
+    momentous: 900,
+  },
+
   // Named durations
   duration: {
     instant: 50,
@@ -713,9 +778,9 @@ export const ANIMATION = {
     normal: 250,
     slow: 350,
     verySlow: 500,
-    pageTransition: 300,
-    modalEntry: 350,
-    buttonPress: 100,
+    pageTransition: 240,
+    modalEntry: 240,
+    buttonPress: 120,
     ripple: 400,
   },
 
@@ -731,6 +796,11 @@ export const ANIMATION = {
 
 // Easing curves
 export const EASING = {
+  // Redesign standard easing — cubic-bezier(.2, 0, 0, 1)
+  standard: [0.2, 0, 0, 1] as const,
+  // Ballot-seal checkmark overshoot — cubic-bezier(.34, 1.3, .5, 1)
+  overshoot: [0.34, 1.3, 0.5, 1] as const,
+
   // Standard curves
   easeOut: [0.0, 0.0, 0.2, 1] as const,
   easeIn: [0.4, 0.0, 1, 1] as const,

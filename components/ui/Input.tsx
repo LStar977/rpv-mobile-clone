@@ -19,7 +19,7 @@ import Animated, {
   FadeIn,
   FadeOut,
 } from 'react-native-reanimated';
-import { useTheme, RADIUS, SPACING, TYPOGRAPHY, EASING } from '../../lib/theme';
+import { useTheme, RADIUS, SPACING, TYPOGRAPHY, EASING, FONTS } from '../../lib/theme';
 import { haptics } from '../../lib/haptics';
 
 const AnimatedView = Animated.View;
@@ -55,8 +55,14 @@ export function Input({
   const { colors, isDark } = useTheme();
   const [isFocused, setIsFocused] = useState(false);
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
+  // Tracks text in uncontrolled usage so the italic-serif placeholder face
+  // (design spec) swaps to the UI sans as soon as the field has content.
+  const [internalText, setInternalText] = useState('');
   const focusAnim = useSharedValue(0);
   const inputRef = useRef<TextInput>(null);
+
+  const hasValue =
+    props.value !== undefined ? String(props.value).length > 0 : internalText.length > 0;
 
   const sizeConfig = {
     sm: { minHeight: 44, fontSize: 14, iconSize: 18, paddingHorizontal: SPACING.md },
@@ -175,6 +181,10 @@ export function Input({
         <TextInput
           ref={inputRef}
           {...props}
+          onChangeText={(text) => {
+            setInternalText(text);
+            props.onChangeText?.(text);
+          }}
           secureTextEntry={actualSecureEntry}
           style={[
             styles.input,
@@ -182,6 +192,9 @@ export function Input({
               color: colors.text,
               fontSize: currentSize.fontSize,
             },
+            // Empty fields show their placeholder in italic serif (spec);
+            // the face flips to Onest the moment there's content.
+            !hasValue && !secureTextEntry && { fontFamily: FONTS.serifItalic },
             leftIcon && styles.inputWithLeftIcon,
             (rightIcon || showPasswordToggle) && styles.inputWithRightIcon,
             inputStyle,
@@ -442,7 +455,8 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   otpText: {
-    ...TYPOGRAPHY.h3,
+    // Verification digits are counted values — mono per redesign spec.
+    ...TYPOGRAPHY.numberSmall,
   },
   otpCursor: {
     position: 'absolute',
