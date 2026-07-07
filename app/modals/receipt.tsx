@@ -5,10 +5,8 @@ import {
   StyleSheet,
   TouchableOpacity,
   Share,
-  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import Animated, {
   FadeIn,
   FadeInDown,
@@ -21,11 +19,9 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
-import { useTheme, SPACING, RADIUS, TYPOGRAPHY, SHADOWS, FONTS } from '../../lib/theme';
+import { useTheme, SPACING, RADIUS, FONTS, withAlpha } from '../../lib/theme';
 import { Button } from '../../components/ui';
 import { haptics } from '../../lib/haptics';
-
-const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
 interface ReceiptParams {
   type: 'verification' | 'premium' | 'organization';
@@ -37,7 +33,7 @@ interface ReceiptParams {
   tier?: string;
 }
 
-// Checkmark animation component
+// Sealed-receipt checkmark — gold ring with drawn check
 function AnimatedCheckmark() {
   const { colors } = useTheme();
   const scale = useSharedValue(0);
@@ -57,27 +53,34 @@ function AnimatedCheckmark() {
   }));
 
   return (
-    <Animated.View style={[styles.checkmarkContainer, animatedStyle]}>
-      <LinearGradient
-        colors={[colors.goldLight, colors.gold, colors.goldDark] as any}
-        style={styles.checkmarkGradient}
-      >
-        <Ionicons name="checkmark" size={48} color={colors.black} />
-      </LinearGradient>
+    <Animated.View
+      style={[
+        styles.checkmarkRing,
+        {
+          backgroundColor: colors.goldSurface,
+          borderColor: withAlpha(colors.goldFill, 0.35),
+          shadowColor: colors.goldFill,
+        },
+        animatedStyle,
+      ]}
+    >
+      <Ionicons name="checkmark" size={48} color={colors.gold} />
     </Animated.View>
   );
 }
 
-// Receipt detail row
+// Mono ledger row — label + recorded value, hairline separated
 function ReceiptRow({
   label,
   value,
   highlight = false,
+  last = false,
   delay = 0,
 }: {
   label: string;
   value: string;
   highlight?: boolean;
+  last?: boolean;
   delay?: number;
 }) {
   const { colors } = useTheme();
@@ -85,17 +88,31 @@ function ReceiptRow({
   return (
     <Animated.View
       entering={FadeInUp.delay(delay).duration(400)}
-      style={[styles.receiptRow, { borderBottomColor: colors.border }]}
+      style={[
+        styles.receiptRow,
+        { borderBottomColor: colors.borderSubtle },
+        last && { borderBottomWidth: 0 },
+      ]}
     >
-      <Text style={[styles.receiptLabel, { color: colors.textSecondary }]}>
+      <Text style={[styles.receiptLabel, { color: colors.textTertiary }]}>
         {label}
       </Text>
-      <Text style={[
-        styles.receiptValue,
-        { color: highlight ? colors.support : colors.text }
-      ]}>
-        {value}
-      </Text>
+      <View style={styles.receiptValueWrap}>
+        {highlight && (
+          <Ionicons name="checkmark" size={12} color={colors.support} />
+        )}
+        <Text
+          style={[
+            styles.receiptValue,
+            highlight
+              ? { color: colors.support, fontFamily: FONTS.monoSemiBold }
+              : { color: colors.text },
+          ]}
+          numberOfLines={1}
+        >
+          {value}
+        </Text>
+      </View>
     </Animated.View>
   );
 }
@@ -174,72 +191,75 @@ export default function ReceiptScreen() {
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + SPACING.md }]}>
         <TouchableOpacity
-          style={[styles.closeButton, { backgroundColor: colors.surface }]}
+          style={[styles.headerButton, { backgroundColor: colors.surface, borderColor: colors.borderSubtle }]}
           onPress={() => router.back()}
           activeOpacity={0.7}
         >
-          <Ionicons name="close" size={24} color={colors.text} />
+          <Ionicons name="close" size={22} color={colors.text} />
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.shareButton, { backgroundColor: colors.surface }]}
+          style={[styles.headerButton, { backgroundColor: colors.surface, borderColor: colors.borderSubtle }]}
           onPress={handleShare}
           activeOpacity={0.7}
         >
-          <Ionicons name="share-outline" size={22} color={colors.gold} />
+          <Ionicons name="share-outline" size={20} color={colors.textSecondary} />
         </TouchableOpacity>
       </View>
 
       {/* Content */}
       <View style={styles.content}>
-        {/* Success indicator */}
+        {/* Seal */}
         <AnimatedCheckmark />
 
         <Animated.Text
           entering={FadeInDown.delay(400).duration(500)}
           style={[styles.successTitle, { color: colors.text }]}
         >
-          Payment Successful
+          Payment Recorded
         </Animated.Text>
 
         <Animated.Text
           entering={FadeInDown.delay(500).duration(500)}
-          style={[styles.amount, { color: colors.gold }]}
+          style={[styles.subtitle, { color: colors.textSecondary }]}
         >
-          {amount}
+          {productInfo.description} — your receipt is below.
         </Animated.Text>
 
-        {/* Receipt card */}
+        {/* Receipt card — mono ledger block */}
         <Animated.View
           entering={FadeIn.delay(600).duration(500)}
           style={[styles.receiptCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
         >
-          {/* Product header */}
-          <View style={[styles.productHeader, { borderBottomColor: colors.border }]}>
-            <View style={[styles.productIcon, { backgroundColor: colors.goldSurface }]}>
-              <Ionicons name={productInfo.icon as any} size={24} color={colors.gold} />
-            </View>
-            <View style={styles.productInfo}>
-              <Text style={[styles.productTitle, { color: colors.text }]}>
-                {productInfo.title}
-              </Text>
-              <Text style={[styles.productDescription, { color: colors.textSecondary }]}>
-                {productInfo.description}
-              </Text>
+          {/* Ledger header */}
+          <View style={[styles.receiptHeader, { borderBottomColor: colors.borderStrong }]}>
+            <Text style={[styles.receiptHeaderLabel, { color: colors.textTertiary }]}>
+              PAYMENT RECEIPT
+            </Text>
+            <View style={[styles.receiptHeaderIcon, { backgroundColor: colors.goldSurface }]}>
+              <Ionicons name={productInfo.icon as any} size={13} color={colors.gold} />
             </View>
           </View>
 
-          {/* Receipt details */}
+          {/* Product */}
+          <View style={[styles.productHeader, { borderBottomColor: colors.borderSubtle }]}>
+            <Text style={[styles.productTitle, { color: colors.text }]}>
+              {productInfo.title}
+            </Text>
+          </View>
+
+          {/* Ledger rows */}
           <View style={styles.receiptDetails}>
-            <ReceiptRow label="Date" value={date} delay={700} />
-            <ReceiptRow label="Payment Method" value={paymentMethod} delay={750} />
-            <ReceiptRow label="Transaction ID" value={transactionId} delay={800} />
-            <ReceiptRow label="Status" value="Completed" highlight delay={850} />
+            <ReceiptRow label="AMOUNT" value={amount} delay={700} />
+            <ReceiptRow label="RECORDED" value={date.toUpperCase()} delay={750} />
+            <ReceiptRow label="METHOD" value={paymentMethod.toUpperCase()} delay={800} />
+            <ReceiptRow label="TRANSACTION ID" value={transactionId} delay={850} />
+            <ReceiptRow label="STATUS" value="COMPLETED" highlight last delay={900} />
           </View>
         </Animated.View>
 
         {/* Footer note */}
         <Animated.Text
-          entering={FadeIn.delay(900).duration(500)}
+          entering={FadeIn.delay(950).duration(500)}
           style={[styles.footerNote, { color: colors.textTertiary }]}
         >
           A confirmation email has been sent to your registered email address.
@@ -259,14 +279,6 @@ export default function ReceiptScreen() {
           fullWidth
         />
       </View>
-
-      {/* Gold accent line */}
-      <LinearGradient
-        colors={[colors.goldLight, colors.gold, colors.goldDark] as any}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0 }}
-        style={[styles.bottomAccent, { bottom: insets.bottom }]}
-      />
     </View>
   );
 }
@@ -278,115 +290,128 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingHorizontal: SPACING.lg,
+    paddingHorizontal: SPACING.screenPadding,
     paddingBottom: SPACING.md,
   },
-  closeButton: {
+  headerButton: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  shareButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
   content: {
     flex: 1,
-    paddingHorizontal: SPACING.xl,
-    alignItems: 'center',
-  },
-  checkmarkContainer: {
-    marginTop: SPACING['3xl'],
-    marginBottom: SPACING.xl,
-  },
-  checkmarkGradient: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
+    paddingHorizontal: SPACING.screenPadding,
     alignItems: 'center',
     justifyContent: 'center',
-    ...SHADOWS.glow,
+  },
+  checkmarkRing: {
+    width: 110,
+    height: 110,
+    borderRadius: 55,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: SPACING['2xl'],
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.25,
+    shadowRadius: 30,
+    elevation: 8,
   },
   successTitle: {
     fontFamily: FONTS.serif,
-    fontSize: 24,
+    fontSize: 34,
+    lineHeight: 38,
+    letterSpacing: -0.4,
+    textAlign: 'center',
     marginBottom: SPACING.sm,
   },
-  amount: {
-    fontFamily: FONTS.mono,
-    fontSize: 40,
-    fontVariant: ['tabular-nums'],
+  subtitle: {
+    fontFamily: FONTS.sans,
+    fontSize: 14.5,
+    lineHeight: 22,
+    textAlign: 'center',
+    maxWidth: 290,
     marginBottom: SPACING['2xl'],
   },
   receiptCard: {
     width: '100%',
-    borderRadius: RADIUS.card,
+    borderRadius: 20,
     borderWidth: 1,
     overflow: 'hidden',
   },
-  productHeader: {
+  receiptHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: SPACING.lg,
-    borderBottomWidth: 1,
+    justifyContent: 'space-between',
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  productIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: RADIUS.md,
+  receiptHeaderLabel: {
+    fontFamily: FONTS.sansSemiBold,
+    fontSize: 10,
+    letterSpacing: 1.6,
+  },
+  receiptHeaderIcon: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: SPACING.md,
   },
-  productInfo: {
-    flex: 1,
+  productHeader: {
+    paddingHorizontal: 18,
+    paddingVertical: 13,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
   productTitle: {
     fontFamily: FONTS.serif,
-    fontSize: 16,
-    marginBottom: SPACING.xs,
-  },
-  productDescription: {
-    ...TYPOGRAPHY.bodySmall,
+    fontSize: 17,
+    lineHeight: 22,
   },
   receiptDetails: {
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.sm,
+    paddingHorizontal: 18,
+    paddingVertical: SPACING.xs,
   },
   receiptRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: SPACING.md,
+    paddingVertical: 11,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   receiptLabel: {
-    ...TYPOGRAPHY.body,
+    fontFamily: FONTS.mono,
+    fontSize: 11,
+    fontVariant: ['tabular-nums'],
+  },
+  receiptValueWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    flexShrink: 1,
+    marginLeft: SPACING.md,
   },
   receiptValue: {
-    ...TYPOGRAPHY.mono,
-    fontSize: 13,
+    fontFamily: FONTS.mono,
+    fontSize: 11,
+    fontVariant: ['tabular-nums'],
+    flexShrink: 1,
   },
   footerNote: {
-    ...TYPOGRAPHY.caption,
+    fontFamily: FONTS.sans,
+    fontSize: 12,
+    lineHeight: 17,
+    letterSpacing: 0.2,
     textAlign: 'center',
     marginTop: SPACING.xl,
     paddingHorizontal: SPACING.lg,
   },
   bottomContainer: {
-    paddingHorizontal: SPACING.xl,
+    paddingHorizontal: SPACING.screenPadding,
     paddingTop: SPACING.lg,
-  },
-  bottomAccent: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    height: 3,
-    opacity: 0.6,
   },
 });
