@@ -1,46 +1,50 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Image } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useRouter } from 'expo-router';
 import { Image as ExpoImage } from 'expo-image';
-import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
-import Svg, { Circle, Line, Path, Defs, LinearGradient as SvgLinearGradient, Stop, G as SvgG } from 'react-native-svg';
+import Svg, { Path } from 'react-native-svg';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
-import { FONTS, SPACING, useTheme } from '../../lib/theme';
+import { FONTS, SPACING, RADIUS, useTheme } from '../../lib/theme';
 import { useAuthStore } from '../../lib/auth';
 import { proposalsApi, userApi, organizationsApi, veriffApi, type Proposal, type Organization, type OrganizationProposal } from '../../lib/api';
 import { useModerationStore, useSyncMutes } from '../../lib/moderation';
 import { useFocusEffect } from 'expo-router';
 
 // ═══════════════════════════════════════════════════════════════════════════
-// DESIGN TOKENS — from Home Redesign.html (static fallbacks for StyleSheet)
+// DESIGN TOKENS — M1 · Home · Civic Inbox (static fallbacks for StyleSheet;
+// live values come from useDashboardColors so both themes work)
 // ═══════════════════════════════════════════════════════════════════════════
 const G_GOLD = '#EABA58';
-const G_GOLD_DARK = '#C89A3E';
-const G_GOLD_LIGHT = '#F4D28C';
 const BG = '#040707';
-const BG_CARD = '#0D0F12';
-const BG_RAISED = '#15181C';
-const LINE = '#1E2228';
-const LINE_STRONG = '#2A2F37';
+const BG_CARD = '#141818';
+const LINE = 'rgba(244,245,246,0.08)';
+const LINE_SUBTLE = 'rgba(244,245,246,0.05)';
 const FG = '#F4F5F6';
-const FG_MUTED = '#C7CACD';
-const FG_FAINT = '#8E9297';
-const GREEN = '#34C759';
+const FG_MUTED = '#B8BABB';
+const FG_FAINT = '#7A7D7E';
+// Text/icons sitting on the gold fill — goldFill is identical in both themes,
+// so this stays a constant (mock: #040707 on #EABA58).
+const ON_GOLD = '#040707';
+const GOLD_BORDER = 'rgba(234,186,88,0.28)';
+const GOLD_BORDER_STRONG = 'rgba(234,186,88,0.35)';
+const TNUM = { fontVariant: ['tabular-nums'] as any };
 
 // Dynamic hook for components to get theme-aware colors
 function useDashboardColors() {
   const { colors, isDark } = useTheme();
   return {
     GOLD: colors.gold,
-    GOLD_DARK: colors.goldDark,
-    GOLD_LIGHT: colors.goldLight,
+    GOLD_FILL: colors.goldFill,
+    GOLD_SURFACE: colors.goldSurface,
     BG: colors.background,
     BG_CARD: colors.surface,
     BG_RAISED: colors.surfaceElevated,
+    BG_HIGHLIGHT: colors.surfaceHighlight,
     LINE: colors.border,
+    LINE_SUBTLE: colors.borderSubtle,
     LINE_STRONG: colors.borderStrong,
     FG: colors.text,
     FG_MUTED: colors.textSecondary,
@@ -48,6 +52,10 @@ function useDashboardColors() {
     GREEN: colors.success,
     SUPPORT: colors.support,
     OPPOSE: colors.oppose,
+    // Level-split shades (identical in both themes — these are fills)
+    SPLIT_FEDERAL: colors.goldGradientStart,
+    SPLIT_PROVINCIAL: colors.goldGradientMiddle,
+    SPLIT_MUNICIPAL: colors.goldGradientEnd,
     isDark,
   };
 }
@@ -147,8 +155,8 @@ export default function DashboardScreen() {
   // Derived data
   const now = Date.now();
   // Org proposals are surfaced in their own section below; the civic inbox
-  // (Hero, breakdown, featured, digest) only counts non-org proposals so
-  // that org-scoped proposals don't get bucketed as federal/provincial/etc.
+  // only counts non-org proposals so that org-scoped proposals don't get
+  // bucketed as federal/provincial/etc.
   // Unverified users can only act on global proposals (geoRestrictions empty),
   // so filter geo-restricted ones out for them — see proposals.tsx:626.
   // Also exclude proposals from muted creators.
@@ -171,20 +179,28 @@ export default function DashboardScreen() {
   const breakdown = { global: 0, federal: 0, provincial: 0, municipal: 0 };
   pendingProposals.forEach(p => { breakdown[classifyScope(p)]++; });
 
-  // Featured: pending proposal with closest upcoming deadline
-  const featured = pendingProposals
+  // Closing-tonight strip: pending proposals whose deadline lands before the
+  // end of today. If none close tonight, fall back to the nearest-deadline
+  // pending proposals so the strip stays useful.
+  const endOfToday = new Date();
+  endOfToday.setHours(23, 59, 59, 999);
+  const deadlined = pendingProposals
     .filter(p => p.deadline)
-    .sort((a, b) => new Date(a.deadline!).getTime() - new Date(b.deadline!).getTime())[0];
+    .sort((a, b) => new Date(a.deadline!).getTime() - new Date(b.deadline!).getTime());
+  const closingTonight = deadlined.filter(p => new Date(p.deadline!).getTime() <= endOfToday.getTime());
+  const stripItems = closingTonight.length > 0 ? closingTonight : deadlined.slice(0, 2);
+  const stripMode: 'tonight' | 'soon' = closingTonight.length > 0 ? 'tonight' : 'soon';
 
-  // Impact stats. Demo account gets a curated, engaged-citizen profile so
-  // App Store reviewers see a populated Civic Record instead of zeroes.
+  // Civic record stats. Demo account gets a curated, engaged-citizen profile
+  // so App Store reviewers see a populated Civic Record instead of zeroes.
   const realVotedCount = votedIds.size;
-  const realPassedCount = civicProposals.filter(p =>
+  const realDecidedCount = civicProposals.filter(p =>
     votedIds.has(String(p.id)) && p.deadline && new Date(p.deadline).getTime() <= now
   ).length;
   const votedCount = isDemoAccount ? 47 : realVotedCount;
-  const passedCount = isDemoAccount ? 31 : realPassedCount;
-  const ringPending = isDemoAccount ? 12 : pendingCount;
+  const decidedCount = isDemoAccount ? 31 : realDecidedCount;
+  const participationDenom = isDemoAccount ? 47 + 3 : votedCount + pendingCount;
+  const participationPct = participationDenom > 0 ? Math.round((votedCount / participationDenom) * 100) : null;
 
   // Sentinel digest: most-engaged active civic proposals (org proposals
   // surface in the Your Organizations section instead).
@@ -222,24 +238,35 @@ export default function DashboardScreen() {
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={dc.GOLD} />}
       >
-        <TopBar name={displayName} city={userCity} state={userState} verified={isVerified} onAvatarPress={() => router.push('/(tabs)/profile')} onVerifyPress={handleStartKyc} />
+        <TopBar
+          name={displayName}
+          city={userCity}
+          state={userState}
+          profileImageUrl={user?.profileImageUrl || null}
+          verified={isVerified}
+          onAvatarPress={() => router.push('/(tabs)/profile')}
+          onVerifyPress={handleStartKyc}
+        />
         {isVerified ? (
-          <Hero pendingCount={pendingCount} breakdown={breakdown} onBeginVoting={navigateToProposals} />
+          <InboxHero pendingCount={pendingCount} breakdown={breakdown} onBeginVoting={navigateToProposals} />
         ) : (
           <UnverifiedHero globalCount={pendingCount} onVerify={handleStartKyc} onViewProposals={navigateToProposals} />
         )}
-        <Featured
-          proposal={featured}
+        <ClosingStrip
+          items={stripItems}
+          mode={stripMode}
           onPress={() => {
-            if (featured) {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              router.push({ pathname: '/(tabs)/proposals', params: { proposalId: String(featured.id) } });
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            if (stripItems.length > 0) {
+              router.push({ pathname: '/(tabs)/proposals', params: { proposalId: String(stripItems[0].id) } });
             } else {
               navigateToProposals();
             }
           }}
         />
-        {isVerified && <ImpactRing pending={ringPending} voted={votedCount} passed={passedCount} />}
+        {isVerified && (
+          <CivicRecord voted={votedCount} decided={decidedCount} participationPct={participationPct} />
+        )}
         {isVerified && userCountry && (
           <Communities
             proposals={civicProposals}
@@ -270,306 +297,229 @@ export default function DashboardScreen() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// PLACEHOLDER COMPONENTS (filled in via subsequent edits)
+// TOP BAR — status dot + "VERIFIED · <PLACE>", date line, serif avatar
 // ═══════════════════════════════════════════════════════════════════════════
-function TopBar({ name, city, state, verified, onAvatarPress, onVerifyPress }: { name: string; city: string; state: string; verified: boolean; onAvatarPress: () => void; onVerifyPress?: () => void }) {
+function TopBar({ name, city, state, profileImageUrl, verified, onAvatarPress, onVerifyPress }: {
+  name: string; city: string; state: string; profileImageUrl: string | null;
+  verified: boolean; onAvatarPress: () => void; onVerifyPress?: () => void;
+}) {
   const dc = useDashboardColors();
   const dateStr = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
-  const locationText = city && state ? ` · ${city}, ${state}` : '';
-  const statusText = verified ? `Verified${locationText}` : 'Unverified · tap to verify';
+  const place = (city || state || '').toUpperCase();
+  const statusText = verified ? (place ? `VERIFIED · ${place}` : 'VERIFIED') : 'UNVERIFIED · TAP TO VERIFY';
   const dotColor = verified ? dc.GREEN : dc.FG_FAINT;
   const StatusContainer: any = verified || !onVerifyPress ? View : TouchableOpacity;
   const statusContainerProps = verified || !onVerifyPress ? {} : { onPress: onVerifyPress, activeOpacity: 0.7, hitSlop: { top: 10, bottom: 10, left: 10, right: 10 } };
   return (
     <Animated.View entering={FadeInDown.duration(500)} style={styles.topBar}>
-      <View>
+      <View style={{ gap: 3 }}>
         <StatusContainer {...statusContainerProps}>
           <View style={styles.topBarLeftRow}>
-            <View style={[styles.greenDot, { backgroundColor: dotColor }]} />
+            <View style={[styles.statusDot, { backgroundColor: dotColor }]} />
             <Text style={[styles.topBarStatus, { color: verified ? dc.FG_MUTED : dc.GOLD }]}>{statusText}</Text>
           </View>
         </StatusContainer>
         <Text style={[styles.topBarDate, { color: dc.FG_FAINT }]}>{dateStr}</Text>
       </View>
       <TouchableOpacity onPress={onAvatarPress} activeOpacity={0.8}>
-        <LinearGradient
-          colors={[`${dc.GOLD}66`, `${dc.GOLD}0D`]}
-          style={styles.avatarOuter}
-          start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-        >
-          <View style={[styles.avatarInner, { backgroundColor: dc.BG_CARD, borderColor: dc.LINE }]}>
+        <View style={[styles.avatar, {
+          backgroundColor: dc.BG_CARD,
+          borderColor: verified ? GOLD_BORDER_STRONG : dc.LINE_STRONG,
+        }]}>
+          {profileImageUrl ? (
+            <ExpoImage
+              source={{ uri: profileImageUrl }}
+              style={{ width: '100%', height: '100%', borderRadius: 22 }}
+              contentFit="cover"
+              cachePolicy="memory-disk"
+              transition={150}
+            />
+          ) : (
             <Text style={[styles.avatarLetter, { color: dc.GOLD }]}>{name.charAt(0).toUpperCase()}</Text>
-          </View>
-        </LinearGradient>
-        {verified && <View style={[styles.avatarVerifiedDot, { backgroundColor: dc.GREEN }]} />}
+          )}
+        </View>
+        {verified && <View style={[styles.avatarVerifiedDot, { backgroundColor: dc.GREEN, borderColor: dc.BG }]} />}
       </TouchableOpacity>
     </Animated.View>
   );
 }
-function Hero({ pendingCount, breakdown, onBeginVoting }: { pendingCount: number; breakdown: { global: number; federal: number; provincial: number; municipal: number }; onBeginVoting: () => void }) {
+
+// ═══════════════════════════════════════════════════════════════════════════
+// HERO — "N proposals awaiting your voice" + level split + Begin Voting
+// ═══════════════════════════════════════════════════════════════════════════
+function InboxHero({ pendingCount, breakdown, onBeginVoting }: {
+  pendingCount: number;
+  breakdown: { global: number; federal: number; provincial: number; municipal: number };
+  onBeginVoting: () => void;
+}) {
   const dc = useDashboardColors();
   const dateStr = new Date().toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' }).replace(/\//g, ' · ');
-  const total = Math.max(breakdown.federal + breakdown.provincial + breakdown.municipal, 1);
   const isPlural = pendingCount !== 1;
-  return (
-    <Animated.View entering={FadeInUp.duration(500).delay(100)} style={[styles.hero, { backgroundColor: dc.BG_CARD, borderColor: dc.LINE }]}>
-      <View style={styles.heroInner}>
-        <View style={styles.heroHeader}>
-          <Text style={[styles.eyebrow, { color: dc.GOLD }]}>Your Civic Inbox</Text>
-          <Text style={[styles.heroDate, { color: dc.FG_FAINT }]}>{dateStr}</Text>
-        </View>
+  // Only render split segments/legend rows that actually have data. The mock
+  // shows federal/provincial/municipal; `global` (no geo restrictions) is a
+  // real bucket in this app, so it appears when populated.
+  const levels = [
+    { key: 'federal', label: 'federal', count: breakdown.federal, color: dc.SPLIT_FEDERAL },
+    { key: 'provincial', label: 'provincial', count: breakdown.provincial, color: dc.SPLIT_PROVINCIAL },
+    { key: 'municipal', label: 'municipal', count: breakdown.municipal, color: dc.SPLIT_MUNICIPAL },
+    { key: 'global', label: 'global', count: breakdown.global, color: dc.FG_FAINT },
+  ].filter(l => l.count > 0);
 
-        <View style={styles.heroNumberRow}>
-          <Text style={[styles.heroNumber, { color: dc.GOLD }]}>{pendingCount}</Text>
-          <View style={styles.heroNumberLabel}>
-            <Text style={[styles.heroNumberLabelText, { color: dc.FG }]}>{isPlural ? 'proposals' : 'proposal'}</Text>
-            <Text style={[styles.heroNumberLabelSub, { color: dc.FG_MUTED }]}>awaiting your voice</Text>
+  return (
+    <Animated.View entering={FadeInUp.duration(500).delay(100)} style={[styles.hero, { backgroundColor: dc.BG_CARD, borderColor: GOLD_BORDER }]}>
+      <View style={styles.heroHeader}>
+        <Text style={[styles.heroEyebrow, { color: dc.GOLD }]}>YOUR CIVIC INBOX</Text>
+        <Text style={[styles.heroDate, { color: dc.FG_FAINT }]}>{dateStr}</Text>
+      </View>
+
+      <View style={styles.heroNumberRow}>
+        <Text style={[styles.heroNumber, { color: dc.GOLD }]}>{pendingCount}</Text>
+        <View style={styles.heroNumberLabel}>
+          <Text style={[styles.heroNumberLabelText, { color: dc.FG }]}>{isPlural ? 'proposals' : 'proposal'}</Text>
+          <Text style={[styles.heroNumberLabelSub, { color: dc.FG_MUTED }]}>awaiting your voice</Text>
+        </View>
+      </View>
+
+      {levels.length > 0 && (
+        <View style={{ gap: 8 }}>
+          <View style={styles.splitBar}>
+            {levels.map((l, i) => (
+              <View
+                key={l.key}
+                style={{
+                  flex: l.count,
+                  backgroundColor: l.color,
+                  borderTopLeftRadius: i === 0 ? 3 : 0,
+                  borderBottomLeftRadius: i === 0 ? 3 : 0,
+                  borderTopRightRadius: i === levels.length - 1 ? 3 : 0,
+                  borderBottomRightRadius: i === levels.length - 1 ? 3 : 0,
+                }}
+              />
+            ))}
+          </View>
+          <View style={styles.splitLegend}>
+            {levels.map(l => (
+              <View key={l.key} style={styles.splitLegendItem}>
+                <View style={[styles.splitLegendDot, { backgroundColor: l.color }]} />
+                <Text style={[styles.splitLegendText, { color: dc.FG_MUTED }]}>
+                  <Text style={TNUM}>{l.count}</Text> {l.label}
+                </Text>
+              </View>
+            ))}
           </View>
         </View>
+      )}
 
-        <View style={[styles.breakdownBarTrack, { backgroundColor: dc.LINE }]}>
-          {breakdown.federal > 0 && <View style={{ flex: breakdown.federal, backgroundColor: dc.GOLD }} />}
-          {breakdown.provincial > 0 && <View style={{ flex: breakdown.provincial, backgroundColor: dc.GOLD_LIGHT, opacity: 0.6 }} />}
-          {breakdown.municipal > 0 && <View style={{ flex: breakdown.municipal, backgroundColor: dc.GOLD_DARK, opacity: 0.7 }} />}
-          {total === 0 && <View style={{ flex: 1, backgroundColor: dc.LINE }} />}
+      <TouchableOpacity
+        onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); onBeginVoting(); }}
+        activeOpacity={0.9}
+        style={[styles.ctaBtn, { backgroundColor: dc.GOLD_FILL }]}
+      >
+        <Text style={styles.ctaBtnText}>Begin Voting</Text>
+        <View style={styles.ctaArrowCircle}>
+          <Ionicons name="arrow-forward" size={17} color={ON_GOLD} />
         </View>
-        <View style={styles.breakdownLegend}>
-          <Text style={[styles.breakdownLegendItem, { color: dc.FG_FAINT }]}><Text style={{ color: dc.GOLD }}>● </Text>{breakdown.federal} federal</Text>
-          <Text style={[styles.breakdownLegendItem, { color: dc.FG_FAINT }]}><Text style={{ color: dc.GOLD_LIGHT }}>● </Text>{breakdown.provincial} provincial</Text>
-          <Text style={[styles.breakdownLegendItem, { color: dc.FG_FAINT }]}><Text style={{ color: dc.GOLD_DARK }}>● </Text>{breakdown.municipal} municipal</Text>
-        </View>
-
-        <TouchableOpacity onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); onBeginVoting(); }} activeOpacity={0.9}>
-          <LinearGradient
-            colors={[dc.GOLD, dc.GOLD_DARK]}
-            style={styles.ctaBtn}
-            start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }}
-          >
-            <Text style={styles.ctaBtnText}>Begin voting</Text>
-            <View style={styles.ctaArrowCircle}>
-              <Svg width={14} height={14} viewBox="0 0 24 24">
-                <Path d="M5 12 L19 12 M12 5 L19 12 L12 19" stroke="#1A1206" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" fill="none" />
-              </Svg>
-            </View>
-          </LinearGradient>
-        </TouchableOpacity>
-      </View>
+      </TouchableOpacity>
     </Animated.View>
   );
 }
+
 function UnverifiedHero({ globalCount, onVerify, onViewProposals }: { globalCount: number; onVerify: () => void; onViewProposals: () => void }) {
   const dc = useDashboardColors();
   return (
-    <Animated.View entering={FadeInUp.duration(500).delay(100)} style={[styles.hero, { backgroundColor: dc.BG_CARD, borderColor: dc.LINE }]}>
-      <View style={styles.heroInner}>
-        <View style={styles.heroHeader}>
-          <Text style={[styles.eyebrow, { color: dc.GOLD }]}>Verify Your Identity</Text>
-        </View>
-
-        <Text style={[styles.unverifiedHeadline, { color: dc.GOLD }]}>Unlock your civic voice</Text>
-        <Text style={[styles.unverifiedSubhead, { color: dc.FG_MUTED }]}>
-          Verify once to vote on proposals in your country, province, and city. Free and takes about 2 minutes.
-        </Text>
-
-        <TouchableOpacity onPress={onVerify} activeOpacity={0.9}>
-          <LinearGradient
-            colors={[dc.GOLD, dc.GOLD_DARK]}
-            style={styles.ctaBtn}
-            start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }}
-          >
-            <Text style={styles.ctaBtnText}>Get Verified</Text>
-            <View style={styles.ctaArrowCircle}>
-              <Svg width={14} height={14} viewBox="0 0 24 24">
-                <Path d="M5 12 L19 12 M12 5 L19 12 L12 19" stroke="#1A1206" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" fill="none" />
-              </Svg>
-            </View>
-          </LinearGradient>
-        </TouchableOpacity>
-
-        {globalCount > 0 && (
-          <TouchableOpacity onPress={onViewProposals} activeOpacity={0.7} style={[styles.unverifiedTease, { borderTopColor: dc.LINE }]}>
-            <Text style={[styles.unverifiedTeaseText, { color: dc.FG_MUTED }]}>
-              {globalCount} global {globalCount === 1 ? 'proposal' : 'proposals'} you can vote on now
-            </Text>
-            <Svg width={7} height={12} viewBox="0 0 7 12">
-              <Path d="M1 1 L6 6 L1 11" stroke={dc.GOLD} strokeWidth={1.5} fill="none" strokeLinecap="round" strokeLinejoin="round" />
-            </Svg>
-          </TouchableOpacity>
-        )}
+    <Animated.View entering={FadeInUp.duration(500).delay(100)} style={[styles.hero, { backgroundColor: dc.BG_CARD, borderColor: GOLD_BORDER }]}>
+      <View style={styles.heroHeader}>
+        <Text style={[styles.heroEyebrow, { color: dc.GOLD }]}>VERIFY YOUR IDENTITY</Text>
       </View>
+
+      <Text style={[styles.unverifiedHeadline, { color: dc.FG }]}>Unlock your civic voice</Text>
+      <Text style={[styles.unverifiedSubhead, { color: dc.FG_MUTED }]}>
+        Verify once to vote on proposals in your country, province, and city. Free and takes about 2 minutes.
+      </Text>
+
+      <TouchableOpacity onPress={onVerify} activeOpacity={0.9} style={[styles.ctaBtn, { backgroundColor: dc.GOLD_FILL }]}>
+        <Text style={styles.ctaBtnText}>Get Verified</Text>
+        <View style={styles.ctaArrowCircle}>
+          <Ionicons name="arrow-forward" size={17} color={ON_GOLD} />
+        </View>
+      </TouchableOpacity>
+
+      {globalCount > 0 && (
+        <TouchableOpacity onPress={onViewProposals} activeOpacity={0.7} style={[styles.unverifiedTease, { borderTopColor: dc.LINE }]}>
+          <Text style={[styles.unverifiedTeaseText, { color: dc.FG_MUTED }]}>
+            <Text style={TNUM}>{globalCount}</Text> global {globalCount === 1 ? 'proposal' : 'proposals'} you can vote on now
+          </Text>
+          <Ionicons name="arrow-forward" size={14} color={dc.GOLD} />
+        </TouchableOpacity>
+      )}
     </Animated.View>
   );
 }
 
-function Featured({ proposal, onPress }: { proposal?: Proposal; onPress: () => void }) {
+// ═══════════════════════════════════════════════════════════════════════════
+// CLOSING STRIP — "N ballots close tonight" (or nearest deadlines)
+// ═══════════════════════════════════════════════════════════════════════════
+function ClosingStrip({ items, mode, onPress }: { items: Proposal[]; mode: 'tonight' | 'soon'; onPress: () => void }) {
   const dc = useDashboardColors();
-  if (!proposal) return null;
-  const deadlineMs = proposal.deadline ? new Date(proposal.deadline).getTime() : Date.now() + 7 * 86400000;
-  const remainingMs = Math.max(deadlineMs - Date.now(), 0);
-  const days = Math.floor(remainingMs / 86400000);
-  const hours = Math.floor((remainingMs % 86400000) / 3600000);
-  const closeText = days > 1 ? `Closes in ${days} days` : days === 1 ? 'Closes in 1 day' : hours > 0 ? `Closes in ${hours}h` : 'Closing today';
-  const totalVotes = proposal.supportVotes + proposal.opposeVotes;
-  const supportPct = totalVotes > 0 ? Math.round((proposal.supportVotes / totalVotes) * 100) : 0;
-  const opposePct = totalVotes > 0 ? 100 - supportPct : 0;
-  const scope = (proposal.geoRestrictions || []).length;
-  const tierLabel = scope === 0 ? 'GLBL' : scope >= 3 ? 'MUNI' : scope === 2 ? 'PROV' : 'FED';
-  const idDigits = String(proposal.id).match(/\d+/g)?.join('') || '000';
-  const refCode = `${tierLabel} · ${idDigits.slice(-3).padStart(3, '0')}`;
-
+  if (items.length === 0) return null;
+  const n = items.length;
+  const titleList = items.slice(0, 2).map(p => p.title).join(' · ');
+  const headline = mode === 'tonight'
+    ? `${n} ${n === 1 ? 'ballot closes' : 'ballots close'} tonight`
+    : `${n} ${n === 1 ? 'ballot' : 'ballots'} closing soonest`;
   return (
     <Animated.View entering={FadeInUp.duration(500).delay(200)} style={styles.sectionPad}>
-      <View style={styles.sectionHeader}>
-        <Text style={[styles.eyebrow, { color: dc.GOLD }]}>Featured This Week</Text>
-        <Text style={[styles.sectionMetaMono, { color: dc.GOLD }]}>{refCode}</Text>
-      </View>
-
-      <TouchableOpacity onPress={onPress} activeOpacity={0.92}>
-        <View style={[styles.featuredCard, { backgroundColor: dc.BG_CARD, borderColor: dc.LINE }]}>
-          <View style={styles.featuredImage}>
-            {proposal.imageUrl ? (
-              <>
-                <ExpoImage
-                  source={{ uri: proposal.imageUrl }}
-                  style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, width: '100%', height: '100%' }}
-                  contentFit="cover"
-                  cachePolicy="memory-disk"
-                  transition={150}
-                />
-                <LinearGradient
-                  colors={['rgba(4,7,7,0.2)', 'rgba(4,7,7,0.55)', 'rgba(13,15,18,0.95)']}
-                  start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }}
-                  style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0 }}
-                />
-                <View style={{
-                  position: 'absolute', right: -40, top: -40,
-                  width: 140, height: 140, borderRadius: 70,
-                  backgroundColor: 'rgba(234,186,88,0.10)',
-                }} />
-              </>
-            ) : (
-              <>
-                <LinearGradient
-                  colors={['rgba(234,186,88,0.18)', 'transparent', '#0A0C10']}
-                  start={{ x: 0.3, y: 0.3 }} end={{ x: 1, y: 1 }}
-                  style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0 }}
-                />
-                <Svg width="100%" height={140} viewBox="0 0 360 140" preserveAspectRatio="xMidYMid slice">
-                  <SvgG opacity={0.5}>
-                    {[40, 60, 80, 100, 160, 180, 200, 260, 280, 300, 320].map((x, i) => {
-                      const heights = [60, 50, 65, 55, 40, 20, 40, 55, 65, 50, 60];
-                      return <Line key={i} x1={x} y1={120} x2={x} y2={heights[i]} stroke={G_GOLD} strokeWidth={0.7} />;
-                    })}
-                  </SvgG>
-                  <Path d="M150 50 Q180 0 210 50" fill="none" stroke={G_GOLD} strokeWidth={1} opacity={0.7} />
-                  <Line x1={0} y1={120} x2={360} y2={120} stroke={G_GOLD} strokeWidth={0.6} opacity={0.5} />
-                </Svg>
-                <View style={styles.featuredImageOverlay} />
-              </>
-            )}
-            <View style={styles.featuredPill}>
-              <View style={styles.featuredPillDot} />
-              <Text style={styles.featuredPillText}>{closeText}</Text>
-            </View>
+      <TouchableOpacity onPress={onPress} activeOpacity={0.8}>
+        <View style={[styles.stripCard, { backgroundColor: dc.BG_CARD, borderColor: dc.LINE_SUBTLE }]}>
+          <View style={styles.stripCount}>
+            <Text style={[styles.stripCountNum, { color: dc.FG }]}>{n}</Text>
+            <Text style={[styles.stripCountLabel, { color: dc.FG_FAINT }]}>{mode === 'tonight' ? 'TONIGHT' : 'CLOSING'}</Text>
           </View>
-
-          <View style={styles.featuredBody}>
-            <Text style={[styles.featuredTitle, { color: dc.FG }]} numberOfLines={2}>{proposal.title}</Text>
-            <Text style={[styles.featuredDesc, { color: dc.FG_MUTED }]} numberOfLines={2}>{proposal.description}</Text>
-            <View style={[styles.sentimentBar, { backgroundColor: dc.LINE }]}>
-              {totalVotes > 0 ? (
-                <>
-                  <View style={{ flex: supportPct, backgroundColor: dc.SUPPORT }} />
-                  <View style={{ flex: opposePct, backgroundColor: dc.OPPOSE, opacity: 0.7 }} />
-                </>
-              ) : (
-                <View style={{ flex: 1, backgroundColor: dc.LINE }} />
-              )}
-            </View>
-            <View style={styles.sentimentLegend}>
-              <Text style={[styles.sentimentLegendText, { color: dc.FG_FAINT }]}>{totalVotes > 0 ? `${supportPct}% support` : 'No votes yet'}</Text>
-              <Text style={[styles.sentimentLegendText, { color: dc.FG_FAINT }]}>{totalVotes.toLocaleString()} {totalVotes === 1 ? 'voice' : 'voices'}</Text>
-            </View>
+          <View style={[styles.stripDivider, { backgroundColor: dc.LINE_SUBTLE }]} />
+          <View style={styles.stripBody}>
+            <Text style={[styles.stripHeadline, { color: dc.FG }]} numberOfLines={1}>{headline}</Text>
+            <Text style={[styles.stripMeta, { color: dc.FG_FAINT }]} numberOfLines={1}>{titleList}</Text>
           </View>
+          <Ionicons name="arrow-forward" size={15} color={dc.GOLD} />
         </View>
       </TouchableOpacity>
     </Animated.View>
   );
 }
-function ImpactRing({ pending, voted, passed }: { pending: number; voted: number; passed: number }) {
-  const dc = useDashboardColors();
-  const total = Math.max(pending + voted, 1);
-  const r = 50, c = 2 * Math.PI * r;
-  const votedDash = (voted / total) * c;
-  const pct = Math.round((voted / total) * 100);
 
+// ═══════════════════════════════════════════════════════════════════════════
+// CIVIC RECORD — mono stat tiles: ballots cast / decided / participation
+// ═══════════════════════════════════════════════════════════════════════════
+function CivicRecord({ voted, decided, participationPct }: { voted: number; decided: number; participationPct: number | null }) {
+  const dc = useDashboardColors();
   return (
     <Animated.View entering={FadeInUp.duration(500).delay(300)} style={styles.sectionPad}>
       <View style={styles.sectionHeader}>
-        <Text style={[styles.eyebrow, { color: dc.GOLD }]}>Your Civic Record</Text>
-        <Text style={[styles.sectionMeta, { color: dc.FG_FAINT }]}>Since Mar 2026</Text>
+        <Text style={[styles.eyebrow, { color: dc.FG_FAINT }]}>YOUR CIVIC RECORD</Text>
+        <Text style={[styles.sectionMetaMono, { color: dc.FG_FAINT }]}>ON THE LEDGER</Text>
       </View>
-
-      <View style={[styles.impactCard, { backgroundColor: dc.BG_CARD, borderColor: dc.LINE }]}>
-        <View style={styles.impactRow}>
-          <View style={styles.impactRingWrap}>
-            <Svg width={124} height={124} viewBox="0 0 124 124">
-              <Defs>
-                <SvgLinearGradient id="ringG" x1="0" y1="0" x2="1" y2="1">
-                  <Stop offset="0%" stopColor={dc.GOLD_LIGHT} />
-                  <Stop offset="100%" stopColor={dc.GOLD_DARK} />
-                </SvgLinearGradient>
-              </Defs>
-              <Circle cx={62} cy={62} r={r} fill="none" stroke={dc.LINE_STRONG} strokeWidth={3} />
-              <Circle
-                cx={62} cy={62} r={r} fill="none"
-                stroke="url(#ringG)" strokeWidth={6}
-                strokeDasharray={`${votedDash} ${c}`} strokeLinecap="round"
-                transform="rotate(-90 62 62)"
-              />
-              {Array.from({ length: 24 }).map((_, i) => {
-                const a = (i / 24) * Math.PI * 2 - Math.PI / 2;
-                const r1 = 56, r2 = 59;
-                return (
-                  <Line key={i}
-                    x1={62 + Math.cos(a) * r1} y1={62 + Math.sin(a) * r1}
-                    x2={62 + Math.cos(a) * r2} y2={62 + Math.sin(a) * r2}
-                    stroke={dc.LINE_STRONG} strokeWidth={0.7}
-                  />
-                );
-              })}
-            </Svg>
-            <View style={styles.impactRingCenter}>
-              <Text style={[styles.impactRingPct, { color: dc.GOLD }]}>{pct}<Text style={[styles.impactRingPctSign, { color: dc.FG_MUTED }]}>%</Text></Text>
-              <Text style={[styles.impactRingLabel, { color: dc.FG_FAINT }]}>Voted</Text>
-            </View>
-          </View>
-
-          <View style={styles.impactLedger}>
-            <LedgerRow label="Pending" value={String(pending)} tint={dc.GOLD} />
-            <View style={[styles.hairline, { backgroundColor: dc.LINE }]} />
-            <LedgerRow label="Voted" value={String(voted)} tint={dc.GREEN} />
-            <View style={[styles.hairline, { backgroundColor: dc.LINE }]} />
-            <LedgerRow label="Passed" value={String(passed)} tint={dc.FG_FAINT} />
-          </View>
-        </View>
+      <View style={styles.recordGrid}>
+        <RecordTile value={String(voted)} label="BALLOTS CAST" />
+        <RecordTile value={String(decided)} label="DECIDED" />
+        <RecordTile value={participationPct === null ? '—' : `${participationPct}%`} label="PARTICIPATION" gold={participationPct !== null} />
       </View>
     </Animated.View>
   );
 }
 
-function LedgerRow({ label, value, tint }: { label: string; value: string; tint: string }) {
+function RecordTile({ value, label, gold }: { value: string; label: string; gold?: boolean }) {
   const dc = useDashboardColors();
   return (
-    <View style={styles.ledgerRow}>
-      <View style={styles.ledgerLabelRow}>
-        <View style={[styles.ledgerDot, { backgroundColor: tint }]} />
-        <Text style={[styles.ledgerLabel, { color: dc.FG_MUTED }]}>{label}</Text>
-      </View>
-      <Text style={[styles.ledgerValue, { color: dc.FG }]}>{value}</Text>
+    <View style={[styles.recordTile, { backgroundColor: dc.BG_CARD, borderColor: dc.LINE_SUBTLE }]}>
+      <Text style={[styles.recordTileValue, { color: gold ? dc.GOLD : dc.FG }]}>{value}</Text>
+      <Text style={[styles.recordTileLabel, { color: dc.FG_FAINT }]}>{label}</Text>
     </View>
   );
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// COMMUNITIES — where you can vote (kept feature, restyled)
+// ═══════════════════════════════════════════════════════════════════════════
 function Communities({ proposals, votedIds, country, state, city, isVerified, onPrimaryPress, onOpenDetail, router }: {
   proposals: Proposal[]; votedIds: Set<string>; country: string; state: string; city: string;
   isVerified: boolean;
@@ -605,16 +555,16 @@ function Communities({ proposals, votedIds, country, state, city, isVerified, on
       <TouchableOpacity
         onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); onOpenDetail(); }}
         activeOpacity={0.7}
-        style={[styles.sectionHeader, { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }]}
+        style={styles.sectionHeader}
       >
-        <Text style={[styles.eyebrow, { color: dc.GOLD }]}>Your Communities</Text>
+        <Text style={[styles.eyebrow, { color: dc.FG_FAINT }]}>YOUR COMMUNITIES</Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-          <Text style={{ fontFamily: FONTS.sans, fontSize: 11, color: dc.FG_FAINT, letterSpacing: 0.5 }}>Details</Text>
+          <Text style={{ fontFamily: FONTS.sansMedium, fontSize: 11, color: dc.FG_FAINT, letterSpacing: 0.5 }}>Details</Text>
           <Ionicons name="chevron-forward" size={12} color={dc.FG_FAINT} />
         </View>
       </TouchableOpacity>
 
-      <View style={[styles.communityCard, { backgroundColor: dc.BG_CARD, borderColor: dc.LINE }]}>
+      <View style={[styles.communityCard, { backgroundColor: dc.BG_CARD, borderColor: dc.LINE_SUBTLE }]}>
         {items.map((it, i) => (
           <CommunityRow key={it.name} {...it} last={i === items.length - 1}
             onPress={() => {
@@ -635,11 +585,11 @@ function CommunityRow({ tier, name, meta, primary, flag, last, onPress }: {
   const dc = useDashboardColors();
   return (
     <TouchableOpacity onPress={onPress} activeOpacity={0.7}>
-      <View style={[styles.communityRow, !last && [styles.communityRowBorder, { borderBottomColor: dc.LINE }]]}>
-        {primary && <View style={[styles.communityPrimaryBar, { backgroundColor: dc.GOLD }]} />}
+      <View style={[styles.communityRow, !last && [styles.communityRowBorder, { borderBottomColor: dc.LINE_SUBTLE }]]}>
+        {primary && <View style={[styles.communityPrimaryBar, { backgroundColor: dc.GOLD_FILL }]} />}
         <View style={[styles.communityFlag, {
-          backgroundColor: primary ? `${dc.GOLD}1A` : dc.BG_RAISED,
-          borderColor: primary ? `${dc.GOLD}4D` : dc.LINE_STRONG,
+          backgroundColor: primary ? dc.GOLD_SURFACE : dc.BG_RAISED,
+          borderColor: primary ? GOLD_BORDER : dc.LINE_STRONG,
         }]}>
           <Text style={[styles.communityFlagText, { color: primary ? dc.GOLD : dc.FG_MUTED }]}>{flag}</Text>
         </View>
@@ -657,6 +607,7 @@ function CommunityRow({ tier, name, meta, primary, flag, last, onPress }: {
     </TouchableOpacity>
   );
 }
+
 const ORG_COLLAPSED_LIMIT = 3;
 
 function YourOrganizations({ orgs, orgProposalsByOrg, votedIds, router }: {
@@ -697,14 +648,14 @@ function YourOrganizations({ orgs, orgProposalsByOrg, votedIds, router }: {
   return (
     <Animated.View entering={FadeInUp.duration(500).delay(450)} style={styles.sectionPad}>
       <View style={styles.sectionHeader}>
-        <Text style={[styles.eyebrow, { color: dc.GOLD }]}>Your Organizations</Text>
+        <Text style={[styles.eyebrow, { color: dc.FG_FAINT }]}>YOUR ORGANIZATIONS</Text>
         <Text style={[styles.eyebrowMeta, { color: dc.FG_FAINT }]}>
           {orgs.length} {orgs.length === 1 ? 'community' : 'communities'}
           {totalPending > 0 ? ` · ${totalPending} pending` : ''}
         </Text>
       </View>
 
-      <View style={[styles.communityCard, { backgroundColor: dc.BG_CARD, borderColor: dc.LINE }]}>
+      <View style={[styles.communityCard, { backgroundColor: dc.BG_CARD, borderColor: dc.LINE_SUBTLE }]}>
         {collapsedRows.map((row, i) => (
           <OrgRow
             key={row.org.id}
@@ -728,7 +679,7 @@ function YourOrganizations({ orgs, orgProposalsByOrg, votedIds, router }: {
             }}
             activeOpacity={0.7}
           >
-            <View style={[styles.orgExpandRow, { borderTopColor: dc.LINE }]}>
+            <View style={[styles.orgExpandRow, { borderTopColor: dc.LINE_SUBTLE }]}>
               <Text style={[styles.orgExpandText, { color: dc.GOLD }]}>
                 {expanded
                   ? 'Show fewer'
@@ -764,11 +715,11 @@ function OrgRow({ org, pendingCount, last, onPress }: {
       : `${pendingCount} ${pendingCount === 1 ? 'proposal' : 'proposals'} awaiting your voice`;
   return (
     <TouchableOpacity onPress={onPress} activeOpacity={0.7}>
-      <View style={[styles.communityRow, !last && [styles.communityRowBorder, { borderBottomColor: dc.LINE }]]}>
-        {pendingCount > 0 && <View style={[styles.communityPrimaryBar, { backgroundColor: dc.GOLD }]} />}
+      <View style={[styles.communityRow, !last && [styles.communityRowBorder, { borderBottomColor: dc.LINE_SUBTLE }]]}>
+        {pendingCount > 0 && <View style={[styles.communityPrimaryBar, { backgroundColor: dc.GOLD_FILL }]} />}
         <View style={[styles.communityFlag, {
-          backgroundColor: pendingCount > 0 ? `${dc.GOLD}1A` : dc.BG_RAISED,
-          borderColor: pendingCount > 0 ? `${dc.GOLD}4D` : dc.LINE_STRONG,
+          backgroundColor: pendingCount > 0 ? dc.GOLD_SURFACE : dc.BG_RAISED,
+          borderColor: pendingCount > 0 ? GOLD_BORDER : dc.LINE_STRONG,
           overflow: 'hidden',
         }]}>
           {org.logoUrl ? (
@@ -798,6 +749,9 @@ function OrgRow({ org, pendingCount, last, onPress }: {
   );
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// TRENDING DIGEST — most-engaged active proposals (kept feature, restyled)
+// ═══════════════════════════════════════════════════════════════════════════
 function SentinelDigest({ items }: { items: Proposal[] }) {
   const dc = useDashboardColors();
   const now = Date.now();
@@ -841,14 +795,14 @@ function SentinelDigest({ items }: { items: Proposal[] }) {
   return (
     <Animated.View entering={FadeInUp.duration(500).delay(500)} style={styles.sectionPad}>
       <View style={styles.sectionHeader}>
-        <Text style={[styles.eyebrow, { color: dc.GOLD }]}>Trending</Text>
-        <Text style={[styles.sectionMetaMono, { color: dc.FG_FAINT }]}>Updated 2h ago</Text>
+        <Text style={[styles.eyebrow, { color: dc.FG_FAINT }]}>TRENDING</Text>
+        <Text style={[styles.sectionMetaMono, { color: dc.FG_FAINT }]}>BY BALLOTS</Text>
       </View>
-      <View style={[styles.communityCard, { backgroundColor: dc.BG_CARD, borderColor: dc.LINE }]}>
+      <View style={[styles.communityCard, { backgroundColor: dc.BG_CARD, borderColor: dc.LINE_SUBTLE }]}>
         {rows.map((r, i) => (
           <View key={r.id}>
             <DigestRow {...r} />
-            {i < rows.length - 1 && <View style={[styles.hairline, { backgroundColor: dc.LINE }]} />}
+            {i < rows.length - 1 && <View style={[styles.hairline, { backgroundColor: dc.LINE_SUBTLE }]} />}
           </View>
         ))}
       </View>
@@ -870,11 +824,12 @@ function DigestRow({ time, tag, headline, meta }: { time: string; tag: string; h
     </View>
   );
 }
+
 function FooterSig() {
   const dc = useDashboardColors();
   return (
     <View style={styles.footerSig}>
-      <View style={[styles.footerLine, { backgroundColor: dc.LINE }]} />
+      <View style={[styles.footerLine, { backgroundColor: dc.LINE_STRONG }]} />
       <Text style={[styles.footerTagline, { color: dc.FG_FAINT }]}>Verified civic infrastructure.</Text>
       <Text style={[styles.footerMark, { color: dc.FG_FAINT }]}>Represent · Est. 2026</Text>
     </View>
@@ -882,211 +837,168 @@ function FooterSig() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// STYLES
+// STYLES — M1 mock values (24px screen padding, radius 22 hero / 18 cards)
 // ═══════════════════════════════════════════════════════════════════════════
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: BG },
   scrollContent: { paddingHorizontal: 0 },
 
   eyebrow: {
-    fontFamily: FONTS.sansSemiBold, fontSize: 11, 
-    letterSpacing: 2.2, textTransform: 'uppercase',
+    fontFamily: FONTS.sansSemiBold, fontSize: 11,
+    letterSpacing: 1.54, textTransform: 'uppercase', color: FG_FAINT,
   },
-  hairline: { height: 1, backgroundColor: LINE },
+  hairline: { height: 1, backgroundColor: LINE_SUBTLE },
 
-  // TopBar
+  // TopBar — mock: status dot + VERIFIED · PLACE / date · 44px avatar
   topBar: {
-    paddingHorizontal: 24, paddingTop: 8, paddingBottom: 18,
+    paddingHorizontal: SPACING.screenPadding, paddingTop: 8, paddingBottom: 16,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
   },
-  topBarLeftRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6,
-  },
-  greenDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: GREEN },
+  topBarLeftRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  statusDot: { width: 6, height: 6, borderRadius: 3 },
   topBarStatus: {
-    fontFamily: FONTS.sansMedium, fontSize: 11, 
-    letterSpacing: 1.98, textTransform: 'uppercase', color: FG_FAINT,
+    fontFamily: FONTS.sansSemiBold, fontSize: 10.5,
+    letterSpacing: 1.68, color: FG_MUTED,
   },
-  topBarDate: { fontFamily: FONTS.sans, fontSize: 13, color: FG_MUTED, },
-  avatarOuter: {
-    width: 40, height: 40, borderRadius: 20,
-    padding: 1.5, alignItems: 'center', justifyContent: 'center',
+  topBarDate: { fontFamily: FONTS.sans, fontSize: 13, color: FG_FAINT },
+  avatar: {
+    width: 44, height: 44, borderRadius: 22,
+    backgroundColor: BG_CARD, borderWidth: 1, borderColor: GOLD_BORDER_STRONG,
+    alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
   },
-  avatarInner: {
-    width: '100%', height: '100%', borderRadius: 20,
-    backgroundColor: BG_RAISED, alignItems: 'center', justifyContent: 'center',
-  },
-  avatarLetter: { fontFamily: FONTS.serifSemiBold, fontSize: 16,  color: G_GOLD },
+  avatarLetter: { fontFamily: FONTS.serif, fontSize: 18, color: G_GOLD },
   avatarVerifiedDot: {
-    position: 'absolute', bottom: -1, right: -1,
-    width: 11, height: 11, borderRadius: 5.5,
-    backgroundColor: GREEN, borderWidth: 2, borderColor: BG,
+    position: 'absolute', bottom: 1, right: 1,
+    width: 10, height: 10, borderRadius: 5,
+    borderWidth: 2, borderColor: BG,
   },
 
-  // Hero
+  // Hero — mock: surface card, gold .28 border, radius 22, padding 22, gap 16
   hero: {
-    marginHorizontal: 16, marginBottom: 24,
-    borderRadius: 22, overflow: 'hidden',
-    backgroundColor: '#0F1115',
-    borderWidth: 1, borderColor: LINE,
+    marginHorizontal: SPACING.screenPadding, marginBottom: 16,
+    borderRadius: 22, padding: 22, gap: 16,
+    backgroundColor: BG_CARD, borderWidth: 1, borderColor: GOLD_BORDER,
   },
-  heroInner: { padding: 22 },
   heroHeader: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    marginBottom: 24,
   },
-  heroDate: { fontFamily: FONTS.mono, fontSize: 10, color: FG_FAINT, letterSpacing: 1 },
-  heroNumberRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 16, marginBottom: 8 },
+  heroEyebrow: {
+    fontFamily: FONTS.sansSemiBold, fontSize: 10.5,
+    letterSpacing: 1.68, color: G_GOLD,
+  },
+  heroDate: {
+    fontFamily: FONTS.mono, fontSize: 10.5, color: FG_FAINT,
+    letterSpacing: 0.84, ...TNUM,
+  },
+  heroNumberRow: { flexDirection: 'row', alignItems: 'baseline', gap: 14 },
   heroNumber: {
-    fontFamily: FONTS.serif, fontSize: 88,  color: FG,
-    letterSpacing: -3.5, lineHeight: 75,
+    fontFamily: FONTS.serif, fontSize: 76, lineHeight: 70,
+    letterSpacing: -1.5, color: G_GOLD, ...TNUM,
   },
-  heroNumberLabel: { paddingBottom: 12 },
+  heroNumberLabel: { gap: 2 },
   heroNumberLabelText: {
-    fontFamily: FONTS.serifItalic, fontSize: 22,  color: FG_MUTED, lineHeight: 24,
+    fontFamily: FONTS.serifMediumItalic, fontSize: 24, lineHeight: 26, color: FG,
   },
-  heroNumberLabelSub: { fontFamily: FONTS.sans, fontSize: 13, color: FG_FAINT, marginTop: 2 },
-  unverifiedHeadline: {
-    fontFamily: FONTS.serif, fontSize: 32, lineHeight: 38,
-    marginTop: 12, marginBottom: 10, 
-  },
-  unverifiedSubhead: {
-    fontFamily: FONTS.sans, fontSize: 14, lineHeight: 20,
-    marginBottom: 22,
-  },
-  unverifiedTease: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    marginTop: 14, paddingTop: 14,
-    borderTopWidth: StyleSheet.hairlineWidth,
-  },
-  unverifiedTeaseText: { fontFamily: FONTS.sansMedium, fontSize: 12, },
-  breakdownBarTrack: {
-    flexDirection: 'row', height: 4, borderRadius: 2, overflow: 'hidden',
-    backgroundColor: LINE, marginTop: 22,
-  },
-  breakdownLegend: {
-    flexDirection: 'row', justifyContent: 'space-between', marginTop: 10,
-    marginBottom: 18,
-  },
-  breakdownLegendItem: { fontFamily: FONTS.sans, fontSize: 11, color: FG_FAINT },
+  heroNumberLabelSub: { fontFamily: FONTS.sans, fontSize: 14, color: FG_MUTED },
+
+  // Level split — mock: 6px tri-tone bar, 3px gaps, dot legend
+  splitBar: { flexDirection: 'row', height: 6, gap: 3 },
+  splitLegend: { flexDirection: 'row', flexWrap: 'wrap', gap: 16, rowGap: 6 },
+  splitLegendItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  splitLegendDot: { width: 6, height: 6, borderRadius: 3 },
+  splitLegendText: { fontFamily: FONTS.sans, fontSize: 11.5, color: FG_MUTED },
+
+  // Gold CTA — mock: 54h, radius 15, label 16.5 semibold, 38px arrow circle
   ctaBtn: {
+    height: 54, borderRadius: 15,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 18, paddingVertical: 14, borderRadius: 14,
+    paddingLeft: 20, paddingRight: 8,
+    backgroundColor: G_GOLD,
   },
   ctaBtnText: {
-    fontFamily: FONTS.sansSemiBold, fontSize: 15,  color: '#1A1206', letterSpacing: -0.15,
+    fontFamily: FONTS.sansSemiBold, fontSize: 16.5, color: ON_GOLD, letterSpacing: -0.15,
   },
   ctaArrowCircle: {
-    width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center',
-    backgroundColor: 'rgba(26,18,6,0.18)',
+    width: 38, height: 38, borderRadius: 19,
+    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: 'rgba(4,7,7,0.15)',
+  },
+
+  // Unverified hero
+  unverifiedHeadline: {
+    fontFamily: FONTS.serif, fontSize: 30, lineHeight: 34, letterSpacing: -0.36,
+  },
+  unverifiedSubhead: { fontFamily: FONTS.sans, fontSize: 14, lineHeight: 20 },
+  unverifiedTease: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingTop: 14, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: LINE,
+  },
+  unverifiedTeaseText: { fontFamily: FONTS.sansMedium, fontSize: 12 },
+
+  // Closing strip — mock: mono count block · divider · headline/titles · arrow
+  stripCard: {
+    flexDirection: 'row', alignItems: 'center', gap: 14,
+    borderRadius: RADIUS.card, borderWidth: 1,
+    paddingVertical: 16, paddingHorizontal: 18,
+    backgroundColor: BG_CARD, borderColor: LINE_SUBTLE,
+  },
+  stripCount: { alignItems: 'center' },
+  stripCountNum: {
+    fontFamily: FONTS.monoSemiBold, fontSize: 22, color: FG, ...TNUM,
+  },
+  stripCountLabel: {
+    fontFamily: FONTS.mono, fontSize: 8, letterSpacing: 1.12, color: FG_FAINT,
+  },
+  stripDivider: { width: 1, alignSelf: 'stretch', backgroundColor: LINE_SUBTLE },
+  stripBody: { flex: 1, gap: 2, minWidth: 0 },
+  stripHeadline: { fontFamily: FONTS.sansSemiBold, fontSize: 12.5, color: FG },
+  stripMeta: { fontFamily: FONTS.sans, fontSize: 11.5, color: FG_FAINT },
+
+  // Civic record — mock: 3-up mono stat tiles, radius 16
+  recordGrid: { flexDirection: 'row', gap: 10 },
+  recordTile: {
+    flex: 1, borderRadius: 16, borderWidth: 1,
+    paddingVertical: 13, paddingHorizontal: 14, gap: 2,
+    backgroundColor: BG_CARD, borderColor: LINE_SUBTLE,
+  },
+  recordTileValue: {
+    fontFamily: FONTS.monoSemiBold, fontSize: 20, color: FG, ...TNUM,
+  },
+  recordTileLabel: {
+    fontFamily: FONTS.sansMedium, fontSize: 9, letterSpacing: 0.9, color: FG_FAINT,
   },
 
   // Section header
   sectionHeader: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 22, paddingBottom: 14,
+    flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between',
+    paddingBottom: 12,
   },
-  sectionPad: { paddingHorizontal: 16, paddingBottom: 28 },
-  sectionMeta: { fontFamily: FONTS.sans, fontSize: 11, color: FG_FAINT },
+  sectionPad: { paddingHorizontal: SPACING.screenPadding, paddingBottom: 20 },
   sectionMetaMono: {
-    fontFamily: FONTS.mono, fontSize: 9.5, color: FG_FAINT,
-    letterSpacing: 1.3, textTransform: 'uppercase',
+    fontFamily: FONTS.mono, fontSize: 10.5, color: FG_FAINT,
+    letterSpacing: 0.84, textTransform: 'uppercase', ...TNUM,
   },
-  sectionMetaGold: { fontFamily: FONTS.sansMedium, fontSize: 11,  color: G_GOLD },
   eyebrowMeta: {
-    fontFamily: FONTS.sans, fontSize: 11, color: FG_FAINT,
-    letterSpacing: 0.3,
+    fontFamily: FONTS.sans, fontSize: 11, color: FG_FAINT, letterSpacing: 0.3,
   },
   orgExpandRow: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     gap: 8, paddingVertical: 14, paddingHorizontal: 16,
-    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: LINE_SUBTLE,
   },
-  orgExpandText: { fontFamily: FONTS.sansMedium, fontSize: 13, },
+  orgExpandText: { fontFamily: FONTS.sansMedium, fontSize: 13 },
 
-  // Featured
-  featuredCard: {
-    borderRadius: 18, overflow: 'hidden',
-    backgroundColor: BG_CARD, borderWidth: 1, borderColor: LINE,
-  },
-  featuredImage: { height: 140, position: 'relative', backgroundColor: '#1A1A22' },
-  featuredImageOverlay: {
-    position: 'absolute', left: 0, right: 0, top: 0, bottom: 0,
-    backgroundColor: 'rgba(13,15,18,0.5)',
-  },
-  featuredPill: {
-    position: 'absolute', top: 14, left: 14,
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999,
-    backgroundColor: 'rgba(4,7,7,0.6)',
-    borderWidth: 1, borderColor: 'rgba(234,186,88,0.35)',
-  },
-  featuredPillDot: { width: 5, height: 5, borderRadius: 2.5, backgroundColor: GREEN },
-  featuredPillText: {
-    fontFamily: FONTS.mono, fontSize: 9.5,  color: FG,
-    letterSpacing: 1.3, textTransform: 'uppercase',
-  },
-  featuredBody: { padding: 18 },
-  featuredTitle: {
-    fontFamily: FONTS.serif, fontSize: 22,  color: FG,
-    letterSpacing: -0.33, lineHeight: 26, marginBottom: 8,
-  },
-  featuredDesc: {
-    fontFamily: FONTS.sans, fontSize: 13, color: FG_MUTED, lineHeight: 19, marginBottom: 16,
-  },
-  sentimentBar: {
-    flexDirection: 'row', height: 3, borderRadius: 2, overflow: 'hidden',
-    backgroundColor: LINE,
-  },
-  sentimentLegend: {
-    flexDirection: 'row', justifyContent: 'space-between', marginTop: 6,
-  },
-  sentimentLegendText: {
-    fontFamily: FONTS.mono, fontSize: 9.5, color: FG_FAINT, letterSpacing: 0.6,
-  },
-
-  // Impact ring
-  impactCard: {
-    backgroundColor: BG_CARD, borderWidth: 1, borderColor: LINE,
-    borderRadius: 18, padding: 20,
-  },
-  impactRow: { flexDirection: 'row', alignItems: 'center', gap: 22 },
-  impactRingWrap: { width: 124, height: 124, position: 'relative' },
-  impactRingCenter: {
-    position: 'absolute', left: 0, right: 0, top: 0, bottom: 0,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  impactRingPct: {
-    fontFamily: FONTS.serif, fontSize: 32,  color: FG,
-    letterSpacing: -0.96, lineHeight: 32,
-  },
-  impactRingPctSign: { fontSize: 16, color: FG_FAINT },
-  impactRingLabel: {
-    fontFamily: FONTS.sansMedium, fontSize: 9.5, 
-    letterSpacing: 1.5, color: FG_FAINT, marginTop: 4,
-    textTransform: 'uppercase',
-  },
-  impactLedger: { flex: 1, gap: 12 },
-  ledgerRow: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' },
-  ledgerLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  ledgerDot: { width: 5, height: 5, borderRadius: 2.5 },
-  ledgerLabel: { fontFamily: FONTS.sans, fontSize: 12, color: FG_FAINT, letterSpacing: 0.48 },
-  ledgerValue: {
-    fontFamily: FONTS.serif, fontSize: 22,  color: FG,
-    letterSpacing: -0.44, lineHeight: 22,
-  },
-
-  // Community
+  // Community / org list card
   communityCard: {
-    backgroundColor: BG_CARD, borderWidth: 1, borderColor: LINE,
-    borderRadius: 18, overflow: 'hidden',
+    backgroundColor: BG_CARD, borderWidth: 1, borderColor: LINE_SUBTLE,
+    borderRadius: RADIUS.card, overflow: 'hidden',
   },
   communityRow: {
     flexDirection: 'row', alignItems: 'center', gap: 14,
     paddingHorizontal: 18, paddingVertical: 16,
     position: 'relative',
   },
-  communityRowBorder: { borderBottomWidth: 1, borderBottomColor: LINE },
+  communityRowBorder: { borderBottomWidth: 1, borderBottomColor: LINE_SUBTLE },
   communityPrimaryBar: {
     position: 'absolute', left: 0, top: 8, bottom: 8, width: 2,
     backgroundColor: G_GOLD, borderTopRightRadius: 2, borderBottomRightRadius: 2,
@@ -1097,36 +1009,36 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   communityFlagText: {
-    fontFamily: FONTS.monoSemiBold, fontSize: 10,  letterSpacing: 0.8,
+    fontFamily: FONTS.monoSemiBold, fontSize: 10, letterSpacing: 0.8, ...TNUM,
   },
   communityNameRow: {
     flexDirection: 'row', alignItems: 'baseline', gap: 8, marginBottom: 2,
   },
   communityName: {
-    fontFamily: FONTS.sansSemiBold, fontSize: 15,  color: FG, letterSpacing: -0.15,
+    fontFamily: FONTS.sansSemiBold, fontSize: 15, color: FG, letterSpacing: -0.15,
   },
   communityTier: {
     fontFamily: FONTS.mono, fontSize: 9, color: FG_FAINT,
-    letterSpacing: 1.26, textTransform: 'uppercase',
+    letterSpacing: 1.26, textTransform: 'uppercase', ...TNUM,
   },
   communityMeta: { fontFamily: FONTS.sans, fontSize: 12, color: FG_FAINT },
 
-  // Sentinel
+  // Trending digest
   digestRow: {
     flexDirection: 'row', alignItems: 'flex-start', gap: 12,
     paddingHorizontal: 18, paddingVertical: 14,
   },
   digestTime: {
     fontFamily: FONTS.mono, fontSize: 10, color: FG_FAINT,
-    letterSpacing: 0.6, paddingTop: 3, width: 38,
+    letterSpacing: 0.6, paddingTop: 3, width: 38, ...TNUM,
   },
   digestTag: {
-    fontFamily: FONTS.monoSemiBold, fontSize: 9, 
+    fontFamily: FONTS.monoSemiBold, fontSize: 9,
     letterSpacing: 1.26, paddingHorizontal: 7, paddingVertical: 3,
     borderRadius: 4, marginTop: 2, overflow: 'hidden',
   },
   digestHeadline: {
-    fontFamily: FONTS.sansMedium, fontSize: 13.5,  color: FG,
+    fontFamily: FONTS.sansMedium, fontSize: 13.5, color: FG,
     letterSpacing: -0.135, lineHeight: 18, marginBottom: 3,
   },
   digestMeta: {
@@ -1135,10 +1047,10 @@ const styles = StyleSheet.create({
 
   // Footer
   footerSig: {
-    paddingHorizontal: 16, paddingTop: 8, paddingBottom: 18,
+    paddingHorizontal: SPACING.screenPadding, paddingTop: 8, paddingBottom: 18,
     alignItems: 'center', gap: 6,
   },
-  footerLine: { width: 24, height: 1, backgroundColor: LINE_STRONG },
+  footerLine: { width: 24, height: 1 },
   footerTagline: {
     fontFamily: FONTS.serifMediumItalic, fontSize: 13,
     color: FG_FAINT, letterSpacing: -0.065,
@@ -1248,32 +1160,32 @@ function CommunitiesDetailPage({
         <TouchableOpacity onPress={onClose} hitSlop={{ top: 8, left: 8, right: 8, bottom: 8 }}>
           <Ionicons name="chevron-back" size={26} color={dc.FG} />
         </TouchableOpacity>
-        <Text style={{ flex: 1, textAlign: 'center', fontSize: 16, fontFamily: FONTS.sansSemiBold, color: dc.FG, marginRight: 26 }}>
+        <Text style={{ flex: 1, textAlign: 'center', fontSize: 17, fontFamily: FONTS.serif, color: dc.FG, marginRight: 26 }}>
           Where you can vote
         </Text>
       </View>
 
-      <ScrollView contentContainerStyle={{ padding: 18, paddingBottom: insets.bottom + 32 }}>
+      <ScrollView contentContainerStyle={{ padding: SPACING.screenPadding, paddingBottom: insets.bottom + 32 }}>
         {/* Hero */}
         <Animated.View entering={FadeInUp.duration(400)} style={{
           backgroundColor: dc.BG_CARD,
-          borderWidth: 1, borderColor: dc.LINE,
-          borderRadius: 14, padding: 20, alignItems: 'center',
+          borderWidth: 1, borderColor: GOLD_BORDER,
+          borderRadius: 22, padding: 20, alignItems: 'center',
           marginBottom: 18,
         }}>
-          <Text style={{ fontSize: 10.5, fontFamily: FONTS.sansBold, letterSpacing: 2, textTransform: 'uppercase', color: dc.FG_MUTED, marginBottom: 6 }}>
+          <Text style={{ fontSize: 10.5, fontFamily: FONTS.sansSemiBold, letterSpacing: 1.68, textTransform: 'uppercase', color: dc.FG_FAINT, marginBottom: 6 }}>
             Your civic reach
           </Text>
-          <Text style={{ fontSize: 44, fontFamily: FONTS.sansBold, color: dc.GOLD, letterSpacing: -1, lineHeight: 50 }}>
+          <Text style={{ fontSize: 44, fontFamily: FONTS.monoSemiBold, color: dc.GOLD, letterSpacing: -1, lineHeight: 50, ...TNUM }}>
             {totalEligibleActive}
           </Text>
-          <Text style={{ fontSize: 13, color: dc.FG_MUTED, marginTop: 4 }}>
+          <Text style={{ fontSize: 13, fontFamily: FONTS.sans, color: dc.FG_MUTED, marginTop: 4 }}>
             active proposal{totalEligibleActive === 1 ? '' : 's'} you can vote on
           </Text>
           {isVerified ? (
             <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 12, gap: 6 }}>
               <Ionicons name="shield-checkmark" size={14} color={dc.GOLD} />
-              <Text style={{ fontSize: 11.5, color: dc.GOLD, fontFamily: FONTS.sansSemiBold}}>
+              <Text style={{ fontSize: 11.5, color: dc.GOLD, fontFamily: FONTS.sansSemiBold }}>
                 Verified resident of {[city, state, country].filter(Boolean).join(', ')}
               </Text>
             </View>
@@ -1282,11 +1194,11 @@ function CommunitiesDetailPage({
               flexDirection: 'row', alignItems: 'center',
               marginTop: 12, gap: 6,
               paddingHorizontal: 12, paddingVertical: 5,
-              backgroundColor: 'rgba(255,200,0,0.12)',
-              borderRadius: 100,
+              backgroundColor: dc.GOLD_SURFACE,
+              borderRadius: RADIUS.chip,
             }}>
               <Ionicons name="lock-closed" size={12} color={dc.GOLD} />
-              <Text style={{ fontSize: 11.5, color: dc.GOLD, fontFamily: FONTS.sansSemiBold}}>
+              <Text style={{ fontSize: 11.5, color: dc.GOLD, fontFamily: FONTS.sansSemiBold }}>
                 Unverified — global only
               </Text>
             </View>
@@ -1294,7 +1206,7 @@ function CommunitiesDetailPage({
         </Animated.View>
 
         {/* Section label */}
-        <Text style={{ fontSize: 10.5, fontFamily: FONTS.sansBold, letterSpacing: 2, textTransform: 'uppercase', color: dc.FG_MUTED, marginBottom: 10, paddingHorizontal: 2 }}>
+        <Text style={{ fontSize: 10.5, fontFamily: FONTS.sansSemiBold, letterSpacing: 1.68, textTransform: 'uppercase', color: dc.FG_FAINT, marginBottom: 10, paddingHorizontal: 2 }}>
           Your eligibility
         </Text>
 
@@ -1312,9 +1224,9 @@ function CommunitiesDetailPage({
                 alignItems: 'center',
                 padding: 14,
                 backgroundColor: dc.BG_CARD,
-                borderColor: tier.eligible ? 'rgba(212,175,55,0.30)' : dc.LINE,
+                borderColor: tier.eligible ? GOLD_BORDER : dc.LINE_SUBTLE,
                 borderWidth: 1,
-                borderRadius: 12,
+                borderRadius: RADIUS.card,
                 marginBottom: 10,
                 gap: 14,
                 opacity: isMuted ? 0.7 : 1,
@@ -1322,14 +1234,14 @@ function CommunitiesDetailPage({
             >
               <View style={{
                 width: 50, height: 50, borderRadius: 25,
-                backgroundColor: tier.eligible ? 'rgba(212,175,55,0.10)' : dc.BG_RAISED,
-                borderColor: tier.eligible ? 'rgba(212,175,55,0.40)' : dc.LINE,
+                backgroundColor: tier.eligible ? dc.GOLD_SURFACE : dc.BG_RAISED,
+                borderColor: tier.eligible ? GOLD_BORDER_STRONG : dc.LINE,
                 borderWidth: 1,
                 alignItems: 'center', justifyContent: 'center',
               }}>
                 <Text style={{
                   fontSize: flag.length === 2 ? 13 : 22,
-                  fontFamily: FONTS.sansBold,
+                  fontFamily: FONTS.monoSemiBold,
                   color: accent,
                   letterSpacing: 0.5,
                 }}>
@@ -1337,25 +1249,25 @@ function CommunitiesDetailPage({
                 </Text>
               </View>
               <View style={{ flex: 1, minWidth: 0 }}>
-                <Text style={{ fontSize: 15, fontFamily: FONTS.sansBold, color: isMuted ? dc.FG_FAINT : dc.FG, letterSpacing: -0.1 }} numberOfLines={1}>
+                <Text style={{ fontSize: 15, fontFamily: FONTS.sansSemiBold, color: isMuted ? dc.FG_FAINT : dc.FG, letterSpacing: -0.1 }} numberOfLines={1}>
                   {tier.locationName ?? '—'}
                 </Text>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 2 }}>
-                  <Text style={{ fontSize: 10, fontFamily: FONTS.sansBold, letterSpacing: 1.5, textTransform: 'uppercase', color: accent }}>
+                  <Text style={{ fontSize: 10, fontFamily: FONTS.sansSemiBold, letterSpacing: 1.5, textTransform: 'uppercase', color: accent }}>
                     {tier.label}
                   </Text>
                   <View style={{ width: 3, height: 3, borderRadius: 1.5, backgroundColor: dc.FG_FAINT }} />
-                  <Text style={{ fontSize: 11, color: dc.FG_MUTED }}>{tier.scopeLabel}</Text>
+                  <Text style={{ fontSize: 11, fontFamily: FONTS.sans, color: dc.FG_MUTED }}>{tier.scopeLabel}</Text>
                 </View>
                 {tier.eligible ? (
-                  <Text style={{ fontSize: 12, color: dc.FG_MUTED, marginTop: 6 }}>
-                    <Text style={{ color: dc.FG, fontFamily: FONTS.sansSemiBold}}>{tier.active}</Text> active
+                  <Text style={{ fontSize: 12, fontFamily: FONTS.sans, color: dc.FG_MUTED, marginTop: 6 }}>
+                    <Text style={{ color: dc.FG, fontFamily: FONTS.monoSemiBold, ...TNUM }}>{tier.active}</Text> active
                     <Text style={{ color: dc.FG_FAINT }}> · {tier.total} total</Text>
                   </Text>
                 ) : (
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 6 }}>
                     <Ionicons name="lock-closed" size={11} color={dc.FG_FAINT} />
-                    <Text style={{ fontSize: 11, color: dc.FG_FAINT }}>
+                    <Text style={{ fontSize: 11, fontFamily: FONTS.sans, color: dc.FG_FAINT }}>
                       {tier.locationName ? 'Verify identity to unlock' : 'No location on file'}
                     </Text>
                   </View>
@@ -1369,10 +1281,10 @@ function CommunitiesDetailPage({
         <View style={{
           marginTop: 14,
           padding: 14,
-          backgroundColor: 'rgba(212,175,55,0.06)',
-          borderColor: 'rgba(212,175,55,0.25)',
+          backgroundColor: dc.GOLD_SURFACE,
+          borderColor: GOLD_BORDER,
           borderWidth: 1,
-          borderRadius: 12,
+          borderRadius: RADIUS.card,
           flexDirection: 'row',
           gap: 10,
         }}>
@@ -1381,7 +1293,7 @@ function CommunitiesDetailPage({
             <Text style={{ fontSize: 13, fontFamily: FONTS.sansSemiBold, color: dc.FG, marginBottom: 4 }}>
               How geo-gating works
             </Text>
-            <Text style={{ fontSize: 12, color: dc.FG_MUTED, lineHeight: 17 }}>
+            <Text style={{ fontSize: 12, fontFamily: FONTS.sans, color: dc.FG_MUTED, lineHeight: 17 }}>
               Verifying your identity unlocks voting on proposals tied to your country, province, and city. Global proposals are open to anyone. One verified person, one ballot per proposal.
             </Text>
           </View>
@@ -1393,13 +1305,14 @@ function CommunitiesDetailPage({
             activeOpacity={0.85}
             style={{
               marginTop: 18,
-              paddingVertical: 14,
-              borderRadius: 12,
+              height: 54,
+              borderRadius: 15,
               alignItems: 'center',
-              backgroundColor: dc.GOLD,
+              justifyContent: 'center',
+              backgroundColor: dc.GOLD_FILL,
             }}
           >
-            <Text style={{ fontSize: 15, fontFamily: FONTS.sansBold, color: '#000' }}>
+            <Text style={{ fontSize: 16.5, fontFamily: FONTS.sansSemiBold, color: ON_GOLD }}>
               Verify identity to unlock
             </Text>
           </TouchableOpacity>
