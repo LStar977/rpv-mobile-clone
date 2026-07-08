@@ -19,9 +19,9 @@ import Animated, {
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuthStore } from '../../lib/auth';
-import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS, responsive, FONTS } from '../../lib/theme';
+import { useTheme, SPACING, RADIUS, TYPOGRAPHY, responsive, FONTS } from '../../lib/theme';
 import { analyticsApi, AnalyticsData, ProposalAnalytics } from '../../lib/api';
-import { FeaturedStat, StatsGrid, ProgressStat, UpgradeModal } from '../../components/ui';
+import { UpgradeModal } from '../../components/ui';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://representportal.com';
 
@@ -62,6 +62,26 @@ const SAMPLE_ANALYTICS: AnalyticsData = {
   ],
 };
 
+// Group ballots by the month each proposal was created — the only time
+// dimension the analytics payload carries. Rendered honestly with a caption
+// saying exactly that.
+function ballotsByMonth(proposals: ProposalAnalytics[]): Array<{ label: string; total: number }> {
+  const buckets = new Map<number, { label: string; total: number }>();
+  for (const p of proposals) {
+    const d = new Date(p.createdAt);
+    if (isNaN(d.getTime())) continue;
+    const key = d.getFullYear() * 12 + d.getMonth();
+    const label = d.toLocaleDateString('en-US', { month: 'short' }).toUpperCase();
+    const bucket = buckets.get(key) ?? { label, total: 0 };
+    bucket.total += (p.supportVotes || 0) + (p.opposeVotes || 0);
+    buckets.set(key, bucket);
+  }
+  return [...buckets.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .slice(-6)
+    .map(([, v]) => v);
+}
+
 // Premium Upgrade Card Component
 function PremiumUpgradeCard() {
   const { colors } = useTheme();
@@ -88,10 +108,10 @@ function PremiumUpgradeCard() {
       {/* Premium Badge */}
       <Animated.View
         entering={FadeInDown.duration(400)}
-        style={[styles.premiumHero, { backgroundColor: `${colors.gold}10` }]}
+        style={[styles.premiumHero, { backgroundColor: colors.goldSurface }]}
       >
-        <View style={[styles.premiumIconBg, { backgroundColor: colors.gold }]}>
-          <Ionicons name="analytics" size={40} color="#000" />
+        <View style={[styles.premiumIconBg, { backgroundColor: colors.goldFill }]}>
+          <Ionicons name="analytics" size={40} color="#040707" />
         </View>
         <Text style={[styles.premiumTitle, { color: colors.gold }]}>
           Analytics Dashboard
@@ -104,7 +124,7 @@ function PremiumUpgradeCard() {
       {/* Description Card */}
       <Animated.View
         entering={FadeInUp.delay(100).duration(400)}
-        style={[styles.descriptionCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
+        style={[styles.descriptionCard, { backgroundColor: colors.surface, borderColor: colors.borderSubtle }]}
       >
         <Text style={[styles.descriptionTitle, { color: colors.text }]}>
           Track Your Proposal Performance
@@ -121,7 +141,7 @@ function PremiumUpgradeCard() {
         style={[styles.featuresCard, { backgroundColor: colors.surface, borderColor: colors.gold }]}
       >
         <LinearGradient
-          colors={[`${colors.gold}08`, 'transparent']}
+          colors={[colors.goldSurface, 'transparent']}
           style={StyleSheet.absoluteFill}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
@@ -135,7 +155,7 @@ function PremiumUpgradeCard() {
             entering={FadeInUp.delay(300 + index * 50).duration(300)}
             style={styles.featureRow}
           >
-            <View style={[styles.featureIconBg, { backgroundColor: `${colors.gold}15` }]}>
+            <View style={[styles.featureIconBg, { backgroundColor: colors.goldSurface }]}>
               <Ionicons name={feature.icon as any} size={18} color={colors.gold} />
             </View>
             <Text style={[styles.featureText, { color: colors.text }]}>
@@ -148,7 +168,7 @@ function PremiumUpgradeCard() {
       {/* Pricing Card */}
       <Animated.View
         entering={FadeInUp.delay(400).duration(400)}
-        style={[styles.pricingCard, { backgroundColor: colors.gold }]}
+        style={[styles.pricingCard, { backgroundColor: colors.goldFill }]}
       >
         <View style={styles.pricingContent}>
           <View style={styles.pricingLeft}>
@@ -177,7 +197,8 @@ function PremiumUpgradeCard() {
   );
 }
 
-// Proposal Analytics Card
+// Proposal Analytics Card — two-tone tally bar (support fill on oppose track)
+// with explicit labels + exact counts, mono numerals throughout.
 function ProposalAnalyticsCard({ proposal, index }: { proposal: ProposalAnalytics; index: number }) {
   const { colors } = useTheme();
   const totalVotes = proposal.supportVotes + proposal.opposeVotes;
@@ -186,46 +207,38 @@ function ProposalAnalyticsCard({ proposal, index }: { proposal: ProposalAnalytic
   return (
     <Animated.View
       entering={FadeInUp.delay(index * 80).duration(400)}
-      style={[styles.proposalCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
+      style={[styles.proposalCard, { backgroundColor: colors.surface, borderColor: colors.borderSubtle }]}
     >
       <Text style={[styles.proposalTitle, { color: colors.text }]} numberOfLines={2}>
         {proposal.title}
       </Text>
 
-      <View style={styles.proposalStats}>
-        <View style={styles.proposalStat}>
-          <Ionicons name="eye-outline" size={14} color={colors.textSecondary} />
-          <Text style={[styles.proposalStatText, { color: colors.textSecondary }]}>
-            {proposal.views} views
-          </Text>
+      {totalVotes > 0 ? (
+        <View style={[styles.tallyTrack, { backgroundColor: colors.oppose }]}>
+          <View style={[styles.tallyFill, { width: `${supportPercent}%`, backgroundColor: colors.support }]} />
         </View>
-        <View style={styles.proposalStat}>
-          <Ionicons name="thumbs-up-outline" size={14} color={colors.support} />
-          <Text style={[styles.proposalStatText, { color: colors.support }]}>
-            {proposal.supportVotes}
-          </Text>
-        </View>
-        <View style={styles.proposalStat}>
-          <Ionicons name="thumbs-down-outline" size={14} color={colors.oppose} />
-          <Text style={[styles.proposalStatText, { color: colors.oppose }]}>
-            {proposal.opposeVotes}
-          </Text>
-        </View>
-      </View>
+      ) : (
+        <View style={[styles.tallyTrack, { backgroundColor: colors.surfaceHighlight }]} />
+      )}
 
-      <View style={styles.voteBarContainer}>
-        <View style={[styles.voteBarBg, { backgroundColor: colors.oppose }]}>
-          <View style={[styles.voteBarFill, { width: `${supportPercent}%`, backgroundColor: colors.support }]} />
-        </View>
-        <Text style={[styles.voteBarLabel, { color: colors.textSecondary }]}>
-          {supportPercent}% support
+      <View style={styles.tallyLegendRow}>
+        <Text style={[styles.tallyLegend, { color: colors.support }]}>
+          Support <Text style={styles.tallyLegendCount}>{proposal.supportVotes.toLocaleString()}</Text>
+        </Text>
+        <Text style={[styles.tallyLegendPct, { color: colors.textSecondary }]}>
+          {totalVotes > 0 ? `${supportPercent}% support` : 'No ballots yet'}
+        </Text>
+        <Text style={[styles.tallyLegend, { color: colors.oppose, textAlign: 'right' }]}>
+          Oppose <Text style={styles.tallyLegendCount}>{proposal.opposeVotes.toLocaleString()}</Text>
         </Text>
       </View>
 
-      <View style={styles.engagementRow}>
-        <Text style={[styles.engagementLabel, { color: colors.textTertiary }]}>Engagement Rate</Text>
-        <Text style={[styles.engagementValue, { color: colors.gold }]}>
-          {(proposal.engagementRate * 100).toFixed(1)}%
+      <View style={[styles.proposalMetaRow, { borderTopColor: colors.borderSubtle }]}>
+        <Text style={[styles.proposalMeta, { color: colors.textTertiary }]}>
+          {proposal.views.toLocaleString()} VIEWS
+        </Text>
+        <Text style={[styles.proposalMeta, { color: colors.textTertiary }]}>
+          ENGAGEMENT <Text style={{ color: colors.gold }}>{(proposal.engagementRate * 100).toFixed(1)}%</Text>
         </Text>
       </View>
     </Animated.View>
@@ -374,26 +387,13 @@ export default function AnalyticsScreen() {
     ? Math.round((displayData.supportVotes / displayData.totalVotes) * 100)
     : 50;
 
+  const monthBuckets = displayData?.proposals ? ballotsByMonth(displayData.proposals) : [];
+  const monthMax = Math.max(1, ...monthBuckets.map(b => b.total));
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingTop: insets.top + 8,
-        paddingHorizontal: 16,
-        paddingBottom: 12,
-        borderBottomWidth: 1,
-        borderBottomColor: colors.border,
-      }}>
-        <TouchableOpacity onPress={() => router.back()} style={{ width: 40, height: 40, alignItems: 'center', justifyContent: 'center' }}>
-          <Ionicons name="chevron-back" size={24} color={colors.text} />
-        </TouchableOpacity>
-        <Text style={{ fontFamily: FONTS.serif, fontSize: 20, color: colors.text }}>Analytics</Text>
-        <View style={{ width: 40 }} />
-      </View>
       <ScrollView
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[styles.content, { paddingTop: insets.top + 8 }]}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -403,101 +403,135 @@ export default function AnalyticsScreen() {
           />
         }
       >
+        {/* Header — back circle + serif title + status chip */}
+        <View style={styles.headerRow}>
+          <View style={styles.headerLeft}>
+            <TouchableOpacity
+              onPress={() => router.back()}
+              style={[styles.backButton, { backgroundColor: colors.surface, borderColor: colors.borderSubtle }]}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="chevron-back" size={20} color={colors.textSecondary} />
+            </TouchableOpacity>
+            <Text style={[styles.headerTitle, { color: colors.text }]}>Your Analytics</Text>
+          </View>
+          <View style={[
+            styles.headerChip,
+            isPremium
+              ? { backgroundColor: colors.goldSurface, borderColor: 'rgba(234,186,88,0.2)' }
+              : { backgroundColor: colors.surfaceHighlight, borderColor: colors.border },
+          ]}>
+            {isPremium && <Ionicons name="sunny-outline" size={10} color={colors.gold} />}
+            <Text style={[styles.headerChipText, { color: isPremium ? colors.gold : colors.textTertiary }]}>
+              {isPremium ? 'PREMIUM' : 'SAMPLE'}
+            </Text>
+          </View>
+        </View>
+
         {/* Premium Banner for non-premium users */}
         {!isPremium && (
           <Animated.View entering={FadeInDown.duration(300)}>
             <TouchableOpacity
-              style={[styles.premiumBanner, { backgroundColor: colors.gold }]}
+              style={[styles.premiumBanner, { backgroundColor: colors.goldFill }]}
               onPress={() => setShowUpgradeModal(true)}
               activeOpacity={0.9}
             >
               <View style={styles.premiumBannerContent}>
-                <Ionicons name="sparkles" size={20} color="#000" />
+                <Ionicons name="sparkles" size={18} color="#040707" />
                 <Text style={styles.premiumBannerText}>
-                  Sample Data - Upgrade to see your real analytics
+                  Sample data — upgrade to see your real analytics
                 </Text>
               </View>
-              <Ionicons name="chevron-forward" size={18} color="#000" />
+              <Ionicons name="chevron-forward" size={16} color="#040707" />
             </TouchableOpacity>
           </Animated.View>
         )}
 
-        {/* Hero Stats */}
-        <Animated.View entering={FadeInDown.duration(400)}>
-          <FeaturedStat
-            value={displayData?.totalVotes || 0}
-            label="Total Votes Received"
-            description="Across all your proposals"
-            icon="checkmark-done-circle"
-            gradient
-            style={{ marginBottom: SPACING.lg }}
-          />
-        </Animated.View>
-
-        {/* Stats Grid */}
-        <Animated.View entering={FadeInUp.delay(100).duration(400)}>
-          <StatsGrid
-            stats={[
-              {
-                value: displayData?.totalProposals || 0,
-                label: 'Proposals',
-                icon: 'document-text-outline',
-                iconColor: colors.info,
-              },
-              {
-                value: displayData?.supportVotes || 0,
-                label: 'Support',
-                icon: 'thumbs-up-outline',
-                iconColor: colors.support,
-              },
-              {
-                value: displayData?.opposeVotes || 0,
-                label: 'Oppose',
-                icon: 'thumbs-down-outline',
-                iconColor: colors.oppose,
-              },
-            ]}
-            columns={3}
-            compact
-            style={{ marginBottom: SPACING.xl }}
-          />
-        </Animated.View>
-
-        {/* Support/Oppose Ratio */}
-        <Animated.View
-          entering={FadeInUp.delay(200).duration(400)}
-          style={[styles.ratioCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
-        >
-          <Text style={[styles.ratioTitle, { color: colors.text }]}>Support Ratio</Text>
-          <ProgressStat
-            value={displayData?.supportVotes || 0}
-            max={displayData?.totalVotes || 1}
-            label="Support vs Total Votes"
-            color={colors.support}
-            size="lg"
-          />
-          <View style={styles.ratioLegend}>
-            <View style={styles.legendItem}>
-              <View style={[styles.legendDot, { backgroundColor: colors.support }]} />
-              <Text style={[styles.legendText, { color: colors.textSecondary }]}>
-                Support ({supportPercent}%)
-              </Text>
-            </View>
-            <View style={styles.legendItem}>
-              <View style={[styles.legendDot, { backgroundColor: colors.oppose }]} />
-              <Text style={[styles.legendText, { color: colors.textSecondary }]}>
-                Oppose ({100 - supportPercent}%)
-              </Text>
-            </View>
+        {/* Stat tiles — mono numerals */}
+        <Animated.View entering={FadeInDown.duration(400)} style={styles.tilesRow}>
+          <View style={[styles.statTile, { backgroundColor: colors.surface, borderColor: colors.borderSubtle }]}>
+            <Text style={[styles.statTileValue, { color: colors.text }]}>
+              {(displayData?.totalVotes || 0).toLocaleString()}
+            </Text>
+            <Text style={[styles.statTileLabel, { color: colors.textTertiary }]}>BALLOTS ON YOUR PROPOSALS</Text>
+          </View>
+          <View style={[styles.statTile, { backgroundColor: colors.surface, borderColor: colors.borderSubtle }]}>
+            <Text style={[styles.statTileValue, { color: colors.text }]}>
+              {(displayData?.totalProposals || 0).toLocaleString()}
+            </Text>
+            <Text style={[styles.statTileLabel, { color: colors.textTertiary }]}>PROPOSALS PUBLISHED</Text>
           </View>
         </Animated.View>
 
+        {/* Support vs Oppose — two-tone tally, labels + exact counts */}
+        <Animated.View
+          entering={FadeInUp.delay(100).duration(400)}
+          style={[styles.sectionCard, { backgroundColor: colors.surface, borderColor: colors.borderSubtle }]}
+        >
+          <Text style={[styles.sectionCardEyebrow, { color: colors.textTertiary }]}>SUPPORT VS OPPOSE · ALL PROPOSALS</Text>
+          {displayData && displayData.totalVotes > 0 ? (
+            <>
+              <View style={[styles.tallyTrack, { backgroundColor: colors.oppose }]}>
+                <View style={[styles.tallyFill, { width: `${supportPercent}%`, backgroundColor: colors.support }]} />
+              </View>
+              <View style={styles.tallyLegendRow}>
+                <Text style={[styles.tallyLegend, { color: colors.support }]}>
+                  Support <Text style={styles.tallyLegendCount}>{(displayData.supportVotes || 0).toLocaleString()}</Text>
+                </Text>
+                <Text style={[styles.tallyLegendPct, { color: colors.textSecondary }]}>
+                  {supportPercent}% · {100 - supportPercent}%
+                </Text>
+                <Text style={[styles.tallyLegend, { color: colors.oppose, textAlign: 'right' }]}>
+                  Oppose <Text style={styles.tallyLegendCount}>{(displayData.opposeVotes || 0).toLocaleString()}</Text>
+                </Text>
+              </View>
+            </>
+          ) : (
+            <Text style={[styles.mutedNote, { color: colors.textTertiary }]}>
+              No ballots recorded yet — tallies appear once voting starts.
+            </Text>
+          )}
+        </Animated.View>
+
+        {/* Ballots by month — grouped by proposal creation month (the only
+            time dimension in the payload), captioned honestly below. */}
+        {monthBuckets.length > 1 && (
+          <Animated.View
+            entering={FadeInUp.delay(200).duration(400)}
+            style={[styles.sectionCard, { backgroundColor: colors.surface, borderColor: colors.borderSubtle }]}
+          >
+            <Text style={[styles.sectionCardEyebrow, { color: colors.textTertiary }]}>BALLOTS BY MONTH</Text>
+            <View style={styles.chartRow}>
+              {monthBuckets.map((bucket, i) => {
+                const isLatest = i === monthBuckets.length - 1;
+                return (
+                  <View key={`${bucket.label}-${i}`} style={styles.chartCol}>
+                    <View
+                      style={[
+                        styles.chartBar,
+                        {
+                          height: `${Math.max(6, Math.round((bucket.total / monthMax) * 100))}%`,
+                          backgroundColor: isLatest ? colors.goldFill : colors.surfaceHighlight,
+                        },
+                      ]}
+                    />
+                    <Text style={[styles.chartBarLabel, { color: isLatest ? colors.gold : colors.textTertiary }]}>
+                      {bucket.label}
+                    </Text>
+                  </View>
+                );
+              })}
+            </View>
+            <Text style={[styles.mutedNote, { color: colors.textTertiary }]}>
+              Ballots grouped by the month each proposal was created.
+            </Text>
+          </Animated.View>
+        )}
+
         {/* Per-Proposal Analytics */}
         {displayData?.proposals && displayData.proposals.length > 0 && (
-          <Animated.View entering={FadeInUp.delay(300).duration(400)}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>
-              Proposal Performance
-            </Text>
+          <Animated.View entering={FadeInUp.delay(300).duration(400)} style={{ gap: 7 }}>
+            <Text style={[styles.sectionEyebrow, { color: colors.textTertiary }]}>PROPOSAL PERFORMANCE</Text>
             {displayData.proposals.map((proposal, index) => (
               <ProposalAnalyticsCard key={proposal.id} proposal={proposal} index={index} />
             ))}
@@ -510,8 +544,8 @@ export default function AnalyticsScreen() {
             entering={FadeIn.delay(300).duration(400)}
             style={styles.emptyState}
           >
-            <View style={[styles.emptyIcon, { backgroundColor: `${colors.gold}15` }]}>
-              <Ionicons name="bar-chart-outline" size={40} color={colors.gold} />
+            <View style={[styles.emptyIcon, { backgroundColor: colors.goldSurface }]}>
+              <Ionicons name="bar-chart-outline" size={32} color={colors.gold} />
             </View>
             <Text style={[styles.emptyTitle, { color: colors.text }]}>
               No Proposals Yet
@@ -520,14 +554,18 @@ export default function AnalyticsScreen() {
               Create proposals to start tracking your analytics
             </Text>
             <TouchableOpacity
-              style={[styles.createBtn, { backgroundColor: colors.gold }]}
+              style={[styles.createBtn, { backgroundColor: colors.goldFill }]}
               onPress={() => router.push('/(tabs)/proposals')}
+              activeOpacity={0.8}
             >
-              <Ionicons name="add-circle" size={20} color="#000" />
               <Text style={styles.createBtnText}>Create Proposal</Text>
             </TouchableOpacity>
           </Animated.View>
         )}
+
+        <Text style={[styles.privacyNote, { color: colors.textTertiary }]}>
+          Analytics are private to you. Nothing here is public or shared.
+        </Text>
 
         <View style={styles.bottomPadding} />
       </ScrollView>
@@ -555,25 +593,70 @@ const styles = StyleSheet.create({
     gap: SPACING.md,
   },
   loadingText: {
-    ...TYPOGRAPHY.bodyMedium,
+    fontFamily: FONTS.sans,
+    fontSize: 13.5,
+    lineHeight: 20,
   },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
-    padding: SPACING.lg,
+    padding: SPACING.screenPadding,
   },
   content: {
-    padding: SPACING.lg,
+    paddingHorizontal: SPACING.screenPadding,
+    gap: 15,
   },
+
+  // Header
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    flex: 1,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerTitle: {
+    fontFamily: FONTS.serif,
+    fontSize: 26,
+    lineHeight: 29,
+    letterSpacing: -0.3,
+    flexShrink: 1,
+  },
+  headerChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderRadius: RADIUS.chip,
+    borderWidth: 1,
+  },
+  headerChipText: {
+    fontFamily: FONTS.sansSemiBold,
+    fontSize: 9.5,
+    letterSpacing: 1.33,
+  },
+
   premiumBanner: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingVertical: SPACING.md,
     paddingHorizontal: SPACING.lg,
-    borderRadius: BORDER_RADIUS.lg,
-    marginBottom: SPACING.lg,
+    borderRadius: RADIUS.button,
   },
   premiumBannerContent: {
     flexDirection: 'row',
@@ -582,16 +665,150 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   premiumBannerText: {
-    ...TYPOGRAPHY.labelMedium,
-    color: '#000',
+    fontFamily: FONTS.sansSemiBold,
+    fontSize: 12.5,
+    color: '#040707',
     flex: 1,
   },
 
-  // Premium Upgrade Card Styles
+  // Stat tiles
+  tilesRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  statTile: {
+    flex: 1,
+    borderRadius: RADIUS.card,
+    borderWidth: 1,
+    padding: 16,
+    gap: 3,
+  },
+  statTileValue: {
+    fontFamily: FONTS.monoSemiBold,
+    fontSize: 30,
+    lineHeight: 38,
+    fontVariant: ['tabular-nums'],
+  },
+  statTileLabel: {
+    fontFamily: FONTS.sansMedium,
+    fontSize: 10,
+    lineHeight: 14,
+    letterSpacing: 1,
+  },
+
+  // Section cards
+  sectionCard: {
+    borderRadius: RADIUS.card,
+    borderWidth: 1,
+    padding: 18,
+    gap: 12,
+  },
+  sectionCardEyebrow: {
+    fontFamily: FONTS.sansSemiBold,
+    fontSize: 10,
+    letterSpacing: 1.4,
+  },
+  sectionEyebrow: {
+    fontFamily: FONTS.sansSemiBold,
+    fontSize: 10.5,
+    letterSpacing: 1.47,
+  },
+
+  // Two-tone tally bar (support fill on oppose track)
+  tallyTrack: {
+    height: 6,
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  tallyFill: {
+    height: '100%',
+  },
+  tallyLegendRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: SPACING.sm,
+  },
+  tallyLegend: {
+    fontFamily: FONTS.sansMedium,
+    fontSize: 12,
+    flex: 1,
+  },
+  tallyLegendCount: {
+    fontFamily: FONTS.monoSemiBold,
+    fontSize: 11,
+    fontVariant: ['tabular-nums'],
+  },
+  tallyLegendPct: {
+    fontFamily: FONTS.mono,
+    fontSize: 11,
+    fontVariant: ['tabular-nums'],
+    textAlign: 'center',
+  },
+  mutedNote: {
+    fontFamily: FONTS.sans,
+    fontSize: 11,
+    lineHeight: 16.5,
+  },
+
+  // Ballots-by-month chart
+  chartRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 7,
+    height: 72,
+  },
+  chartCol: {
+    flex: 1,
+    height: '100%',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    gap: 4,
+  },
+  chartBar: {
+    width: '100%',
+    borderTopLeftRadius: 5,
+    borderTopRightRadius: 5,
+    borderBottomLeftRadius: 2,
+    borderBottomRightRadius: 2,
+  },
+  chartBarLabel: {
+    fontFamily: FONTS.mono,
+    fontSize: 8.5,
+    fontVariant: ['tabular-nums'],
+  },
+
+  // Proposal cards
+  proposalCard: {
+    borderRadius: RADIUS.card,
+    borderWidth: 1,
+    padding: 18,
+    gap: 10,
+  },
+  proposalTitle: {
+    fontFamily: FONTS.serif,
+    fontSize: 16,
+    lineHeight: 21,
+  },
+  proposalMetaRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderTopWidth: 1,
+    paddingTop: 10,
+  },
+  proposalMeta: {
+    fontFamily: FONTS.mono,
+    fontSize: 10,
+    letterSpacing: 0.5,
+    fontVariant: ['tabular-nums'],
+  },
+
+  // Premium Upgrade Card Styles (secondary sub-view, kept + restyled)
   premiumHero: {
     alignItems: 'center',
     paddingVertical: SPACING.xxxl,
-    borderRadius: BORDER_RADIUS['2xl'],
+    borderRadius: RADIUS['2xl'],
     marginBottom: SPACING.lg,
   },
   premiumIconBg: {
@@ -612,7 +829,7 @@ const styles = StyleSheet.create({
   },
   descriptionCard: {
     padding: SPACING.xl,
-    borderRadius: BORDER_RADIUS['2xl'],
+    borderRadius: RADIUS['2xl'],
     borderWidth: 1,
     marginBottom: SPACING.lg,
   },
@@ -627,8 +844,8 @@ const styles = StyleSheet.create({
   },
   featuresCard: {
     padding: SPACING.xl,
-    borderRadius: BORDER_RADIUS['2xl'],
-    borderWidth: 1.5,
+    borderRadius: RADIUS['2xl'],
+    borderWidth: 1,
     marginBottom: SPACING.lg,
     overflow: 'hidden',
   },
@@ -656,7 +873,7 @@ const styles = StyleSheet.create({
   },
   pricingCard: {
     padding: SPACING.xl,
-    borderRadius: BORDER_RADIUS['2xl'],
+    borderRadius: RADIUS['2xl'],
     marginBottom: SPACING.lg,
   },
   pricingContent: {
@@ -668,7 +885,7 @@ const styles = StyleSheet.create({
   pricingLeft: {},
   pricingLabel: {
     ...TYPOGRAPHY.labelMedium,
-    color: '#000',
+    color: '#040707',
     opacity: 0.7,
     marginBottom: SPACING.xxs,
   },
@@ -680,122 +897,32 @@ const styles = StyleSheet.create({
     fontFamily: FONTS.monoSemiBold,
     fontVariant: ['tabular-nums'],
     fontSize: responsive(28, 32, 36),
-    color: '#000',
+    color: '#040707',
   },
   pricePeriod: {
     ...TYPOGRAPHY.bodyMedium,
-    color: '#000',
+    color: '#040707',
     opacity: 0.7,
     marginLeft: SPACING.xxs,
   },
   upgradeButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#000',
+    backgroundColor: '#040707',
     paddingHorizontal: SPACING.xl,
     paddingVertical: SPACING.md,
-    borderRadius: BORDER_RADIUS.full,
+    borderRadius: RADIUS.full,
     gap: SPACING.sm,
   },
   upgradeButtonText: {
     ...TYPOGRAPHY.labelLarge,
-    color: '#fff',
+    color: '#F4F5F6',
   },
   pricingNote: {
     ...TYPOGRAPHY.bodySmall,
-    color: '#000',
+    color: '#040707',
     opacity: 0.7,
     textAlign: 'center',
-  },
-
-  // Analytics Dashboard Styles
-  ratioCard: {
-    padding: SPACING.xl,
-    borderRadius: BORDER_RADIUS['2xl'],
-    borderWidth: 1,
-    marginBottom: SPACING.xl,
-  },
-  ratioTitle: {
-    fontFamily: FONTS.serif,
-    fontSize: 18,
-    marginBottom: SPACING.lg,
-  },
-  ratioLegend: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: SPACING.xl,
-    marginTop: SPACING.md,
-  },
-  legendItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.sm,
-  },
-  legendDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-  },
-  legendText: {
-    ...TYPOGRAPHY.labelSmall,
-  },
-  sectionTitle: {
-    fontFamily: FONTS.serif,
-    fontSize: 18,
-    marginBottom: SPACING.lg,
-  },
-  proposalCard: {
-    padding: SPACING.lg,
-    borderRadius: BORDER_RADIUS.xl,
-    borderWidth: 1,
-    marginBottom: SPACING.md,
-  },
-  proposalTitle: {
-    fontFamily: FONTS.serif,
-    fontSize: 16,
-    marginBottom: SPACING.md,
-  },
-  proposalStats: {
-    flexDirection: 'row',
-    gap: SPACING.lg,
-    marginBottom: SPACING.md,
-  },
-  proposalStat: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.xs,
-  },
-  proposalStatText: {
-    ...TYPOGRAPHY.labelSmall,
-  },
-  voteBarContainer: {
-    marginBottom: SPACING.md,
-  },
-  voteBarBg: {
-    height: 6,
-    borderRadius: BORDER_RADIUS.full,
-    overflow: 'hidden',
-    marginBottom: SPACING.xs,
-  },
-  voteBarFill: {
-    height: '100%',
-    borderRadius: BORDER_RADIUS.full,
-  },
-  voteBarLabel: {
-    ...TYPOGRAPHY.labelSmall,
-  },
-  engagementRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  engagementLabel: {
-    ...TYPOGRAPHY.labelSmall,
-  },
-  engagementValue: {
-    ...TYPOGRAPHY.labelMedium,
-    fontFamily: FONTS.monoSemiBold,
-    fontVariant: ['tabular-nums'],
   },
 
   // Empty State
@@ -804,9 +931,9 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.xxxl,
   },
   emptyIcon: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 72,
+    height: 72,
+    borderRadius: 36,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: SPACING.lg,
@@ -817,21 +944,30 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.sm,
   },
   emptyText: {
-    ...TYPOGRAPHY.bodyMedium,
+    fontFamily: FONTS.sans,
+    fontSize: 13.5,
+    lineHeight: 20,
     textAlign: 'center',
     marginBottom: SPACING.xl,
   },
   createBtn: {
-    flexDirection: 'row',
+    height: 52,
+    paddingHorizontal: SPACING['3xl'],
+    borderRadius: 15,
     alignItems: 'center',
-    paddingHorizontal: SPACING.xl,
-    paddingVertical: SPACING.md,
-    borderRadius: BORDER_RADIUS.full,
-    gap: SPACING.sm,
+    justifyContent: 'center',
   },
   createBtnText: {
-    ...TYPOGRAPHY.labelLarge,
-    color: '#000',
+    fontFamily: FONTS.sansSemiBold,
+    fontSize: 15,
+    color: '#040707',
+  },
+  privacyNote: {
+    fontFamily: FONTS.sans,
+    fontSize: 11,
+    lineHeight: 16.5,
+    textAlign: 'center',
+    marginTop: SPACING.sm,
   },
 
   bottomPadding: {
