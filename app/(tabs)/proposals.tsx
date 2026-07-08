@@ -98,7 +98,7 @@ function useProposalColors() {
   };
 }
 import { showVoteConfirmation } from '../../lib/notifications';
-import { VoteConfirmationOverlay, UpgradeModal, BallotDisplay, TallyBar, TrustChip } from '../../components/ui';
+import { VoteConfirmationOverlay, UpgradeModal, BallotDisplay, TallyBar, TrustChip, HowVotingWorksSheet } from '../../components/ui';
 import { checkForNewBadges } from '../../lib/badgeNotification';
 import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -199,6 +199,7 @@ function VoteHeader({
   insetTop,
   onCreate,
   onToggleView,
+  onHowVotingWorks,
 }: {
   index: number;
   total: number;
@@ -209,6 +210,7 @@ function VoteHeader({
   insetTop: number;
   onCreate: () => void;
   onToggleView: () => void;
+  onHowVotingWorks?: () => void;
 }) {
   const { colors } = useTheme();
   const filters = ['All', 'Federal', 'Provincial', 'Municipal', 'Closing'];
@@ -286,9 +288,24 @@ function VoteHeader({
             <Text style={[voteHeaderStyles.counterNum, { color: colors.text }]}>
               {String(Math.min(index + 1, total)).padStart(2, '0')} / {String(total).padStart(2, '0')} IN QUEUE
             </Text>
-            <Text style={[voteHeaderStyles.percentText, { color: colors.textTertiary }]}>
-              {reviewed}% REVIEWED
-            </Text>
+            <View style={voteHeaderStyles.progressRight}>
+              <Text style={[voteHeaderStyles.percentText, { color: colors.textTertiary }]}>
+                {reviewed}% REVIEWED
+              </Text>
+              {onHowVotingWorks && (
+                <TouchableOpacity
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    onHowVotingWorks();
+                  }}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  accessibilityRole="button"
+                  accessibilityLabel="How voting works"
+                >
+                  <Ionicons name="information-circle-outline" size={15} color={colors.textTertiary} />
+                </TouchableOpacity>
+              )}
+            </View>
           </View>
           <View style={[voteHeaderStyles.progressBar, { backgroundColor: colors.surfaceHighlight }]}>
             <View
@@ -363,6 +380,11 @@ const voteHeaderStyles = StyleSheet.create({
     fontSize: 12,
     letterSpacing: 1.2,
     fontVariant: ['tabular-nums'],
+  },
+  progressRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
   },
   percentText: {
     fontFamily: FONTS.mono,
@@ -1404,6 +1426,10 @@ export default function ProposalsScreen() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [creating, setCreating] = useState(false);
   const [usageLimits, setUsageLimits] = useState<UsageLimits | null>(null);
+  // Create form: which field is focused (drives the gold active-field border).
+  const [createFocusField, setCreateFocusField] = useState<'question' | 'details' | null>(null);
+  // P3 · How voting works rules sheet (opened from the vote queue).
+  const [showHowVoting, setShowHowVoting] = useState(false);
 
   const [userCountry, setUserCountry] = useState('');
   const [userState, setUserState] = useState('');
@@ -2519,6 +2545,7 @@ export default function ProposalsScreen() {
                 insetTop={insets.top}
                 onCreate={() => setShowCreateModal(true)}
                 onToggleView={() => setViewMode('list')}
+                onHowVotingWorks={() => setShowHowVoting(true)}
               />
 
               {/* Card stack — swiping a side opens the mandatory X1 confirm sheet */}
@@ -2886,204 +2913,288 @@ export default function ProposalsScreen() {
         </View>
       </Modal>
 
-      {/* Create Modal */}
-      <Modal visible={showCreateModal} animationType="slide" presentationStyle="pageSheet">
+      {/* Create Modal — 12 · New Proposal. Full re-skin of the form; every
+          piece of creation logic (newProposal state shape, validation,
+          limits/upsell alerts, verification gating, image upload, options,
+          handleCreateProposal, creating state) is unchanged. */}
+      <Modal
+        visible={showCreateModal}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setShowCreateModal(false)}
+      >
         <KeyboardAvoidingView
-          style={[styles.modalContainer, { backgroundColor: colors.background }]}
+          style={[createStyles.container, { backgroundColor: colors.background }]}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
-          <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
-            <TouchableOpacity onPress={() => setShowCreateModal(false)} style={styles.modalClose}>
-              <Ionicons name="close" size={24} color={colors.textSecondary} />
-            </TouchableOpacity>
-
-            <Text style={[styles.modalTitle, { color: colors.text }]}>New Proposal</Text>
-
+          {/* Top bar — circular close, proposal allowance in mono on the right */}
+          <View style={createStyles.topBar}>
             <TouchableOpacity
-              onPress={handleCreateProposal}
-              disabled={creating}
-              style={[creating && styles.btnDisabled]}
+              onPress={() => setShowCreateModal(false)}
+              style={[createStyles.closeBtn, { backgroundColor: colors.surface, borderColor: colors.borderSubtle }]}
+              accessibilityRole="button"
+              accessibilityLabel="Close"
             >
-              <LinearGradient
-                colors={[colors.gold, colors.goldDark || '#A68523']}
-                style={styles.submitBtn}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-              >
-                {creating ? (
-                  <ActivityIndicator size="small" color="#000" />
-                ) : (
-                  <Text style={styles.submitBtnText}>Create</Text>
-                )}
-              </LinearGradient>
+              <Ionicons name="close" size={18} color={colors.textSecondary} />
             </TouchableOpacity>
+            {usageLimits &&
+              (usageLimits.proposals.limit === 'unlimited' ? (
+                <Text style={[createStyles.topMeta, { color: colors.textTertiary }]}>
+                  UNLIMITED · PREMIUM
+                </Text>
+              ) : (
+                <TouchableOpacity
+                  onPress={() => {
+                    setShowCreateModal(false);
+                    router.push('/modals/subscription');
+                  }}
+                  style={createStyles.topMetaRow}
+                  accessibilityRole="button"
+                  accessibilityLabel="Proposal allowance — tap to upgrade"
+                >
+                  <Text style={[createStyles.topMeta, { color: colors.textTertiary }]}>
+                    {usageLimits.proposals.used} OF {usageLimits.proposals.limit} THIS{' '}
+                    {String(usageLimits.proposals.period).toUpperCase()}
+                  </Text>
+                  <Text style={[createStyles.topMetaUpgrade, { color: colors.gold }]}>UPGRADE</Text>
+                </TouchableOpacity>
+              ))}
           </View>
 
-          <ScrollView style={styles.formScroll} showsVerticalScrollIndicator={false}>
-            {/* Usage Limits Display */}
-            {usageLimits && (
-              <View style={[styles.limitsCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                <Ionicons name="analytics-outline" size={18} color={colors.gold} />
-                <View style={styles.limitsContent}>
-                  {usageLimits.proposals.limit === 'unlimited' ? (
-                    <Text style={[styles.limitsText, { color: colors.gold }]}>
-                      Unlimited proposals (Premium)
-                    </Text>
-                  ) : (
-                    <>
-                      <Text style={[styles.limitsText, { color: colors.textSecondary }]}>
-                        {usageLimits.proposals.used} of {usageLimits.proposals.limit} proposals this {usageLimits.proposals.period}
-                      </Text>
-                      <View style={[styles.limitsProgressBg, { backgroundColor: `${colors.gold}20` }]}>
-                        <View
-                          style={[
-                            styles.limitsProgressFill,
-                            {
-                              backgroundColor: colors.gold,
-                              width: `${Math.min(100, (usageLimits.proposals.used / (usageLimits.proposals.limit as number)) * 100)}%`,
-                            },
-                          ]}
-                        />
-                      </View>
-                    </>
-                  )}
-                </View>
-                {usageLimits.tier !== 'premium' && (
-                  <TouchableOpacity
-                    onPress={() => {
-                      setShowCreateModal(false);
-                      router.push('/modals/subscription');
-                    }}
-                    style={[styles.upgradeChip, { backgroundColor: `${colors.gold}15` }]}
-                  >
-                    <Text style={[styles.upgradeChipText, { color: colors.gold }]}>Upgrade</Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-            )}
+          <ScrollView
+            style={createStyles.scroll}
+            contentContainerStyle={createStyles.scrollContent}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          >
+            <Text style={[createStyles.pageTitle, { color: colors.text }]}>New Proposal</Text>
 
-            <View style={styles.formSection}>
-              <Text style={[styles.formLabel, { color: colors.gold }]}>Title</Text>
-              <TextInput
-                style={[styles.formInput, { backgroundColor: colors.surface, color: colors.text, borderColor: colors.border }]}
-                placeholder="Enter proposal title..."
-                placeholderTextColor={colors.textTertiary}
-                value={newProposal.title}
-                onChangeText={(t) => setNewProposal((p) => ({ ...p, title: t }))}
-              />
-            </View>
-
-            <View style={styles.formSection}>
-              <Text style={[styles.formLabel, { color: colors.gold }]}>Description</Text>
-              <TextInput
+            {/* THE QUESTION — serif input, gold border while focused */}
+            <View style={createStyles.section}>
+              <Text style={[createStyles.sectionLabel, { color: colors.textTertiary }]}>THE QUESTION</Text>
+              <View
                 style={[
-                  styles.formInput,
-                  styles.formTextArea,
-                  { backgroundColor: colors.surface, color: colors.text, borderColor: colors.border },
+                  createStyles.questionCard,
+                  {
+                    backgroundColor: colors.surface,
+                    borderColor: createFocusField === 'question' ? 'rgba(234, 186, 88, 0.4)' : colors.border,
+                  },
                 ]}
-                placeholder="Describe your proposal..."
-                placeholderTextColor={colors.textTertiary}
-                value={newProposal.description}
-                onChangeText={(t) => setNewProposal((p) => ({ ...p, description: t }))}
-                multiline
-                numberOfLines={6}
-                textAlignVertical="top"
-              />
+              >
+                <TextInput
+                  style={[
+                    createStyles.questionInput,
+                    { color: colors.text, fontFamily: newProposal.title ? FONTS.serif : FONTS.serifItalic },
+                  ]}
+                  placeholder="Should your community…?"
+                  placeholderTextColor={colors.textTertiary}
+                  value={newProposal.title}
+                  onChangeText={(t) => setNewProposal((p) => ({ ...p, title: t }))}
+                  onFocus={() => setCreateFocusField('question')}
+                  onBlur={() => setCreateFocusField(null)}
+                  multiline
+                  maxLength={140}
+                />
+                <Text style={[createStyles.questionMeta, { color: colors.textTertiary }]}>
+                  {newProposal.title.length} / 140 · PHRASED AS A NEUTRAL QUESTION
+                </Text>
+              </View>
             </View>
 
-            <View style={styles.formSection}>
-              <Text style={[styles.formLabel, { color: colors.gold }]}>Image (Optional)</Text>
+            {/* THE DETAILS — description, unchanged wiring */}
+            <View style={createStyles.section}>
+              <Text style={[createStyles.sectionLabel, { color: colors.textTertiary }]}>THE DETAILS</Text>
+              <View
+                style={[
+                  createStyles.detailsCard,
+                  {
+                    backgroundColor: colors.surface,
+                    borderColor: createFocusField === 'details' ? 'rgba(234, 186, 88, 0.4)' : colors.border,
+                  },
+                ]}
+              >
+                <TextInput
+                  style={[createStyles.detailsInput, { color: colors.text }]}
+                  placeholder="Add the context voters need — what changes, what it costs, who decides."
+                  placeholderTextColor={colors.textTertiary}
+                  value={newProposal.description}
+                  onChangeText={(t) => setNewProposal((p) => ({ ...p, description: t }))}
+                  onFocus={() => setCreateFocusField('details')}
+                  onBlur={() => setCreateFocusField(null)}
+                  multiline
+                  textAlignVertical="top"
+                />
+              </View>
+            </View>
+
+            {/* IMAGE — optional, same picker logic */}
+            <View style={createStyles.section}>
+              <Text style={[createStyles.sectionLabel, { color: colors.textTertiary }]}>IMAGE · OPTIONAL</Text>
               <TouchableOpacity
-                style={[styles.imagePicker, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                style={[createStyles.imageCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
                 onPress={pickImage}
+                activeOpacity={0.8}
+                accessibilityRole="button"
+                accessibilityLabel="Add an image"
               >
                 {newProposal.imageUri ? (
-                  <Image source={{ uri: newProposal.imageUri }} style={styles.imagePreview} />
+                  <Image source={{ uri: newProposal.imageUri }} style={createStyles.imagePreview} />
                 ) : (
-                  <View style={styles.imagePickerContent}>
-                    <Ionicons name="image-outline" size={32} color={colors.textTertiary} />
-                    <Text style={[styles.imagePickerText, { color: colors.textTertiary }]}>Tap to add image</Text>
+                  <View style={createStyles.imageEmpty}>
+                    <Ionicons name="image-outline" size={26} color={colors.textTertiary} />
+                    <Text style={[createStyles.imageEmptyText, { color: colors.textTertiary }]}>
+                      Tap to add image
+                    </Text>
                   </View>
                 )}
               </TouchableOpacity>
-
-              {newProposal.imageUri && (
+              {!!newProposal.imageUri && (
                 <TouchableOpacity
-                  style={styles.removeImageBtn}
+                  style={createStyles.imageRemoveBtn}
                   onPress={() => setNewProposal((p) => ({ ...p, imageUri: '' }))}
+                  accessibilityRole="button"
+                  accessibilityLabel="Remove image"
                 >
-                  <Ionicons name="trash-outline" size={16} color={colors.error} />
-                  <Text style={[styles.removeImageText, { color: colors.error }]}>Remove</Text>
+                  <Ionicons name="trash-outline" size={14} color={colors.error} />
+                  <Text style={[createStyles.imageRemoveText, { color: colors.error }]}>Remove</Text>
                 </TouchableOpacity>
               )}
             </View>
 
-            {/* Ballot type picker. Defaults to yes-no for backward compat. */}
-            <View style={styles.formSection}>
-              <Text style={[styles.formLabel, { color: colors.gold }]}>Ballot type</Text>
-              <View style={{ flexDirection: 'row', gap: 8 }}>
-                {(['yes-no', 'multiple-choice', 'ranked-choice'] as const).map((vt) => {
-                  const active = newProposal.voteType === vt;
-                  const label = vt === 'yes-no' ? 'Yes / No' : vt === 'multiple-choice' ? 'Multiple choice' : 'Ranked choice';
+            {/* SCOPE — geo reach chips; non-global scopes still gate on verification */}
+            <View style={createStyles.section}>
+              <Text style={[createStyles.sectionLabel, { color: colors.textTertiary }]}>SCOPE</Text>
+              <View style={createStyles.chipRow}>
+                {[
+                  { key: 'global' as const, label: 'Global' },
+                  ...(userCountry ? [{ key: 'national' as const, label: userCountry }] : []),
+                  ...(userCountry && userState ? [{ key: 'state' as const, label: userState }] : []),
+                  ...(userCountry && userCity ? [{ key: 'city' as const, label: userCity }] : []),
+                ].map((scope) => {
+                  const active = newProposal.geoScope === scope.key;
                   return (
                     <TouchableOpacity
-                      key={vt}
-                      onPress={() => setNewProposal((p) => ({ ...p, voteType: vt }))}
-                      style={{
-                        flex: 1,
-                        paddingVertical: 10,
-                        paddingHorizontal: 8,
-                        backgroundColor: active ? colors.gold : colors.surface,
-                        borderColor: active ? colors.gold : colors.border,
-                        borderWidth: 1,
-                        borderRadius: 8,
-                        alignItems: 'center',
-                      }}
+                      key={scope.key}
+                      onPress={() => setNewProposal((p) => ({ ...p, geoScope: scope.key }))}
+                      style={[
+                        createStyles.scopeChip,
+                        active
+                          ? { backgroundColor: colors.goldFill, borderColor: 'transparent' }
+                          : { backgroundColor: colors.surface, borderColor: colors.border },
+                      ]}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: active }}
                     >
-                      <Text style={{ color: active ? '#000' : colors.textSecondary, fontSize: 12, fontFamily: FONTS.sansSemiBold}}>
-                        {label}
+                      <Text
+                        style={[
+                          active ? createStyles.scopeChipTextActive : createStyles.scopeChipText,
+                          { color: active ? '#040707' : colors.textSecondary },
+                        ]}
+                      >
+                        {scope.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+              <Text style={[createStyles.scopeHint, { color: colors.textTertiary }]}>
+                {newProposal.geoScope === 'global'
+                  ? 'Anyone can vote'
+                  : newProposal.geoScope === 'national'
+                  ? `All of ${userCountry}`
+                  : newProposal.geoScope === 'state'
+                  ? `${userState} only`
+                  : `${userCity} only`}
+              </Text>
+              {!userCountry && (
+                <View
+                  style={[createStyles.infoBanner, { backgroundColor: colors.surface, borderColor: colors.borderSubtle }]}
+                >
+                  <Ionicons name="information-circle-outline" size={18} color={colors.info} />
+                  <View style={createStyles.infoBannerText}>
+                    <Text style={[createStyles.infoBannerTitle, { color: colors.text }]}>Global proposals only</Text>
+                    <Text style={[createStyles.infoBannerDesc, { color: colors.textSecondary }]}>
+                      Verify your identity ($4.99) to create proposals for your specific region.
+                    </Text>
+                  </View>
+                </View>
+              )}
+            </View>
+
+            {/* BALLOT TYPE — segmented control; defaults to yes-no for backward compat */}
+            <View style={createStyles.section}>
+              <Text style={[createStyles.sectionLabel, { color: colors.textTertiary }]}>BALLOT TYPE</Text>
+              <View
+                style={[
+                  createStyles.segmentWrap,
+                  { backgroundColor: colors.backgroundSecondary, borderColor: colors.borderSubtle },
+                ]}
+              >
+                {[
+                  { value: 'yes-no' as const, label: 'Support / Oppose' },
+                  { value: 'ranked-choice' as const, label: 'Ranked' },
+                  { value: 'multiple-choice' as const, label: 'Multiple' },
+                ].map((seg) => {
+                  const active = newProposal.voteType === seg.value;
+                  return (
+                    <TouchableOpacity
+                      key={seg.value}
+                      onPress={() => setNewProposal((p) => ({ ...p, voteType: seg.value }))}
+                      style={[createStyles.segmentCell, active && { backgroundColor: colors.surfaceHighlight }]}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: active }}
+                    >
+                      <Text
+                        numberOfLines={1}
+                        style={[
+                          active ? createStyles.segmentTextActive : createStyles.segmentText,
+                          { color: active ? colors.text : colors.textTertiary },
+                        ]}
+                      >
+                        {seg.label}
                       </Text>
                     </TouchableOpacity>
                   );
                 })}
               </View>
               {newProposal.voteType === 'ranked-choice' && (
-                <Text style={{ color: colors.textSecondary, fontSize: 11, marginTop: 6, lineHeight: 16 }}>
+                <Text style={[createStyles.scopeHint, { color: colors.textTertiary }]}>
                   Voters rank options in order of preference. Winner determined by instant-runoff (IRV).
                 </Text>
               )}
             </View>
 
-            {/* Options list, shown for non-yes-no ballots. */}
+            {/* Options list — required for ranked / multiple ballots */}
             {newProposal.voteType !== 'yes-no' && (
-              <View style={styles.formSection}>
-                <Text style={[styles.formLabel, { color: colors.gold }]}>Options</Text>
+              <View style={createStyles.section}>
+                <Text style={[createStyles.sectionLabel, { color: colors.textTertiary }]}>OPTIONS</Text>
                 {newProposal.options.map((opt, idx) => (
-                  <View key={idx} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                  <View key={idx} style={createStyles.optionRow}>
                     <TextInput
-                      style={{
-                        flex: 1,
-                        padding: 12,
-                        backgroundColor: colors.surface,
-                        borderColor: colors.border,
-                        borderWidth: 1,
-                        borderRadius: 8,
-                        color: colors.text,
-                      }}
+                      style={[
+                        createStyles.optionInput,
+                        { backgroundColor: colors.surface, borderColor: colors.border, color: colors.text },
+                      ]}
                       placeholder={`Option ${idx + 1}`}
                       placeholderTextColor={colors.textTertiary}
                       value={opt}
-                      onChangeText={(t) => setNewProposal((p) => {
-                        const next = [...p.options];
-                        next[idx] = t;
-                        return { ...p, options: next };
-                      })}
+                      onChangeText={(t) =>
+                        setNewProposal((p) => {
+                          const next = [...p.options];
+                          next[idx] = t;
+                          return { ...p, options: next };
+                        })
+                      }
                       maxLength={120}
                     />
                     {newProposal.options.length > 2 && (
                       <TouchableOpacity
-                        onPress={() => setNewProposal((p) => ({ ...p, options: p.options.filter((_, i) => i !== idx) }))}
-                        style={{ padding: 8 }}
+                        onPress={() =>
+                          setNewProposal((p) => ({ ...p, options: p.options.filter((_, i) => i !== idx) }))
+                        }
+                        style={createStyles.optionRemove}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Remove option ${idx + 1}`}
                       >
                         <Ionicons name="close-circle" size={20} color={colors.textTertiary} />
                       </TouchableOpacity>
@@ -3093,17 +3204,20 @@ export default function ProposalsScreen() {
                 {newProposal.options.length < 10 && (
                   <TouchableOpacity
                     onPress={() => setNewProposal((p) => ({ ...p, options: [...p.options, ''] }))}
-                    style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 8 }}
+                    style={createStyles.addOptionBtn}
+                    accessibilityRole="button"
+                    accessibilityLabel="Add option"
                   >
                     <Ionicons name="add-circle-outline" size={16} color={colors.gold} />
-                    <Text style={{ color: colors.gold, fontSize: 12, fontFamily: FONTS.sansSemiBold}}>Add option</Text>
+                    <Text style={[createStyles.addOptionText, { color: colors.gold }]}>Add option</Text>
                   </TouchableOpacity>
                 )}
               </View>
             )}
 
-            <View style={styles.formSection}>
-              <Text style={[styles.formLabel, { color: colors.gold }]}>Category</Text>
+            {/* CATEGORY — same chips, same wiring */}
+            <View style={createStyles.section}>
+              <Text style={[createStyles.sectionLabel, { color: colors.textTertiary }]}>CATEGORY</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                 <View style={styles.filterRow}>
                   {CATEGORIES.filter((c) => c !== 'All').map((cat) => (
@@ -3118,149 +3232,44 @@ export default function ProposalsScreen() {
               </ScrollView>
             </View>
 
-            <View style={[styles.formDivider, { borderTopColor: colors.border }]}>
-              <View style={[styles.formDividerIcon, { backgroundColor: `${colors.gold}15` }]}>
-                <Ionicons name="location-outline" size={16} color={colors.gold} />
-              </View>
-              <Text style={[styles.formDividerLabel, { color: colors.gold }]}>Geographic Scope</Text>
-            </View>
-
-            {/* Global scope - available to all users */}
-            <View style={styles.scopeGrid}>
-              <TouchableOpacity
-                style={[
-                  styles.scopeCard,
-                  {
-                    backgroundColor: newProposal.geoScope === 'global' ? `${colors.gold}15` : colors.surface,
-                    borderColor: newProposal.geoScope === 'global' ? colors.gold : colors.border,
-                  },
-                ]}
-                onPress={() => setNewProposal((p) => ({ ...p, geoScope: 'global' }))}
-              >
-                <Ionicons
-                  name="earth-outline"
-                  size={24}
-                  color={newProposal.geoScope === 'global' ? colors.gold : colors.textSecondary}
-                />
-                <Text
-                  style={[
-                    styles.scopeTitle,
-                    { color: newProposal.geoScope === 'global' ? colors.gold : colors.text },
-                  ]}
-                >
-                  Global
-                </Text>
-                <Text style={[styles.scopeDesc, { color: colors.textTertiary }]}>Anyone can vote</Text>
-              </TouchableOpacity>
-
-            {userCountry ? (
-              <>
-                {/* Geo-restricted options for verified users */}
-                <TouchableOpacity
-                  style={[
-                    styles.scopeCard,
-                    {
-                      backgroundColor: newProposal.geoScope === 'national' ? `${colors.gold}15` : colors.surface,
-                      borderColor: newProposal.geoScope === 'national' ? colors.gold : colors.border,
-                    },
-                  ]}
-                  onPress={() => setNewProposal((p) => ({ ...p, geoScope: 'national' }))}
-                >
-                  <Ionicons
-                    name="globe-outline"
-                    size={24}
-                    color={newProposal.geoScope === 'national' ? colors.gold : colors.textSecondary}
-                  />
-                  <Text
-                    style={[
-                      styles.scopeTitle,
-                      { color: newProposal.geoScope === 'national' ? colors.gold : colors.text },
-                    ]}
-                  >
-                    National
-                  </Text>
-                  <Text style={[styles.scopeDesc, { color: colors.textTertiary }]}>All of {userCountry}</Text>
-                </TouchableOpacity>
-
-                  {userState && (
-                    <TouchableOpacity
-                      style={[
-                        styles.scopeCard,
-                        {
-                          backgroundColor: newProposal.geoScope === 'state' ? `${colors.gold}15` : colors.surface,
-                          borderColor: newProposal.geoScope === 'state' ? colors.gold : colors.border,
-                        },
-                      ]}
-                      onPress={() => setNewProposal((p) => ({ ...p, geoScope: 'state' }))}
-                    >
-                      <Ionicons
-                        name="map-outline"
-                        size={24}
-                        color={newProposal.geoScope === 'state' ? colors.gold : colors.textSecondary}
-                      />
-                      <Text
-                        style={[
-                          styles.scopeTitle,
-                          { color: newProposal.geoScope === 'state' ? colors.gold : colors.text },
-                        ]}
-                      >
-                        State
-                      </Text>
-                      <Text style={[styles.scopeDesc, { color: colors.textTertiary }]}>{userState} only</Text>
-                    </TouchableOpacity>
-                  )}
-
-                  {userCity && (
-                    <TouchableOpacity
-                      style={[
-                        styles.scopeCard,
-                        {
-                          backgroundColor: newProposal.geoScope === 'city' ? `${colors.gold}15` : colors.surface,
-                          borderColor: newProposal.geoScope === 'city' ? colors.gold : colors.border,
-                        },
-                      ]}
-                      onPress={() => setNewProposal((p) => ({ ...p, geoScope: 'city' }))}
-                    >
-                      <Ionicons
-                        name="business-outline"
-                        size={24}
-                        color={newProposal.geoScope === 'city' ? colors.gold : colors.textSecondary}
-                      />
-                      <Text
-                        style={[
-                          styles.scopeTitle,
-                          { color: newProposal.geoScope === 'city' ? colors.gold : colors.text },
-                        ]}
-                      >
-                        City
-                      </Text>
-                      <Text style={[styles.scopeDesc, { color: colors.textTertiary }]}>{userCity} only</Text>
-                    </TouchableOpacity>
-                  )}
-              </>
-            ) : (
-              /* Unverified users only see Global option with upgrade prompt */
-              <View style={[styles.infoBanner, { backgroundColor: `${colors.info}10`, borderColor: `${colors.info}25` }]}>
-                <Ionicons name="information-circle-outline" size={20} color={colors.info} />
-                <View style={styles.warningContent}>
-                  <Text style={[styles.infoTitle, { color: colors.info }]}>Global Proposals Only</Text>
-                  <Text style={[styles.warningDesc, { color: colors.textSecondary }]}>
-                    Verify your identity ($4.99) to create proposals for your specific region.
+            {/* Eligibility & deadline settings card */}
+            <View style={[createStyles.settingsCard, { backgroundColor: colors.surface, borderColor: colors.borderSubtle }]}>
+              <View style={[createStyles.settingRow, { borderBottomWidth: 1, borderBottomColor: colors.borderSubtle }]}>
+                <View style={createStyles.settingText}>
+                  <Text style={[createStyles.settingTitle, { color: colors.text }]}>Citizens only</Text>
+                  <Text style={[createStyles.settingSub, { color: colors.textTertiary }]}>
+                    Verified citizenship (passport + proof of address) required to vote
                   </Text>
                 </View>
+                <Switch
+                  value={newProposal.requiresCitizenship}
+                  onValueChange={(v) => setNewProposal((p) => ({ ...p, requiresCitizenship: v }))}
+                  trackColor={{ false: colors.border, true: colors.goldFill }}
+                  thumbColor={newProposal.requiresCitizenship ? '#040707' : '#f4f3f4'}
+                />
               </View>
-            )}
+              <View style={createStyles.settingRow}>
+                <View style={createStyles.settingText}>
+                  <Text style={[createStyles.settingTitle, { color: colors.text }]}>Deadline</Text>
+                  <Text style={[createStyles.settingSub, { color: colors.textTertiary }]}>
+                    Voting closes automatically
+                  </Text>
+                </View>
+                <Text
+                  style={[
+                    createStyles.settingValue,
+                    { color: colors.textSecondary, backgroundColor: colors.surfaceHighlight },
+                  ]}
+                >
+                  SET ON PUBLISH
+                </Text>
+              </View>
             </View>
 
-            <View style={[styles.formDivider, { borderTopColor: colors.border }]}>
-              <View style={[styles.formDividerIcon, { backgroundColor: `${colors.gold}15` }]}>
-                <Ionicons name="people-outline" size={16} color={colors.gold} />
-              </View>
-              <Text style={[styles.formDividerLabel, { color: colors.gold }]}>Demographics (Optional)</Text>
-            </View>
-
-            <View style={styles.formSection}>
-              <Text style={[styles.formSubLabel, { color: colors.textSecondary }]}>Age Group</Text>
+            {/* WHO CAN VOTE — demographics, optional (unchanged wiring) */}
+            <View style={createStyles.section}>
+              <Text style={[createStyles.sectionLabel, { color: colors.textTertiary }]}>WHO CAN VOTE · OPTIONAL</Text>
+              <Text style={[createStyles.subLabel, { color: colors.textSecondary }]}>Age group</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                 <View style={styles.filterRow}>
                   {AGE_GROUPS.map((age) => (
@@ -3273,10 +3282,7 @@ export default function ProposalsScreen() {
                   ))}
                 </View>
               </ScrollView>
-            </View>
-
-            <View style={styles.formSection}>
-              <Text style={[styles.formSubLabel, { color: colors.textSecondary }]}>Gender</Text>
+              <Text style={[createStyles.subLabel, { color: colors.textSecondary, marginTop: 8 }]}>Gender</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                 <View style={styles.filterRow}>
                   {GENDERS.map((g) => (
@@ -3290,33 +3296,37 @@ export default function ProposalsScreen() {
                 </View>
               </ScrollView>
             </View>
-
-            <View style={[styles.formDivider, { borderTopColor: colors.border }]}>
-              <View style={[styles.formDividerIcon, { backgroundColor: `${colors.gold}15` }]}>
-                <Ionicons name="shield-checkmark-outline" size={16} color={colors.gold} />
-              </View>
-              <Text style={[styles.formDividerLabel, { color: colors.gold }]}>Eligibility</Text>
-            </View>
-
-            <View style={styles.formSection}>
-              <View style={styles.citizenToggleRow}>
-                <View style={styles.citizenToggleText}>
-                  <Text style={[styles.formSubLabel, { color: colors.text, marginBottom: 2 }]}>Citizens only</Text>
-                  <Text style={[styles.scopeDesc, { color: colors.textTertiary }]}>
-                    Only voters who verify citizenship (passport + proof of address) can vote.
-                  </Text>
-                </View>
-                <Switch
-                  value={newProposal.requiresCitizenship}
-                  onValueChange={(v) => setNewProposal((p) => ({ ...p, requiresCitizenship: v }))}
-                  trackColor={{ false: colors.border, true: colors.gold }}
-                  thumbColor="#fff"
-                />
-              </View>
-            </View>
-
-            <View style={{ height: 100 }} />
           </ScrollView>
+
+          {/* Pinned gold CTA — the one gold moment on this screen */}
+          <View
+            style={[
+              createStyles.footer,
+              {
+                backgroundColor: colors.background,
+                borderTopColor: colors.borderSubtle,
+                paddingBottom: Math.max(insets.bottom, 16),
+              },
+            ]}
+          >
+            <TouchableOpacity
+              style={[createStyles.submitBtn, { backgroundColor: colors.goldFill }, creating && createStyles.btnDisabled]}
+              onPress={handleCreateProposal}
+              disabled={creating}
+              activeOpacity={0.85}
+              accessibilityRole="button"
+              accessibilityLabel="Create proposal"
+            >
+              {creating ? (
+                <ActivityIndicator size="small" color="#040707" />
+              ) : (
+                <Text style={createStyles.submitText}>Create Proposal</Text>
+              )}
+            </TouchableOpacity>
+            <Text style={[createStyles.footerNote, { color: colors.textTertiary }]}>
+              Published proposals cannot be edited — only withdrawn
+            </Text>
+          </View>
         </KeyboardAvoidingView>
       </Modal>
 
@@ -3336,6 +3346,9 @@ export default function ProposalsScreen() {
           if (last) shareVoteAchievement(last.title, lastVoteType, last.id);
         }}
       />
+
+      {/* P3 · How voting works — rules sheet, opened from the queue's info glyph */}
+      <HowVotingWorksSheet visible={showHowVoting} onClose={() => setShowHowVoting(false)} />
 
       {/* Verification/Upgrade Modal */}
       <UpgradeModal
@@ -3957,165 +3970,6 @@ const styles = StyleSheet.create({
   },
   emptyBtnText: { color: '#000', ...TYPOGRAPHY.labelLarge,},
 
-  // Modal
-  modalContainer: { flex: 1 },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: SPACING.lg,
-    paddingTop: SPACING.lg,
-    paddingBottom: SPACING.md,
-    borderBottomWidth: 1,
-  },
-  modalClose: { padding: SPACING.xs },
-  modalTitle: { ...TYPOGRAPHY.headlineSmall },
-  modalShare: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-  },
-  modalContent: { padding: SPACING.lg },
-
-  // Detail Card
-  detailCard: {
-    borderRadius: BORDER_RADIUS['2xl'],
-    borderWidth: 1,
-    padding: SPACING.xl,
-    overflow: 'hidden',
-    ...SHADOWS.lg,
-  },
-  detailHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  detailTitle: { ...TYPOGRAPHY.headlineLarge, marginTop: SPACING.lg },
-  detailDesc: { ...TYPOGRAPHY.bodyLarge, marginTop: SPACING.md, lineHeight: 26 },
-
-  // Create Form
-  submitBtn: {
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.sm,
-    borderRadius: BORDER_RADIUS.full,
-    minWidth: 80,
-    alignItems: 'center',
-  },
-  submitBtnText: { color: '#000', ...TYPOGRAPHY.labelMedium,},
-  formScroll: { flex: 1, padding: SPACING.lg },
-  formSection: { marginBottom: SPACING.lg },
-  formLabel: { ...TYPOGRAPHY.labelMedium, marginBottom: SPACING.sm },
-  formSubLabel: { ...TYPOGRAPHY.labelSmall, marginBottom: SPACING.sm },
-  formInput: {
-    borderWidth: 1,
-    borderRadius: BORDER_RADIUS.xl,
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.md,
-    ...TYPOGRAPHY.bodyMedium,
-  },
-  formTextArea: { minHeight: 140, paddingTop: SPACING.md },
-  imagePicker: {
-    borderWidth: 1,
-    borderRadius: BORDER_RADIUS.xl,
-    overflow: 'hidden',
-    borderStyle: 'dashed',
-  },
-  imagePreview: { width: '100%', height: 180 },
-  imagePickerContent: { alignItems: 'center', justifyContent: 'center', paddingVertical: SPACING.xxxl },
-  imagePickerText: { ...TYPOGRAPHY.bodySmall, marginTop: SPACING.sm },
-  removeImageBtn: { flexDirection: 'row', alignItems: 'center', gap: SPACING.xs, marginTop: SPACING.sm },
-  removeImageText: { ...TYPOGRAPHY.labelMedium },
-
-  formDivider: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.sm,
-    marginTop: SPACING.xl,
-    marginBottom: SPACING.lg,
-    paddingTop: SPACING.xl,
-    borderTopWidth: 1,
-  },
-  formDividerIcon: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  formDividerLabel: { ...TYPOGRAPHY.headlineSmall, fontSize: 16 },
-  formHelper: { ...TYPOGRAPHY.bodySmall, marginBottom: SPACING.md },
-  locationBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.sm,
-    padding: SPACING.md,
-    borderRadius: BORDER_RADIUS.xl,
-    borderWidth: 1,
-    marginBottom: SPACING.lg,
-  },
-  locationText: { ...TYPOGRAPHY.bodyMedium,},
-  scopeGrid: { gap: SPACING.md },
-  scopeCard: {
-    alignItems: 'center',
-    padding: SPACING.lg,
-    borderRadius: BORDER_RADIUS.xl,
-    borderWidth: 2,
-  },
-  scopeTitle: { ...TYPOGRAPHY.labelLarge, marginTop: SPACING.sm },
-  scopeDesc: { ...TYPOGRAPHY.bodySmall, marginTop: 2 },
-  citizenToggleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: SPACING.md },
-  citizenToggleText: { flex: 1 },
-  warningBanner: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: SPACING.md,
-    padding: SPACING.lg,
-    borderRadius: BORDER_RADIUS.xl,
-    borderWidth: 1,
-    marginBottom: SPACING.lg,
-  },
-  infoBanner: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: SPACING.md,
-    padding: SPACING.lg,
-    borderRadius: BORDER_RADIUS.xl,
-    borderWidth: 1,
-    marginTop: SPACING.md,
-  },
-  infoTitle: { ...TYPOGRAPHY.labelMedium, marginBottom: SPACING.xxs },
-  warningContent: { flex: 1 },
-  warningTitle: { ...TYPOGRAPHY.labelMedium, marginBottom: SPACING.xxs },
-  warningDesc: { ...TYPOGRAPHY.bodySmall, lineHeight: 20 },
-
-  // Limits Display
-  limitsCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: SPACING.md,
-    borderRadius: BORDER_RADIUS.xl,
-    borderWidth: 1,
-    marginBottom: SPACING.lg,
-    gap: SPACING.md,
-  },
-  limitsContent: {
-    flex: 1,
-  },
-  limitsText: {
-    ...TYPOGRAPHY.bodySmall,
-    marginBottom: SPACING.xs,
-  },
-  limitsProgressBg: {
-    height: 4,
-    borderRadius: 2,
-    overflow: 'hidden',
-  },
-  limitsProgressFill: {
-    height: '100%',
-    borderRadius: 2,
-  },
-  upgradeChip: {
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.xs,
-    borderRadius: BORDER_RADIUS.full,
-  },
-  upgradeChipText: {
-    ...TYPOGRAPHY.labelSmall,
-  },
-
   // View Mode Toggle
   viewModeBtn: {
     width: 44,
@@ -4721,5 +4575,275 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(0,0,0,0.5)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 4,
+  },
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 12 · CREATE PROPOSAL — form re-skin styles (serif question, mono metadata,
+// chip scope selector, segmented ballot type, settings card, pinned gold CTA)
+// ═══════════════════════════════════════════════════════════════════════════════
+const createStyles = StyleSheet.create({
+  container: { flex: 1 },
+  topBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: SPACING.screenPadding,
+    paddingTop: 14,
+    paddingBottom: 6,
+  },
+  closeBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  topMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  topMeta: {
+    fontFamily: FONTS.mono,
+    fontSize: 10.5,
+    letterSpacing: 1.68,
+    fontVariant: ['tabular-nums'],
+  },
+  topMetaUpgrade: {
+    fontFamily: FONTS.monoSemiBold,
+    fontSize: 10.5,
+    letterSpacing: 1.26,
+  },
+  scroll: { flex: 1 },
+  scrollContent: {
+    paddingHorizontal: SPACING.screenPadding,
+    paddingTop: 8,
+    paddingBottom: 24,
+    gap: 16,
+  },
+  pageTitle: {
+    fontFamily: FONTS.serif,
+    fontSize: 30,
+    lineHeight: 33,
+    letterSpacing: -0.36,
+  },
+  section: { gap: 7 },
+  sectionLabel: {
+    fontFamily: FONTS.sansSemiBold,
+    fontSize: 10.5,
+    letterSpacing: 1.47,
+  },
+  subLabel: {
+    fontFamily: FONTS.sansMedium,
+    fontSize: 12,
+    marginTop: 2,
+  },
+  questionCard: {
+    borderWidth: 1.5,
+    borderRadius: 15,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    gap: 6,
+  },
+  questionInput: {
+    fontSize: 15.5,
+    lineHeight: 22,
+    padding: 0,
+    minHeight: 44,
+  },
+  questionMeta: {
+    fontFamily: FONTS.mono,
+    fontSize: 10,
+    letterSpacing: 0.4,
+    fontVariant: ['tabular-nums'],
+  },
+  detailsCard: {
+    borderWidth: 1.5,
+    borderRadius: 15,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  detailsInput: {
+    fontFamily: FONTS.sans,
+    fontSize: 13.5,
+    lineHeight: 20,
+    padding: 0,
+    minHeight: 96,
+  },
+  imageCard: {
+    borderWidth: 1,
+    borderRadius: 15,
+    overflow: 'hidden',
+  },
+  imageEmpty: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 26,
+    gap: 7,
+  },
+  imageEmptyText: {
+    fontFamily: FONTS.sans,
+    fontSize: 12,
+  },
+  imagePreview: { width: '100%', height: 180 },
+  imageRemoveBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 6,
+    alignSelf: 'flex-start',
+  },
+  imageRemoveText: {
+    fontFamily: FONTS.sansMedium,
+    fontSize: 12,
+  },
+  chipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 7,
+  },
+  scopeChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 100,
+    borderWidth: 1,
+  },
+  scopeChipText: {
+    fontFamily: FONTS.sansMedium,
+    fontSize: 12,
+  },
+  scopeChipTextActive: {
+    fontFamily: FONTS.sansSemiBold,
+    fontSize: 12,
+  },
+  scopeHint: {
+    fontFamily: FONTS.sans,
+    fontSize: 11,
+    lineHeight: 16,
+  },
+  infoBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    borderWidth: 1,
+    borderRadius: 13,
+    padding: 13,
+    marginTop: 3,
+  },
+  infoBannerText: { flex: 1, gap: 2 },
+  infoBannerTitle: {
+    fontFamily: FONTS.sansSemiBold,
+    fontSize: 12.5,
+  },
+  infoBannerDesc: {
+    fontFamily: FONTS.sans,
+    fontSize: 11.5,
+    lineHeight: 16,
+  },
+  segmentWrap: {
+    flexDirection: 'row',
+    borderWidth: 1,
+    borderRadius: 13,
+    padding: 3,
+  },
+  segmentCell: {
+    flex: 1,
+    height: 38,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  segmentText: {
+    fontFamily: FONTS.sansMedium,
+    fontSize: 12.5,
+  },
+  segmentTextActive: {
+    fontFamily: FONTS.sansSemiBold,
+    fontSize: 12.5,
+  },
+  optionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  optionInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    fontFamily: FONTS.sans,
+    fontSize: 13.5,
+  },
+  optionRemove: { padding: 6 },
+  addOptionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 7,
+    alignSelf: 'flex-start',
+  },
+  addOptionText: {
+    fontFamily: FONTS.sansSemiBold,
+    fontSize: 12,
+  },
+  settingsCard: {
+    borderWidth: 1,
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 4,
+  },
+  settingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 14,
+    paddingVertical: 13,
+  },
+  settingText: { flex: 1, gap: 1 },
+  settingTitle: {
+    fontFamily: FONTS.sansMedium,
+    fontSize: 13.5,
+  },
+  settingSub: {
+    fontFamily: FONTS.sans,
+    fontSize: 11,
+    lineHeight: 15,
+  },
+  settingValue: {
+    fontFamily: FONTS.mono,
+    fontSize: 11,
+    letterSpacing: 0.4,
+    paddingHorizontal: 11,
+    paddingVertical: 7,
+    borderRadius: 9,
+    overflow: 'hidden',
+    fontVariant: ['tabular-nums'],
+  },
+  footer: {
+    paddingHorizontal: SPACING.screenPadding,
+    paddingTop: 12,
+    gap: 9,
+    borderTopWidth: 1,
+  },
+  submitBtn: {
+    height: 54,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  btnDisabled: { opacity: 0.6 },
+  submitText: {
+    fontFamily: FONTS.sansSemiBold,
+    fontSize: 16,
+    color: '#040707',
+  },
+  footerNote: {
+    fontFamily: FONTS.sans,
+    fontSize: 11.5,
+    textAlign: 'center',
   },
 });
