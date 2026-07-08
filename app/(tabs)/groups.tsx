@@ -3,262 +3,249 @@ import { useState, useCallback, useMemo } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
-import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Svg, { Circle, Line, Path, Rect, Defs, Pattern, G } from 'react-native-svg';
+import Svg, { Circle, Path } from 'react-native-svg';
 import { useAuthStore } from '../../lib/auth';
-import { FONTS } from '../../lib/theme';
+import { FONTS, RADIUS, SPACING, useTheme } from '../../lib/theme';
 import { organizationsApi, Organization } from '../../lib/api';
 import { UpgradeModal } from '../../components/ui/UpgradeModal';
-
-// ─── design tokens (matches PassportCard / Identity surface) ──────────
-const G_GOLD = '#EABA58';
-const G_GOLD_D = '#C89A3E';
-const G_GOLD_L = '#F4D28C';
-const G_BG = '#040707';
-const G_BG_CARD = '#0D0F12';
-const G_BG_RAISED = '#15181C';
-const G_LINE = '#1E2228';
-const G_LINE_STRONG = '#2A2F37';
-const G_FG = '#F4F5F6';
-const G_FG_MUTED = '#C7CACD';
-const G_FG_FAINT = '#8E9297';
-const G_GREEN = '#34C759';
-
-const SERIF = FONTS.serif;
-const MONO = FONTS.mono;
 
 // ─── helpers ──────────────────────────────────────────────────────────
 function monogramFromName(name: string): string {
   const parts = (name || '').split(/\s+/).filter(Boolean);
   if (!parts.length) return 'O';
-  return parts[0][0].toUpperCase();
+  return parts.length >= 2
+    ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+    : parts[0].slice(0, 2).toUpperCase();
+}
+
+// Open = not explicitly closed/decided and deadline (if any) in the future.
+function isOpenProposal(p: any): boolean {
+  const s = (p?.status || '').toLowerCase();
+  if (['passed', 'approved', 'failed', 'rejected', 'closed', 'archived'].includes(s)) return false;
+  if (p?.deadline) {
+    const d = new Date(p.deadline);
+    if (!Number.isNaN(d.getTime()) && d.getTime() < Date.now()) return false;
+  }
+  return true;
 }
 
 // ─── atoms ────────────────────────────────────────────────────────────
-function Guilloche({ opacity = 0.07, color = G_GOLD, id = 'gguil' }: { opacity?: number; color?: string; id?: string }) {
-  return (
-    <Svg
-      width="100%"
-      height="100%"
-      style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, opacity }}
-      preserveAspectRatio="none"
-      viewBox="0 0 400 260"
-      pointerEvents="none"
-    >
-      <Defs>
-        <Pattern id={id} x={0} y={0} width={40} height={40} patternUnits="userSpaceOnUse">
-          <Path d="M 0 20 Q 10 0, 20 20 T 40 20" stroke={color} fill="none" strokeWidth={0.5} />
-          <Path d="M 0 20 Q 10 40, 20 20 T 40 20" stroke={color} fill="none" strokeWidth={0.5} />
-        </Pattern>
-      </Defs>
-      <Rect width={400} height={260} fill={`url(#${id})`} />
-    </Svg>
-  );
-}
-
-function CornerTicks({ color = G_GOLD, size = 8, weight = 1.2 }: { color?: string; size?: number; weight?: number }) {
-  return (
-    <>
-      <View pointerEvents="none" style={{
-        position: 'absolute', top: -1, left: -1, width: size, height: size,
-        borderTopWidth: weight, borderLeftWidth: weight, borderColor: color,
-      }} />
-      <View pointerEvents="none" style={{
-        position: 'absolute', top: -1, right: -1, width: size, height: size,
-        borderTopWidth: weight, borderRightWidth: weight, borderColor: color,
-      }} />
-      <View pointerEvents="none" style={{
-        position: 'absolute', bottom: -1, left: -1, width: size, height: size,
-        borderBottomWidth: weight, borderLeftWidth: weight, borderColor: color,
-      }} />
-      <View pointerEvents="none" style={{
-        position: 'absolute', bottom: -1, right: -1, width: size, height: size,
-        borderBottomWidth: weight, borderRightWidth: weight, borderColor: color,
-      }} />
-    </>
-  );
-}
-
-function GEyebrow({ children, color = G_FG_FAINT, style }: { children: React.ReactNode; color?: string; style?: any }) {
-  return (
-    <Text style={[{
-      fontFamily: FONTS.sansSemiBold,
-      fontSize: 9.5,
-      letterSpacing: 2,
-      textTransform: 'uppercase',
-      color,
-    }, style]}>{children}</Text>
-  );
-}
-
-function VerifiedTick({ size = 12 }: { size?: number }) {
+function VerifiedTick({ size = 13 }: { size?: number }) {
+  const { colors } = useTheme();
   return (
     <Svg width={size} height={size} viewBox="0 0 14 14">
-      <Circle cx={7} cy={7} r={6.4} fill="rgba(52,199,89,0.12)" stroke={G_GREEN} strokeWidth={0.6} />
-      <Path d="M4.2 7.2l2 2 3.6-4" stroke={G_GREEN} strokeWidth={1.4} strokeLinecap="round" strokeLinejoin="round" fill="none" />
+      <Circle cx={7} cy={7} r={6.4} fill={colors.supportSurface} stroke={colors.support} strokeWidth={0.6} />
+      <Path d="M4.2 7.2l2 2 3.6-4" stroke={colors.support} strokeWidth={1.4} strokeLinecap="round" strokeLinejoin="round" fill="none" />
     </Svg>
+  );
+}
+
+function RoleChip({ role }: { role: 'admin' | 'member' }) {
+  const { colors } = useTheme();
+  const isAdmin = role === 'admin';
+  return (
+    <View style={{
+      paddingHorizontal: 9, paddingVertical: 4, borderRadius: RADIUS.chip,
+      backgroundColor: isAdmin ? colors.goldFill : colors.surfaceHighlight,
+    }}>
+      <Text style={{
+        fontFamily: FONTS.sansSemiBold, fontSize: 9.5, letterSpacing: 1.14,
+        color: isAdmin ? '#040707' : colors.textSecondary,
+      }}>{isAdmin ? 'ADMIN' : 'MEMBER'}</Text>
+    </View>
+  );
+}
+
+function OpenVotesChip({ count }: { count: number }) {
+  const { colors } = useTheme();
+  if (count <= 0) {
+    return (
+      <Text style={{ fontFamily: FONTS.sansMedium, fontSize: 10.5, color: colors.textTertiary }}>
+        No open votes
+      </Text>
+    );
+  }
+  return (
+    <View style={{
+      paddingHorizontal: 9, paddingVertical: 4, borderRadius: RADIUS.chip,
+      backgroundColor: colors.goldSurface,
+      borderWidth: 1, borderColor: colors.goldSurfaceStrong,
+    }}>
+      <Text style={{
+        fontFamily: FONTS.sansSemiBold, fontSize: 9.5, letterSpacing: 1.14,
+        color: colors.gold, fontVariant: ['tabular-nums'],
+      }}>{count} OPEN {count === 1 ? 'VOTE' : 'VOTES'}</Text>
+    </View>
   );
 }
 
 // ─── header ───────────────────────────────────────────────────────────
-function GHeader({ stat, admins, onAddPress, insetTop }: { stat: number; admins: number; onAddPress: () => void; insetTop: number }) {
+function HubHeader({ onAddPress }: { onAddPress: () => void }) {
+  const { colors } = useTheme();
   return (
-    <Animated.View entering={FadeInDown.duration(400)} style={{ paddingTop: insetTop + 12, paddingHorizontal: 24, paddingBottom: 18 }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 10 }}>
+    <Animated.View entering={FadeInDown.duration(400)} style={{ gap: 16, marginBottom: 16 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
         <Text style={{
-          fontFamily: SERIF, fontSize: 38,
-          letterSpacing: -0.8, lineHeight: 40, color: G_FG, flex: 1,
+          fontFamily: FONTS.serif, fontSize: 32, lineHeight: 35,
+          letterSpacing: -0.38, color: colors.text,
         }}>
-          My{' '}
-          <Text style={{ fontFamily: FONTS.serifItalic, color: G_GOLD_L }}>groups</Text>
+          Organizations
         </Text>
         <TouchableOpacity
           onPress={onAddPress}
           activeOpacity={0.7}
+          accessibilityLabel="Add organization"
           style={{
-            width: 36, height: 36, borderRadius: 8,
-            backgroundColor: G_BG_RAISED,
-            borderWidth: 1, borderColor: G_LINE_STRONG,
+            width: 40, height: 40, borderRadius: 20,
+            backgroundColor: colors.surface,
+            borderWidth: 1, borderColor: colors.borderSubtle,
             alignItems: 'center', justifyContent: 'center',
           }}
         >
-          <Ionicons name="add" size={18} color={G_FG_MUTED} />
+          <Ionicons name="add" size={19} color={colors.textSecondary} />
         </TouchableOpacity>
       </View>
-      {stat > 0 && (
-        <Text style={{ fontFamily: FONTS.mono, fontVariant: ['tabular-nums'], fontSize: 13, color: G_FG_MUTED, letterSpacing: -0.05 }}>
-          {stat} {stat === 1 ? 'organization' : 'organizations'}
-          {admins > 0 && (
-            <Text style={{ color: G_FG_FAINT }}> · admin in {admins}</Text>
-          )}
-        </Text>
-      )}
+      <Text style={{ fontFamily: FONTS.sans, fontSize: 14, lineHeight: 21, color: colors.textSecondary }}>
+        Verified governance for the groups you belong to.
+      </Text>
     </Animated.View>
   );
 }
 
 // ─── ORG CARD ─────────────────────────────────────────────────────────
-function OrgLogo({ name, logoUrl, size = 48 }: { name: string; logoUrl?: string; size?: number }) {
+function OrgLogo({ name, logoUrl, size = 42 }: { name: string; logoUrl?: string; size?: number }) {
+  const { colors } = useTheme();
   if (logoUrl) {
     return (
       <Image
         source={{ uri: logoUrl }}
-        style={{ width: size, height: size, borderRadius: 10, backgroundColor: G_BG_RAISED }}
+        style={{ width: size, height: size, borderRadius: 13, backgroundColor: colors.surfaceHighlight }}
         resizeMode="cover"
       />
     );
   }
   return (
     <View style={{
-      width: size, height: size, borderRadius: 10,
-      backgroundColor: G_BG_RAISED,
-      borderWidth: 1, borderColor: G_LINE,
+      width: size, height: size, borderRadius: 13,
+      backgroundColor: colors.surfaceHighlight,
       alignItems: 'center', justifyContent: 'center',
     }}>
-      <Text style={{
-        fontFamily: FONTS.serifMediumItalic, fontSize: size * 0.46,
-        color: G_GOLD_L, letterSpacing: -0.5,
-      }}>
+      <Text style={{ fontFamily: FONTS.serifSemiBold, fontSize: 15, color: colors.text }}>
         {monogramFromName(name)}
       </Text>
     </View>
   );
 }
 
-function OrgCard({ org, onPress, index }: { org: Organization; onPress: () => void; index: number }) {
-  const isAdmin = org.role === 'admin';
+function OrgCard({ org, openVotes, onPress, index }: {
+  org: Organization;
+  openVotes: number | undefined;
+  onPress: () => void;
+  index: number;
+}) {
+  const { colors } = useTheme();
   const memberCount = org.memberCount ?? 0;
-  const memberLabel = `${memberCount.toLocaleString()} ${memberCount === 1 ? 'member' : 'members'}`;
   return (
     <Animated.View entering={FadeInUp.delay(index * 50).duration(280)}>
       <TouchableOpacity activeOpacity={0.7} onPress={onPress}>
         <View style={{
-          backgroundColor: G_BG_CARD,
-          borderWidth: 1, borderColor: G_LINE,
-          borderRadius: 14,
-          padding: 14,
-          flexDirection: 'row', gap: 13, alignItems: 'flex-start',
+          backgroundColor: colors.surface,
+          borderWidth: 1, borderColor: colors.borderSubtle,
+          borderRadius: RADIUS.card,
+          paddingHorizontal: 18, paddingVertical: 17,
+          gap: 11,
         }}>
-          <OrgLogo name={org.name} logoUrl={org.logoUrl} size={48} />
-          <View style={{ flex: 1, minWidth: 0 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 3 }}>
-              <Text
-                numberOfLines={1}
-                style={{
-                  flex: 1,
-                  fontFamily: SERIF, fontSize: 17,
-                  color: G_FG, lineHeight: 21, letterSpacing: -0.2,
-                }}
-              >
-                {org.name || 'Unnamed organization'}
-              </Text>
-              {org.verified && <VerifiedTick size={13} />}
-            </View>
-            {!!org.description && (
-              <Text
-                numberOfLines={2}
-                style={{
-                  fontFamily: FONTS.sans,
-                  fontSize: 12.5, color: G_FG_MUTED,
-                  letterSpacing: -0.05, lineHeight: 17,
-                  marginBottom: 6,
-                }}
-              >
-                {org.description}
-              </Text>
-            )}
-            <Text style={{ fontFamily: FONTS.mono, fontVariant: ['tabular-nums'], fontSize: 12, color: G_FG_FAINT, letterSpacing: -0.05 }}>
-              {memberLabel}
-              {isAdmin && (
-                <Text>
-                  <Text style={{ color: G_FG_FAINT }}>  ·  </Text>
-                  <Text style={{ fontFamily: FONTS.sansMedium, color: G_GOLD_L }}>Admin</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            <OrgLogo name={org.name} logoUrl={org.logoUrl} size={42} />
+            <View style={{ flex: 1, minWidth: 0, gap: 1 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Text numberOfLines={1} style={{
+                  fontFamily: FONTS.sansSemiBold, fontSize: 15, color: colors.text, flexShrink: 1,
+                }}>
+                  {org.name || 'Unnamed organization'}
                 </Text>
-              )}
-            </Text>
+                {org.verified && <VerifiedTick size={13} />}
+              </View>
+              <Text style={{
+                fontFamily: FONTS.mono, fontVariant: ['tabular-nums'], fontSize: 10.5,
+                color: colors.textTertiary, letterSpacing: 0.2,
+              }}>
+                {memberCount.toLocaleString()} {memberCount === 1 ? 'MEMBER' : 'MEMBERS'}
+              </Text>
+            </View>
           </View>
-          <Ionicons name="chevron-forward" size={14} color={G_FG_FAINT} style={{ marginTop: 4 }} />
+          {!!org.description && (
+            <Text numberOfLines={2} style={{
+              fontFamily: FONTS.sans, fontSize: 12.5, color: colors.textSecondary, lineHeight: 17.5,
+            }}>
+              {org.description}
+            </Text>
+          )}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <RoleChip role={org.role === 'admin' ? 'admin' : 'member'} />
+            {openVotes !== undefined && <OpenVotesChip count={openVotes} />}
+          </View>
         </View>
       </TouchableOpacity>
     </Animated.View>
   );
 }
 
-// ─── empty ledger ─────────────────────────────────────────────────────
-function EmptyLedger({ onJoinPress, onCreatePress }: { onJoinPress: () => void; onCreatePress: () => void }) {
+// ─── join / create entries ────────────────────────────────────────────
+function JoinInviteCard({ onPress }: { onPress: () => void }) {
+  const { colors } = useTheme();
   return (
-    <Animated.View entering={FadeInDown.duration(400)} style={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 20 }}>
+    <TouchableOpacity
+      activeOpacity={0.7}
+      onPress={onPress}
+      style={{
+        borderWidth: 1.5, borderColor: colors.borderStrong, borderStyle: 'dashed',
+        borderRadius: RADIUS.card,
+        paddingHorizontal: 18, paddingVertical: 16,
+        flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9,
+      }}
+    >
+      <Ionicons name="mail-outline" size={16} color={colors.textSecondary} />
+      <Text style={{ fontFamily: FONTS.sansSemiBold, fontSize: 13.5, color: colors.textSecondary }}>
+        Join With an Invite Code
+      </Text>
+    </TouchableOpacity>
+  );
+}
+
+// ─── empty state ──────────────────────────────────────────────────────
+function EmptyLedger({ onJoinPress, onCreatePress }: { onJoinPress: () => void; onCreatePress: () => void }) {
+  const { colors } = useTheme();
+  return (
+    <Animated.View entering={FadeInDown.duration(400)}>
       <View style={{
-        position: 'relative',
-        backgroundColor: G_BG_CARD,
-        borderRadius: 18,
-        borderWidth: 1, borderColor: G_LINE,
+        backgroundColor: colors.surface,
+        borderRadius: RADIUS.card,
+        borderWidth: 1, borderColor: colors.borderSubtle,
         paddingHorizontal: 24, paddingTop: 36, paddingBottom: 28,
-        minHeight: 320,
       }}>
-        {/* icon */}
         <View style={{
           alignSelf: 'center', width: 64, height: 64, borderRadius: 32,
-          backgroundColor: G_BG_RAISED,
+          backgroundColor: colors.surfaceHighlight,
           alignItems: 'center', justifyContent: 'center',
           marginBottom: 18,
         }}>
-          <Ionicons name="people-outline" size={28} color={G_GOLD_L} />
+          <Ionicons name="people-outline" size={28} color={colors.gold} />
         </View>
 
         <Text style={{
-          fontFamily: SERIF, fontSize: 24,
-          color: G_FG, letterSpacing: -0.3, lineHeight: 28,
+          fontFamily: FONTS.serif, fontSize: 24,
+          color: colors.text, letterSpacing: -0.3, lineHeight: 28,
           textAlign: 'center', marginBottom: 8,
         }}>
-          No groups yet
+          No organizations yet
         </Text>
         <Text style={{
           fontFamily: FONTS.sans,
-          fontSize: 13, color: G_FG_MUTED, letterSpacing: -0.05, lineHeight: 19,
+          fontSize: 13, color: colors.textSecondary, lineHeight: 19,
           textAlign: 'center', maxWidth: 280, alignSelf: 'center', marginBottom: 22,
         }}>
           Join one with an invite code from your union, school, or community group — or start your own.
@@ -268,15 +255,15 @@ function EmptyLedger({ onJoinPress, onCreatePress }: { onJoinPress: () => void; 
           activeOpacity={0.85}
           onPress={onJoinPress}
           style={{
-            paddingHorizontal: 18, paddingVertical: 13,
-            backgroundColor: G_GOLD, borderRadius: 999,
+            height: 50,
+            backgroundColor: colors.goldFill, borderRadius: 15,
             flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
             gap: 8, marginBottom: 10,
           }}
         >
-          <Ionicons name="key-outline" size={15} color="#0A0C0F" />
-          <Text style={{ fontFamily: FONTS.sansSemiBold, fontSize: 14, color: '#0A0C0F' }}>
-            Enter invite code
+          <Ionicons name="key-outline" size={15} color="#040707" />
+          <Text style={{ fontFamily: FONTS.sansSemiBold, fontSize: 15, color: '#040707' }}>
+            Enter Invite Code
           </Text>
         </TouchableOpacity>
 
@@ -284,15 +271,15 @@ function EmptyLedger({ onJoinPress, onCreatePress }: { onJoinPress: () => void; 
           activeOpacity={0.85}
           onPress={onCreatePress}
           style={{
-            paddingHorizontal: 18, paddingVertical: 13,
-            backgroundColor: 'transparent',
-            borderWidth: 1, borderColor: G_GOLD_D,
-            borderRadius: 999,
+            height: 48,
+            backgroundColor: colors.surfaceElevated,
+            borderWidth: 1, borderColor: colors.border,
+            borderRadius: RADIUS.button,
             alignItems: 'center', justifyContent: 'center',
           }}
         >
-          <Text style={{ fontFamily: FONTS.sansSemiBold, fontSize: 14, color: G_GOLD }}>
-            Start your own
+          <Text style={{ fontFamily: FONTS.sansSemiBold, fontSize: 13.5, color: colors.text }}>
+            Start a New Organization
           </Text>
         </TouchableOpacity>
       </View>
@@ -308,6 +295,7 @@ function InviteSheet({
   onClose: () => void;
   onSuccess: (org: Organization) => void;
 }) {
+  const { colors } = useTheme();
   const [inviteCode, setInviteCode] = useState('');
   const [joining, setJoining] = useState(false);
   // The joiner can't fix a member-cap error themselves — only the org admin
@@ -362,124 +350,115 @@ function InviteSheet({
         <TouchableOpacity
           activeOpacity={1}
           onPress={onClose}
-          style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(4,7,7,0.7)' }]}
+          style={[StyleSheet.absoluteFill, { backgroundColor: colors.overlay }]}
         />
-      <View style={{
-        position: 'absolute', left: 0, right: 0, bottom: 0,
-        backgroundColor: G_BG_CARD,
-        borderTopLeftRadius: 20, borderTopRightRadius: 20,
-        borderTopWidth: 1, borderTopColor: G_GOLD_D,
-        borderLeftWidth: 1, borderLeftColor: G_LINE_STRONG,
-        borderRightWidth: 1, borderRightColor: G_LINE_STRONG,
-        paddingTop: 12,
-        paddingBottom: 36 + insets.bottom,
-        shadowColor: '#000', shadowOffset: { width: 0, height: -20 },
-        shadowOpacity: 0.6, shadowRadius: 60, elevation: 24,
-      }}>
-        {/* grabber */}
-        <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: G_LINE_STRONG, alignSelf: 'center', marginBottom: 18 }} />
+        <View style={{
+          position: 'absolute', left: 0, right: 0, bottom: 0,
+          backgroundColor: colors.surfaceElevated,
+          borderTopLeftRadius: RADIUS.modal, borderTopRightRadius: RADIUS.modal,
+          borderWidth: 1, borderBottomWidth: 0, borderColor: colors.border,
+          paddingTop: 12,
+          paddingBottom: 36 + insets.bottom,
+          shadowColor: '#000', shadowOffset: { width: 0, height: -20 },
+          shadowOpacity: 0.6, shadowRadius: 60, elevation: 24,
+        }}>
+          {/* grabber */}
+          <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: colors.borderStrong, alignSelf: 'center', marginBottom: 18 }} />
 
-        {/* title + close */}
-        <View style={{ paddingHorizontal: 22, paddingBottom: 14, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-          <View style={{ flex: 1 }}>
+          {/* title + close */}
+          <View style={{ paddingHorizontal: 24, paddingBottom: 12, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <Text style={{
-              fontFamily: SERIF, fontSize: 24,
-              color: G_FG, letterSpacing: -0.3, lineHeight: 28,
+              fontFamily: FONTS.serif, fontSize: 24,
+              color: colors.text, letterSpacing: -0.3, lineHeight: 28, flex: 1,
             }}>
-              Join with an{' '}
-              <Text style={{ fontFamily: FONTS.serifMediumItalic, color: G_GOLD_L }}>invite code</Text>
+              Join with an invite code
+            </Text>
+            <TouchableOpacity
+              onPress={onClose}
+              activeOpacity={0.7}
+              accessibilityLabel="Close"
+              style={{
+                width: 32, height: 32, borderRadius: 16,
+                borderWidth: 1, borderColor: colors.borderSubtle,
+                backgroundColor: colors.surface,
+                alignItems: 'center', justifyContent: 'center',
+              }}
+            >
+              <Ionicons name="close" size={14} color={colors.textTertiary} />
+            </TouchableOpacity>
+          </View>
+
+          {/* copy */}
+          <Text style={{
+            paddingHorizontal: 24, fontFamily: FONTS.sans, fontSize: 13, color: colors.textSecondary,
+            lineHeight: 19, marginBottom: 18,
+          }}>
+            Ask an admin of your union, school, or community group for their invite code.
+          </Text>
+
+          {/* code field */}
+          <View style={{ paddingHorizontal: 24, marginBottom: 14 }}>
+            <View style={{
+              borderWidth: 1.5, borderColor: lengthOk ? colors.goldFill : colors.border,
+              backgroundColor: colors.backgroundSecondary,
+              borderRadius: 15,
+              paddingLeft: 46, paddingRight: 16, paddingVertical: 16,
+            }}>
+              <View style={{
+                position: 'absolute', left: 14, top: 0, bottom: 0,
+                alignItems: 'center', justifyContent: 'center',
+              }}>
+                <Ionicons name="key-outline" size={17} color={colors.gold} />
+              </View>
+              <TextInput
+                style={{
+                  fontFamily: FONTS.mono, fontVariant: ['tabular-nums'], fontSize: 22,
+                  letterSpacing: 6, color: colors.text,
+                  padding: 0,
+                }}
+                placeholder="ENTER CODE"
+                placeholderTextColor={colors.textTertiary}
+                value={inviteCode}
+                onChangeText={(t) => setInviteCode(t.toUpperCase())}
+                autoCapitalize="characters"
+                autoCorrect={false}
+                maxLength={12}
+                selectionColor={colors.gold}
+              />
+            </View>
+            <Text style={{ fontFamily: FONTS.mono, fontVariant: ['tabular-nums'], fontSize: 10, color: colors.textTertiary, letterSpacing: 0.6, marginTop: 8, textAlign: 'right' }}>
+              {codeLen} / 12
             </Text>
           </View>
-          <TouchableOpacity
-            onPress={onClose}
-            activeOpacity={0.7}
-            style={{
-              width: 32, height: 32, borderRadius: 16,
-              borderWidth: 1, borderColor: G_LINE_STRONG,
-              backgroundColor: G_BG_RAISED,
-              alignItems: 'center', justifyContent: 'center',
-            }}
-          >
-            <Ionicons name="close" size={14} color={G_FG_FAINT} />
-          </TouchableOpacity>
-        </View>
 
-        {/* copy */}
-        <Text style={{
-          paddingHorizontal: 22, fontFamily: FONTS.sans, fontSize: 13, color: G_FG_MUTED,
-          letterSpacing: -0.05, lineHeight: 19, marginBottom: 18,
-        }}>
-          Ask an admin of your union, school, or community group for their invite code.
-        </Text>
-
-        {/* code field */}
-        <View style={{ paddingHorizontal: 22, marginBottom: 14 }}>
-          <View style={{
-            position: 'relative',
-            borderWidth: 1, borderColor: G_GOLD_D,
-            backgroundColor: '#0A0C0F',
-            borderRadius: 4,
-            paddingLeft: 46, paddingRight: 16, paddingVertical: 18,
-            shadowColor: G_GOLD, shadowOffset: { width: 0, height: 4 },
-            shadowOpacity: 0.06, shadowRadius: 14,
-          }}>
-            <View style={{
-              position: 'absolute', left: 14, top: 0, bottom: 0,
-              alignItems: 'center', justifyContent: 'center',
-            }}>
-              <Svg width={18} height={18} viewBox="0 0 20 20">
-                <Circle cx={7} cy={10} r={3.2} stroke={G_GOLD} strokeWidth={1.1} fill="none" />
-                <Path d="M10 10h8M16 10v3M14 10v2" stroke={G_GOLD} strokeWidth={1.1} strokeLinecap="round" fill="none" />
-              </Svg>
-            </View>
-            <TextInput
+          {/* primary action */}
+          <View style={{ paddingHorizontal: 24 }}>
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={handleJoin}
+              disabled={joining || !lengthOk}
               style={{
-                fontFamily: MONO, fontVariant: ['tabular-nums'], fontSize: 22,
-                letterSpacing: 6, color: G_GOLD_L,
-                padding: 0,
+                height: 54,
+                backgroundColor: colors.goldFill,
+                opacity: lengthOk ? 1 : 0.35,
+                borderRadius: 15,
+                flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+                gap: 8,
               }}
-              placeholder="ENTER CODE"
-              placeholderTextColor="rgba(244,210,140,0.25)"
-              value={inviteCode}
-              onChangeText={(t) => setInviteCode(t.toUpperCase())}
-              autoCapitalize="characters"
-              autoCorrect={false}
-              maxLength={12}
-              selectionColor={G_GOLD}
-            />
+            >
+              {joining ? (
+                <ActivityIndicator size="small" color="#040707" />
+              ) : (
+                <>
+                  <Text style={{ fontFamily: FONTS.sansSemiBold, fontSize: 16, color: '#040707' }}>
+                    Join Organization
+                  </Text>
+                  <Ionicons name="arrow-forward" size={15} color="#040707" />
+                </>
+              )}
+            </TouchableOpacity>
           </View>
-          <Text style={{ fontFamily: MONO, fontVariant: ['tabular-nums'], fontSize: 10, color: G_FG_FAINT, letterSpacing: 0.6, marginTop: 8, textAlign: 'right' }}>
-            {codeLen} / 12
-          </Text>
         </View>
-
-        {/* primary action */}
-        <View style={{ paddingHorizontal: 22 }}>
-          <TouchableOpacity
-            activeOpacity={0.85}
-            onPress={handleJoin}
-            disabled={joining || !lengthOk}
-            style={{
-              paddingHorizontal: 16, paddingVertical: 14,
-              backgroundColor: lengthOk ? G_GOLD : 'rgba(234,186,88,0.3)',
-              borderRadius: 999,
-              flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-              gap: 8,
-            }}
-          >
-            {joining ? (
-              <ActivityIndicator size="small" color="#0A0C0F" />
-            ) : (
-              <>
-                <Text style={{ fontFamily: FONTS.sansSemiBold, fontSize: 14, color: '#0A0C0F' }}>
-                  Join organization
-                </Text>
-                <Ionicons name="arrow-forward" size={14} color="#0A0C0F" />
-              </>
-            )}
-          </TouchableOpacity>
-        </View>
-      </View>
       </View>
       <UpgradeModal
         visible={orgFullModal.visible}
@@ -499,16 +478,38 @@ function InviteSheet({
 }
 
 // ═══════════════════════════════════════════════════════════════════════
-// ── Groups screen ─────────────────────────────────────────────────────
+// ── Groups screen (Organizations hub) ─────────────────────────────────
 // ═══════════════════════════════════════════════════════════════════════
 export default function GroupsScreen() {
   const { token } = useAuthStore();
+  const { colors } = useTheme();
   const insets = useSafeAreaInsets();
 
   const [organizations, setOrganizations] = useState<Organization[]>([]);
+  const [openCounts, setOpenCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [showInviteSheet, setShowInviteSheet] = useState(false);
+
+  // Count each org's open ballots so the hub cards can show "N OPEN VOTES"
+  // honestly. Failures leave the count unknown (chip hidden) rather than
+  // showing a fake zero.
+  const fetchOpenCounts = useCallback(async (orgs: Organization[]) => {
+    const entries = await Promise.all(
+      orgs.map(async (o) => {
+        try {
+          const result = await organizationsApi.getOrganizationProposals(o.id);
+          if (!result.data) return null;
+          return [o.id, result.data.filter(isOpenProposal).length] as const;
+        } catch {
+          return null;
+        }
+      })
+    );
+    const next: Record<string, number> = {};
+    entries.forEach((e) => { if (e) next[e[0]] = e[1]; });
+    setOpenCounts(next);
+  }, []);
 
   const fetchOrganizations = useCallback(async () => {
     if (!token) {
@@ -517,14 +518,17 @@ export default function GroupsScreen() {
     }
     try {
       const result = await organizationsApi.getMyOrganizations();
-      if (result.data) setOrganizations(result.data);
+      if (result.data) {
+        setOrganizations(result.data);
+        fetchOpenCounts(result.data);
+      }
     } catch (error) {
       console.error('Failed to fetch organizations:', error);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [token]);
+  }, [token, fetchOpenCounts]);
 
   useFocusEffect(useCallback(() => { fetchOrganizations(); }, [fetchOrganizations]));
 
@@ -568,9 +572,9 @@ export default function GroupsScreen() {
 
   if (loading) {
     return (
-      <View style={[styles.container, { backgroundColor: G_BG, alignItems: 'center', justifyContent: 'center' }]}>
-        <ActivityIndicator size="small" color={G_GOLD} />
-        <Text style={{ fontFamily: MONO, fontVariant: ['tabular-nums'], fontSize: 10, color: G_FG_FAINT, letterSpacing: 1.4, marginTop: 12, textTransform: 'uppercase' }}>
+      <View style={[styles.container, { backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center' }]}>
+        <ActivityIndicator size="small" color={colors.gold} />
+        <Text style={{ fontFamily: FONTS.mono, fontVariant: ['tabular-nums'], fontSize: 10, color: colors.textTertiary, letterSpacing: 1.4, marginTop: 12, textTransform: 'uppercase' }}>
           Loading
         </Text>
       </View>
@@ -578,24 +582,23 @@ export default function GroupsScreen() {
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: G_BG }]}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView
-        contentContainerStyle={{ paddingBottom: 120 + insets.bottom }}
+        contentContainerStyle={{
+          paddingTop: insets.top + 14,
+          paddingHorizontal: SPACING.screenPadding,
+          paddingBottom: 120 + insets.bottom,
+        }}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor={G_GOLD}
+            tintColor={colors.gold}
           />
         }
       >
-        <GHeader
-          stat={organizations.length}
-          admins={adminCount}
-          onAddPress={handleAdd}
-          insetTop={insets.top}
-        />
+        <HubHeader onAddPress={handleAdd} />
 
         {organizations.length === 0 ? (
           <EmptyLedger
@@ -607,16 +610,49 @@ export default function GroupsScreen() {
           />
         ) : (
           <>
-            <View style={{ paddingHorizontal: 16, gap: 12 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 14 }}>
+              <Text style={{
+                fontFamily: FONTS.sansSemiBold, fontSize: 11, letterSpacing: 1.54,
+                textTransform: 'uppercase', color: colors.textTertiary,
+              }}>
+                Your organizations
+              </Text>
+              <Text style={{
+                fontFamily: FONTS.mono, fontVariant: ['tabular-nums'], fontSize: 10.5,
+                color: colors.textTertiary, letterSpacing: 0.4,
+              }}>
+                {organizations.length}{adminCount > 0 ? ` · ADMIN IN ${adminCount}` : ''}
+              </Text>
+            </View>
+
+            <View style={{ gap: 12, marginBottom: 16 }}>
               {organizations.map((org, i) => (
                 <OrgCard
                   key={org.id}
                   org={org}
+                  openVotes={openCounts[org.id]}
                   index={i}
                   onPress={() => handleOrgPress(org)}
                 />
               ))}
             </View>
+
+            <JoinInviteCard
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                setShowInviteSheet(true);
+              }}
+            />
+
+            <TouchableOpacity
+              onPress={handleCharter}
+              activeOpacity={0.7}
+              style={{ alignSelf: 'center', paddingVertical: 14, paddingHorizontal: 10 }}
+            >
+              <Text style={{ fontFamily: FONTS.sansMedium, fontSize: 13, color: colors.textSecondary }}>
+                or start a new organization →
+              </Text>
+            </TouchableOpacity>
           </>
         )}
 
