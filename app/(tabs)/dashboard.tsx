@@ -2,7 +2,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl } 
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { useRouter } from 'expo-router';
+import { useRouter, router } from 'expo-router';
 import { Image as ExpoImage } from 'expo-image';
 import * as Haptics from 'expo-haptics';
 import Svg, { Path } from 'react-native-svg';
@@ -332,25 +332,39 @@ function TopBar({ name, city, state, profileImageUrl, verified, onAvatarPress, o
         </StatusContainer>
         <Text style={[styles.topBarDate, { color: dc.FG_FAINT }]}>{dateStr}</Text>
       </View>
-      <TouchableOpacity onPress={onAvatarPress} activeOpacity={0.8}>
-        <View style={[styles.avatar, {
-          backgroundColor: dc.BG_CARD,
-          borderColor: verified ? GOLD_BORDER_STRONG : dc.LINE_STRONG,
-        }]}>
-          {profileImageUrl ? (
-            <ExpoImage
-              source={{ uri: profileImageUrl }}
-              style={{ width: '100%', height: '100%', borderRadius: 22 }}
-              contentFit="cover"
-              cachePolicy="memory-disk"
-              transition={150}
-            />
-          ) : (
-            <Text style={[styles.avatarLetter, { color: dc.GOLD }]}>{name.charAt(0).toUpperCase()}</Text>
-          )}
-        </View>
-        {verified && <View style={[styles.avatarVerifiedDot, { backgroundColor: dc.GREEN, borderColor: dc.BG }]} />}
-      </TouchableOpacity>
+      <View style={styles.topBarActions}>
+        <TouchableOpacity
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            router.push('/modals/notifications');
+          }}
+          style={[styles.bellButton, { backgroundColor: dc.BG_CARD, borderColor: dc.LINE }]}
+          accessibilityRole="button"
+          accessibilityLabel="Notifications"
+          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+        >
+          <Ionicons name="notifications-outline" size={18} color={dc.FG_MUTED} />
+        </TouchableOpacity>
+        <TouchableOpacity onPress={onAvatarPress} activeOpacity={0.8}>
+          <View style={[styles.avatar, {
+            backgroundColor: dc.BG_CARD,
+            borderColor: verified ? GOLD_BORDER_STRONG : dc.LINE_STRONG,
+          }]}>
+            {profileImageUrl ? (
+              <ExpoImage
+                source={{ uri: profileImageUrl }}
+                style={{ width: '100%', height: '100%', borderRadius: 22 }}
+                contentFit="cover"
+                cachePolicy="memory-disk"
+                transition={150}
+              />
+            ) : (
+              <Text style={[styles.avatarLetter, { color: dc.GOLD }]}>{name.charAt(0).toUpperCase()}</Text>
+            )}
+          </View>
+          {verified && <View style={[styles.avatarVerifiedDot, { backgroundColor: dc.GREEN, borderColor: dc.BG }]} />}
+        </TouchableOpacity>
+      </View>
     </Animated.View>
   );
 }
@@ -909,6 +923,11 @@ const styles = StyleSheet.create({
     letterSpacing: 1.68, color: FG_MUTED,
   },
   topBarDate: { fontFamily: FONTS.sans, fontSize: 13, color: FG_FAINT },
+  topBarActions: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  bellButton: {
+    width: 38, height: 38, borderRadius: 19,
+    borderWidth: 1, alignItems: 'center', justifyContent: 'center',
+  },
   avatar: {
     width: 44, height: 44, borderRadius: 22,
     backgroundColor: BG_CARD, borderWidth: 1, borderColor: GOLD_BORDER_STRONG,
