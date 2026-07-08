@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import Animated, { LinearTransition, FadeIn, FadeOut } from 'react-native-reanimated';
-import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, FONTS } from '../../lib/theme';
+import { useTheme, SPACING, FONTS } from '../../lib/theme';
 
 interface RCVBallotInputProps {
   options: string[];
@@ -43,179 +43,198 @@ export function RCVBallotInput({ options, onSubmit, submitting, minRankings = 1 
 
   return (
     <View>
-      {/* Ranked list (header) */}
-      <View style={[styles.rankedCard, { backgroundColor: colors.surface, borderColor: colors.gold }]}>
-        <Text style={[styles.label, { color: colors.gold }]}>YOUR RANKING</Text>
-        {rankings.length === 0 ? (
-          <Text style={[styles.empty, { color: colors.textSecondary }]}>
-            Tap options below to rank in your order of preference. You can stop early — partial ballots are fine.
-          </Text>
-        ) : (
-          <Animated.View layout={LinearTransition.duration(200)}>
-            {rankings.map((option, idx) => (
-              <Animated.View
-                key={option}
-                entering={FadeIn.duration(150)}
-                exiting={FadeOut.duration(150)}
-                layout={LinearTransition.duration(200)}
-                style={[styles.rankedRow, { borderBottomColor: colors.border }]}
+      <Text style={[styles.helper, { color: colors.textSecondary }]}>
+        Tap to order the options — your first choice carries the most weight. You can stop early; partial ballots are fine.
+      </Text>
+
+      <Animated.View layout={LinearTransition.duration(200)} style={styles.list}>
+        {/* Ranked rows */}
+        {rankings.map((option, idx) => {
+          const first = idx === 0;
+          return (
+            <Animated.View
+              key={option}
+              entering={FadeIn.duration(150)}
+              exiting={FadeOut.duration(150)}
+              layout={LinearTransition.duration(200)}
+              style={[
+                styles.row,
+                {
+                  backgroundColor: colors.surface,
+                  borderColor: first ? 'rgba(234,186,88,0.4)' : colors.border,
+                  borderWidth: first ? 1.5 : 1,
+                },
+              ]}
+            >
+              <View
+                style={[
+                  styles.rankBadge,
+                  { backgroundColor: first ? colors.goldFill : colors.surfaceHighlight },
+                ]}
               >
-                <View style={[styles.rankBadge, { backgroundColor: colors.gold }]}>
-                  <Text style={styles.rankBadgeText}>{idx + 1}</Text>
-                </View>
-                <Text style={[styles.rankedOption, { color: colors.text }]} numberOfLines={2}>
+                <Text
+                  style={[
+                    styles.rankBadgeText,
+                    { color: first ? '#040707' : colors.text },
+                  ]}
+                >
+                  {idx + 1}
+                </Text>
+              </View>
+              <View style={styles.rowBody}>
+                <Text style={[styles.rowTitle, { color: colors.text }]} numberOfLines={2}>
                   {option}
                 </Text>
-                <TouchableOpacity
-                  onPress={() => remove(option)}
-                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                  style={[styles.removeButton, { backgroundColor: colors.surfaceHighlight }]}
-                >
-                  <Ionicons name="close" size={16} color={colors.textSecondary} />
-                </TouchableOpacity>
-              </Animated.View>
-            ))}
-          </Animated.View>
-        )}
-      </View>
-
-      {/* Available options */}
-      {remainingOptions.length > 0 && (
-        <View style={[styles.poolCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <Text style={[styles.label, { color: colors.textSecondary }]}>
-            {rankings.length === 0 ? 'OPTIONS' : 'TAP TO ADD NEXT CHOICE'}
-          </Text>
-          <Animated.View layout={LinearTransition.duration(200)}>
-            {remainingOptions.map((option) => (
-              <Animated.View
-                key={option}
-                entering={FadeIn.duration(150)}
-                exiting={FadeOut.duration(150)}
-                layout={LinearTransition.duration(200)}
+                <Text style={[styles.rowSub, { color: colors.textTertiary }]}>
+                  {first ? 'First choice' : `Choice ${idx + 1}`}
+                </Text>
+              </View>
+              <Ionicons name="reorder-two-outline" size={18} color={colors.textTertiary} />
+              <TouchableOpacity
+                onPress={() => remove(option)}
+                hitSlop={{ top: 10, bottom: 10, left: 6, right: 10 }}
+                style={[styles.clearButton, { backgroundColor: colors.surfaceHighlight }]}
+                accessibilityLabel={`Clear rank for ${option}`}
               >
-                <TouchableOpacity
-                  style={[styles.poolRow, { borderBottomColor: colors.border }]}
-                  onPress={() => add(option)}
-                  activeOpacity={0.6}
-                >
-                  <Ionicons name="add-circle-outline" size={20} color={colors.gold} />
-                  <Text style={[styles.poolOption, { color: colors.text }]} numberOfLines={2}>
-                    {option}
-                  </Text>
-                </TouchableOpacity>
-              </Animated.View>
-            ))}
+                <Ionicons name="close" size={15} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </Animated.View>
+          );
+        })}
+
+        {/* Unranked rows */}
+        {remainingOptions.map((option) => (
+          <Animated.View
+            key={option}
+            entering={FadeIn.duration(150)}
+            exiting={FadeOut.duration(150)}
+            layout={LinearTransition.duration(200)}
+          >
+            <TouchableOpacity
+              style={[styles.row, styles.rowUnranked, { borderColor: colors.borderStrong }]}
+              onPress={() => add(option)}
+              activeOpacity={0.6}
+            >
+              <View style={[styles.rankBadge, styles.rankBadgeUnranked, { borderColor: colors.borderStrong }]}>
+                <Text style={[styles.rankBadgeText, { color: colors.textTertiary, fontSize: 15 }]}>—</Text>
+              </View>
+              <View style={styles.rowBody}>
+                <Text style={[styles.rowTitle, { color: colors.textSecondary }]} numberOfLines={2}>
+                  {option}
+                </Text>
+                <Text style={[styles.rowSub, { color: colors.textTertiary }]}>
+                  Not ranked · tap to rank next
+                </Text>
+              </View>
+              <Ionicons name="reorder-two-outline" size={18} color={colors.textTertiary} />
+            </TouchableOpacity>
           </Animated.View>
-        </View>
-      )}
+        ))}
+      </Animated.View>
 
       {/* Submit */}
       <TouchableOpacity
         style={[
           styles.submitButton,
-          {
-            backgroundColor: canSubmit ? colors.gold : `${colors.gold}40`,
-          },
+          { backgroundColor: canSubmit ? colors.goldFill : `${colors.goldFill}40` },
         ]}
         onPress={handleSubmit}
         disabled={!canSubmit}
         activeOpacity={0.8}
       >
         {submitting ? (
-          <ActivityIndicator color="#000" />
+          <ActivityIndicator color="#040707" />
         ) : (
-          <>
-            <Ionicons name="checkmark-circle" size={20} color="#000" />
-            <Text style={styles.submitButtonText}>
-              {rankings.length === 0
-                ? 'Rank at least 1 option'
-                : `Cast ballot (${rankings.length} ranked)`}
-            </Text>
-          </>
+          <Text style={styles.submitButtonText}>
+            {rankings.length === 0
+              ? `Rank at least ${minRankings} option${minRankings === 1 ? '' : 's'}`
+              : `Cast ballot (${rankings.length} ranked)`}
+          </Text>
         )}
       </TouchableOpacity>
+      <Text style={[styles.footnote, { color: colors.textTertiary }]}>
+        You can reorder until you cast your ballot
+      </Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  rankedCard: {
-    borderRadius: BORDER_RADIUS.xl,
-    borderWidth: 1.5,
-    padding: SPACING.lg,
+  helper: {
+    fontFamily: FONTS.sans,
+    fontSize: 13.5,
+    lineHeight: 20,
     marginBottom: SPACING.md,
   },
-  poolCard: {
-    borderRadius: BORDER_RADIUS.xl,
-    borderWidth: 1,
-    padding: SPACING.lg,
-    marginBottom: SPACING.md,
+  list: {
+    gap: 9,
+    marginBottom: SPACING.lg,
   },
-  label: {
-    ...TYPOGRAPHY.labelSmall,
-    letterSpacing: 1.5,
-    marginBottom: SPACING.sm,
-  },
-  empty: {
-    ...TYPOGRAPHY.bodySmall,
-    lineHeight: 18,
-  },
-  rankedRow: {
+  row: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: SPACING.md,
-    paddingVertical: SPACING.sm,
-    borderBottomWidth: StyleSheet.hairlineWidth,
+    gap: 13,
+    borderRadius: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 15,
+  },
+  rowUnranked: {
+    backgroundColor: 'transparent',
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
   },
   rankBadge: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 34,
+    height: 34,
+    borderRadius: 11,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  rankBadgeUnranked: {
+    backgroundColor: 'transparent',
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
   },
   rankBadgeText: {
-    ...TYPOGRAPHY.labelSmall,
     fontFamily: FONTS.monoSemiBold,
     fontVariant: ['tabular-nums'],
-    color: '#000',
-    fontSize: 13,
+    fontSize: 16,
   },
-  rankedOption: {
-    ...TYPOGRAPHY.bodyMedium,
+  rowBody: {
     flex: 1,
-    fontFamily: FONTS.sansMedium,
+    gap: 1,
   },
-  removeButton: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+  rowTitle: {
+    fontFamily: FONTS.sansSemiBold,
+    fontSize: 14.5,
+  },
+  rowSub: {
+    fontFamily: FONTS.sans,
+    fontSize: 12,
+  },
+  clearButton: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  poolRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.md,
-    paddingVertical: SPACING.md,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  poolOption: {
-    ...TYPOGRAPHY.bodyMedium,
-    flex: 1,
   },
   submitButton: {
-    flexDirection: 'row',
+    height: 56,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: SPACING.sm,
-    paddingVertical: SPACING.lg,
-    borderRadius: BORDER_RADIUS.xl,
-    marginTop: SPACING.sm,
   },
   submitButtonText: {
-    ...TYPOGRAPHY.labelLarge,
-    color: '#000',
+    fontFamily: FONTS.sansSemiBold,
+    fontSize: 17,
+    color: '#040707',
+  },
+  footnote: {
+    fontFamily: FONTS.sans,
+    fontSize: 12,
+    textAlign: 'center',
+    marginTop: SPACING.sm,
   },
 });
 

@@ -5,21 +5,31 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { useState } from 'react';
-import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS, FONTS } from '../../lib/theme';
+import { useTheme, SPACING, RADIUS, TYPOGRAPHY, FONTS } from '../../lib/theme';
 
 const VERIFICATION_BENEFITS = [
-  { icon: 'checkmark-circle', text: 'Vote on all proposals (global + geo-restricted)' },
-  { icon: 'location', text: 'Create proposals for your verified region' },
-  { icon: 'infinite', text: 'Unlimited voting (no monthly limits)' },
-  { icon: 'shield-checkmark', text: 'Verified badge on your profile' },
-  { icon: 'gift', text: 'Free verification, lifetime access' },
+  'Vote on all proposals (global + geo-restricted)',
+  'Create proposals for your verified region',
+  'Unlimited voting (no monthly limits)',
+  'Verified badge on your profile',
+  'Free verification, lifetime access',
 ];
 
 const CITIZEN_BENEFITS = [
-  { icon: 'shield-checkmark', text: 'Vote on citizens-only proposals (e.g. the Alberta referendum)' },
-  { icon: 'checkmark-circle', text: 'Everything standard verification unlocks' },
-  { icon: 'document-text', text: 'Passport + proof of address required' },
-  { icon: 'gift', text: 'Free, lifetime access' },
+  'Vote on citizens-only proposals (e.g. the Alberta referendum)',
+  'Everything standard verification unlocks',
+  'Free, lifetime access',
+];
+
+const STANDARD_REQUIREMENTS: { icon: keyof typeof Ionicons.glyphMap; title: string; sub: string }[] = [
+  { icon: 'card-outline', title: 'Government-Issued ID', sub: "Driver's licence, passport, or provincial ID" },
+  { icon: 'person-outline', title: 'A Quick Selfie', sub: 'Confirms the ID belongs to you' },
+];
+
+const CITIZEN_REQUIREMENTS: { icon: keyof typeof Ionicons.glyphMap; title: string; sub: string }[] = [
+  { icon: 'document-text-outline', title: 'Passport', sub: 'Confirms your citizenship' },
+  { icon: 'home-outline', title: 'Proof of Address', sub: 'Utility bill or bank statement' },
+  { icon: 'person-outline', title: 'A Quick Selfie', sub: 'Confirms the documents belong to you' },
 ];
 
 export default function VerificationPaymentScreen() {
@@ -63,19 +73,21 @@ export default function VerificationPaymentScreen() {
   if (chosenFlow === null) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <View style={[styles.header, { borderBottomColor: colors.border }]}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-            <Ionicons name="close" size={24} color={colors.text} />
+        <View style={styles.topRow}>
+          <TouchableOpacity
+            onPress={() => router.back()}
+            style={[styles.circleButton, { backgroundColor: colors.surface, borderColor: colors.borderSubtle }]}
+          >
+            <Ionicons name="close" size={18} color={colors.textSecondary} />
           </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: colors.text }]}>Verify Identity</Text>
-          <View style={{ width: 40 }} />
+          <Text style={[styles.stepLabel, { color: colors.textTertiary }]}>VERIFICATION</Text>
         </View>
 
         <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
           <Animated.View entering={FadeInDown.duration(400)} style={styles.heroSection}>
             <Text style={[styles.heroTitle, { color: colors.text }]}>Choose verification level</Text>
             <Text style={[styles.heroSubtitle, { color: colors.textSecondary }]}>
-              Both are free and take about 2 minutes. Pick the one that matches what you want to vote on.
+              Both are free and take about two minutes. Pick the one that matches what you want to vote on.
             </Text>
           </Animated.View>
 
@@ -87,15 +99,15 @@ export default function VerificationPaymentScreen() {
                 Haptics.selectionAsync();
                 setChosenFlow('standard');
               }}
-              style={[styles.pickerCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
+              style={[styles.pickerCard, { backgroundColor: colors.surface, borderColor: colors.borderSubtle }]}
             >
               <View style={styles.pickerHeader}>
-                <View style={[styles.pickerIcon, { backgroundColor: `${colors.success}15` }]}>
-                  <Ionicons name="card-outline" size={22} color={colors.success} />
+                <View style={[styles.pickerIcon, { backgroundColor: colors.surfaceHighlight }]}>
+                  <Ionicons name="card-outline" size={20} color={colors.textSecondary} />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.pickerTitle, { color: colors.text }]}>Standard Verification</Text>
-                  <Text style={[styles.pickerSubtitle, { color: colors.textSecondary }]}>
+                  <Text style={[styles.pickerSubtitle, { color: colors.textTertiary }]}>
                     Driver's license or government ID
                   </Text>
                 </View>
@@ -115,33 +127,33 @@ export default function VerificationPaymentScreen() {
                 Haptics.selectionAsync();
                 setChosenFlow('citizen');
               }}
-              style={[styles.pickerCard, { backgroundColor: colors.surface, borderColor: colors.gold, borderWidth: 1.5 }]}
+              style={[styles.pickerCard, { backgroundColor: colors.surface, borderColor: 'rgba(234,186,88,0.4)', borderWidth: 1.5 }]}
             >
               <LinearGradient
-                colors={[`${colors.gold}10`, 'transparent']}
+                colors={[colors.goldSurface, 'transparent']}
                 style={StyleSheet.absoluteFill}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
               />
               <View style={styles.pickerHeader}>
-                <View style={[styles.pickerIcon, { backgroundColor: `${colors.gold}15` }]}>
-                  <Ionicons name="shield-checkmark" size={22} color={colors.gold} />
+                <View style={[styles.pickerIcon, { backgroundColor: colors.goldSurface }]}>
+                  <Ionicons name="shield-checkmark" size={20} color={colors.gold} />
                 </View>
                 <View style={{ flex: 1 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: SPACING.xs, flexWrap: 'wrap' }}>
                     <Text style={[styles.pickerTitle, { color: colors.text }]}>Citizen Verification</Text>
-                    <View style={[styles.pickerBadge, { backgroundColor: colors.gold }]}>
+                    <View style={[styles.pickerBadge, { backgroundColor: colors.goldFill }]}>
                       <Text style={styles.pickerBadgeText}>UNLOCKS MORE</Text>
                     </View>
                   </View>
-                  <Text style={[styles.pickerSubtitle, { color: colors.textSecondary }]}>
+                  <Text style={[styles.pickerSubtitle, { color: colors.textTertiary }]}>
                     Passport + proof of address
                   </Text>
                 </View>
                 <Ionicons name="chevron-forward" size={20} color={colors.gold} />
               </View>
               <Text style={[styles.pickerDesc, { color: colors.textSecondary }]}>
-                Everything Standard unlocks, <Text style={{ color: colors.gold, fontFamily: FONTS.sansSemiBold}}>plus citizens-only proposals</Text> like the Alberta separation referendum.
+                Everything Standard unlocks, <Text style={{ color: colors.gold, fontFamily: FONTS.sansSemiBold }}>plus citizens-only proposals</Text> like the Alberta separation referendum.
               </Text>
             </TouchableOpacity>
           </Animated.View>
@@ -152,11 +164,14 @@ export default function VerificationPaymentScreen() {
     );
   }
 
-  // ── Flow-specific confirmation view ────────────────────────────────
+  // ── Flow-specific "Why verify" view (03a treatment) ────────────────
+  const requirements = isCitizenFlow ? CITIZEN_REQUIREMENTS : STANDARD_REQUIREMENTS;
+  const benefits = isCitizenFlow ? CITIZEN_BENEFITS : VERIFICATION_BENEFITS;
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Header */}
-      <View style={[styles.header, { borderBottomColor: colors.border }]}>
+      {/* Top row */}
+      <View style={styles.topRow}>
         <TouchableOpacity
           onPress={() => {
             // When the picker was shown and the user already picked, the
@@ -168,126 +183,125 @@ export default function VerificationPaymentScreen() {
               router.back();
             }
           }}
-          style={styles.backButton}
+          style={[styles.circleButton, { backgroundColor: colors.surface, borderColor: colors.borderSubtle }]}
         >
-          <Ionicons name={initialFlow === null ? 'arrow-back' : 'close'} size={24} color={colors.text} />
+          <Ionicons name={initialFlow === null ? 'arrow-back' : 'close'} size={18} color={colors.textSecondary} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>Verify Identity</Text>
-        <View style={{ width: 40 }} />
+        <Text style={[styles.stepLabel, { color: colors.textTertiary }]}>STEP 1 OF 3</Text>
+      </View>
+
+      {/* Progress */}
+      <View style={styles.progressRow}>
+        <View style={[styles.progressSeg, { backgroundColor: colors.goldFill }]} />
+        <View style={[styles.progressSeg, { backgroundColor: colors.surfaceHighlight }]} />
+        <View style={[styles.progressSeg, { backgroundColor: colors.surfaceHighlight }]} />
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Hero Section */}
+        {/* Hero */}
         <Animated.View entering={FadeInDown.duration(400)} style={styles.heroSection}>
-          <View style={[styles.priceContainer, { backgroundColor: `${colors.success}15` }]}>
-            <Text style={[styles.priceAmount, { color: colors.success }]}>
-              {isOrgPaid ? 'Covered' : 'Free'}
-            </Text>
-            <Text style={[styles.priceLabel, { color: colors.textSecondary }]}>
-              {isOrgPaid ? `by ${originatingOrgName ?? 'your organization'}` : 'forever'}
-            </Text>
-          </View>
-
           <Text style={[styles.heroTitle, { color: colors.text }]}>
-            {isCitizenFlow
-              ? 'Verify your citizenship'
-              : isOrgPaid ? 'Verify to vote in this organization' : 'Unlock Full Voting Access'}
+            {isCitizenFlow ? 'Verify Your Citizenship' : 'Verify Your Identity'}
           </Text>
           <Text style={[styles.heroSubtitle, { color: colors.textSecondary }]}>
             {isCitizenFlow
-              ? 'Verify with your passport and a proof-of-address document to unlock citizens-only proposals.'
-              : isOrgPaid
-              ? `${originatingOrgName ?? 'Your organization'} requires identity verification before voting. Your verification is covered — no payment needed.`
-              : 'Verify your identity once to participate in all proposals in your region.'}
+              ? 'Every count on Represent is one verified citizen. Citizen verification unlocks citizens-only proposals — confirmed with your passport and a proof-of-address document.'
+              : 'Every count on Represent is one verified citizen. Verification is what makes your ballot impossible to fake — and impossible to ignore.'}
           </Text>
+          {isOrgPaid && (
+            <View style={[styles.orgChip, { backgroundColor: colors.successSurface }]}>
+              <Ionicons name="checkmark-circle" size={14} color={colors.success} />
+              <Text style={[styles.orgChipText, { color: colors.success }]}>
+                Covered by {originatingOrgName ?? 'your organization'} — no payment needed
+              </Text>
+            </View>
+          )}
         </Animated.View>
 
-        {/* Benefits Card */}
-        <Animated.View
-          entering={FadeInUp.delay(150).duration(400)}
-          style={[styles.benefitsCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
-        >
-          <Text style={[styles.benefitsTitle, { color: colors.text }]}>What you get</Text>
-
-          {(isCitizenFlow ? CITIZEN_BENEFITS : VERIFICATION_BENEFITS).map((benefit, index) => (
-            <View key={index} style={styles.benefitRow}>
-              <View style={[styles.benefitIcon, { backgroundColor: `${colors.success}15` }]}>
-                <Ionicons name={benefit.icon as any} size={16} color={colors.success} />
+        {/* What you will need */}
+        <Animated.View entering={FadeInUp.delay(100).duration(400)} style={styles.section}>
+          <Text style={[styles.sectionLabel, { color: colors.textTertiary }]}>WHAT YOU WILL NEED</Text>
+          {requirements.map((req) => (
+            <View
+              key={req.title}
+              style={[styles.reqCard, { backgroundColor: colors.surface, borderColor: colors.borderSubtle }]}
+            >
+              <View style={[styles.reqIcon, { backgroundColor: colors.goldSurface }]}>
+                <Ionicons name={req.icon} size={19} color={colors.gold} />
               </View>
-              <Text style={[styles.benefitText, { color: colors.text }]}>{benefit.text}</Text>
+              <View style={{ flex: 1, gap: 2 }}>
+                <Text style={[styles.reqTitle, { color: colors.text }]}>{req.title}</Text>
+                <Text style={[styles.reqSub, { color: colors.textTertiary }]}>{req.sub}</Text>
+              </View>
             </View>
           ))}
         </Animated.View>
 
-        {/* Process Info */}
+        {/* Trust note — copy verbatim */}
         <Animated.View
-          entering={FadeInUp.delay(300).duration(400)}
-          style={[styles.processCard, { backgroundColor: `${colors.info}10`, borderColor: `${colors.info}25` }]}
+          entering={FadeInUp.delay(200).duration(400)}
+          style={[styles.trustCard, { backgroundColor: colors.goldSurface, borderColor: colors.goldSurfaceStrong }]}
         >
-          <Ionicons name="information-circle-outline" size={20} color={colors.info} />
-          <Text style={[styles.processText, { color: colors.textSecondary }]}>
-            {isCitizenFlow
-              ? "You'll verify with a passport and a proof-of-address document. This confirms citizenship and your region."
-              : "You'll complete identity verification using a government-issued ID. Your location will be verified automatically."}
+          <Ionicons name="shield-outline" size={18} color={colors.gold} style={{ marginTop: 1 }} />
+          <Text style={[styles.trustText, { color: colors.textSecondary }]}>
+            <Text style={[styles.trustLead, { color: colors.text }]}>Checked, never kept.</Text>
+            {' '}Your documents are verified in about 1.4 seconds, then discarded. Represent stores only the fact that you are verified — never your ID.
           </Text>
+        </Animated.View>
+
+        {/* What it unlocks */}
+        <Animated.View entering={FadeInUp.delay(300).duration(400)} style={styles.section}>
+          <Text style={[styles.sectionLabel, { color: colors.textTertiary }]}>WHAT IT UNLOCKS</Text>
+          <View style={[styles.benefitsCard, { backgroundColor: colors.surface, borderColor: colors.borderSubtle }]}>
+            {benefits.map((benefit, index) => (
+              <View
+                key={benefit}
+                style={[
+                  styles.benefitRow,
+                  index < benefits.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.borderSubtle },
+                ]}
+              >
+                <Ionicons name="checkmark" size={15} color={colors.gold} />
+                <Text style={[styles.benefitText, { color: colors.textSecondary }]}>{benefit}</Text>
+              </View>
+            ))}
+          </View>
         </Animated.View>
 
         {/* Premium Upsell — hidden in the org-paid flow (the user isn't
             paying, the org is, so the cross-sell would just confuse). */}
         {!isOrgPaid && (
-        <Animated.View
-          entering={FadeInUp.delay(450).duration(400)}
-          style={[styles.upsellCard, { backgroundColor: colors.surface, borderColor: colors.gold }]}
-        >
-          <LinearGradient
-            colors={[`${colors.gold}08`, 'transparent']}
-            style={StyleSheet.absoluteFill}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-          />
-          <View style={styles.upsellHeader}>
-            <Ionicons name="star" size={20} color={colors.gold} />
-            <Text style={[styles.upsellTitle, { color: colors.gold }]}>Or go Premium</Text>
-            <View style={[styles.upsellBadge, { backgroundColor: colors.gold }]}>
-              <Text style={styles.upsellBadgeText}>BEST VALUE</Text>
-            </View>
-          </View>
-          <Text style={[styles.upsellText, { color: colors.textSecondary }]}>
-            Get verification included + unlimited proposals, analytics dashboard, and more for just $7.99/month.
-          </Text>
-          <TouchableOpacity
-            onPress={handleViewPremium}
-            style={styles.upsellLink}
+          <Animated.View
+            entering={FadeInUp.delay(400).duration(400)}
+            style={[styles.upsellCard, { backgroundColor: colors.surface, borderColor: colors.borderSubtle }]}
           >
-            <Text style={[styles.upsellLinkText, { color: colors.gold }]}>View Premium</Text>
-            <Ionicons name="chevron-forward" size={16} color={colors.gold} />
-          </TouchableOpacity>
-        </Animated.View>
+            <View style={styles.upsellHeader}>
+              <Ionicons name="star-outline" size={16} color={colors.textSecondary} />
+              <Text style={[styles.upsellTitle, { color: colors.text }]}>Or go Premium</Text>
+            </View>
+            <Text style={[styles.upsellText, { color: colors.textSecondary }]}>
+              Get verification included + unlimited proposals, analytics dashboard, and more for $7.99/month.
+            </Text>
+            <TouchableOpacity onPress={handleViewPremium} style={styles.upsellLink}>
+              <Text style={[styles.upsellLinkText, { color: colors.textSecondary }]}>View Premium</Text>
+              <Ionicons name="chevron-forward" size={14} color={colors.textTertiary} />
+            </TouchableOpacity>
+          </Animated.View>
         )}
 
-        <View style={{ height: 140 }} />
+        <View style={{ height: 150 }} />
       </ScrollView>
 
-      {/* Fixed CTA */}
+      {/* Fixed CTA — the screen's single gold moment */}
       <View style={[styles.ctaContainer, { backgroundColor: colors.background, borderTopColor: colors.border }]}>
         <TouchableOpacity
           onPress={handleStartVerification}
+          activeOpacity={0.8}
+          style={[styles.ctaButton, { backgroundColor: colors.goldFill }]}
         >
-          <LinearGradient
-            colors={[colors.success, '#22A06B']}
-            style={styles.ctaButton}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-          >
-            <Ionicons name="shield-checkmark" size={20} color="#000" />
-            <Text style={styles.ctaButtonText}>Start Verification</Text>
-          </LinearGradient>
+          <Text style={styles.ctaButtonText}>Begin Verification</Text>
         </TouchableOpacity>
-        <View style={styles.paymentMethodsRow}>
-          <Text style={[styles.ctaDisclaimer, { color: colors.textTertiary }]}>
-            Quick, secure identity verification
-          </Text>
-        </View>
+        <Text style={[styles.ctaDisclaimer, { color: colors.textTertiary }]}>Takes about two minutes</Text>
       </View>
     </View>
   );
@@ -297,108 +311,144 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  header: {
+  topRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: SPACING.lg,
+    justifyContent: 'space-between',
+    paddingHorizontal: SPACING.screenPadding,
     paddingTop: SPACING.xl,
     paddingBottom: SPACING.md,
-    borderBottomWidth: 1,
   },
-  backButton: {
+  circleButton: {
     width: 40,
     height: 40,
+    borderRadius: 20,
+    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  headerTitle: {
-    fontFamily: FONTS.serif,
-    fontSize: 20,
+  stepLabel: {
+    fontFamily: FONTS.mono,
+    fontSize: 10.5,
+    letterSpacing: 1.7,
+  },
+  progressRow: {
+    flexDirection: 'row',
+    gap: 6,
+    paddingHorizontal: SPACING.screenPadding,
+    marginBottom: SPACING.lg,
+  },
+  progressSeg: {
+    flex: 1,
+    height: 4,
+    borderRadius: 2,
   },
   content: {
     flex: 1,
-    padding: SPACING.lg,
+    paddingHorizontal: SPACING.screenPadding,
   },
   heroSection: {
-    alignItems: 'center',
+    gap: 10,
     marginBottom: SPACING.xl,
-  },
-  priceContainer: {
-    paddingHorizontal: SPACING.xl,
-    paddingVertical: SPACING.md,
-    borderRadius: BORDER_RADIUS.full,
-    marginBottom: SPACING.lg,
-  },
-  priceAmount: {
-    fontFamily: FONTS.serif,
-    fontSize: 36,
-    textAlign: 'center',
-  },
-  priceLabel: {
-    ...TYPOGRAPHY.labelMedium,
-    textAlign: 'center',
-    marginTop: SPACING.xxs,
   },
   heroTitle: {
     fontFamily: FONTS.serif,
-    fontSize: 24,
-    textAlign: 'center',
-    marginBottom: SPACING.sm,
+    fontSize: 34,
+    lineHeight: 38,
+    letterSpacing: -0.4,
   },
   heroSubtitle: {
-    ...TYPOGRAPHY.bodyMedium,
-    textAlign: 'center',
-    lineHeight: 22,
+    fontFamily: FONTS.sans,
+    fontSize: 15,
+    lineHeight: 23,
+  },
+  orgChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 6,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: 6,
+    borderRadius: RADIUS.chip,
+    marginTop: SPACING.xs,
+  },
+  orgChipText: {
+    ...TYPOGRAPHY.labelSmall,
+  },
+  section: {
+    gap: 10,
+    marginBottom: SPACING.lg,
+  },
+  sectionLabel: {
+    fontFamily: FONTS.sansSemiBold,
+    fontSize: 11,
+    letterSpacing: 1.5,
+  },
+  reqCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderWidth: 1,
+    borderRadius: 16,
+    paddingVertical: 15,
+    paddingHorizontal: 16,
+  },
+  reqIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  reqTitle: {
+    fontFamily: FONTS.sansSemiBold,
+    fontSize: 14.5,
+  },
+  reqSub: {
+    fontFamily: FONTS.sans,
+    fontSize: 12.5,
+  },
+  trustCard: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+    borderWidth: 1,
+    borderRadius: 16,
+    paddingVertical: 15,
+    paddingHorizontal: 16,
+    marginBottom: SPACING.lg,
+  },
+  trustText: {
+    flex: 1,
+    fontFamily: FONTS.sans,
+    fontSize: 13,
+    lineHeight: 20,
+  },
+  trustLead: {
+    fontFamily: FONTS.sansSemiBold,
   },
   benefitsCard: {
-    padding: SPACING.xl,
-    borderRadius: BORDER_RADIUS['2xl'],
     borderWidth: 1,
-    marginBottom: SPACING.lg,
-    ...SHADOWS.md,
-  },
-  benefitsTitle: {
-    fontFamily: FONTS.serif,
-    fontSize: 18,
-    marginBottom: SPACING.lg,
+    borderRadius: 16,
+    paddingVertical: 4,
+    paddingHorizontal: 16,
   },
   benefitRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: SPACING.md,
-  },
-  benefitIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: SPACING.md,
+    gap: 11,
+    paddingVertical: 11,
   },
   benefitText: {
-    ...TYPOGRAPHY.bodyMedium,
+    fontFamily: FONTS.sans,
+    fontSize: 13,
     flex: 1,
-  },
-  processCard: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    padding: SPACING.lg,
-    borderRadius: BORDER_RADIUS.xl,
-    borderWidth: 1,
-    marginBottom: SPACING.lg,
-    gap: SPACING.sm,
-  },
-  processText: {
-    ...TYPOGRAPHY.bodySmall,
-    flex: 1,
-    lineHeight: 20,
+    lineHeight: 18,
   },
   upsellCard: {
+    borderWidth: 1,
+    borderRadius: 16,
     padding: SPACING.lg,
-    borderRadius: BORDER_RADIUS['2xl'],
-    borderWidth: 2,
-    overflow: 'hidden',
   },
   upsellHeader: {
     flexDirection: 'row',
@@ -410,19 +460,10 @@ const styles = StyleSheet.create({
     fontFamily: FONTS.serif,
     fontSize: 16,
   },
-  upsellBadge: {
-    paddingHorizontal: SPACING.sm,
-    paddingVertical: 2,
-    borderRadius: BORDER_RADIUS.sm,
-  },
-  upsellBadgeText: {
-    ...TYPOGRAPHY.labelSmall,
-    color: '#000',
-    fontSize: 9,
-  },
   upsellText: {
-    ...TYPOGRAPHY.bodySmall,
-    lineHeight: 20,
+    fontFamily: FONTS.sans,
+    fontSize: 12.5,
+    lineHeight: 19,
     marginBottom: SPACING.sm,
   },
   upsellLink: {
@@ -431,53 +472,39 @@ const styles = StyleSheet.create({
     gap: SPACING.xxs,
   },
   upsellLinkText: {
-    ...TYPOGRAPHY.labelMedium,
+    fontFamily: FONTS.sansMedium,
+    fontSize: 13,
   },
   ctaContainer: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    padding: SPACING.lg,
+    padding: SPACING.screenPadding,
     paddingBottom: SPACING.xxxl,
     borderTopWidth: 1,
+    gap: 10,
   },
   ctaButton: {
-    flexDirection: 'row',
+    height: 56,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: SPACING.lg,
-    borderRadius: BORDER_RADIUS.xl,
-    gap: SPACING.sm,
-    ...SHADOWS.md,
   },
   ctaButtonText: {
-    ...TYPOGRAPHY.labelLarge,
-    color: '#000',
+    fontFamily: FONTS.sansSemiBold,
+    fontSize: 17,
+    color: '#040707',
   },
   ctaDisclaimer: {
-    ...TYPOGRAPHY.labelSmall,
+    fontFamily: FONTS.sans,
+    fontSize: 12,
     textAlign: 'center',
-  },
-  paymentMethodsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: SPACING.sm,
-    gap: SPACING.sm,
-  },
-  paymentIcons: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.xs,
-  },
-  btnDisabled: {
-    opacity: 0.6,
   },
   // Picker cards
   pickerCard: {
     padding: SPACING.lg,
-    borderRadius: BORDER_RADIUS['2xl'],
+    borderRadius: RADIUS.card,
     borderWidth: 1,
     marginBottom: SPACING.md,
     overflow: 'hidden',
@@ -489,9 +516,9 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.sm,
   },
   pickerIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 40,
+    height: 40,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -500,21 +527,23 @@ const styles = StyleSheet.create({
     fontSize: 18,
   },
   pickerSubtitle: {
-    ...TYPOGRAPHY.bodySmall,
+    fontFamily: FONTS.sans,
+    fontSize: 12.5,
     marginTop: 2,
   },
   pickerDesc: {
-    ...TYPOGRAPHY.bodyMedium,
-    lineHeight: 22,
+    fontFamily: FONTS.sans,
+    fontSize: 13.5,
+    lineHeight: 20,
   },
   pickerBadge: {
     paddingHorizontal: SPACING.sm,
     paddingVertical: 2,
-    borderRadius: BORDER_RADIUS.sm,
+    borderRadius: RADIUS.badge,
   },
   pickerBadgeText: {
     ...TYPOGRAPHY.labelSmall,
-    color: '#000',
+    color: '#040707',
     fontSize: 9,
   },
 });
