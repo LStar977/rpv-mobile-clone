@@ -278,30 +278,33 @@ function VoteHeader({
         </View>
       </View>
 
-      {/* Queue progress — everything counted is mono + tabular */}
-      <View style={voteHeaderStyles.progressSection}>
-        <View style={voteHeaderStyles.progressRow}>
-          <Text style={[voteHeaderStyles.counterNum, { color: colors.text }]}>
-            {String(Math.min(index + 1, total)).padStart(2, '0')} / {String(total).padStart(2, '0')} IN QUEUE
-          </Text>
-          <Text style={[voteHeaderStyles.percentText, { color: colors.textTertiary }]}>
-            {reviewed}% REVIEWED
-          </Text>
+      {/* Queue progress — everything counted is mono + tabular. Hidden when
+          the queue is empty (E1 queue-clear state owns that layout). */}
+      {total > 0 && (
+        <View style={voteHeaderStyles.progressSection}>
+          <View style={voteHeaderStyles.progressRow}>
+            <Text style={[voteHeaderStyles.counterNum, { color: colors.text }]}>
+              {String(Math.min(index + 1, total)).padStart(2, '0')} / {String(total).padStart(2, '0')} IN QUEUE
+            </Text>
+            <Text style={[voteHeaderStyles.percentText, { color: colors.textTertiary }]}>
+              {reviewed}% REVIEWED
+            </Text>
+          </View>
+          <View style={[voteHeaderStyles.progressBar, { backgroundColor: colors.surfaceHighlight }]}>
+            <View
+              style={[
+                voteHeaderStyles.progressFill,
+                { backgroundColor: colors.goldFill, width: `${reviewed}%` },
+              ]}
+            />
+          </View>
+          {(activeCount > 0 || closingSoon > 0) && (
+            <Text style={[voteHeaderStyles.metaText, { color: colors.textTertiary }]}>
+              {activeCount} OPEN{closingSoon > 0 ? ` · ${closingSoon} CLOSING SOON` : ''}
+            </Text>
+          )}
         </View>
-        <View style={[voteHeaderStyles.progressBar, { backgroundColor: colors.surfaceHighlight }]}>
-          <View
-            style={[
-              voteHeaderStyles.progressFill,
-              { backgroundColor: colors.goldFill, width: `${reviewed}%` },
-            ]}
-          />
-        </View>
-        {(activeCount > 0 || closingSoon > 0) && (
-          <Text style={[voteHeaderStyles.metaText, { color: colors.textTertiary }]}>
-            {activeCount} OPEN{closingSoon > 0 ? ` · ${closingSoon} CLOSING SOON` : ''}
-          </Text>
-        )}
-      </View>
+      )}
     </View>
   );
 }
@@ -2390,26 +2393,103 @@ export default function ProposalsScreen() {
         /* M2 · Vote Queue — review session */
         <GestureHandlerRootView style={[styles.swipeContainer, { backgroundColor: colors.background }]}>
           {visibleSwipeCards.length === 0 ? (
-            <Animated.View entering={FadeIn.duration(400)} style={styles.swipeEmptyState}>
-              <View style={[styles.swipeEmptyIcon, { backgroundColor: `${colors.success}15` }]}>
-                <Ionicons name="checkmark-done-circle" size={64} color={colors.success} />
-              </View>
-              <Text style={[styles.swipeEmptyTitle, { color: colors.text }]}>All caught up!</Text>
-              <Text style={[styles.swipeEmptyDesc, { color: colors.textSecondary }]}>
-                You've voted on all available proposals.{'\n'}Check back later for new ones.
-              </Text>
-              <TouchableOpacity
-                style={[styles.swipeRefreshBtn, { backgroundColor: colors.surface, borderColor: colors.border }]}
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                  setSwipeIndex(0);
-                  fetchData(true);
+            /* E1 · Queue Complete — the header stays so filters, list view,
+               and the create button remain reachable from the empty queue. */
+            <View style={{ flex: 1 }}>
+              <VoteHeader
+                index={0}
+                total={0}
+                activeCount={activeCount}
+                closingSoon={0}
+                selectedFilter={selectedGeoLevel === 'All' ? 'All' :
+                  selectedGeoLevel === 'National' ? 'Federal' :
+                  selectedGeoLevel === 'State/Province' ? 'Provincial' :
+                  selectedGeoLevel === 'City/Local' ? 'Municipal' : 'All'}
+                onFilterChange={(filter) => {
+                  const geoMap: Record<string, string> = {
+                    'All': 'All',
+                    'Federal': 'National',
+                    'Provincial': 'State/Province',
+                    'Municipal': 'City/Local',
+                    'Closing': 'All',
+                  };
+                  setSelectedGeoLevel(geoMap[filter] || 'All');
+                  if (filter === 'Closing') setSelectedStatus('Active');
                 }}
-              >
-                <Ionicons name="refresh-outline" size={20} color={colors.text} />
-                <Text style={[styles.swipeRefreshText, { color: colors.text }]}>Refresh</Text>
-              </TouchableOpacity>
-            </Animated.View>
+                insetTop={insets.top}
+                onCreate={() => setShowCreateModal(true)}
+                onToggleView={() => setViewMode('list')}
+              />
+              <Animated.View entering={FadeIn.duration(400)} style={styles.queueClearBody}>
+                <View style={styles.queueClearCenter}>
+                  <View style={[styles.queueClearSeal, { backgroundColor: colors.goldSurface, borderColor: 'rgba(234, 186, 88, 0.35)' }]}>
+                    <Ionicons name="checkmark-done-outline" size={44} color={colors.gold} />
+                  </View>
+                  <Text style={[styles.queueClearTitle, { color: colors.text }]}>Queue clear.</Text>
+                  <Text style={[styles.queueClearDesc, { color: colors.textSecondary }]}>
+                    {votedProposals.size > 0
+                      ? `You've voted on every open proposal in your scope. Your voice is on the record, ${votedProposals.size} ${votedProposals.size === 1 ? 'time' : 'times'} over.`
+                      : 'No open proposals in your scope right now.'}
+                  </Text>
+                  <View style={[styles.queueClearStats, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                    <View style={styles.queueClearStatRow}>
+                      <Text style={[styles.queueClearStatLabel, { color: colors.textTertiary }]}>YOUR RECORD</Text>
+                      <Text style={[styles.queueClearStatValue, { color: colors.text }]}>
+                        {votedProposals.size} {votedProposals.size === 1 ? 'BALLOT' : 'BALLOTS'}
+                      </Text>
+                    </View>
+                    <View style={styles.queueClearStatRow}>
+                      <Text style={[styles.queueClearStatLabel, { color: colors.textTertiary }]}>ALL RECORDED</Text>
+                      <View style={styles.queueClearStatCheck}>
+                        <Ionicons name="checkmark" size={12} color={colors.support} />
+                        <Text style={[styles.queueClearStatValue, { color: colors.support }]}>ON THE PUBLIC LEDGER</Text>
+                      </View>
+                    </View>
+                  </View>
+                  <Text style={[styles.queueClearNote, { color: colors.textTertiary }]}>
+                    We'll let you know the moment a new proposal opens in your scope.
+                  </Text>
+                </View>
+                <View style={styles.queueClearActions}>
+                  <TouchableOpacity
+                    style={[styles.queueClearCta, { backgroundColor: colors.goldFill }]}
+                    onPress={() => {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                      setViewMode('list');
+                    }}
+                    accessibilityRole="button"
+                    accessibilityLabel="See live results"
+                  >
+                    <Text style={styles.queueClearCtaText}>See Live Results</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.queueClearGhost}
+                    onPress={() => {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      router.push('/modals/voting-history');
+                    }}
+                    accessibilityRole="button"
+                    accessibilityLabel="Share your record"
+                  >
+                    <Ionicons name="share-outline" size={15} color={colors.textSecondary} />
+                    <Text style={[styles.queueClearGhostText, { color: colors.textSecondary }]}>Your Record</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.queueClearGhost}
+                    onPress={() => {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                      setSwipeIndex(0);
+                      fetchData(true);
+                    }}
+                    accessibilityRole="button"
+                    accessibilityLabel="Check for new proposals"
+                  >
+                    <Ionicons name="refresh-outline" size={15} color={colors.textSecondary} />
+                    <Text style={[styles.queueClearGhostText, { color: colors.textSecondary }]}>Check for New Proposals</Text>
+                  </TouchableOpacity>
+                </View>
+              </Animated.View>
+            </View>
           ) : (
             <View style={{ flex: 1 }}>
               {/* Premium Vote Header */}
@@ -4297,6 +4377,101 @@ const styles = StyleSheet.create({
   },
 
   // Swipe Empty State
+  // E1 · Queue Complete
+  queueClearBody: {
+    flex: 1,
+    paddingHorizontal: 28,
+    paddingBottom: 24,
+    gap: 18,
+  },
+  queueClearCenter: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 18,
+  },
+  queueClearSeal: {
+    width: 110,
+    height: 110,
+    borderRadius: 55,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  queueClearTitle: {
+    fontFamily: FONTS.serif,
+    fontSize: 40,
+    lineHeight: 44,
+    letterSpacing: -0.48,
+  },
+  queueClearDesc: {
+    fontFamily: FONTS.sans,
+    fontSize: 14.5,
+    lineHeight: 22,
+    textAlign: 'center',
+    maxWidth: 290,
+  },
+  queueClearStats: {
+    width: '100%',
+    borderWidth: 1,
+    borderRadius: 20,
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    gap: 12,
+  },
+  queueClearStatRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  queueClearStatLabel: {
+    fontFamily: FONTS.mono,
+    fontSize: 11,
+    fontVariant: ['tabular-nums'],
+  },
+  queueClearStatValue: {
+    fontFamily: FONTS.mono,
+    fontSize: 11,
+    fontVariant: ['tabular-nums'],
+  },
+  queueClearStatCheck: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  queueClearNote: {
+    fontFamily: FONTS.sans,
+    fontSize: 12.5,
+    lineHeight: 19,
+    textAlign: 'center',
+    maxWidth: 280,
+  },
+  queueClearActions: {
+    gap: 4,
+  },
+  queueClearCta: {
+    height: 56,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  queueClearCtaText: {
+    fontFamily: FONTS.sansSemiBold,
+    fontSize: 17,
+    color: '#040707',
+  },
+  queueClearGhost: {
+    height: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  queueClearGhostText: {
+    fontFamily: FONTS.sansMedium,
+    fontSize: 14,
+  },
+
   swipeEmptyState: {
     flex: 1,
     alignItems: 'center',

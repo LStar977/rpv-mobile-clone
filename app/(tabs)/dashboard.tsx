@@ -11,6 +11,7 @@ import { FONTS, SPACING, RADIUS, useTheme } from '../../lib/theme';
 import { useAuthStore } from '../../lib/auth';
 import { proposalsApi, userApi, organizationsApi, veriffApi, type Proposal, type Organization, type OrganizationProposal } from '../../lib/api';
 import { useModerationStore, useSyncMutes } from '../../lib/moderation';
+import { canUserVoteOnProposal } from '../../lib/proposalGeo';
 import { useFocusEffect } from 'expo-router';
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -166,8 +167,11 @@ export default function DashboardScreen() {
     if ((p as any).organizationId) return false;
     const creatorId = (p as any).creatorId || (p as any).userId;
     if (creatorId && mutedUserIds.includes(String(creatorId))) return false;
-    if (isVerified) return true;
-    return ((p as any).geoRestrictions || []).length === 0;
+    // Count only proposals the user is actually ELIGIBLE to vote on — the
+    // same region filter the vote queue applies. Otherwise the inbox counts
+    // ballots (e.g. other provinces') that never appear in the queue and the
+    // two screens contradict each other.
+    return canUserVoteOnProposal(p as any, userCountry, userState, userCity, isVerified);
   });
   const activeProposals = civicProposals.filter(p => {
     if (!p.deadline) return true;
