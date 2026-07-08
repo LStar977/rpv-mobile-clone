@@ -4,9 +4,13 @@
 // .published.json). Proposals are created through the ordinary authenticated
 // API, so they behave exactly like user-created proposals.
 //
-// Usage:
+// Usage (email/password accounts):
 //   REPRESENT_EMAIL=you@example.com REPRESENT_PASSWORD=yourpassword \
 //     node scripts/publish-test-proposals.mjs
+//
+// Usage (Google/Apple accounts — no password exists, use the app token):
+//   In a dev build: Identity tab → Account → "Copy API token", then:
+//   REPRESENT_TOKEN=<paste> node scripts/publish-test-proposals.mjs
 //
 // Optional:
 //   REPRESENT_API_URL=https://representportal.com   (default)
@@ -27,11 +31,13 @@ const PUBLISHED_PATH = path.join(__dirname, '..', 'content', 'civic-desk-test-pr
 const API_URL = process.env.REPRESENT_API_URL || 'https://representportal.com';
 const EMAIL = process.env.REPRESENT_EMAIL;
 const PASSWORD = process.env.REPRESENT_PASSWORD;
+const TOKEN = process.env.REPRESENT_TOKEN;
 
-if (!EMAIL || !PASSWORD) {
-  console.error('Set REPRESENT_EMAIL and REPRESENT_PASSWORD environment variables.');
-  console.error('Example:');
-  console.error('  REPRESENT_EMAIL=you@example.com REPRESENT_PASSWORD=secret node scripts/publish-test-proposals.mjs');
+if (!TOKEN && (!EMAIL || !PASSWORD)) {
+  console.error('Provide either REPRESENT_TOKEN, or REPRESENT_EMAIL + REPRESENT_PASSWORD.');
+  console.error('Google/Apple accounts have no password — use the token path:');
+  console.error('  In a dev build: Identity tab → Account → "Copy API token", then');
+  console.error('  REPRESENT_TOKEN=<paste> node scripts/publish-test-proposals.mjs');
   process.exit(1);
 }
 
@@ -47,20 +53,42 @@ function resolveDeadline(rel) {
 async function main() {
   const slate = JSON.parse(readFileSync(SLATE_PATH, 'utf8'));
 
-  console.log(`Signing in as ${EMAIL} …`);
-  const loginRes = await fetch(`${API_URL}/api/auth/mobile/email/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email: EMAIL, password: PASSWORD }),
-  });
-  if (!loginRes.ok) {
-    const err = await loginRes.json().catch(() => ({}));
-    throw new Error(`Login failed (${loginRes.status}): ${err.message || err.error || 'unknown'}`);
-  }
-  const { token, user } = await loginRes.json();
-  console.log(`Signed in as ${user?.name || user?.email} (verified: ${user?.verified ? 'yes' : 'NO'})`);
-  if (!user?.verified) {
-    console.warn('Warning: this account is not verified — the server may reject proposal creation.');
+  let token = TOKEN;
+  let accountLabel = 'token';
+  if (!token) {
+    console.log(`Signing in as ${EMAIL} …`);
+    const loginRes = await fetch(`${API_URL}/api/auth/mobile/email/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: EMAIL, password: PASSWORD }),
+    });
+    if (!loginRes.ok) {
+      const err = await loginRes.json().catch(() => ({}));
+      throw new Error(`Login failed (${loginRes.status}): ${err.message || err.error || 'unknown'}`);
+    }
+    const data = await loginRes.json();
+    token = data.token;
+    accountLabel = EMAIL;
+    console.log(`Signed in as ${data.user?.name || data.user?.email} (verified: ${data.user?.verified ? 'yes' : 'NO'})`);
+    if (!data.user?.verified) {
+      console.warn('Warning: this account is not verified — the server may reject proposal creation.');
+    }
+  } else {
+    // Validate the pasted token before publishing anything (same endpoint
+    // the app's checkAuth uses).
+    const meRes = await fetch(`${API_URL}/api/auth/verify`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const me = meRes.ok ? await meRes.json().catch(() => null) : null;
+    if (me?.valid && me?.user) {
+      accountLabel = me.user.email || 'token';
+      console.log(`Token OK — acting as ${me.user.name || me.user.email} (verified: ${me.user.verified ? 'yes' : 'NO'})`);
+      if (!me.user.verified) {
+        console.warn('Warning: this account is not verified — the server may reject proposal creation.');
+      }
+    } else {
+      throw new Error(`Token invalid or expired (${meRes.status}). Copy a fresh one from the app and retry.`);
+    }
   }
 
   const published = [];
@@ -98,7 +126,7 @@ async function main() {
 
   writeFileSync(
     PUBLISHED_PATH,
-    JSON.stringify({ publishedAt: new Date().toISOString(), account: EMAIL, proposals: published }, null, 2) + '\n',
+    JSON.stringify({ publishedAt: new Date().toISOString(), account: accountLabel, proposals: published }, null, 2) + '\n',
   );
   const okCount = published.filter((p) => p.id != null).length;
   console.log(`\nDone: ${okCount}/${slate.proposals.length} published. Record: content/civic-desk-test-proposals.published.json`);

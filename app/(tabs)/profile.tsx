@@ -1,5 +1,6 @@
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Platform, RefreshControl } from 'react-native';
 import * as Haptics from 'expo-haptics';
+import * as Clipboard from 'expo-clipboard';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useState, useEffect, useCallback } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
@@ -707,6 +708,22 @@ export default function ProfileScreen() {
               />
             )}
             <SettingsRow label="Settings & privacy" onPress={() => navigateTo('/modals/privacy')} />
+            {/* Dev builds only: exposes the session token for local tooling
+                (e.g. scripts/publish-test-proposals.mjs). Never ships. */}
+            {__DEV__ && (
+              <SettingsRow
+                label="Copy API token"
+                sub="Dev only — for local scripts"
+                onPress={async () => {
+                  if (!token) {
+                    Alert.alert('No token', 'Sign in first.');
+                    return;
+                  }
+                  await Clipboard.setStringAsync(token);
+                  Alert.alert('Token copied', 'Paste it into REPRESENT_TOKEN in your terminal.');
+                }}
+              />
+            )}
             <SettingsRow label="Legal" last onPress={() => navigateTo('/modals/legal')} />
           </RowCard>
         </Animated.View>
