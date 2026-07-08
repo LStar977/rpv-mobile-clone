@@ -1,16 +1,19 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, AccessibilityInfo } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
+  useAnimatedProps,
   withTiming,
   withSpring,
-  withDelay,
   runOnJS,
+  Easing,
 } from 'react-native-reanimated';
+import Svg, { Circle } from 'react-native-svg';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useTheme, FONTS, ANIMATION } from '../../lib/theme';
+import { useTheme, FONTS, ANIMATION, EASING } from '../../lib/theme';
+import { heavyTap, errorNotification } from '../../lib/haptics';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // X1 · CONFIRM-BEFORE-CAST SHEET
@@ -20,13 +23,36 @@ import { useTheme, FONTS, ANIMATION } from '../../lib/theme';
 // the chosen side rendered in GOLD (the committed-ballot color — never
 // green/red), the permanence warning, then Confirm (gold) / Go Back.
 //
-// After Confirm the sheet transitions to a brief "ballot cast" seal state
-// (gold check + optional "Share your vote" pill) and auto-dismisses — this
-// preserves the previous post-vote celebration + share entry point.
+// After Confirm the sheet transitions to the "ballot cast" seal state:
+// the Momentous ballot seal — a gold ring draws around the seal circle in
+// real time over ANIMATION.motion.momentous (900ms, standard easing), and
+// when the ring closes the checkmark stamps in with overshoot + a heavy
+// haptic. Then it auto-dismisses (share pill stretches the window).
+//
+// Honesty: when the parent reports submission status via the optional
+// `castState` prop, the seal never claims completion it doesn't have —
+// the ring holds at ~85% while 'pending', only completes and stamps on
+// 'confirmed', and reverses in red on 'failed' with a retry/dismiss row.
+// When `castState` is absent, behavior matches the legacy contract: the
+// ring draws fully and stamps immediately on entering the cast state.
+//
+// Reduced motion: the ring-draw is replaced with a 160ms crossfade + haptic.
 //
 // Back-compat: when `onConfirm` is not provided the sheet skips straight to
 // the cast/seal state, behaving like the old post-vote overlay.
 // ═══════════════════════════════════════════════════════════════════════════════
+
+const SEAL_SIZE = 72;
+const RING_STROKE = 2.5;
+const RING_RADIUS = (SEAL_SIZE - RING_STROKE) / 2;
+const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
+
+const AnimatedCircle = Animated.createAnimatedComponent(Circle);
+
+// Redesign standard curve cubic-bezier(.2,0,0,1) and the ballot-seal
+// checkmark overshoot cubic-bezier(.34,1.3,.5,1), from lib/theme EASING.
+const STANDARD_EASING = Easing.bezier(...EASING.standard);
+const OVERSHOOT_EASING = Easing.bezier(...EASING.overshoot);
 
 interface VoteConfirmationOverlayProps {
   visible: boolean;
@@ -44,6 +70,24 @@ interface VoteConfirmationOverlayProps {
   // cheapest viral moment in the app — the user just acted and is at peak
   // motivation to tell someone.
   onShare?: () => void;
+  /**
+   * OPTIONAL truthfulness channel. When the parent reports actual submission
+   * status here, the seal reflects it instead of pretending:
+   *   'pending'   → gold ring draws and HOLDS at ~85%; no checkmark, no
+   *                 "cast" claim, no auto-dismiss.
+   *   'confirmed' → ring completes, checkmark stamps with overshoot + heavy
+   *                 haptic, auto-dismiss timer starts.
+   *   'failed'    → ring turns red (colors.oppose) and reverses; a
+   *                 Try Again / Dismiss row appears. Never auto-dismisses.
+   * When ABSENT, legacy behavior: the ring draws fully and stamps as soon as
+   * the cast state is entered (parent submits fire-and-forget today).
+   */
+  castState?: 'pending' | 'confirmed' | 'failed';
+  /**
+   * Called by the "Try Again" button on the 'failed' state. Falls back to
+   * `onConfirm` when omitted; if neither exists only Dismiss is offered.
+   */
+  onRetry?: () => void;
 }
 
 export function VoteConfirmationOverlay({
@@ -53,17 +97,38 @@ export function VoteConfirmationOverlay({
   question,
   onConfirm,
   onShare,
+  castState,
+  onRetry,
 }: VoteConfirmationOverlayProps) {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
 
   const [phase, setPhase] = useState<'confirm' | 'cast'>(onConfirm ? 'confirm' : 'cast');
+  const [reduceMotion, setReduceMotion] = useState(false);
 
   const scrimOpacity = useSharedValue(0);
   const sheetTranslate = useSharedValue(480);
   const sealScale = useSharedValue(0);
+  const ringProgress = useSharedValue(0); // 0 → 1 around the seal circle
+  const checkScale = useSharedValue(0);
 
   const sideLabel = voteType === 'support' ? 'Support' : 'Oppose';
+  const isFailed = castState === 'failed';
+  const isPending = castState === 'pending';
+  const isSealed = castState === undefined || castState === 'confirmed';
+
+  // Respect reduced motion — queried on each open so the setting is honored
+  // without needing a remount.
+  useEffect(() => {
+    if (!visible) return;
+    let mounted = true;
+    AccessibilityInfo.isReduceMotionEnabled().then((enabled) => {
+      if (mounted) setReduceMotion(!!enabled);
+    });
+    return () => {
+      mounted = false;
+    };
+  }, [visible]);
 
   // Entrance / reset
   useEffect(() => {
@@ -75,25 +140,103 @@ export function VoteConfirmationOverlay({
       scrimOpacity.value = 0;
       sheetTranslate.value = 480;
       sealScale.value = 0;
+      ringProgress.value = 0;
+      checkScale.value = 0;
     }
   }, [visible]);
 
-  // Cast state: draw the gold seal, then auto-dismiss (longer when the share
-  // pill is showing, so there's actually time to tap it).
+  // The checkmark stamp: overshoot cubic-bezier(.34,1.3,.5,1) + heavy haptic.
+  // Runs on the JS thread (invoked via runOnJS from the ring's completion).
+  const stampCheckmark = () => {
+    heavyTap();
+    checkScale.value = withTiming(1, {
+      duration: ANIMATION.motion.quick,
+      easing: OVERSHOOT_EASING,
+    });
+  };
+
+  // Cast state: the Momentous ballot seal. Auto-dismiss only once the seal is
+  // truthfully complete (legacy mode, or castState === 'confirmed') — timing
+  // unchanged: longer when the share pill is showing so there's time to tap it.
   useEffect(() => {
     if (!visible || phase !== 'cast') return;
-    sealScale.value = 0;
-    sealScale.value = withDelay(120, withSpring(1, ANIMATION.spring.bouncy));
 
-    const timeout = setTimeout(() => {
-      scrimOpacity.value = withTiming(0, { duration: ANIMATION.motion.quick });
-      sheetTranslate.value = withTiming(480, { duration: ANIMATION.motion.quick }, () => {
-        runOnJS(onDismiss)();
+    let dismissTimer: ReturnType<typeof setTimeout> | undefined;
+    const startAutoDismiss = () => {
+      dismissTimer = setTimeout(() => {
+        scrimOpacity.value = withTiming(0, { duration: ANIMATION.motion.quick });
+        sheetTranslate.value = withTiming(480, { duration: ANIMATION.motion.quick }, () => {
+          runOnJS(onDismiss)();
+        });
+      }, onShare ? 2800 : 1600);
+    };
+
+    if (reduceMotion) {
+      // Reduced motion: no ring-draw — a 160ms crossfade to the final state.
+      sealScale.value = withTiming(1, { duration: 160 });
+      if (castState === undefined || castState === 'confirmed') {
+        ringProgress.value = withTiming(1, { duration: 160 });
+        checkScale.value = withTiming(1, { duration: 160 });
+        heavyTap();
+        startAutoDismiss();
+      } else if (castState === 'pending') {
+        ringProgress.value = withTiming(0.85, { duration: 160 });
+        checkScale.value = withTiming(0, { duration: 160 });
+      } else {
+        // failed
+        ringProgress.value = withTiming(0, { duration: 160 });
+        checkScale.value = withTiming(0, { duration: 160 });
+        errorNotification();
+      }
+    } else {
+      // The seal circle settles in quickly while the ring draws around it.
+      sealScale.value = withTiming(1, {
+        duration: ANIMATION.motion.quick,
+        easing: STANDARD_EASING,
       });
-    }, onShare ? 2800 : 1600);
 
-    return () => clearTimeout(timeout);
-  }, [visible, phase]);
+      if (castState === undefined) {
+        // Legacy: draw the full ring over the momentous beat, then stamp.
+        ringProgress.value = withTiming(
+          1,
+          { duration: ANIMATION.motion.momentous, easing: STANDARD_EASING },
+          (finished) => {
+            if (finished) runOnJS(stampCheckmark)();
+          }
+        );
+        startAutoDismiss();
+      } else if (castState === 'pending') {
+        // Honest: draw to ~85% and hold — the ledger hasn't answered yet.
+        checkScale.value = withTiming(0, { duration: ANIMATION.motion.instant });
+        ringProgress.value = withTiming(0.85, {
+          duration: Math.round(ANIMATION.motion.momentous * 0.85),
+          easing: STANDARD_EASING,
+        });
+      } else if (castState === 'confirmed') {
+        // Close the remaining arc, then stamp.
+        ringProgress.value = withTiming(
+          1,
+          { duration: ANIMATION.motion.quick, easing: STANDARD_EASING },
+          (finished) => {
+            if (finished) runOnJS(stampCheckmark)();
+          }
+        );
+        startAutoDismiss();
+      } else {
+        // Failed: the ring reverses — the seal visibly un-makes itself.
+        checkScale.value = withTiming(0, { duration: ANIMATION.motion.instant });
+        ringProgress.value = withTiming(0, {
+          duration: ANIMATION.motion.deliberate,
+          easing: STANDARD_EASING,
+        });
+        errorNotification();
+      }
+    }
+
+    return () => {
+      if (dismissTimer) clearTimeout(dismissTimer);
+    };
+  }, [visible, phase, castState, reduceMotion]);
 
   const scrimStyle = useAnimatedStyle(() => ({
     opacity: scrimOpacity.value,
@@ -106,6 +249,16 @@ export function VoteConfirmationOverlay({
   const sealStyle = useAnimatedStyle(() => ({
     transform: [{ scale: sealScale.value }],
     opacity: sealScale.value,
+  }));
+
+  const checkStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: checkScale.value }],
+    opacity: Math.min(checkScale.value, 1),
+  }));
+
+  // The gold ring draws by animating strokeDashoffset in real time.
+  const ringProps = useAnimatedProps(() => ({
+    strokeDashoffset: RING_CIRCUMFERENCE * (1 - ringProgress.value),
   }));
 
   if (!visible) return null;
@@ -121,6 +274,19 @@ export function VoteConfirmationOverlay({
       runOnJS(onDismiss)();
     });
   };
+
+  const handleRetry = onRetry ?? onConfirm;
+
+  const castTitle = isFailed
+    ? 'Ballot not cast'
+    : isPending
+      ? `Casting ballot — ${sideLabel}`
+      : `Ballot cast — ${sideLabel}`;
+  const castSub = isFailed
+    ? 'NOTHING WAS RECORDED ON THE LEDGER'
+    : isPending
+      ? 'WRITING TO THE PUBLIC LEDGER…'
+      : 'RECORDED ON THE PUBLIC LEDGER · COUNTED EXACTLY ONCE';
 
   return (
     <View style={styles.root} pointerEvents="auto">
@@ -208,35 +374,92 @@ export function VoteConfirmationOverlay({
           </>
         ) : (
           <View style={styles.castBlock}>
+            {/* The Momentous ballot seal — gold ring draws around the circle,
+                checkmark stamps when (and only when) the seal is truthfully
+                complete. Failure reverses the ring in red. */}
             <Animated.View
               style={[
                 styles.sealCircle,
-                { backgroundColor: colors.goldSurfaceStrong, borderColor: 'rgba(234, 186, 88, 0.4)' },
+                {
+                  backgroundColor: isFailed ? colors.opposeSurface : colors.goldSurfaceStrong,
+                  borderColor: isFailed ? colors.oppose : 'rgba(234, 186, 88, 0.4)',
+                },
                 sealStyle,
               ]}
             >
-              <Ionicons name="checkmark" size={34} color={colors.gold} />
+              <Svg
+                width={SEAL_SIZE}
+                height={SEAL_SIZE}
+                style={styles.sealRing}
+                pointerEvents="none"
+              >
+                <AnimatedCircle
+                  cx={SEAL_SIZE / 2}
+                  cy={SEAL_SIZE / 2}
+                  r={RING_RADIUS}
+                  stroke={isFailed ? colors.oppose : colors.goldFill}
+                  strokeWidth={RING_STROKE}
+                  strokeLinecap="round"
+                  strokeDasharray={RING_CIRCUMFERENCE}
+                  fill="none"
+                  animatedProps={ringProps}
+                />
+              </Svg>
+              {isFailed ? (
+                <Ionicons name="close" size={34} color={colors.oppose} />
+              ) : (
+                <Animated.View style={checkStyle}>
+                  <Ionicons name="checkmark" size={34} color={colors.gold} />
+                </Animated.View>
+              )}
             </Animated.View>
-            <Text style={[styles.castTitle, { color: colors.gold }]}>
-              Ballot cast — {sideLabel}
+            <Text style={[styles.castTitle, { color: isFailed ? colors.oppose : isPending ? colors.text : colors.gold }]}>
+              {castTitle}
             </Text>
             <Text style={[styles.castSub, { color: colors.textTertiary }]}>
-              RECORDED ON THE PUBLIC LEDGER · COUNTED EXACTLY ONCE
+              {castSub}
             </Text>
-            {onShare && (
-              <TouchableOpacity
-                style={[styles.shareBtn, { borderColor: colors.gold }]}
-                onPress={() => {
-                  onShare();
-                  onDismiss();
-                }}
-                activeOpacity={0.8}
-                accessibilityRole="button"
-                accessibilityLabel="Share your vote"
-              >
-                <Ionicons name="share-outline" size={15} color={colors.gold} />
-                <Text style={[styles.shareText, { color: colors.gold }]}>Share your vote</Text>
-              </TouchableOpacity>
+            {isFailed ? (
+              <View style={styles.failedRow}>
+                {handleRetry && (
+                  <TouchableOpacity
+                    style={[styles.retryBtn, { backgroundColor: colors.goldFill }]}
+                    onPress={handleRetry}
+                    activeOpacity={0.85}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Try casting your ${sideLabel} ballot again`}
+                  >
+                    <Ionicons name="refresh-outline" size={15} color="#040707" />
+                    <Text style={styles.retryText}>Try Again</Text>
+                  </TouchableOpacity>
+                )}
+                <TouchableOpacity
+                  style={[styles.dismissBtn, { borderColor: colors.borderStrong }]}
+                  onPress={handleGoBack}
+                  activeOpacity={0.7}
+                  accessibilityRole="button"
+                  accessibilityLabel="Dismiss without casting"
+                >
+                  <Text style={[styles.dismissText, { color: colors.textSecondary }]}>Dismiss</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              isSealed &&
+              onShare && (
+                <TouchableOpacity
+                  style={[styles.shareBtn, { borderColor: colors.gold }]}
+                  onPress={() => {
+                    onShare();
+                    onDismiss();
+                  }}
+                  activeOpacity={0.8}
+                  accessibilityRole="button"
+                  accessibilityLabel="Share your vote"
+                >
+                  <Ionicons name="share-outline" size={15} color={colors.gold} />
+                  <Text style={[styles.shareText, { color: colors.gold }]}>Share your vote</Text>
+                </TouchableOpacity>
+              )
             )}
           </View>
         )}
@@ -368,13 +591,18 @@ const styles = StyleSheet.create({
     paddingVertical: 18,
   },
   sealCircle: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
+    width: SEAL_SIZE,
+    height: SEAL_SIZE,
+    borderRadius: SEAL_SIZE / 2,
     borderWidth: 1.5,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 4,
+  },
+  sealRing: {
+    ...StyleSheet.absoluteFillObject,
+    // Start the ring draw at 12 o'clock.
+    transform: [{ rotate: '-90deg' }],
   },
   castTitle: {
     fontFamily: FONTS.serif,
@@ -387,6 +615,37 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     textAlign: 'center',
     fontVariant: ['tabular-nums'],
+  },
+  failedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 10,
+  },
+  retryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderRadius: 100,
+  },
+  retryText: {
+    fontFamily: FONTS.sansSemiBold,
+    fontSize: 12,
+    letterSpacing: 0.5,
+    color: '#040707',
+  },
+  dismissBtn: {
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderRadius: 100,
+    borderWidth: 1.5,
+  },
+  dismissText: {
+    fontFamily: FONTS.sansSemiBold,
+    fontSize: 12,
+    letterSpacing: 0.5,
   },
   shareBtn: {
     flexDirection: 'row',
