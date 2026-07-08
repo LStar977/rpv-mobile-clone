@@ -293,6 +293,13 @@ export default function DashboardScreen() {
           />
         )}
         <SentinelDigest items={digestItems} />
+        <SentinelEntry
+          isPremium={isDemoAccount || !!user?.isPremium || user?.subscriptionStatus === 'active'}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            router.push('/(tabs)/sentinel');
+          }}
+        />
         <FooterSig />
         <View style={{ height: 120 }} />
       </ScrollView>
@@ -829,6 +836,43 @@ function DigestRow({ time, tag, headline, meta }: { time: string; tag: string; h
   );
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// SENTINEL ENTRY — compact row into /(tabs)/sentinel now that Sentinel left
+// the tab bar. Lock badge mirrors the old tab's premium gating.
+// ═══════════════════════════════════════════════════════════════════════════
+function SentinelEntry({ isPremium, onPress }: { isPremium: boolean; onPress: () => void }) {
+  const dc = useDashboardColors();
+  return (
+    <Animated.View entering={FadeInUp.duration(500).delay(550)} style={styles.sectionPad}>
+      <TouchableOpacity
+        activeOpacity={0.7}
+        onPress={onPress}
+        accessibilityLabel="Sentinel — AI governance analysis"
+        style={[
+          styles.communityCard,
+          styles.sentinelRow,
+          { backgroundColor: dc.BG_CARD, borderColor: dc.LINE_SUBTLE },
+        ]}
+      >
+        <View style={[styles.sentinelIcon, { backgroundColor: dc.GOLD_SURFACE }]}>
+          <Ionicons name="sparkles" size={16} color={dc.GOLD} />
+        </View>
+        <View style={{ flex: 1, minWidth: 0, gap: 1 }}>
+          <Text style={[styles.sentinelName, { color: dc.FG }]}>Sentinel</Text>
+          <Text style={[styles.communityMeta, { color: dc.FG_FAINT }]}>AI governance analysis</Text>
+        </View>
+        {!isPremium && (
+          <View style={[styles.sentinelLock, { backgroundColor: dc.GOLD_SURFACE }]}>
+            <Ionicons name="lock-closed" size={9} color={dc.GOLD} />
+            <Text style={[styles.sentinelLockText, { color: dc.GOLD }]}>PREMIUM</Text>
+          </View>
+        )}
+        <Ionicons name="chevron-forward" size={15} color={dc.FG_FAINT} />
+      </TouchableOpacity>
+    </Animated.View>
+  );
+}
+
 function FooterSig() {
   const dc = useDashboardColors();
   return (
@@ -1026,6 +1070,27 @@ const styles = StyleSheet.create({
     letterSpacing: 1.26, textTransform: 'uppercase', ...TNUM,
   },
   communityMeta: { fontFamily: FONTS.sans, fontSize: 12, color: FG_FAINT },
+
+  // Sentinel entry row
+  sentinelRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 14,
+    paddingHorizontal: 18, paddingVertical: 15,
+  },
+  sentinelIcon: {
+    width: 36, height: 36, borderRadius: 9,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  sentinelName: {
+    fontFamily: FONTS.serif, fontSize: 17, lineHeight: 20,
+    color: FG, letterSpacing: -0.17,
+  },
+  sentinelLock: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: 8, paddingVertical: 4, borderRadius: RADIUS.chip,
+  },
+  sentinelLockText: {
+    fontFamily: FONTS.sansSemiBold, fontSize: 8.5, letterSpacing: 1.02, color: G_GOLD,
+  },
 
   // Trending digest
   digestRow: {

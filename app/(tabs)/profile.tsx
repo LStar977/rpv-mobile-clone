@@ -659,6 +659,13 @@ export default function ProfileScreen() {
           <SectionLabel>MEMBERSHIP</SectionLabel>
           <RowCard>
             <SettingsRow
+              label="Sentinel"
+              sub="AI governance analysis"
+              value={userTier === 'premium' ? undefined : 'Premium'}
+              valueColor={userTier === 'premium' ? undefined : colors.gold}
+              onPress={() => navigateTo('/(tabs)/sentinel')}
+            />
+            <SettingsRow
               label="Subscription"
               sub={`${tierLabel} tier`}
               value={userTier === 'premium' ? undefined : 'Upgrade'}

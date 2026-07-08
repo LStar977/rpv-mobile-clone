@@ -77,11 +77,6 @@ export default function TabLayout() {
   const { user, token } = useAuthStore();
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [onboardingChecked, setOnboardingChecked] = useState(false);
-  // Premium-gated tabs show a small lock badge for non-premium users.
-  const isPremiumUser =
-    user?.email === DEMO_EMAIL ||
-    !!user?.isPremium ||
-    user?.subscriptionStatus === 'active';
 
   useEffect(() => {
     const checkOnboarding = async () => {
@@ -192,17 +187,21 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="results"
+        options={{
+          title: 'Results',
+          tabBarIcon: ({ color, focused }) => (
+            <TabIcon name="stats-chart-outline" color={color} focused={focused} />
+          ),
+        }}
+      />
+      {/* Sentinel left the tab bar in the 4-tab redesign IA but the route
+          stays alive (href: null) so dashboard/profile entry points can
+          still router.push('/(tabs)/sentinel'). */}
+      <Tabs.Screen
         name="sentinel"
         options={{
-          title: 'Sentinel',
-          tabBarIcon: ({ color, focused }) => (
-            <TabIcon
-              name="sparkles-outline"
-              color={color}
-              focused={focused}
-              premiumBadge={!isPremiumUser}
-            />
-          ),
+          href: null,
         }}
       />
       <Tabs.Screen
