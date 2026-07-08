@@ -1,0 +1,111 @@
+#!/usr/bin/env node
+// Publish the design-QA test slate to the real backend, following the same
+// pattern as the June launch slate (content/civic-desk-2026-06-launch.json →
+// .published.json). Proposals are created through the ordinary authenticated
+// API, so they behave exactly like user-created proposals.
+//
+// Usage:
+//   REPRESENT_EMAIL=you@example.com REPRESENT_PASSWORD=yourpassword \
+//     node scripts/publish-test-proposals.mjs
+//
+// Optional:
+//   REPRESENT_API_URL=https://representportal.com   (default)
+//
+// The account must be identity-verified (the server requires it for
+// proposal creation unless the platform setting disables that).
+// Published IDs are recorded in content/civic-desk-test-proposals.published.json
+// so the slate is easy to find and delete from the admin dashboard later.
+
+import { readFileSync, writeFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import path from 'node:path';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const SLATE_PATH = path.join(__dirname, '..', 'content', 'civic-desk-test-proposals.json');
+const PUBLISHED_PATH = path.join(__dirname, '..', 'content', 'civic-desk-test-proposals.published.json');
+
+const API_URL = process.env.REPRESENT_API_URL || 'https://representportal.com';
+const EMAIL = process.env.REPRESENT_EMAIL;
+const PASSWORD = process.env.REPRESENT_PASSWORD;
+
+if (!EMAIL || !PASSWORD) {
+  console.error('Set REPRESENT_EMAIL and REPRESENT_PASSWORD environment variables.');
+  console.error('Example:');
+  console.error('  REPRESENT_EMAIL=you@example.com REPRESENT_PASSWORD=secret node scripts/publish-test-proposals.mjs');
+  process.exit(1);
+}
+
+// "+15m" / "+2h" / "+10d" → ISO timestamp relative to now
+function resolveDeadline(rel) {
+  const m = /^\+(\d+)([mhd])$/.exec(rel);
+  if (!m) throw new Error(`Bad deadlineIn value: ${rel}`);
+  const n = Number(m[1]);
+  const ms = m[2] === 'm' ? n * 60_000 : m[2] === 'h' ? n * 3_600_000 : n * 86_400_000;
+  return new Date(Date.now() + ms).toISOString();
+}
+
+async function main() {
+  const slate = JSON.parse(readFileSync(SLATE_PATH, 'utf8'));
+
+  console.log(`Signing in as ${EMAIL} …`);
+  const loginRes = await fetch(`${API_URL}/api/auth/mobile/email/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: EMAIL, password: PASSWORD }),
+  });
+  if (!loginRes.ok) {
+    const err = await loginRes.json().catch(() => ({}));
+    throw new Error(`Login failed (${loginRes.status}): ${err.message || err.error || 'unknown'}`);
+  }
+  const { token, user } = await loginRes.json();
+  console.log(`Signed in as ${user?.name || user?.email} (verified: ${user?.verified ? 'yes' : 'NO'})`);
+  if (!user?.verified) {
+    console.warn('Warning: this account is not verified — the server may reject proposal creation.');
+  }
+
+  const published = [];
+  for (const p of slate.proposals) {
+    const body = {
+      title: p.title,
+      description: p.description,
+      category: p.category,
+      geoRestrictions: p.geoRestrictions,
+      voteType: p.voteType,
+      deadline: resolveDeadline(p.deadlineIn),
+    };
+    if (p.options) body.options = p.options;
+
+    process.stdout.write(`Publishing: ${p.title.slice(0, 60)} … `);
+    const res = await fetch(`${API_URL}/api/proposals`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      console.log(`FAILED (${res.status}): ${err.message || err.error || 'unknown'}`);
+      published.push({ title: p.title, error: err.message || err.error || String(res.status) });
+      continue;
+    }
+    const created = await res.json();
+    const id = created?.id ?? created?.proposal?.id;
+    console.log(`ok → id ${id}`);
+    published.push({ id, title: p.title, deadline: body.deadline });
+  }
+
+  writeFileSync(
+    PUBLISHED_PATH,
+    JSON.stringify({ publishedAt: new Date().toISOString(), account: EMAIL, proposals: published }, null, 2) + '\n',
+  );
+  const okCount = published.filter((p) => p.id != null).length;
+  console.log(`\nDone: ${okCount}/${slate.proposals.length} published. Record: content/civic-desk-test-proposals.published.json`);
+  if (okCount < slate.proposals.length) process.exitCode = 1;
+}
+
+main().catch((e) => {
+  console.error(e.message || e);
+  process.exit(1);
+});
