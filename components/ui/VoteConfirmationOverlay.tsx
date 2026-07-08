@@ -1,28 +1,48 @@
-import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, Dimensions, TouchableOpacity } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withTiming,
   withSpring,
   withDelay,
-  withSequence,
   runOnJS,
-  Easing,
 } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
-import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, ANIMATION } from '../../lib/theme';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTheme, FONTS, ANIMATION } from '../../lib/theme';
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+// ═══════════════════════════════════════════════════════════════════════════════
+// X1 · CONFIRM-BEFORE-CAST SHEET
+//
+// The mandatory stop between choosing a side and writing it to the ledger.
+// A bottom sheet over a 75% scrim: the ballot question VERBATIM in serif,
+// the chosen side rendered in GOLD (the committed-ballot color — never
+// green/red), the permanence warning, then Confirm (gold) / Go Back.
+//
+// After Confirm the sheet transitions to a brief "ballot cast" seal state
+// (gold check + optional "Share your vote" pill) and auto-dismisses — this
+// preserves the previous post-vote celebration + share entry point.
+//
+// Back-compat: when `onConfirm` is not provided the sheet skips straight to
+// the cast/seal state, behaving like the old post-vote overlay.
+// ═══════════════════════════════════════════════════════════════════════════════
 
 interface VoteConfirmationOverlayProps {
   visible: boolean;
   voteType: 'support' | 'oppose';
   onDismiss: () => void;
-  // When provided, a "Share your vote" pill renders under the confirmation
-  // text and the auto-dismiss window stretches to give it a beat. This is
-  // the single cheapest viral moment in the app — the user just acted and
-  // is at peak motivation to tell someone.
+  /** The ballot question, rendered verbatim in serif on the confirm sheet. */
+  question?: string;
+  /**
+   * Called when the user presses "Cast Ballot". When provided, the sheet is a
+   * mandatory confirm step: nothing is cast until this fires.
+   */
+  onConfirm?: () => void;
+  // When provided, a "Share your vote" pill renders on the cast state and the
+  // auto-dismiss window stretches to give it a beat. This is the single
+  // cheapest viral moment in the app — the user just acted and is at peak
+  // motivation to tell someone.
   onShare?: () => void;
 }
 
@@ -30,216 +50,358 @@ export function VoteConfirmationOverlay({
   visible,
   voteType,
   onDismiss,
+  question,
+  onConfirm,
   onShare,
 }: VoteConfirmationOverlayProps) {
   const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
 
-  const overlayOpacity = useSharedValue(0);
-  const iconScale = useSharedValue(0);
-  const iconRotation = useSharedValue(-45);
-  const textOpacity = useSharedValue(0);
-  const textTranslateY = useSharedValue(20);
-  const ringScale = useSharedValue(0.8);
-  const ringOpacity = useSharedValue(0);
+  const [phase, setPhase] = useState<'confirm' | 'cast'>(onConfirm ? 'confirm' : 'cast');
 
-  const isSupport = voteType === 'support';
-  const iconColor = isSupport ? colors.support : colors.oppose;
-  const iconName = isSupport ? 'checkmark-circle' : 'close-circle';
-  const voteText = isSupport ? 'Vote Supported' : 'Vote Opposed';
+  const scrimOpacity = useSharedValue(0);
+  const sheetTranslate = useSharedValue(480);
+  const sealScale = useSharedValue(0);
 
+  const sideLabel = voteType === 'support' ? 'Support' : 'Oppose';
+
+  // Entrance / reset
   useEffect(() => {
     if (visible) {
-      // Animate in
-      overlayOpacity.value = withTiming(1, { duration: 200 });
-
-      // Ring pulse animation
-      ringOpacity.value = withDelay(100, withTiming(0.3, { duration: 200 }));
-      ringScale.value = withDelay(100, withSequence(
-        withSpring(1.2, ANIMATION.spring.bouncy),
-        withTiming(1.5, { duration: 400 }),
-      ));
-      ringOpacity.value = withDelay(100, withSequence(
-        withTiming(0.3, { duration: 200 }),
-        withDelay(200, withTiming(0, { duration: 300 })),
-      ));
-
-      // Icon animation - scale up with rotation
-      iconScale.value = withDelay(150, withSpring(1, ANIMATION.spring.bouncy));
-      iconRotation.value = withDelay(150, withSpring(0, ANIMATION.spring.bouncy));
-
-      // Text fade in
-      textOpacity.value = withDelay(350, withTiming(1, { duration: 250 }));
-      textTranslateY.value = withDelay(350, withSpring(0, ANIMATION.spring.gentle));
-
-      // Auto dismiss after delay (longer when the share pill is showing,
-      // so there's actually time to tap it)
-      const timeout = setTimeout(() => {
-        // Animate out
-        textOpacity.value = withTiming(0, { duration: 150 });
-        iconScale.value = withTiming(0.8, { duration: 150 });
-        overlayOpacity.value = withDelay(100, withTiming(0, { duration: 200 }, () => {
-          runOnJS(onDismiss)();
-        }));
-      }, onShare ? 2800 : 1500);
-
-      return () => clearTimeout(timeout);
+      setPhase(onConfirm ? 'confirm' : 'cast');
+      scrimOpacity.value = withTiming(1, { duration: ANIMATION.motion.quick });
+      sheetTranslate.value = withSpring(0, ANIMATION.spring.gentle);
     } else {
-      // Reset values
-      overlayOpacity.value = 0;
-      iconScale.value = 0;
-      iconRotation.value = -45;
-      textOpacity.value = 0;
-      textTranslateY.value = 20;
-      ringScale.value = 0.8;
-      ringOpacity.value = 0;
+      scrimOpacity.value = 0;
+      sheetTranslate.value = 480;
+      sealScale.value = 0;
     }
   }, [visible]);
 
-  const overlayStyle = useAnimatedStyle(() => ({
-    opacity: overlayOpacity.value,
-    pointerEvents: overlayOpacity.value > 0 ? 'auto' : 'none',
+  // Cast state: draw the gold seal, then auto-dismiss (longer when the share
+  // pill is showing, so there's actually time to tap it).
+  useEffect(() => {
+    if (!visible || phase !== 'cast') return;
+    sealScale.value = 0;
+    sealScale.value = withDelay(120, withSpring(1, ANIMATION.spring.bouncy));
+
+    const timeout = setTimeout(() => {
+      scrimOpacity.value = withTiming(0, { duration: ANIMATION.motion.quick });
+      sheetTranslate.value = withTiming(480, { duration: ANIMATION.motion.quick }, () => {
+        runOnJS(onDismiss)();
+      });
+    }, onShare ? 2800 : 1600);
+
+    return () => clearTimeout(timeout);
+  }, [visible, phase]);
+
+  const scrimStyle = useAnimatedStyle(() => ({
+    opacity: scrimOpacity.value,
   }));
 
-  const iconContainerStyle = useAnimatedStyle(() => ({
-    transform: [
-      { scale: iconScale.value },
-      { rotate: `${iconRotation.value}deg` },
-    ],
+  const sheetStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: sheetTranslate.value }],
   }));
 
-  const ringStyle = useAnimatedStyle(() => ({
-    opacity: ringOpacity.value,
-    transform: [{ scale: ringScale.value }],
+  const sealStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: sealScale.value }],
+    opacity: sealScale.value,
   }));
 
-  const textStyle = useAnimatedStyle(() => ({
-    opacity: textOpacity.value,
-    transform: [{ translateY: textTranslateY.value }],
-  }));
+  if (!visible) return null;
 
-  if (!visible && overlayOpacity.value === 0) {
-    return null;
-  }
+  const handleConfirm = () => {
+    onConfirm?.();
+    setPhase('cast');
+  };
+
+  const handleGoBack = () => {
+    scrimOpacity.value = withTiming(0, { duration: ANIMATION.motion.quick });
+    sheetTranslate.value = withTiming(480, { duration: ANIMATION.motion.quick }, () => {
+      runOnJS(onDismiss)();
+    });
+  };
 
   return (
-    <Animated.View style={[styles.overlay, overlayStyle]}>
-      <View style={styles.content}>
-        {/* Animated ring */}
-        <Animated.View
-          style={[
-            styles.ring,
-            { borderColor: iconColor },
-            ringStyle,
-          ]}
-        />
+    <View style={styles.root} pointerEvents="auto">
+      {/* 75% scrim — the queue stays dimly visible behind the decision */}
+      <Animated.View style={[styles.scrim, { backgroundColor: colors.overlay }, scrimStyle]}>
+        <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={phase === 'confirm' ? handleGoBack : undefined} />
+      </Animated.View>
 
-        {/* Icon container with glow */}
-        <Animated.View style={[styles.iconContainer, iconContainerStyle]}>
-          <View
-            style={[
-              styles.iconGlow,
-              { backgroundColor: iconColor, shadowColor: iconColor },
-            ]}
-          />
-          <View style={[styles.iconCircle, { backgroundColor: iconColor }]}>
-            <Ionicons
-              name={iconName}
-              size={64}
-              color="#fff"
-            />
-          </View>
-        </Animated.View>
+      <Animated.View
+        style={[
+          styles.sheet,
+          {
+            backgroundColor: colors.backgroundElevated,
+            borderColor: colors.border,
+            paddingBottom: Math.max(insets.bottom, 16) + 24,
+          },
+          sheetStyle,
+        ]}
+      >
+        <View style={[styles.grabber, { backgroundColor: colors.surfaceHighlight }]} />
 
-        {/* Text */}
-        <Animated.View style={[styles.textContainer, textStyle]}>
-          <Text style={[styles.title, { color: colors.gold }]}>
-            {voteText}
-          </Text>
-          <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-            Your voice has been recorded
-          </Text>
-          {onShare && (
-            <TouchableOpacity
-              style={[styles.shareBtn, { borderColor: colors.gold }]}
-              onPress={() => { onShare(); onDismiss(); }}
-              activeOpacity={0.8}
-              accessibilityRole="button"
-              accessibilityLabel="Share your vote"
+        {phase === 'confirm' ? (
+          <>
+            <View style={styles.headerBlock}>
+              <Text style={[styles.eyebrow, { color: colors.gold }]}>CONFIRM YOUR BALLOT</Text>
+              {!!question && (
+                <Text style={[styles.question, { color: colors.text }]}>{question}</Text>
+              )}
+            </View>
+
+            {/* The chosen side — rendered in GOLD, the committed-ballot color */}
+            <View
+              style={[
+                styles.ballotRow,
+                { backgroundColor: colors.goldSurface, borderColor: 'rgba(234, 186, 88, 0.4)' },
+              ]}
             >
-              <Ionicons name="share-outline" size={16} color={colors.gold} />
-              <Text style={[styles.shareText, { color: colors.gold }]}>Share your vote</Text>
-            </TouchableOpacity>
-          )}
-        </Animated.View>
-      </View>
-    </Animated.View>
+              <View style={styles.ballotCol}>
+                <Text style={[styles.ballotEyebrow, { color: colors.textTertiary }]}>YOUR BALLOT</Text>
+                <Text style={[styles.ballotSide, { color: colors.gold }]}>{sideLabel}</Text>
+              </View>
+              <View style={[styles.ballotCheck, { backgroundColor: colors.goldFill }]}>
+                <Ionicons name="checkmark" size={20} color="#040707" />
+              </View>
+            </View>
+
+            {/* Permanence warning */}
+            <View
+              style={[
+                styles.warningCard,
+                { backgroundColor: colors.backgroundSecondary, borderColor: colors.borderSubtle },
+              ]}
+            >
+              <Ionicons name="lock-closed-outline" size={15} color={colors.textSecondary} style={styles.warningIcon} />
+              <Text style={[styles.warningText, { color: colors.textSecondary }]}>
+                <Text style={[styles.warningStrong, { color: colors.text }]}>
+                  This cannot be changed or recast.{' '}
+                </Text>
+                Your ballot is recorded on the public ledger the moment you cast it — permanent,
+                public, and verifiable by anyone.
+              </Text>
+            </View>
+
+            <View style={styles.actions}>
+              <TouchableOpacity
+                style={[styles.confirmBtn, { backgroundColor: colors.goldFill }]}
+                onPress={handleConfirm}
+                activeOpacity={0.85}
+                accessibilityRole="button"
+                accessibilityLabel={`Cast ballot, ${sideLabel}`}
+              >
+                <Ionicons name="checkmark-done-outline" size={17} color="#040707" />
+                <Text style={styles.confirmText}>Cast Ballot — {sideLabel}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.goBackBtn}
+                onPress={handleGoBack}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel="Go back without casting"
+              >
+                <Text style={[styles.goBackText, { color: colors.textSecondary }]}>Go Back</Text>
+              </TouchableOpacity>
+            </View>
+          </>
+        ) : (
+          <View style={styles.castBlock}>
+            <Animated.View
+              style={[
+                styles.sealCircle,
+                { backgroundColor: colors.goldSurfaceStrong, borderColor: 'rgba(234, 186, 88, 0.4)' },
+                sealStyle,
+              ]}
+            >
+              <Ionicons name="checkmark" size={34} color={colors.gold} />
+            </Animated.View>
+            <Text style={[styles.castTitle, { color: colors.gold }]}>
+              Ballot cast — {sideLabel}
+            </Text>
+            <Text style={[styles.castSub, { color: colors.textTertiary }]}>
+              RECORDED ON THE PUBLIC LEDGER · COUNTED EXACTLY ONCE
+            </Text>
+            {onShare && (
+              <TouchableOpacity
+                style={[styles.shareBtn, { borderColor: colors.gold }]}
+                onPress={() => {
+                  onShare();
+                  onDismiss();
+                }}
+                activeOpacity={0.8}
+                accessibilityRole="button"
+                accessibilityLabel="Share your vote"
+              >
+                <Ionicons name="share-outline" size={15} color={colors.gold} />
+                <Text style={[styles.shareText, { color: colors.gold }]}>Share your vote</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
+      </Animated.View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  overlay: {
+  root: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.85)',
-    justifyContent: 'center',
-    alignItems: 'center',
     zIndex: 9999,
+    justifyContent: 'flex-end',
   },
-  content: {
+  scrim: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  sheet: {
+    borderWidth: 1,
+    borderBottomWidth: 0,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingTop: 12,
+    paddingHorizontal: 26,
+    gap: 18,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -20 },
+    shadowOpacity: 0.6,
+    shadowRadius: 60,
+    elevation: 24,
+  },
+  grabber: {
+    width: 40,
+    height: 5,
+    borderRadius: 3,
+    alignSelf: 'center',
+  },
+  headerBlock: {
+    gap: 6,
+  },
+  eyebrow: {
+    fontFamily: FONTS.sansSemiBold,
+    fontSize: 10,
+    letterSpacing: 1.6,
+  },
+  question: {
+    fontFamily: FONTS.serif,
+    fontSize: 20,
+    lineHeight: 26,
+  },
+  ballotRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1.5,
+    borderRadius: 16,
+    paddingVertical: 15,
+    paddingHorizontal: 17,
+  },
+  ballotCol: {
+    gap: 2,
+  },
+  ballotEyebrow: {
+    fontFamily: FONTS.mono,
+    fontSize: 9,
+    letterSpacing: 1.44,
+    fontVariant: ['tabular-nums'],
+  },
+  ballotSide: {
+    fontFamily: FONTS.sansSemiBold,
+    fontSize: 19,
+  },
+  ballotCheck: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  ring: {
-    position: 'absolute',
-    width: 140,
-    height: 140,
-    borderRadius: 70,
-    borderWidth: 3,
+  warningCard: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 11,
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingVertical: 13,
+    paddingHorizontal: 15,
   },
-  iconContainer: {
+  warningIcon: {
+    marginTop: 1,
+  },
+  warningText: {
+    flex: 1,
+    fontFamily: FONTS.sans,
+    fontSize: 12.5,
+    lineHeight: 19,
+  },
+  warningStrong: {
+    fontFamily: FONTS.sansSemiBold,
+  },
+  actions: {
+    gap: 9,
+  },
+  confirmBtn: {
+    height: 56,
+    borderRadius: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 9,
+  },
+  confirmText: {
+    fontFamily: FONTS.sansSemiBold,
+    fontSize: 17,
+    color: '#040707',
+  },
+  goBackBtn: {
+    height: 46,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  iconGlow: {
-    position: 'absolute',
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    opacity: 0.3,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.5,
-    shadowRadius: 30,
-    elevation: 20,
+  goBackText: {
+    fontFamily: FONTS.sansMedium,
+    fontSize: 14.5,
   },
-  iconCircle: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
+  castBlock: {
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 18,
+  },
+  sealCircle: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    borderWidth: 1.5,
     alignItems: 'center',
     justifyContent: 'center',
+    marginBottom: 4,
   },
-  textContainer: {
-    marginTop: SPACING.xl,
-    alignItems: 'center',
+  castTitle: {
+    fontFamily: FONTS.serif,
+    fontSize: 22,
+    lineHeight: 28,
   },
-  title: {
-    ...TYPOGRAPHY.headlineLarge,
-    marginBottom: SPACING.xs,
-  },
-  subtitle: {
-    ...TYPOGRAPHY.bodyMedium,
+  castSub: {
+    fontFamily: FONTS.mono,
+    fontSize: 9.5,
+    letterSpacing: 1,
+    textAlign: 'center',
+    fontVariant: ['tabular-nums'],
   },
   shareBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginTop: SPACING.lg,
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.sm + 2,
-    borderRadius: BORDER_RADIUS.full,
+    marginTop: 10,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderRadius: 100,
     borderWidth: 1.5,
   },
   shareText: {
-    ...TYPOGRAPHY.labelMedium,
+    fontFamily: FONTS.sansSemiBold,
+    fontSize: 12,
+    letterSpacing: 0.5,
   },
 });
 

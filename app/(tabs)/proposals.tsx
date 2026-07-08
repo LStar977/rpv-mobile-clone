@@ -53,7 +53,6 @@ import { getTierLabel, getLocationLabel, canUserVoteOnProposal, meetsCitizenship
 import { useModerationStore, useSyncMutes } from '../../lib/moderation';
 import { ProposalModerationMenu } from '../../components/moderation/ProposalModerationMenu';
 import { CommentsSection } from '../../components/comments/CommentsSection';
-import Svg, { Rect, Line, Ellipse, Path, Circle, G, Defs, LinearGradient as SvgLinearGradient, Stop } from 'react-native-svg';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // PREMIUM DESIGN CONSTANTS - Institutional gold-on-black (static fallbacks)
@@ -99,7 +98,7 @@ function useProposalColors() {
   };
 }
 import { showVoteConfirmation } from '../../lib/notifications';
-import { VoteConfirmationOverlay, UpgradeModal, BallotDisplay, TallyBar } from '../../components/ui';
+import { VoteConfirmationOverlay, UpgradeModal, BallotDisplay, TallyBar, TrustChip } from '../../components/ui';
 import { checkForNewBadges } from '../../lib/badgeNotification';
 import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -127,185 +126,9 @@ const COUNTRIES = ['Canada', 'United States', 'United Kingdom', 'Australia'];
 const AGE_GROUPS = ['All Ages', '18-25', '26-35', '36-45', '46-55', '56-65', '65+'];
 const GENDERS = ['All Genders', 'Male', 'Female'];
 
-// Category-themed gradient colors for proposal cards
-const categoryThemes: Record<string, { primary: string; secondary: string; icon: string }> = {
-  'Transportation': { primary: '#3B82F6', secondary: '#1D4ED8', icon: 'car-outline' },
-  'Environment': { primary: '#22C55E', secondary: '#15803D', icon: 'leaf-outline' },
-  'Housing': { primary: '#F59E0B', secondary: '#D97706', icon: 'home-outline' },
-  'Education': { primary: '#8B5CF6', secondary: '#6D28D9', icon: 'school-outline' },
-  'Healthcare': { primary: '#EF4444', secondary: '#DC2626', icon: 'medkit-outline' },
-  'Economy': { primary: '#10B981', secondary: '#059669', icon: 'trending-up-outline' },
-  'Public Safety': { primary: '#F97316', secondary: '#EA580C', icon: 'shield-checkmark-outline' },
-  'Infrastructure': { primary: '#6366F1', secondary: '#4F46E5', icon: 'construct-outline' },
-  'Other': { primary: '#D4AF37', secondary: '#A68523', icon: 'ellipsis-horizontal-outline' },
-  'General': { primary: '#D4AF37', secondary: '#A68523', icon: 'ellipsis-horizontal-outline' },
-};
 
 const SWIPE_THRESHOLD = 120;
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// SVG SCENE ILLUSTRATIONS - Abstract gold line art for proposals
-// ═══════════════════════════════════════════════════════════════════════════════
-function HousingScene() {
-  return (
-    <Svg width="100%" height="100%" viewBox="0 0 360 180" preserveAspectRatio="xMidYMid slice" style={StyleSheet.absoluteFill}>
-      <Defs>
-        <SvgLinearGradient id="sky1" x1="0" y1="0" x2="0" y2="1">
-          <Stop offset="0%" stopColor="#1A2030" />
-          <Stop offset="100%" stopColor="#0A0D14" />
-        </SvgLinearGradient>
-      </Defs>
-      <Rect width="360" height="180" fill="url(#sky1)" />
-      <Ellipse cx="280" cy="40" rx="100" ry="50" fill={GOLD} opacity={0.08} />
-      <G fill="#0E1218" stroke={GOLD} strokeWidth={0.5} strokeOpacity={0.35}>
-        <Rect x={20} y={80} width={38} height={100} />
-        <Rect x={62} y={60} width={44} height={120} />
-        <Rect x={110} y={50} width={32} height={130} />
-        <Rect x={146} y={70} width={52} height={110} />
-        <Rect x={202} y={45} width={40} height={135} />
-        <Rect x={246} y={65} width={36} height={115} />
-        <Rect x={286} y={75} width={50} height={105} />
-      </G>
-      <G fill={GOLD} opacity={0.7}>
-        {[[28,100],[44,100],[28,120],[44,140],[70,80],[86,100],[70,120],[118,70],[130,90],[156,90],[176,110],[212,65],[228,85],[254,85],[294,95]].map(([x,y], i) => (
-          <Rect key={i} x={x} y={y} width={6} height={6} />
-        ))}
-      </G>
-      <Line x1={0} y1={180} x2={360} y2={180} stroke={GOLD} strokeWidth={0.5} opacity={0.4} />
-    </Svg>
-  );
-}
-
-function TransitScene() {
-  return (
-    <Svg width="100%" height="100%" viewBox="0 0 360 180" preserveAspectRatio="xMidYMid slice" style={StyleSheet.absoluteFill}>
-      <Defs>
-        <SvgLinearGradient id="sky2" x1="0" y1="0" x2="0" y2="1">
-          <Stop offset="0%" stopColor="#101522" />
-          <Stop offset="100%" stopColor="#08090F" />
-        </SvgLinearGradient>
-      </Defs>
-      <Rect width="360" height="180" fill="url(#sky2)" />
-      <Path d="M-20 150 Q 90 100 180 120 Q 270 140 380 80" stroke={GOLD} strokeWidth={2} fill="none" opacity={0.7} />
-      <Path d="M-20 165 Q 90 115 180 135 Q 270 155 380 95" stroke={GOLD} strokeWidth={0.8} fill="none" opacity={0.4} />
-      <G stroke={GOLD} strokeWidth={1} opacity={0.55}>
-        <Line x1={40} y1={130} x2={40} y2={180} />
-        <Line x1={100} y1={108} x2={100} y2={180} />
-        <Line x1={160} y1={120} x2={160} y2={180} />
-        <Line x1={220} y1={128} x2={220} y2={180} />
-        <Line x1={280} y1={118} x2={280} y2={180} />
-        <Line x1={320} y1={100} x2={320} y2={180} />
-      </G>
-      <Path d="M-20 150 Q 90 100 180 120 Q 270 140 380 80" stroke={GOLD_LIGHT} strokeWidth={1} strokeDasharray="3 6" fill="none" opacity={0.9} />
-      <G transform="translate(310, 30)" stroke={GOLD} strokeWidth={0.6} fill="none" opacity={0.6}>
-        <Circle r={14} />
-        <Line x1={0} y1={-14} x2={0} y2={14} />
-        <Line x1={-14} y1={0} x2={14} y2={0} />
-      </G>
-    </Svg>
-  );
-}
-
-function EconomyScene() {
-  return (
-    <Svg width="100%" height="100%" viewBox="0 0 360 180" preserveAspectRatio="xMidYMid slice" style={StyleSheet.absoluteFill}>
-      <Defs>
-        <SvgLinearGradient id="sky3" x1="0" y1="0" x2="0" y2="1">
-          <Stop offset="0%" stopColor="#1B1F2A" />
-          <Stop offset="100%" stopColor="#0A0D14" />
-        </SvgLinearGradient>
-      </Defs>
-      <Rect width="360" height="180" fill="url(#sky3)" />
-      {[0, 1, 2, 3, 4].map((i) => (
-        <G key={i} transform={`translate(${20 + i * 68}, 50)`}>
-          <Rect width={58} height={130} fill="#0E1218" stroke={GOLD} strokeWidth={0.6} strokeOpacity={0.5} />
-          <Rect x={6} y={14} width={46} height={60} fill="#070A10" stroke={GOLD} strokeOpacity={i === 1 || i === 3 ? 0.9 : 0.3} strokeWidth={0.6} />
-          <Line x1={0} y1={80} x2={58} y2={80} stroke={GOLD} strokeWidth={0.4} opacity={0.4} />
-          {(i === 1 || i === 3) && (
-            <G>
-              <Rect x={14} y={32} width={30} height={20} fill={BG} stroke={GOLD} strokeWidth={0.6} />
-            </G>
-          )}
-        </G>
-      ))}
-      <Line x1={0} y1={180} x2={360} y2={180} stroke={GOLD} strokeWidth={0.5} opacity={0.4} />
-    </Svg>
-  );
-}
-
-function EnvironmentScene() {
-  return (
-    <Svg width="100%" height="100%" viewBox="0 0 360 180" preserveAspectRatio="xMidYMid slice" style={StyleSheet.absoluteFill}>
-      <Defs>
-        <SvgLinearGradient id="sky4" x1="0" y1="0" x2="0" y2="1">
-          <Stop offset="0%" stopColor="#0F1A14" />
-          <Stop offset="100%" stopColor="#060A08" />
-        </SvgLinearGradient>
-      </Defs>
-      <Rect width="360" height="180" fill="url(#sky4)" />
-      <Ellipse cx="180" cy="200" rx="200" ry="60" fill={GOLD} opacity={0.05} />
-      {[40, 100, 160, 220, 280, 320].map((x, i) => (
-        <G key={i} transform={`translate(${x}, ${140 - (i % 3) * 20})`}>
-          <Line x1={0} y1={0} x2={0} y2={40 + (i % 2) * 20} stroke={GOLD} strokeWidth={1} opacity={0.6} />
-          <Path d={`M-12,-${10 + i * 3} Q0,-${25 + i * 3} 12,-${10 + i * 3}`} stroke={GOLD} strokeWidth={0.8} fill="none" opacity={0.5} />
-          <Path d={`M-8,-${18 + i * 3} Q0,-${30 + i * 3} 8,-${18 + i * 3}`} stroke={GOLD} strokeWidth={0.6} fill="none" opacity={0.4} />
-        </G>
-      ))}
-    </Svg>
-  );
-}
-
-function HealthcareScene() {
-  return (
-    <Svg width="100%" height="100%" viewBox="0 0 360 180" preserveAspectRatio="xMidYMid slice" style={StyleSheet.absoluteFill}>
-      <Defs>
-        <SvgLinearGradient id="sky5" x1="0" y1="0" x2="0" y2="1">
-          <Stop offset="0%" stopColor="#1A1520" />
-          <Stop offset="100%" stopColor="#0A080D" />
-        </SvgLinearGradient>
-      </Defs>
-      <Rect width="360" height="180" fill="url(#sky5)" />
-      <G transform="translate(180, 90)">
-        <Circle r={50} fill="none" stroke={GOLD} strokeWidth={1} opacity={0.3} />
-        <Circle r={35} fill="none" stroke={GOLD} strokeWidth={0.6} opacity={0.2} />
-        <Rect x={-5} y={-25} width={10} height={50} fill={GOLD} opacity={0.6} />
-        <Rect x={-25} y={-5} width={50} height={10} fill={GOLD} opacity={0.6} />
-      </G>
-      <Path d="M40 160 Q100 100 160 120 Q220 140 280 100 Q340 60 380 80" stroke={GOLD} strokeWidth={1} fill="none" opacity={0.3} />
-    </Svg>
-  );
-}
-
-function DefaultScene() {
-  return (
-    <Svg width="100%" height="100%" viewBox="0 0 360 180" preserveAspectRatio="xMidYMid slice" style={StyleSheet.absoluteFill}>
-      <Defs>
-        <SvgLinearGradient id="sky6" x1="0" y1="0" x2="0" y2="1">
-          <Stop offset="0%" stopColor="#1A1814" />
-          <Stop offset="100%" stopColor="#0A0908" />
-        </SvgLinearGradient>
-      </Defs>
-      <Rect width="360" height="180" fill="url(#sky6)" />
-      <G transform="translate(180, 90)" opacity={0.3}>
-        <Circle r={60} fill="none" stroke={GOLD} strokeWidth={1} strokeDasharray="4 4" />
-        <Circle r={40} fill="none" stroke={GOLD} strokeWidth={0.6} />
-        <Circle r={20} fill={GOLD} opacity={0.2} />
-      </G>
-      <Line x1={0} y1={180} x2={360} y2={180} stroke={GOLD} strokeWidth={0.5} opacity={0.3} />
-    </Svg>
-  );
-}
-
-function getSceneForCategory(category: string) {
-  switch (category?.toLowerCase()) {
-    case 'housing': return <HousingScene />;
-    case 'transportation': case 'infrastructure': return <TransitScene />;
-    case 'economy': return <EconomyScene />;
-    case 'environment': return <EnvironmentScene />;
-    case 'healthcare': return <HealthcareScene />;
-    default: return <DefaultScene />;
-  }
-}
 
 
 // Generate dossier ref code from proposal
@@ -364,7 +187,7 @@ function SwipeHintOverlay({ visible, onDismiss }: { visible: boolean; onDismiss:
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// PREMIUM VOTE HEADER - Institutional serif styling
+// M2 · VOTE QUEUE HEADER — filter rail, mono queue counter, 4px gold progress
 // ═══════════════════════════════════════════════════════════════════════════════
 function VoteHeader({
   index,
@@ -387,254 +210,177 @@ function VoteHeader({
   onCreate: () => void;
   onToggleView: () => void;
 }) {
-  const pc = useProposalColors();
+  const { colors } = useTheme();
   const filters = ['All', 'Federal', 'Provincial', 'Municipal', 'Closing'];
+  const reviewed = total > 0 ? Math.round(((index + 1) / total) * 100) : 0;
 
   return (
-    <View style={{ paddingTop: insetTop + 8, backgroundColor: pc.BG }}>
-      {/* Title block + actions */}
-      <View style={voteHeaderStyles.titleBlock}>
-        <View style={{ flex: 1 }}>
-          <Text style={[voteHeaderStyles.serifTitle, { color: pc.FG }]}>Proposals</Text>
-          <View style={voteHeaderStyles.subtitleRow}>
-            <Text style={[voteHeaderStyles.subtitleText, { color: pc.FG_MUTED }]}>{activeCount} active</Text>
-            <View style={[voteHeaderStyles.dotSeparator, { backgroundColor: pc.LINE_STRONG }]} />
-            <Text style={[voteHeaderStyles.subtitleText, { color: pc.FG_MUTED }]}>{closingSoon} closing soon</Text>
-          </View>
-        </View>
-        {/* Swipe-mode actions: list-view toggle + create button. */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+    <View style={{ paddingTop: insetTop + 8, backgroundColor: colors.background }}>
+      {/* Filter rail + queue actions (list toggle / create kept from the old header) */}
+      <View style={voteHeaderStyles.railRow}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={voteHeaderStyles.filterRail}
+          style={{ flex: 1 }}
+        >
+          {filters.map((label) => {
+            const isActive = selectedFilter === label;
+            return (
+              <TouchableOpacity
+                key={label}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  onFilterChange(label);
+                }}
+                style={[
+                  voteHeaderStyles.filterChip,
+                  isActive
+                    ? { backgroundColor: colors.goldFill }
+                    : { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1 },
+                ]}
+                accessibilityRole="button"
+                accessibilityState={{ selected: isActive }}
+              >
+                <Text
+                  style={[
+                    isActive ? voteHeaderStyles.filterChipTextActive : voteHeaderStyles.filterChipText,
+                    { color: isActive ? '#040707' : colors.textSecondary },
+                  ]}
+                >
+                  {label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+        <View style={voteHeaderStyles.actionsRow}>
           <TouchableOpacity
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
               onToggleView();
             }}
-            style={{
-              width: 38, height: 38, borderRadius: 10,
-              borderWidth: 1, borderColor: pc.LINE_STRONG,
-              alignItems: 'center', justifyContent: 'center',
-              backgroundColor: 'transparent',
-            }}
+            style={[voteHeaderStyles.actionBtn, { backgroundColor: colors.surface, borderColor: colors.borderSubtle }]}
             accessibilityLabel="Switch to list view"
           >
-            <Ionicons name="list-outline" size={18} color={pc.FG} />
+            <Ionicons name="list-outline" size={17} color={colors.textSecondary} />
           </TouchableOpacity>
           <TouchableOpacity
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
               onCreate();
             }}
+            style={[voteHeaderStyles.actionBtn, { backgroundColor: colors.goldFill, borderColor: 'transparent' }]}
             accessibilityLabel="Create proposal"
           >
-            <LinearGradient
-              colors={[pc.GOLD, pc.GOLD_DARK]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={{
-                width: 38, height: 38, borderRadius: 10,
-                alignItems: 'center', justifyContent: 'center',
-              }}
-            >
-              <Ionicons name="add" size={22} color="#000" />
-            </LinearGradient>
+            <Ionicons name="add" size={20} color="#040707" />
           </TouchableOpacity>
         </View>
       </View>
 
-      {/* Filter rail */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={voteHeaderStyles.filterRail}
-      >
-        {filters.map((label) => {
-          const isActive = selectedFilter === label;
-          return (
-            <TouchableOpacity
-              key={label}
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                onFilterChange(label);
-              }}
-              style={[
-                voteHeaderStyles.filterChip,
-                {
-                  backgroundColor: isActive ? pc.GOLD : 'transparent',
-                  borderColor: isActive ? pc.GOLD : pc.LINE_STRONG,
-                },
-              ]}
-            >
-              <Text style={[
-                voteHeaderStyles.filterChipText,
-                { color: isActive ? '#1A1206' : pc.FG_MUTED },
-              ]}>{label}</Text>
-            </TouchableOpacity>
-          );
-        })}
-      </ScrollView>
-
-      {/* Progress counter */}
+      {/* Queue progress — everything counted is mono + tabular */}
       <View style={voteHeaderStyles.progressSection}>
         <View style={voteHeaderStyles.progressRow}>
-          <View style={voteHeaderStyles.counterRow}>
-            <Text style={[voteHeaderStyles.counterNum, { color: pc.FG }]}>
-              {String(index + 1).padStart(2, '0')} / {String(total).padStart(2, '0')}
-            </Text>
-            <Text style={[voteHeaderStyles.counterLabel, { color: pc.FG_FAINT }]}>in queue</Text>
-          </View>
-          <Text style={[voteHeaderStyles.percentText, { color: pc.FG_FAINT }]}>
-            {total > 0 ? Math.round(((index + 1) / total) * 100) : 0}% reviewed
+          <Text style={[voteHeaderStyles.counterNum, { color: colors.text }]}>
+            {String(Math.min(index + 1, total)).padStart(2, '0')} / {String(total).padStart(2, '0')} IN QUEUE
+          </Text>
+          <Text style={[voteHeaderStyles.percentText, { color: colors.textTertiary }]}>
+            {reviewed}% REVIEWED
           </Text>
         </View>
-        <View style={[voteHeaderStyles.progressBar, { backgroundColor: pc.LINE }]}>
-          <LinearGradient
-            colors={[pc.GOLD_DARK, pc.GOLD, pc.GOLD_LIGHT]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={[voteHeaderStyles.progressFill, { width: `${total > 0 ? ((index + 1) / total) * 100 : 0}%` }]}
+        <View style={[voteHeaderStyles.progressBar, { backgroundColor: colors.surfaceHighlight }]}>
+          <View
+            style={[
+              voteHeaderStyles.progressFill,
+              { backgroundColor: colors.goldFill, width: `${reviewed}%` },
+            ]}
           />
-          {[25, 50, 75].map(p => (
-            <View key={p} style={[voteHeaderStyles.progressTick, { left: `${p}%`, backgroundColor: pc.LINE_STRONG }]} />
-          ))}
         </View>
+        {(activeCount > 0 || closingSoon > 0) && (
+          <Text style={[voteHeaderStyles.metaText, { color: colors.textTertiary }]}>
+            {activeCount} OPEN{closingSoon > 0 ? ` · ${closingSoon} CLOSING SOON` : ''}
+          </Text>
+        )}
       </View>
     </View>
   );
 }
 
 const voteHeaderStyles = StyleSheet.create({
-  identityStrip: {
-    paddingHorizontal: 24,
-    paddingTop: 8,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  statusRow: {
+  railRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    paddingLeft: 24,
+    paddingRight: 24,
+    paddingTop: 6,
+    paddingBottom: 14,
     gap: 8,
   },
-  statusDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-  },
-  statusText: {
-    fontFamily: FONTS.sansSemiBold,
-    fontSize: 11,
-    letterSpacing: 1.5,
-    textTransform: 'uppercase',
-    color: FG_FAINT,
-  },
-  dateText: {
-    fontFamily: FONTS.mono,
-    fontSize: 9.5,
-    color: FG_FAINT,
-    letterSpacing: 1,
-    fontVariant: ['tabular-nums'],
-  },
-  titleBlock: {
-    paddingHorizontal: 24,
-    paddingTop: 14,
-    paddingBottom: 18,
-  },
-  serifTitle: {
-    fontFamily: FONTS.serif,
-    fontSize: 38,
-    color: FG,
-    letterSpacing: -1,
-  },
-  subtitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    marginTop: 8,
-  },
-  subtitleText: {
-    fontFamily: FONTS.sans,
-    fontSize: 12,
-    color: FG_FAINT,
-    letterSpacing: -0.2,
-  },
-  dotSeparator: {
-    width: 2,
-    height: 2,
-    borderRadius: 1,
-    backgroundColor: FG_FAINT,
-  },
   filterRail: {
-    paddingHorizontal: 24,
-    paddingBottom: 18,
-    gap: 6,
+    gap: 8,
+    paddingRight: 8,
   },
   filterChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 999,
-    borderWidth: 1,
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+    borderRadius: 100,
   },
   filterChipText: {
     fontFamily: FONTS.sansMedium,
-    fontSize: 11,
-    letterSpacing: 0.3,
+    fontSize: 12.5,
+  },
+  filterChipTextActive: {
+    fontFamily: FONTS.sansSemiBold,
+    fontSize: 12.5,
+  },
+  actionsRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  actionBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   progressSection: {
     paddingHorizontal: 24,
-    paddingBottom: 16,
+    paddingBottom: 14,
+    gap: 7,
   },
   progressRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'baseline',
-    marginBottom: 10,
-  },
-  counterRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: 8,
   },
   counterNum: {
     fontFamily: FONTS.mono,
-    fontSize: 10.5,
-    color: FG,
-    letterSpacing: 0.5,
+    fontSize: 12,
+    letterSpacing: 1.2,
     fontVariant: ['tabular-nums'],
-  },
-  counterLabel: {
-    fontFamily: FONTS.sansSemiBold,
-    fontSize: 10,
-    letterSpacing: 1.5,
-    textTransform: 'uppercase',
-    color: GOLD,
   },
   percentText: {
     fontFamily: FONTS.mono,
-    fontSize: 9,
-    color: FG_FAINT,
-    letterSpacing: 0.8,
+    fontSize: 10.5,
+    letterSpacing: 0.84,
     fontVariant: ['tabular-nums'],
   },
   progressBar: {
-    height: 2,
-    backgroundColor: LINE_COLOR,
+    height: 4,
     borderRadius: 2,
-    overflow: 'visible',
-    position: 'relative',
+    overflow: 'hidden',
   },
   progressFill: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    bottom: 0,
+    height: '100%',
     borderRadius: 2,
   },
-  progressTick: {
-    position: 'absolute',
-    top: -2,
-    bottom: -2,
-    width: 1,
-    backgroundColor: BG,
+  metaText: {
+    fontFamily: FONTS.mono,
+    fontSize: 9.5,
+    letterSpacing: 1,
+    fontVariant: ['tabular-nums'],
   },
 });
 
@@ -687,30 +433,25 @@ function FilterChip({
       style={[
         styles.filterChip,
         {
-          backgroundColor: selected ? colors.gold : colors.surface,
-          borderColor: selected ? colors.gold : colors.border,
+          backgroundColor: selected ? colors.text : colors.surface,
+          borderColor: selected ? colors.text : colors.border,
         },
         animatedStyle,
       ]}
       onPress={handlePress}
       activeOpacity={1}
     >
-      {selected && (
-        <LinearGradient
-          colors={[colors.gold, colors.goldDark || '#A68523']}
-          style={StyleSheet.absoluteFill}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-        />
-      )}
-      <Text style={[styles.filterChipText, { color: selected ? '#000' : colors.text }]}>
+      <Text style={[styles.filterChipText, { color: selected ? colors.background : colors.textSecondary }]}>
         {label}
       </Text>
     </AnimatedTouchable>
   );
 }
 
-// --- Swipe Card Component (Full-Screen Tinder-Style) ---
+// ── M2 · QUEUE PROPOSAL CARD ────────────────────────────────────────────────
+// Scope chips · serif question · description · captioned attachment ·
+// proposer · TallyBar with ledger line. Swiping a side no longer casts —
+// it snaps back and opens the mandatory X1 confirm sheet.
 interface SwipeCardProps {
   proposal: Proposal;
   onSwipeLeft: () => void;
@@ -723,11 +464,11 @@ interface SwipeCardProps {
 }
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
-// Base card height - will be adjusted with safe area insets in component
-const BASE_CARD_HEIGHT_OFFSET = 280; // Space for header, tab bar, and margins
+// Space reserved for the header, vote buttons, skip control and tab bar.
+const BASE_CARD_HEIGHT_OFFSET = 420;
 
 function SwipeCard({ proposal, onSwipeLeft, onSwipeRight, onSwipeUp, onTap, isTopCard, cardIndex, cardHeight }: SwipeCardProps) {
-  const pc = useProposalColors();
+  const { colors } = useTheme();
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
   const rotation = useSharedValue(0);
@@ -747,11 +488,8 @@ function SwipeCard({ proposal, onSwipeLeft, onSwipeRight, onSwipeUp, onTap, isTo
   }, [onSwipeRight, onSwipeLeft, onSwipeUp, onTap]);
 
   const category = proposal.category || 'General';
-  const theme = categoryThemes[category] || categoryThemes['General'];
   const timeRemaining = getTimeRemaining(proposal.deadline);
   const isEnded = timeRemaining === 'Ended';
-  const totalVotes = (proposal.supportVotes || 0) + (proposal.opposeVotes || 0);
-  const supportPercent = totalVotes > 0 ? Math.round(((proposal.supportVotes || 0) / totalVotes) * 100) : 50;
 
   useEffect(() => {
     scale.value = withSpring(isTopCard ? 1 : 0.95 - cardIndex * 0.02, { damping: 15 });
@@ -789,14 +527,18 @@ function SwipeCard({ proposal, onSwipeLeft, onSwipeRight, onSwipeUp, onTap, isTo
         runOnJS(Haptics.impactAsync)(Haptics.ImpactFeedbackStyle.Light);
         runOnJS(handleSwipeUp)();
       } else if (event.translationX > SWIPE_THRESHOLD) {
-        translateX.value = withTiming(SCREEN_WIDTH * 1.5, { duration: 300 });
-        rotation.value = withTiming(20, { duration: 300 });
-        runOnJS(Haptics.notificationAsync)(Haptics.NotificationFeedbackType.Success);
+        // Side chosen — snap back; the X1 confirm sheet is mandatory before
+        // any ballot is cast, so the card stays until the user confirms.
+        translateX.value = withSpring(0, { damping: 15 });
+        translateY.value = withSpring(0, { damping: 15 });
+        rotation.value = withSpring(0, { damping: 15 });
+        runOnJS(Haptics.impactAsync)(Haptics.ImpactFeedbackStyle.Medium);
         runOnJS(handleSwipeRight)();
       } else if (event.translationX < -SWIPE_THRESHOLD) {
-        translateX.value = withTiming(-SCREEN_WIDTH * 1.5, { duration: 300 });
-        rotation.value = withTiming(-20, { duration: 300 });
-        runOnJS(Haptics.notificationAsync)(Haptics.NotificationFeedbackType.Warning);
+        translateX.value = withSpring(0, { damping: 15 });
+        translateY.value = withSpring(0, { damping: 15 });
+        rotation.value = withSpring(0, { damping: 15 });
+        runOnJS(Haptics.impactAsync)(Haptics.ImpactFeedbackStyle.Medium);
         runOnJS(handleSwipeLeft)();
       } else {
         translateX.value = withSpring(0, { damping: 15 });
@@ -837,226 +579,253 @@ function SwipeCard({ proposal, onSwipeLeft, onSwipeRight, onSwipeUp, onTap, isTo
     opacity: interpolate(translateY.value, [-SWIPE_THRESHOLD, 0], [1, 0], Extrapolation.CLAMP),
   }));
 
-  // Get category color for tag
-  const getCategoryColor = () => {
-    switch (category?.toLowerCase()) {
-      case 'economy': return pc.GREEN;
-      case 'housing': return pc.GOLD;
-      case 'transportation': case 'infrastructure': return pc.BLUE;
-      case 'environment': return '#22C55E';
-      case 'healthcare': return '#EF4444';
-      default: return pc.GOLD;
-    }
-  };
-
   const tierLabel = getTierLabel(proposal.geoRestrictions);
-  const categoryColor = getCategoryColor();
   const location = getLocationLabel(proposal.geoRestrictions);
+  const scopeLabel = tierLabel === 'GLOBAL' ? 'GLOBAL' : `${location} · ${tierLabel}`;
+  const voteType = (proposal as any).voteType || 'yes-no';
+  const optionCount = ((proposal as any).options || []).length;
+  const totalBallots = (proposal.supportVotes || 0) + (proposal.opposeVotes || 0);
+  const creatorName = proposal.creatorName || 'Community Member';
 
   return (
     <GestureDetector gesture={composedGesture}>
-      <Animated.View style={[premiumCardStyles.card, { height: cardHeight, backgroundColor: pc.BG_CARD, borderColor: pc.LINE }, cardStyle]}>
-        {/* Hero with SVG scene */}
-        <View style={premiumCardStyles.heroContainer}>
-          {proposal.imageUrl ? (
-            <>
-              <ExpoImage source={{ uri: proposal.imageUrl }} style={StyleSheet.absoluteFill} contentFit="cover" cachePolicy="memory-disk" transition={150} />
-              <LinearGradient
-                colors={pc.isDark ? ['rgba(4,7,7,0.2)', 'rgba(4,7,7,0.55)', 'rgba(13,15,18,0.95)'] : ['rgba(255,255,255,0.2)', 'rgba(255,255,255,0.55)', 'rgba(250,248,245,0.95)']}
-                locations={[0, 0.5, 1]}
-                style={StyleSheet.absoluteFill}
-              />
-            </>
-          ) : (
-            <>
-              {getSceneForCategory(category)}
-              <LinearGradient
-                colors={pc.isDark ? ['rgba(4,7,7,0.15)', 'transparent', 'transparent', 'rgba(13,15,18,0.95)'] : ['rgba(255,255,255,0.15)', 'transparent', 'transparent', 'rgba(250,248,245,0.95)']}
-                locations={[0, 0.3, 0.75, 1]}
-                style={StyleSheet.absoluteFill}
-              />
-            </>
-          )}
-
-          {/* Location pill - top left */}
-          <View style={[premiumCardStyles.locationPill, { backgroundColor: pc.isDark ? 'rgba(4,7,7,0.55)' : 'rgba(255,255,255,0.75)' }]}>
-            <Ionicons name="location" size={11} color={pc.FG} />
-            <Text style={[premiumCardStyles.locationText, { color: pc.FG }]}>{location}</Text>
-          </View>
-
-          {/* Time remaining pill - top right */}
-          {!isEnded && timeRemaining ? (
-            <View style={[premiumCardStyles.timePill, { borderColor: `${pc.GOLD}55`, backgroundColor: pc.isDark ? 'rgba(4,7,7,0.55)' : 'rgba(255,255,255,0.75)' }]}>
-              <Ionicons name="time-outline" size={11} color={pc.GOLD} />
-              <Text style={[premiumCardStyles.timePillText, { color: pc.GOLD }]}>{timeRemaining}</Text>
-            </View>
-          ) : null}
-
-          {/* Category tag - bottom left */}
-          <View style={[premiumCardStyles.categoryTag, { borderColor: `${categoryColor}66` }]}>
-            <View style={[premiumCardStyles.categoryDot, { backgroundColor: categoryColor }]} />
-            <Text style={[premiumCardStyles.categoryText, { color: categoryColor }]}>{category.toUpperCase()}</Text>
-          </View>
-        </View>
-
+      <Animated.View
+        style={[
+          premiumCardStyles.card,
+          { height: cardHeight, backgroundColor: colors.surface, borderColor: colors.border },
+          cardStyle,
+        ]}
+      >
         {/* Swipe Indicators */}
         {isTopCard && !isEnded && (
           <>
-            <Animated.View style={[premiumCardStyles.swipeVeil, { backgroundColor: `${pc.SUPPORT}20` }, supportIndicatorStyle]}>
-              <View style={[premiumCardStyles.swipeStamp, { borderColor: pc.SUPPORT }]}>
-                <Text style={[premiumCardStyles.swipeStampText, { color: pc.SUPPORT }]}>SUPPORT</Text>
+            <Animated.View style={[premiumCardStyles.swipeVeil, { backgroundColor: colors.supportSurface }, supportIndicatorStyle]}>
+              <View style={[premiumCardStyles.swipeStamp, { borderColor: colors.support }]}>
+                <Text style={[premiumCardStyles.swipeStampText, { color: colors.support }]}>SUPPORT</Text>
               </View>
             </Animated.View>
-            <Animated.View style={[premiumCardStyles.swipeVeil, { backgroundColor: `${pc.OPPOSE}20` }, opposeIndicatorStyle]}>
-              <View style={[premiumCardStyles.swipeStamp, { borderColor: pc.OPPOSE, right: 24, left: undefined }]}>
-                <Text style={[premiumCardStyles.swipeStampText, { color: pc.OPPOSE }]}>OPPOSE</Text>
+            <Animated.View style={[premiumCardStyles.swipeVeil, { backgroundColor: colors.opposeSurface }, opposeIndicatorStyle]}>
+              <View style={[premiumCardStyles.swipeStamp, { borderColor: colors.oppose, right: 24, left: undefined }]}>
+                <Text style={[premiumCardStyles.swipeStampText, { color: colors.oppose }]}>OPPOSE</Text>
               </View>
             </Animated.View>
-            <Animated.View style={[premiumCardStyles.swipeVeilTop, skipIndicatorStyle]}>
-              <View style={[premiumCardStyles.swipeStamp, { borderColor: pc.GOLD, transform: [{ rotate: '0deg' }] }]}>
-                <Text style={[premiumCardStyles.swipeStampText, { color: pc.GOLD }]}>SKIP</Text>
+            <Animated.View style={[premiumCardStyles.swipeVeilTop, { backgroundColor: colors.goldSurface }, skipIndicatorStyle]}>
+              <View style={[premiumCardStyles.swipeStamp, { borderColor: colors.gold }]}>
+                <Text style={[premiumCardStyles.swipeStampText, { color: colors.gold }]}>SKIP</Text>
               </View>
             </Animated.View>
           </>
         )}
 
-        {/* Card body */}
-        <View style={premiumCardStyles.cardBody}>
-          {/* Tier label */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-            <Text style={[premiumCardStyles.refText, { color: pc.GOLD }]}>{tierLabel}</Text>
+        {/* Scope chips + time left */}
+        <View style={premiumCardStyles.chipRow}>
+          <View style={premiumCardStyles.chipGroup}>
+            {proposal.source === 'civic-desk' ? (
+              <TrustChip label="CIVIC DESK" variant="gold" />
+            ) : null}
+            <TrustChip label={scopeLabel} variant="neutral" />
+            <TrustChip label={category} variant="outline" />
             {proposal.requiresCitizenship && (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                <Ionicons name="shield-checkmark" size={11} color={pc.GOLD} />
-                <Text style={[premiumCardStyles.refText, { color: pc.GOLD }]}>CITIZENS ONLY</Text>
-              </View>
+              <TrustChip label="CITIZENS ONLY" variant="outline" icon="shield-outline" />
             )}
           </View>
+          {timeRemaining ? (
+            <Text style={[premiumCardStyles.timeText, { color: isEnded ? colors.oppose : colors.textTertiary }]}>
+              {timeRemaining.toUpperCase()}
+            </Text>
+          ) : null}
+        </View>
 
-          {/* Serif title */}
-          <Text style={[premiumCardStyles.serifTitle, { color: pc.FG }]} numberOfLines={2}>{proposal.title}</Text>
+        {/* Serif ballot question */}
+        <Text style={[premiumCardStyles.serifTitle, { color: colors.text }]} numberOfLines={3}>
+          {proposal.title}
+        </Text>
 
-          {/* Proposer */}
-          <View style={premiumCardStyles.proposerRow}>
-            <View style={[premiumCardStyles.proposerAvatar, { backgroundColor: pc.LINE_STRONG }]}>
-              <Text style={[premiumCardStyles.proposerDot, { color: pc.GOLD }]}>·</Text>
+        {/* Description */}
+        <Text style={[premiumCardStyles.description, { color: colors.textSecondary }]} numberOfLines={4}>
+          {proposal.description}
+        </Text>
+
+        {/* Attachment — captioned document, not decoration */}
+        {proposal.imageUrl ? (
+          <View style={premiumCardStyles.attachmentBlock}>
+            <ExpoImage
+              source={{ uri: proposal.imageUrl }}
+              style={[premiumCardStyles.attachmentImage, { borderColor: colors.borderSubtle }]}
+              contentFit="cover"
+              cachePolicy="memory-disk"
+              transition={150}
+            />
+            <View style={premiumCardStyles.attachmentCaptionRow}>
+              <Ionicons name="document-attach-outline" size={11} color={colors.textTertiary} />
+              <Text style={[premiumCardStyles.attachmentCaption, { color: colors.textTertiary }]}>
+                ATTACHMENT · FILED WITH THIS PROPOSAL
+              </Text>
             </View>
-            <Text style={[premiumCardStyles.proposerText, { color: pc.FG_MUTED }]}>
-              Proposed by <Text style={{ color: pc.FG }}>{proposal.creatorName || 'Community Member'}</Text>
+          </View>
+        ) : null}
+
+        {/* Proposer */}
+        <View style={premiumCardStyles.proposerRow}>
+          <View
+            style={[
+              premiumCardStyles.proposerAvatar,
+              { backgroundColor: colors.goldSurface, borderColor: 'rgba(234, 186, 88, 0.25)' },
+            ]}
+          >
+            <Text style={[premiumCardStyles.proposerInitial, { color: colors.gold }]}>
+              {creatorName.charAt(0).toUpperCase()}
             </Text>
           </View>
-
-          {/* Description */}
-          <Text style={[premiumCardStyles.description, { color: pc.FG_MUTED }]}>{proposal.description}</Text>
-
-          {/* Sentiment ledger */}
-          <TallyBar
-            supportCount={proposal.supportVotes || 0}
-            opposeCount={proposal.opposeVotes || 0}
-            variant="compact"
-            applyThreshold={!isEnded}
-            style={premiumCardStyles.sentimentSection}
-          />
-
-          {/* Ended Banner */}
-          {isEnded && (
-            <View style={premiumCardStyles.endedBanner}>
-              <Ionicons name="flag-outline" size={14} color="#fff" />
-              <Text style={premiumCardStyles.endedText}>Voting has ended</Text>
-            </View>
-          )}
+          <Text style={[premiumCardStyles.proposerText, { color: colors.textTertiary }]}>
+            Proposed by <Text style={{ color: colors.textSecondary }}>{creatorName}</Text>
+          </Text>
         </View>
+
+        {/* Tally — compact treatment per the 25-ballot threshold rules */}
+        <View style={premiumCardStyles.tallySection}>
+          {voteType !== 'yes-no' ? (
+            <View style={premiumCardStyles.optionsRow}>
+              <Text style={[premiumCardStyles.optionsText, { color: colors.textSecondary }]}>
+                {optionCount || 2} OPTIONS · {voteType === 'ranked-choice' ? 'RANK YOUR CHOICES' : 'PICK ONE'}
+              </Text>
+              <Text style={[premiumCardStyles.optionsText, { color: colors.textTertiary }]}>
+                {totalBallots.toLocaleString('en-CA')} VERIFIED BALLOTS
+              </Text>
+            </View>
+          ) : (
+            <TallyBar
+              supportCount={proposal.supportVotes || 0}
+              opposeCount={proposal.opposeVotes || 0}
+              variant="full"
+              applyThreshold={!isEnded}
+            />
+          )}
+          <Text style={[premiumCardStyles.ledgerLine, { color: colors.textTertiary }]}>
+            ON THE PUBLIC LEDGER · ONE PERSON, ONE BALLOT
+          </Text>
+        </View>
+
+        {/* Ended Banner — failure/closure must look like what it is */}
+        {isEnded && (
+          <View style={[premiumCardStyles.endedBanner, { backgroundColor: colors.opposeSurface }]}>
+            <Ionicons name="flag-outline" size={13} color={colors.oppose} />
+            <Text style={[premiumCardStyles.endedText, { color: colors.oppose }]}>VOTING CLOSED</Text>
+          </View>
+        )}
       </Animated.View>
     </GestureDetector>
   );
 }
 
-// Premium card styles
+// M2 queue card styles
 const premiumCardStyles = StyleSheet.create({
   card: {
     position: 'absolute',
-    left: 16,
-    right: 16,
+    left: 24,
+    right: 24,
     top: 0,
-    backgroundColor: BG_CARD,
     borderRadius: 22,
     borderWidth: 1,
-    borderColor: LINE_COLOR,
     overflow: 'hidden',
+    padding: 20,
+    gap: 13,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 24 },
     shadowOpacity: 0.5,
     shadowRadius: 48,
     elevation: 20,
   },
-  heroContainer: {
-    height: 260,
-    position: 'relative',
-    overflow: 'hidden',
-  },
-  locationPill: {
-    position: 'absolute',
-    top: 16,
-    left: 16,
+  chipRow: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    gap: 7,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 999,
-    backgroundColor: 'rgba(4,7,7,0.55)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
+    gap: 8,
   },
-  locationText: {
-    fontFamily: FONTS.sansMedium,
-    fontSize: 11,
-    color: FG,
-    letterSpacing: -0.2,
-  },
-  timePill: {
-    position: 'absolute',
-    top: 16,
-    right: 16,
+  chipGroup: {
+    flex: 1,
     flexDirection: 'row',
-    alignItems: 'center',
+    flexWrap: 'wrap',
     gap: 6,
-    paddingHorizontal: 11,
-    paddingVertical: 6,
-    borderRadius: 999,
-    backgroundColor: 'rgba(4,7,7,0.55)',
-    borderWidth: 1,
-    borderColor: `${GOLD}55`,
   },
-  timePillText: {
-    fontFamily: FONTS.monoSemiBold,
-    fontSize: 10.5,
-    color: GOLD,
-    letterSpacing: 0.3,
+  timeText: {
+    fontFamily: FONTS.mono,
+    fontSize: 10,
     fontVariant: ['tabular-nums'],
   },
-  categoryTag: {
-    position: 'absolute',
-    bottom: 14,
-    left: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
+  serifTitle: {
+    fontFamily: FONTS.serif,
+    fontSize: 23,
+    lineHeight: 29,
+    letterSpacing: -0.18,
+  },
+  description: {
+    fontFamily: FONTS.sans,
+    fontSize: 13,
+    lineHeight: 20,
+  },
+  attachmentBlock: {
     gap: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 4,
-    backgroundColor: 'rgba(4,7,7,0.7)',
+  },
+  attachmentImage: {
+    width: '100%',
+    height: 110,
+    borderRadius: 12,
     borderWidth: 1,
   },
-  categoryDot: {
-    width: 4,
-    height: 4,
-    borderRadius: 2,
+  attachmentCaptionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
   },
-  categoryText: {
-    fontFamily: FONTS.sansSemiBold,
-    fontSize: 9,
-    letterSpacing: 1.3,
+  attachmentCaption: {
+    fontFamily: FONTS.mono,
+    fontSize: 8.5,
+    letterSpacing: 0.85,
+    fontVariant: ['tabular-nums'],
+  },
+  proposerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  proposerAvatar: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  proposerInitial: {
+    fontFamily: FONTS.serif,
+    fontSize: 10,
+  },
+  proposerText: {
+    fontFamily: FONTS.sans,
+    fontSize: 11.5,
+  },
+  tallySection: {
+    marginTop: 'auto',
+    gap: 8,
+  },
+  optionsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'baseline',
+  },
+  optionsText: {
+    fontFamily: FONTS.mono,
+    fontSize: 10,
+    letterSpacing: 0.6,
+    fontVariant: ['tabular-nums'],
+  },
+  ledgerLine: {
+    fontFamily: FONTS.mono,
+    fontSize: 9.5,
+    letterSpacing: 0.95,
+    textAlign: 'center',
+    fontVariant: ['tabular-nums'],
   },
   swipeVeil: {
     ...StyleSheet.absoluteFillObject,
@@ -1068,7 +837,6 @@ const premiumCardStyles = StyleSheet.create({
     left: 0,
     right: 0,
     height: 100,
-    backgroundColor: `${GOLD}20`,
     zIndex: 5,
   },
   swipeStamp: {
@@ -1087,208 +855,18 @@ const premiumCardStyles = StyleSheet.create({
     fontSize: 14,
     letterSpacing: 3,
   },
-  cardBody: {
-    padding: 16,
-    paddingTop: 14,
-  },
-  refRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'baseline',
-    marginBottom: 10,
-  },
-  refText: {
-    fontFamily: FONTS.mono,
-    fontSize: 9,
-    color: FG_FAINT,
-    letterSpacing: 1.4,
-    textTransform: 'uppercase',
-    marginBottom: 8,
-  },
-  timeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  timeText: {
-    fontFamily: FONTS.mono,
-    fontSize: 9.5,
-    letterSpacing: 1.3,
-    textTransform: 'uppercase',
-    color: GOLD,
-    fontVariant: ['tabular-nums'],
-  },
-  serifTitle: {
-    fontFamily: FONTS.serif,
-    fontSize: 22,
-    color: FG,
-    lineHeight: 28,
-    letterSpacing: -0.5,
-    marginBottom: 10,
-  },
-  proposerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 10,
-  },
-  proposerAvatar: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    backgroundColor: 'rgba(234,186,88,0.10)',
-    borderWidth: 1,
-    borderColor: 'rgba(234,186,88,0.35)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  proposerDot: {
-    fontFamily: FONTS.serifSemiBold,
-    fontSize: 9,
-    color: GOLD,
-  },
-  proposerText: {
-    fontFamily: FONTS.sans,
-    fontSize: 11.5,
-    color: FG_MUTED,
-    letterSpacing: -0.2,
-  },
-  description: {
-    fontFamily: FONTS.sans,
-    fontSize: 12.5,
-    color: FG_MUTED,
-    lineHeight: 18,
-    letterSpacing: -0.2,
-    marginBottom: 12,
-  },
-  sentimentSection: {
-    marginBottom: 10,
-  },
-  sentimentBar: {
-    height: 6,
-    borderRadius: 3,
-    overflow: 'hidden',
-    flexDirection: 'row',
-    backgroundColor: LINE_COLOR,
-    marginBottom: 10,
-  },
-  sentimentBarEmpty: {
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: LINE_COLOR,
-    marginBottom: 10,
-  },
-  noVotesText: {
-    fontSize: 11,
-    fontFamily: FONTS.sansMedium,
-    color: FG_FAINT,
-    letterSpacing: 0.4,
-    textAlign: 'center',
-  },
-  sentimentFillSupport: {
-    height: '100%',
-    backgroundColor: GREEN,
-  },
-  sentimentFillOppose: {
-    height: '100%',
-    backgroundColor: RED,
-    opacity: 0.8,
-  },
-  sentimentStats: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  sentimentStat: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: 6,
-  },
-  sentimentStatRight: {
-    flexDirection: 'row-reverse',
-    alignItems: 'baseline',
-    gap: 6,
-  },
-  sentimentNum: {
-    fontFamily: SERIF_FONT,
-    fontSize: 18,
-    letterSpacing: -0.5,
-  },
-  sentimentLabel: {
-    fontSize: 10,
-    fontFamily: FONTS.sansMedium,
-    color: FG_FAINT,
-    letterSpacing: 1.2,
-    textTransform: 'uppercase',
-  },
-  sentimentPct: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 4,
-    backgroundColor: BG_RAISED,
-    borderWidth: 1,
-    borderColor: LINE_STRONG,
-  },
-  sentimentPctText: {
-    fontFamily: MONO_FONT,
-    fontSize: 11,
-    color: FG,
-    letterSpacing: 0.3,
-  },
-  cardFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: LINE_COLOR,
-  },
-  footerChips: {
-    flexDirection: 'row',
-    gap: 6,
-  },
-  metaChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 9,
-    paddingVertical: 5,
-    borderRadius: 7,
-    backgroundColor: BG_RAISED,
-    borderWidth: 1,
-    borderColor: LINE_COLOR,
-  },
-  metaChipText: {
-    fontSize: 10.5,
-    fontFamily: FONTS.sansMedium,
-    color: FG_MUTED,
-    letterSpacing: -0.2,
-  },
-  dossierLink: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  dossierLinkText: {
-    fontSize: 10,
-    fontFamily: FONTS.sansSemiBold,
-    letterSpacing: 0.3,
-    color: GOLD,
-  },
   endedBanner: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    marginTop: 12,
     paddingVertical: 10,
-    borderRadius: 8,
-    backgroundColor: 'rgba(239,68,68,0.15)',
+    borderRadius: 10,
   },
   endedText: {
-    fontSize: 12,
     fontFamily: FONTS.sansSemiBold,
-    color: '#fff',
+    fontSize: 11,
+    letterSpacing: 1.32,
   },
 });
 
@@ -1313,7 +891,7 @@ function ViewModeToggle({ mode, onToggle }: { mode: 'swipe' | 'list'; onToggle: 
   );
 }
 
-// Premium Proposal Card
+// 05 · FEED PROPOSAL CARD — scope chips, serif question, compact tally
 interface ProposalCardProps {
   proposal: Proposal;
   hasVoted: boolean;
@@ -1343,7 +921,6 @@ function ProposalCard({
 }: ProposalCardProps) {
   const { colors } = useTheme();
   const scale = useSharedValue(1);
-  const shimmer = useSharedValue(0);
 
   // Check if user's location matches for voting on geo-restricted proposals
   const userLocation = [userCountry, userState, userCity].filter(Boolean);
@@ -1353,25 +930,16 @@ function ProposalCard({
       userLocation[i]?.toLowerCase() === restriction.toLowerCase()
     );
 
-  useEffect(() => {
-    shimmer.value = withRepeat(
-      withTiming(1, { duration: 3000 }),
-      -1,
-      false
-    );
-  }, []);
-
-  const shimmerStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: interpolate(shimmer.value, [0, 1], [-SCREEN_WIDTH, SCREEN_WIDTH]) }],
-  }));
-
-  const totalVotes = (proposal.supportVotes || 0) + (proposal.opposeVotes || 0);
-  const supportPercent =
-    totalVotes > 0 ? Math.round(((proposal.supportVotes || 0) / totalVotes) * 100) : 50;
-
   const timeRemaining = getTimeRemaining(proposal.deadline);
   const isEnded = timeRemaining === 'Ended';
   const geoTags = proposal.geoRestrictions || [];
+  const tierLabel = getTierLabel(proposal.geoRestrictions);
+  const location = getLocationLabel(proposal.geoRestrictions);
+  const scopeLabel = tierLabel === 'GLOBAL' ? 'GLOBAL' : `${location} · ${tierLabel}`;
+  const isCivicDesk = proposal.source === 'civic-desk';
+  const voteType = (proposal as any).voteType || 'yes-no';
+  const optionCount = ((proposal as any).options || []).length;
+  const totalBallots = (proposal.supportVotes || 0) + (proposal.opposeVotes || 0);
 
   const handlePressIn = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -1398,194 +966,176 @@ function ProposalCard({
   return (
     <AnimatedTouchable
       entering={FadeInUp.delay(index * 60).duration(400).springify()}
-      style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }, animatedCardStyle]}
+      style={[
+        feedCardStyles.card,
+        {
+          backgroundColor: colors.surface,
+          // The civic-desk (referendum) card carries a gold-tinted border, per 05.
+          borderColor: isCivicDesk ? 'rgba(234, 186, 88, 0.24)' : colors.borderSubtle,
+        },
+        animatedCardStyle,
+      ]}
       onPress={onPress}
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}
       activeOpacity={1}
     >
-      {/* Subtle shimmer */}
-      <View style={styles.shimmerContainer}>
-        <Animated.View style={[styles.shimmerBar, shimmerStyle]}>
-          <LinearGradient
-            colors={['transparent', `${colors.gold}06`, 'transparent']}
-            style={StyleSheet.absoluteFill}
-            start={{ x: 0, y: 0.5 }}
-            end={{ x: 1, y: 0.5 }}
-          />
-        </Animated.View>
-      </View>
-
-      {/* Header */}
-      <View style={styles.cardHeader}>
-        <View style={styles.headerBadges}>
-          <View style={[styles.categoryBadge, { backgroundColor: `${colors.gold}15` }]}>
-            <Text style={[styles.categoryText, { color: colors.gold }]}>
-              {proposal.category || 'General'}
-            </Text>
-          </View>
-          {proposal.source === 'civic-desk' && (
-            <View style={[styles.civicDeskBadge, { backgroundColor: `${colors.info}15` }]}>
-              <Ionicons name="newspaper-outline" size={10} color={colors.info} />
-              <Text style={[styles.civicDeskText, { color: colors.info }]}>Civic Desk</Text>
-            </View>
+      {/* Chip row + deadline */}
+      <View style={feedCardStyles.chipRow}>
+        <View style={feedCardStyles.chipGroup}>
+          {isCivicDesk && <TrustChip label="CIVIC DESK" variant="gold" />}
+          <TrustChip label={scopeLabel} variant="neutral" />
+          {voteType === 'ranked-choice' && <TrustChip label="RANKED" variant="outline" />}
+          {voteType === 'multiple-choice' && <TrustChip label="PICK ONE" variant="outline" />}
+          {proposal.requiresCitizenship && (
+            <TrustChip label="CITIZENS ONLY" variant="outline" icon="shield-outline" />
           )}
         </View>
-
-        <View style={styles.headerRight}>
+        <View style={feedCardStyles.chipRight}>
           {timeRemaining ? (
-            <View
-              style={[
-                styles.timeBadge,
-                { backgroundColor: isEnded ? `${colors.error}15` : `${colors.gold}15` },
-              ]}
-            >
-              <Ionicons
-                name="time-outline"
-                size={12}
-                color={isEnded ? colors.error : colors.gold}
-              />
-              <Text style={[styles.timeText, { color: isEnded ? colors.error : colors.gold }]}>
-                {timeRemaining}
-              </Text>
-            </View>
+            <Text style={[feedCardStyles.timeText, { color: isEnded ? colors.oppose : colors.textTertiary }]}>
+              {timeRemaining.toUpperCase()}
+            </Text>
           ) : null}
-
           <TouchableOpacity
-            style={[styles.shareBtn, { backgroundColor: colors.surfaceHover || `${colors.gold}08` }]}
             onPress={(e) => {
               e.stopPropagation();
               handleShare();
             }}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            accessibilityLabel={`Share ${proposal.title}`}
           >
-            <Ionicons name="share-outline" size={16} color={colors.textSecondary} />
+            <Ionicons name="share-outline" size={15} color={colors.textTertiary} />
           </TouchableOpacity>
         </View>
       </View>
 
-      {/* Geo tags */}
-      {geoTags.length > 0 && (
-        <View style={styles.geoTags}>
-          {geoTags.slice(0, 3).map((tag, i) => (
-            <View key={i} style={[styles.geoTag, { backgroundColor: `${colors.info}12` }]}>
-              <Ionicons name="location-outline" size={10} color={colors.info} />
-              <Text style={[styles.geoTagText, { color: colors.info }]}>{tag}</Text>
-            </View>
-          ))}
-        </View>
-      )}
-
-      {/* Verification required badge for unverified users on geo-restricted proposals */}
+      {/* Eligibility notices — restyled, all conditions preserved */}
       {geoTags.length > 0 && !isUserVerified && (
-        <View style={[styles.restrictionBadge, { backgroundColor: `${colors.warning}12` }]}>
-          <Ionicons name="lock-closed" size={12} color={colors.warning} />
-          <Text style={[styles.restrictionText, { color: colors.warning }]}>
+        <View style={[feedCardStyles.noticeChip, { backgroundColor: colors.warningSurface }]}>
+          <Ionicons name="lock-closed" size={11} color={colors.warning} />
+          <Text style={[feedCardStyles.noticeText, { color: colors.warning }]}>
             Verification required to vote
           </Text>
         </View>
       )}
-
-      {/* Location mismatch badge for verified users outside the proposal's region */}
       {geoTags.length > 0 && isUserVerified && !canVoteByLocation && (
-        <View style={[styles.restrictionBadge, { backgroundColor: `${colors.error}12` }]}>
-          <Ionicons name="location-outline" size={12} color={colors.error} />
-          <Text style={[styles.restrictionText, { color: colors.error }]}>
-            Not in your region
+        <View style={[feedCardStyles.noticeChip, { backgroundColor: colors.errorSurface }]}>
+          <Ionicons name="location-outline" size={11} color={colors.error} />
+          <Text style={[feedCardStyles.noticeText, { color: colors.error }]}>Not in your region</Text>
+        </View>
+      )}
+      {proposal.requiresCitizenship && !isUserCitizen && (
+        <View style={[feedCardStyles.noticeChip, { backgroundColor: colors.warningSurface }]}>
+          <Ionicons name="shield-checkmark" size={11} color={colors.warning} />
+          <Text style={[feedCardStyles.noticeText, { color: colors.warning }]}>
+            Citizens only — verify to vote
           </Text>
         </View>
       )}
 
-      {/* Citizens-only badge */}
-      {proposal.requiresCitizenship && (
-        <View style={[styles.restrictionBadge, { backgroundColor: isUserCitizen ? `${colors.success}12` : `${colors.warning}12` }]}>
-          <Ionicons name="shield-checkmark" size={12} color={isUserCitizen ? colors.success : colors.warning} />
-          <Text style={[styles.restrictionText, { color: isUserCitizen ? colors.success : colors.warning }]}>
-            {isUserCitizen ? 'Citizens only' : 'Citizens only — verify to vote'}
-          </Text>
-        </View>
-      )}
-
-      {/* Content */}
-      <Text style={[styles.cardTitle, { color: colors.text }]} numberOfLines={2}>
+      {/* Serif ballot question */}
+      <Text style={[feedCardStyles.title, { color: colors.text }]} numberOfLines={3}>
         {proposal.title}
       </Text>
-      <Text style={[styles.cardDesc, { color: colors.textSecondary }]} numberOfLines={3}>
-        {proposal.description}
-      </Text>
 
-      {/* Image */}
+      {/* Attachment — captioned document */}
       {proposal.imageUrl && (
-        <View style={styles.imageWrapper}>
-          <ExpoImage source={{ uri: proposal.imageUrl }} style={styles.proposalImage} contentFit="cover" cachePolicy="memory-disk" transition={150} />
-          <LinearGradient
-            colors={['transparent', 'rgba(0,0,0,0.3)']}
-            style={styles.imageOverlay}
+        <View style={feedCardStyles.attachmentBlock}>
+          <ExpoImage
+            source={{ uri: proposal.imageUrl }}
+            style={[feedCardStyles.attachmentImage, { borderColor: colors.borderSubtle }]}
+            contentFit="cover"
+            cachePolicy="memory-disk"
+            transition={150}
           />
+          <View style={feedCardStyles.attachmentCaptionRow}>
+            <Ionicons name="document-attach-outline" size={11} color={colors.textTertiary} />
+            <Text style={[feedCardStyles.attachmentCaption, { color: colors.textTertiary }]}>
+              ATTACHMENT · FILED WITH THIS PROPOSAL
+            </Text>
+          </View>
         </View>
       )}
 
-      {/* Vote Bar */}
-      <View style={styles.voteSection}>
-        <View style={[styles.voteBarBg, { backgroundColor: colors.error }]}>
-          <Animated.View
-            style={[
-              styles.voteBarFill,
-              { width: `${supportPercent}%`, backgroundColor: colors.success },
-            ]}
-          />
-        </View>
-
-        <View style={styles.voteStats}>
-          <View style={styles.voteStat}>
-            <View style={[styles.voteIconBg, { backgroundColor: `${colors.success}15` }]}>
-              <Ionicons name="thumbs-up" size={12} color={colors.success} />
-            </View>
-            <Text style={[styles.voteCount, { color: colors.textSecondary }]}>
-              {(proposal.supportVotes || 0).toLocaleString()}
-            </Text>
-          </View>
-
-          <View style={styles.voteStat}>
-            <View style={[styles.voteIconBg, { backgroundColor: `${colors.error}15` }]}>
-              <Ionicons name="thumbs-down" size={12} color={colors.error} />
-            </View>
-            <Text style={[styles.voteCount, { color: colors.textSecondary }]}>
-              {(proposal.opposeVotes || 0).toLocaleString()}
-            </Text>
-          </View>
-        </View>
-      </View>
-
-      {/* Actions */}
-      {isEnded ? (
-        <View style={[styles.statusBanner, { backgroundColor: `${colors.error}10` }]}>
-          <Ionicons name="flag-outline" size={16} color={colors.error} />
-          <Text style={[styles.statusText, { color: colors.error }]}>Voting has ended</Text>
-        </View>
-      ) : hasVoted ? (
-        <View style={[styles.statusBanner, { backgroundColor: `${colors.success}10` }]}>
-          <Ionicons name="checkmark-circle" size={16} color={colors.success} />
-          <Text style={[styles.statusText, { color: colors.success }]}>You have voted</Text>
-        </View>
-      ) : !canVoteByLocation && proposalGeo.length > 0 && isUserVerified ? (
-        <View style={[styles.statusBanner, { backgroundColor: `${colors.error}10` }]}>
-          <Ionicons name="lock-closed" size={16} color={colors.error} />
-          <Text style={[styles.statusText, { color: colors.error }]}>
-            Voting open only to {proposalGeo[proposalGeo.length - 1]} residents
+      {/* Tally — TallyBar enforces the 25-ballot threshold */}
+      {voteType !== 'yes-no' ? (
+        <View style={feedCardStyles.optionsRow}>
+          <Text style={[feedCardStyles.optionsText, { color: colors.textSecondary }]}>
+            {optionCount || 2} OPTIONS · {voteType === 'ranked-choice' ? 'RANK YOUR CHOICES' : 'PICK ONE'}
           </Text>
-        </View>
-      ) : !isUserVerified && proposalGeo.length > 0 ? (
-        <View style={[styles.statusBanner, { backgroundColor: `${colors.warning}10` }]}>
-          <Ionicons name="lock-closed" size={16} color={colors.warning} />
-          <Text style={[styles.statusText, { color: colors.warning }]}>
-            Verify your identity to vote
+          <Text style={[feedCardStyles.optionsText, { color: colors.textTertiary }]}>
+            {totalBallots.toLocaleString('en-CA')} VERIFIED BALLOTS
           </Text>
         </View>
       ) : (
-        <View style={styles.voteActions}>
+        <TallyBar
+          supportCount={proposal.supportVotes || 0}
+          opposeCount={proposal.opposeVotes || 0}
+          variant="compact"
+          applyThreshold={!isEnded}
+        />
+      )}
+
+      {/* Status / actions */}
+      {isEnded ? (
+        <View style={[feedCardStyles.statusBanner, { backgroundColor: colors.opposeSurface }]}>
+          <Ionicons name="flag-outline" size={13} color={colors.oppose} />
+          <Text style={[feedCardStyles.statusText, { color: colors.oppose }]}>VOTING CLOSED</Text>
+        </View>
+      ) : hasVoted ? (
+        // Committed ballot state is GOLD — never green/red
+        <View
+          style={[
+            feedCardStyles.votedBanner,
+            { backgroundColor: colors.goldSurface, borderColor: 'rgba(234, 186, 88, 0.3)' },
+          ]}
+        >
+          <View style={[feedCardStyles.votedCheck, { backgroundColor: colors.goldSurfaceStrong }]}>
+            <Ionicons name="checkmark" size={13} color={colors.gold} />
+          </View>
+          <View>
+            <Text style={[feedCardStyles.votedTitle, { color: colors.text }]}>Your ballot is recorded</Text>
+            <Text style={[feedCardStyles.votedSub, { color: colors.textTertiary }]}>ON THE PUBLIC LEDGER</Text>
+          </View>
+        </View>
+      ) : !canVoteByLocation && proposalGeo.length > 0 && isUserVerified ? (
+        <View style={[feedCardStyles.statusBanner, { backgroundColor: colors.errorSurface }]}>
+          <Ionicons name="lock-closed" size={13} color={colors.error} />
+          <Text style={[feedCardStyles.statusText, { color: colors.error }]}>
+            OPEN TO {String(proposalGeo[proposalGeo.length - 1] ?? 'REGION').toUpperCase()} RESIDENTS ONLY
+          </Text>
+        </View>
+      ) : !isUserVerified && proposalGeo.length > 0 ? (
+        <View style={[feedCardStyles.statusBanner, { backgroundColor: colors.warningSurface }]}>
+          <Ionicons name="lock-closed" size={13} color={colors.warning} />
+          <Text style={[feedCardStyles.statusText, { color: colors.warning }]}>
+            VERIFY YOUR IDENTITY TO VOTE
+          </Text>
+        </View>
+      ) : voteType !== 'yes-no' ? (
+        // Non-binary ballots open the dedicated ballot screen (X2 / ranked)
+        <TouchableOpacity
+          style={[feedCardStyles.openBallotBtn, { backgroundColor: colors.goldFill }]}
+          onPress={(e) => {
+            e.stopPropagation();
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            onPress();
+          }}
+          activeOpacity={0.85}
+          accessibilityRole="button"
+          accessibilityLabel={`Open ballot for ${proposal.title}`}
+        >
+          <Text style={feedCardStyles.openBallotText}>Open Ballot</Text>
+        </TouchableOpacity>
+      ) : (
+        <View style={feedCardStyles.voteActions}>
           <TouchableOpacity
-            style={[styles.voteBtn, { backgroundColor: colors.success }, isVoting && styles.btnDisabled]}
+            style={[
+              feedCardStyles.voteBtn,
+              { backgroundColor: colors.supportSurface, borderColor: colors.support },
+              isVoting && feedCardStyles.btnDisabled,
+            ]}
             onPress={(e) => {
               e.stopPropagation();
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -1598,17 +1148,18 @@ function ProposalCard({
             accessibilityState={{ disabled: isVoting }}
           >
             {isVoting ? (
-              <ActivityIndicator size="small" color="#fff" />
+              <ActivityIndicator size="small" color={colors.support} />
             ) : (
-              <>
-                <Ionicons name="checkmark-circle" size={16} color="#fff" />
-                <Text style={styles.voteBtnText}>Support</Text>
-              </>
+              <Text style={[feedCardStyles.voteBtnText, { color: colors.support }]}>Support</Text>
             )}
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.voteBtn, { backgroundColor: colors.error }, isVoting && styles.btnDisabled]}
+            style={[
+              feedCardStyles.voteBtn,
+              { backgroundColor: colors.opposeSurface, borderColor: colors.oppose },
+              isVoting && feedCardStyles.btnDisabled,
+            ]}
             onPress={(e) => {
               e.stopPropagation();
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -1621,12 +1172,9 @@ function ProposalCard({
             accessibilityState={{ disabled: isVoting }}
           >
             {isVoting ? (
-              <ActivityIndicator size="small" color="#fff" />
+              <ActivityIndicator size="small" color={colors.oppose} />
             ) : (
-              <>
-                <Ionicons name="close-circle" size={16} color="#fff" />
-                <Text style={styles.voteBtnText}>Oppose</Text>
-              </>
+              <Text style={[feedCardStyles.voteBtnText, { color: colors.oppose }]}>Oppose</Text>
             )}
           </TouchableOpacity>
         </View>
@@ -1634,6 +1182,156 @@ function ProposalCard({
     </AnimatedTouchable>
   );
 }
+
+const feedCardStyles = StyleSheet.create({
+  card: {
+    borderRadius: 18,
+    borderWidth: 1,
+    paddingVertical: 17,
+    paddingHorizontal: 18,
+    gap: 12,
+  },
+  chipRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 8,
+  },
+  chipGroup: {
+    flex: 1,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  chipRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  timeText: {
+    fontFamily: FONTS.mono,
+    fontSize: 10.5,
+    fontVariant: ['tabular-nums'],
+  },
+  noticeChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 100,
+  },
+  noticeText: {
+    fontFamily: FONTS.sansSemiBold,
+    fontSize: 10.5,
+    letterSpacing: 0.2,
+  },
+  title: {
+    fontFamily: FONTS.serif,
+    fontSize: 18,
+    lineHeight: 24,
+  },
+  attachmentBlock: {
+    gap: 6,
+  },
+  attachmentImage: {
+    width: '100%',
+    height: 140,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  attachmentCaptionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  attachmentCaption: {
+    fontFamily: FONTS.mono,
+    fontSize: 8.5,
+    letterSpacing: 0.85,
+    fontVariant: ['tabular-nums'],
+  },
+  optionsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'baseline',
+  },
+  optionsText: {
+    fontFamily: FONTS.mono,
+    fontSize: 10,
+    letterSpacing: 0.6,
+    fontVariant: ['tabular-nums'],
+  },
+  statusBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+    paddingVertical: 10,
+    borderRadius: 10,
+  },
+  statusText: {
+    fontFamily: FONTS.sansSemiBold,
+    fontSize: 10.5,
+    letterSpacing: 1.1,
+  },
+  votedBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 11,
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingVertical: 11,
+    paddingHorizontal: 14,
+  },
+  votedCheck: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  votedTitle: {
+    fontFamily: FONTS.sansSemiBold,
+    fontSize: 13,
+  },
+  votedSub: {
+    fontFamily: FONTS.mono,
+    fontSize: 8.5,
+    letterSpacing: 0.85,
+    marginTop: 1,
+    fontVariant: ['tabular-nums'],
+  },
+  openBallotBtn: {
+    height: 48,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  openBallotText: {
+    fontFamily: FONTS.sansSemiBold,
+    fontSize: 15,
+    color: '#040707',
+  },
+  voteActions: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  voteBtn: {
+    flex: 1,
+    height: 50,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  voteBtnText: {
+    fontFamily: FONTS.sansSemiBold,
+    fontSize: 15,
+  },
+  btnDisabled: { opacity: 0.6 },
+});
 
 // Memoized list-item wrapper: without this, every parent re-render (vote
 // counts, filters, swipe index) re-renders every visible card. Re-render
@@ -1721,8 +1419,14 @@ export default function ProposalsScreen() {
   const mutedUserIds = useModerationStore((s) => s.mutedUserIds);
   useSyncMutes();
 
-  // Vote confirmation overlay state
-  const [showVoteOverlay, setShowVoteOverlay] = useState(false);
+  // X1 confirm-before-cast sheet state. EVERY cast — swipe, queue buttons,
+  // list card, detail modal — must pass through this pending state; nothing
+  // is submitted until the user confirms on the sheet.
+  const [pendingVote, setPendingVote] = useState<{
+    proposal: Proposal;
+    vote: 'support' | 'oppose';
+    source: 'swipe' | 'list' | 'detail';
+  } | null>(null);
   const [lastVoteType, setLastVoteType] = useState<'support' | 'oppose'>('support');
   // Context for the post-vote "Share your vote" pill on the confirmation
   // overlay — the user's just-cast vote is the highest-motivation share
@@ -2041,9 +1745,9 @@ export default function ProposalsScreen() {
             : p
         )
       );
+      // The X1 sheet (already open in its cast state) is the confirmation UI.
       setLastVoteType(vote);
       lastVotedRef.current = { id: proposalId, title: target?.title || 'Proposal' };
-      setShowVoteOverlay(true);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       return;
     }
@@ -2169,10 +1873,10 @@ export default function ProposalsScreen() {
       // Show vote confirmation notification
       showVoteConfirmation(proposalTitle, vote);
 
-      // Show animated confirmation overlay
+      // The X1 sheet (already open in its cast state) is the confirmation UI;
+      // keep the share context fresh for its "Share your vote" pill.
       setLastVoteType(vote);
       lastVotedRef.current = { id: proposalId, title: proposalTitle };
-      setShowVoteOverlay(true);
 
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
@@ -2208,25 +1912,46 @@ export default function ProposalsScreen() {
     isProcessingQueueRef.current = false;
   }, [handleVote]);
 
-  // Swipe vote handler
-  const handleSwipeVote = useCallback(async (proposal: Proposal, vote: 'support' | 'oppose') => {
-    // Move to next card
-    setSwipeIndex((prev) => prev + 1);
-
-    // Show animation immediately (optimistic UI) instead of waiting for API
+  // ── X1 confirm-before-cast flow ────────────────────────────────────────────
+  // Step 1: any vote intent (swipe, queue button, list card, detail modal)
+  // lands here and opens the mandatory confirm sheet. Non-binary ballots are
+  // routed to their dedicated ballot screen instead — a support/oppose sheet
+  // would misrepresent a ranked or multiple-choice ballot.
+  const requestVote = (
+    proposal: Proposal,
+    vote: 'support' | 'oppose',
+    source: 'swipe' | 'list' | 'detail',
+  ) => {
+    const voteType = (proposal as any).voteType;
+    if (voteType && voteType !== 'yes-no') {
+      openProposal(proposal);
+      return;
+    }
     setLastVoteType(vote);
     lastVotedRef.current = { id: proposal.id, title: proposal.title || 'Proposal' };
-    setShowVoteOverlay(true);
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    setPendingVote({ proposal, vote, source });
+  };
 
-    // Submit the vote — queue real proposals for sequential processing
-    if (!isSeedProposal(proposal.id)) {
-      voteQueueRef.current.push({ proposalId: proposal.id, vote, title: proposal.title || 'Untitled' });
-      processVoteQueue();
+  // Step 2: the user pressed "Cast Ballot" on the X1 sheet — only now does
+  // anything get submitted. Swipe-sourced casts advance the queue and go
+  // through the sequential vote queue (blockchain nonce collisions).
+  const confirmPendingVote = () => {
+    const pending = pendingVote;
+    if (!pending) return;
+    const { proposal, vote, source } = pending;
+
+    if (source === 'swipe') {
+      setSwipeIndex((prev) => prev + 1);
+      if (!isSeedProposal(proposal.id)) {
+        voteQueueRef.current.push({ proposalId: proposal.id, vote, title: proposal.title || 'Untitled' });
+        processVoteQueue();
+      } else {
+        handleVote(proposal.id, vote);
+      }
     } else {
       handleVote(proposal.id, vote);
     }
-  }, [handleVote, processVoteQueue]);
+  };
 
   // Skip handler - move to next card without voting
   const handleSkip = useCallback(() => {
@@ -2662,8 +2387,8 @@ export default function ProposalsScreen() {
           )}
         </Animated.View>
       ) : viewMode === 'swipe' ? (
-        /* Swipe Mode - Premium Redesign */
-        <GestureHandlerRootView style={[styles.swipeContainer, { backgroundColor: BG }]}>
+        /* M2 · Vote Queue — review session */
+        <GestureHandlerRootView style={[styles.swipeContainer, { backgroundColor: colors.background }]}>
           {visibleSwipeCards.length === 0 ? (
             <Animated.View entering={FadeIn.duration(400)} style={styles.swipeEmptyState}>
               <View style={[styles.swipeEmptyIcon, { backgroundColor: `${colors.success}15` }]}>
@@ -2716,14 +2441,14 @@ export default function ProposalsScreen() {
                 onToggleView={() => setViewMode('list')}
               />
 
-              {/* Card stack */}
+              {/* Card stack — swiping a side opens the mandatory X1 confirm sheet */}
               <View ref={swipeCardRef} style={[styles.cardStack, { marginTop: 8 }]} collapsable={false}>
                 {visibleSwipeCards.map((proposal, idx) => (
                   <SwipeCard
                     key={proposal.id}
                     proposal={proposal}
-                    onSwipeLeft={() => { dismissSwipeHint(); handleSwipeVote(proposal, 'oppose'); }}
-                    onSwipeRight={() => { dismissSwipeHint(); handleSwipeVote(proposal, 'support'); }}
+                    onSwipeLeft={() => { dismissSwipeHint(); requestVote(proposal, 'oppose', 'swipe'); }}
+                    onSwipeRight={() => { dismissSwipeHint(); requestVote(proposal, 'support', 'swipe'); }}
                     onSwipeUp={() => { dismissSwipeHint(); handleSkip(); }}
                     onTap={() => openProposal(proposal)}
                     isTopCard={idx === 0}
@@ -2732,6 +2457,84 @@ export default function ProposalsScreen() {
                   />
                 )).reverse()}
               </View>
+
+              {/* M2 vote controls — big tinted Support / Oppose + skip */}
+              {(() => {
+                const topCard = visibleSwipeCards[0];
+                const topVoteType = topCard ? ((topCard as any).voteType || 'yes-no') : 'yes-no';
+                return (
+                  <View style={styles.voteControls}>
+                    {topVoteType !== 'yes-no' ? (
+                      <TouchableOpacity
+                        style={[styles.openBallotBtn, { backgroundColor: colors.goldFill }]}
+                        onPress={() => {
+                          if (!topCard) return;
+                          dismissSwipeHint();
+                          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                          openProposal(topCard);
+                        }}
+                        activeOpacity={0.85}
+                        accessibilityRole="button"
+                        accessibilityLabel="Open ballot"
+                      >
+                        <Text style={styles.openBallotText}>
+                          Open Ballot — {topVoteType === 'ranked-choice' ? 'Rank Your Choices' : 'Pick One'}
+                        </Text>
+                      </TouchableOpacity>
+                    ) : (
+                      <View style={styles.voteButtonRow}>
+                        <TouchableOpacity
+                          style={[
+                            styles.queueVoteBtn,
+                            { backgroundColor: colors.supportSurface, borderColor: colors.support },
+                          ]}
+                          onPress={() => {
+                            if (!topCard) return;
+                            dismissSwipeHint();
+                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                            requestVote(topCard, 'support', 'swipe');
+                          }}
+                          activeOpacity={0.85}
+                          accessibilityRole="button"
+                          accessibilityLabel="Support this proposal"
+                        >
+                          <Text style={[styles.queueVoteText, { color: colors.support }]}>Support</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[
+                            styles.queueVoteBtn,
+                            { backgroundColor: colors.opposeSurface, borderColor: colors.oppose },
+                          ]}
+                          onPress={() => {
+                            if (!topCard) return;
+                            dismissSwipeHint();
+                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                            requestVote(topCard, 'oppose', 'swipe');
+                          }}
+                          activeOpacity={0.85}
+                          accessibilityRole="button"
+                          accessibilityLabel="Oppose this proposal"
+                        >
+                          <Text style={[styles.queueVoteText, { color: colors.oppose }]}>Oppose</Text>
+                        </TouchableOpacity>
+                      </View>
+                    )}
+                    <TouchableOpacity
+                      style={styles.skipBtn}
+                      onPress={() => {
+                        dismissSwipeHint();
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                        handleSkip();
+                      }}
+                      activeOpacity={0.7}
+                      accessibilityRole="button"
+                      accessibilityLabel="Skip, decide later"
+                    >
+                      <Text style={[styles.skipText, { color: colors.textTertiary }]}>Skip — decide later</Text>
+                    </TouchableOpacity>
+                  </View>
+                );
+              })()}
 
               {/* Swipe hint overlay for first-time users */}
               <SwipeHintOverlay visible={showSwipeHint} onDismiss={dismissSwipeHint} />
@@ -2912,8 +2715,9 @@ export default function ProposalsScreen() {
                       </View>
                     ) : detailHasVoted ? (
                       <View style={detailStyles.statusBanner}>
-                        <Ionicons name="checkmark-circle" size={14} color={GREEN} />
-                        <Text style={[detailStyles.statusBannerText, { color: GREEN }]}>You have voted</Text>
+                        {/* Committed ballot renders gold — the act, per the design's color rules. */}
+                        <Ionicons name="checkmark-circle" size={14} color={GOLD} />
+                        <Text style={[detailStyles.statusBannerText, { color: GOLD }]}>Ballot cast · on the public ledger</Text>
                       </View>
                     ) : (
                       <View style={detailStyles.voteActions}>
@@ -2921,8 +2725,10 @@ export default function ProposalsScreen() {
                           style={[detailStyles.voteBtn, detailStyles.voteBtnSupport, detailIsVoting && { opacity: 0.5 }]}
                           onPress={() => {
                             if (!detail) return;
+                            const p = detail;
                             closeProposal();
-                            handleVote(detail.id as number, 'support');
+                            // Route through the mandatory X1 confirm sheet — never cast directly.
+                            requestVote(p, 'support', 'detail');
                           }}
                           disabled={detailIsVoting}
                           activeOpacity={0.7}
@@ -2940,8 +2746,10 @@ export default function ProposalsScreen() {
                           style={[detailStyles.voteBtn, detailStyles.voteBtnOppose, detailIsVoting && { opacity: 0.5 }]}
                           onPress={() => {
                             if (!detail) return;
+                            const p = detail;
                             closeProposal();
-                            handleVote(detail.id as number, 'oppose');
+                            // Route through the mandatory X1 confirm sheet — never cast directly.
+                            requestVote(p, 'oppose', 'detail');
                           }}
                           disabled={detailIsVoting}
                           activeOpacity={0.7}
@@ -3432,11 +3240,17 @@ export default function ProposalsScreen() {
         </KeyboardAvoidingView>
       </Modal>
 
-      {/* Vote Confirmation Overlay */}
+      {/* X1 confirm-before-cast sheet — mandatory before every cast. Driven
+          by pendingVote: requestVote opens it in its confirm phase, Cast
+          Ballot fires confirmPendingVote (the only path that submits), then
+          the same sheet transitions to its gold seal + share state and
+          auto-dismisses by clearing pendingVote. */}
       <VoteConfirmationOverlay
-        visible={showVoteOverlay}
-        voteType={lastVoteType}
-        onDismiss={() => setShowVoteOverlay(false)}
+        visible={!!pendingVote}
+        voteType={pendingVote?.vote ?? lastVoteType}
+        question={pendingVote?.proposal.title}
+        onConfirm={confirmPendingVote}
+        onDismiss={() => setPendingVote(null)}
         onShare={() => {
           const last = lastVotedRef.current;
           if (last) shareVoteAchievement(last.title, lastVoteType, last.id);
@@ -4262,6 +4076,54 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'flex-start',
     paddingHorizontal: SPACING.lg,
+  },
+
+  // M2 vote controls — big tinted Support / Oppose buttons + skip.
+  voteControls: {
+    paddingHorizontal: SPACING.lg,
+    paddingTop: 14,
+    gap: 12,
+  },
+  voteButtonRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  queueVoteBtn: {
+    flex: 1,
+    height: 58,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  queueVoteText: {
+    fontFamily: FONTS.sansSemiBold,
+    fontSize: 16,
+    letterSpacing: 0.1,
+  },
+  // Non-binary ballots (ranked / multiple-choice) open their dedicated
+  // ballot screen instead of a support/oppose pair.
+  openBallotBtn: {
+    height: 58,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 20,
+  },
+  openBallotText: {
+    fontFamily: FONTS.sansSemiBold,
+    fontSize: 16,
+    color: '#040707',
+  },
+  skipBtn: {
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  skipText: {
+    fontFamily: FONTS.sansMedium,
+    fontSize: 13.5,
+    letterSpacing: 0.2,
   },
 
   // Swipe Card
