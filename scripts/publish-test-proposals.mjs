@@ -32,12 +32,15 @@ const API_URL = process.env.REPRESENT_API_URL || 'https://representportal.com';
 const EMAIL = process.env.REPRESENT_EMAIL;
 const PASSWORD = process.env.REPRESENT_PASSWORD;
 const TOKEN = process.env.REPRESENT_TOKEN;
+// REPRESENT_DEMO=1 publishes as the demo account (demo@represent.app), which
+// bypasses the free-tier one-active-proposal limit. Credentials are the same
+// ones already shipped in lib/auth.ts for App Store review.
+const DEMO = process.env.REPRESENT_DEMO === '1';
 
-if (!TOKEN && (!EMAIL || !PASSWORD)) {
-  console.error('Provide either REPRESENT_TOKEN, or REPRESENT_EMAIL + REPRESENT_PASSWORD.');
-  console.error('Google/Apple accounts have no password — use the token path:');
-  console.error('  In a dev build: Identity tab → Account → "Copy API token", then');
-  console.error('  REPRESENT_TOKEN=<paste> node scripts/publish-test-proposals.mjs');
+if (!DEMO && !TOKEN && (!EMAIL || !PASSWORD)) {
+  console.error('Provide REPRESENT_DEMO=1, REPRESENT_TOKEN, or REPRESENT_EMAIL + REPRESENT_PASSWORD.');
+  console.error('Free accounts are limited to one active proposal — for a full test slate use:');
+  console.error('  REPRESENT_DEMO=1 node scripts/publish-test-proposals.mjs');
   process.exit(1);
 }
 
@@ -55,7 +58,22 @@ async function main() {
 
   let token = TOKEN;
   let accountLabel = 'token';
-  if (!token) {
+  if (DEMO) {
+    console.log('Signing in as the demo account …');
+    const demoRes = await fetch(`${API_URL}/api/auth/mobile/demo`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: 'demo@represent.app', password: 'RepresentDemo2024!' }),
+    });
+    if (!demoRes.ok) {
+      const err = await demoRes.json().catch(() => ({}));
+      throw new Error(`Demo login failed (${demoRes.status}): ${err.message || err.error || 'unknown'}`);
+    }
+    const data = await demoRes.json();
+    token = data.token;
+    accountLabel = 'demo@represent.app';
+    console.log(`Signed in as ${data.user?.name || 'Demo'} (verified: ${data.user?.verified ? 'yes' : 'NO'})`);
+  } else if (!token) {
     console.log(`Signing in as ${EMAIL} …`);
     const loginRes = await fetch(`${API_URL}/api/auth/mobile/email/login`, {
       method: 'POST',
