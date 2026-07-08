@@ -13,28 +13,40 @@ import * as Haptics from 'expo-haptics';
 import { commentsApi, type ProposalComment } from '../../lib/api';
 import { useAuthStore } from '../../lib/auth';
 import { useModerationStore } from '../../lib/moderation';
-import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, FONTS } from '../../lib/theme';
+import { useTheme, SPACING, FONTS } from '../../lib/theme';
 
-const MAX_LEN = 500;
+// E2 mock: 280-char limit with a live mono counter.
+const MAX_LEN = 280;
 
 function timeAgo(iso: string): string {
   const ms = Date.now() - new Date(iso).getTime();
   if (!Number.isFinite(ms) || ms < 0) return 'now';
   const mins = Math.floor(ms / 60000);
   if (mins < 1) return 'now';
-  if (mins < 60) return `${mins}m`;
+  if (mins < 60) return `${mins}m ago`;
   const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h`;
+  if (hours < 24) return `${hours}h ago`;
   const days = Math.floor(hours / 24);
-  if (days < 7) return `${days}d`;
+  if (days < 7) return `${days}d ago`;
   return new Date(iso).toLocaleDateString();
 }
 
+function initialOf(name: string | null | undefined): string {
+  const trimmed = (name || '').trim();
+  return trimmed ? trimmed[0].toUpperCase() : 'M';
+}
+
 /**
- * Flat comment thread for a proposal. Designed to sit at the bottom of a
- * detail ScrollView — renders its own header, input, and list (plain Views,
- * no nested VirtualizedList). Handles: optimistic posting, delete-own,
- * report, mute-aware filtering, demo/seed sandboxing (via commentsApi).
+ * "Voices" — flat comment thread for a proposal (E2). Designed to sit at the
+ * bottom of a detail ScrollView — renders its own header, composer, and list
+ * (plain Views, no nested VirtualizedList). Handles: optimistic posting,
+ * delete-own, report, mute-aware filtering, demo/seed sandboxing (via
+ * commentsApi).
+ *
+ * Data honesty: the comments API (`commentsApi` / `ProposalComment`) provides
+ * no commenter stance/ballot and no helpful/like endpoint, so the mock's
+ * stance chips, Support/Oppose filters, and helpful counts are intentionally
+ * omitted — we never guess a stance.
  */
 export function CommentsSection({ proposalId }: { proposalId: number | string }) {
   const { colors } = useTheme();
@@ -45,12 +57,6 @@ export function CommentsSection({ proposalId }: { proposalId: number | string })
   const [loading, setLoading] = useState(true);
   const [draft, setDraft] = useState('');
   const [posting, setPosting] = useState(false);
-
-  const load = useCallback(async () => {
-    const result = await commentsApi.list(proposalId);
-    if (result.data) setComments(result.data);
-    setLoading(false);
-  }, [proposalId]);
 
   useEffect(() => {
     let alive = true;
@@ -79,55 +85,83 @@ export function CommentsSection({ proposalId }: { proposalId: number | string })
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   }, [draft, posting, proposalId]);
 
+  const handleDelete = useCallback((comment: ProposalComment) => {
+    Alert.alert('Your comment', undefined, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          const r = await commentsApi.remove(comment.id, proposalId);
+          if (r.error) { Alert.alert('Could not delete', r.error); return; }
+          setComments((prev) => prev.filter((c) => c.id !== comment.id));
+        },
+      },
+    ]);
+  }, [proposalId]);
+
+  const handleReport = useCallback((comment: ProposalComment) => {
+    Alert.alert(`Comment by ${comment.authorName || 'a member'}`, undefined, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Report',
+        style: 'destructive',
+        onPress: async () => {
+          const r = await commentsApi.report(comment.id, 'other');
+          if (r.error) { Alert.alert('Could not report', r.error); return; }
+          // Hide locally right away — reporter shouldn't keep seeing it.
+          setComments((prev) => prev.filter((c) => c.id !== comment.id));
+          Alert.alert('Reported', 'Thanks — our team reviews reports within 24 hours.');
+        },
+      },
+    ]);
+  }, []);
+
   const handleLongPress = useCallback((comment: ProposalComment) => {
     const isOwn = user?.id && String(comment.userId) === String(user.id);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    if (isOwn) {
-      Alert.alert('Your comment', undefined, [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            const r = await commentsApi.remove(comment.id, proposalId);
-            if (r.error) { Alert.alert('Could not delete', r.error); return; }
-            setComments((prev) => prev.filter((c) => c.id !== comment.id));
-          },
-        },
-      ]);
-    } else {
-      Alert.alert(`Comment by ${comment.authorName || 'a member'}`, undefined, [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Report',
-          style: 'destructive',
-          onPress: async () => {
-            const r = await commentsApi.report(comment.id, 'other');
-            if (r.error) { Alert.alert('Could not report', r.error); return; }
-            // Hide locally right away — reporter shouldn't keep seeing it.
-            setComments((prev) => prev.filter((c) => c.id !== comment.id));
-            Alert.alert('Reported', 'Thanks — our team reviews reports within 24 hours.');
-          },
-        },
-      ]);
-    }
-  }, [user?.id, proposalId]);
+    if (isOwn) handleDelete(comment);
+    else handleReport(comment);
+  }, [user?.id, handleDelete, handleReport]);
 
   const visible = comments.filter((c) => !mutedUserIds.includes(String(c.userId)));
+  const remaining = MAX_LEN - draft.length;
 
   return (
     <View style={styles.wrap}>
+      {/* Header — serif "Voices" + mono count */}
       <View style={styles.header}>
-        <Text style={[styles.title, { color: colors.text }]}>
-          Discussion{visible.length > 0 ? ` (${visible.length})` : ''}
+        <Text style={[styles.title, { color: colors.text }]}>Voices</Text>
+        <Text style={[styles.headerCount, { color: colors.textTertiary }]}>
+          {loading ? '· —' : `· ${visible.length}`}
         </Text>
       </View>
 
-      {/* Composer */}
-      <View style={[styles.composer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+      {/* Composer — avatar, italic-serif placeholder, mono live counter */}
+      <View
+        style={[
+          styles.composer,
+          { backgroundColor: colors.surface, borderColor: colors.border },
+        ]}
+      >
+        <View
+          style={[
+            styles.composerAvatar,
+            { backgroundColor: colors.goldSurface, borderColor: colors.goldSurfaceIntense },
+          ]}
+        >
+          <Text style={[styles.composerAvatarText, { color: colors.gold }]}>
+            {initialOf(user?.name)}
+          </Text>
+        </View>
         <TextInput
-          style={[styles.input, { color: colors.text }]}
-          placeholder="Add your voice to the discussion…"
+          style={[
+            styles.input,
+            { color: colors.text },
+            // Italic-serif placeholder per mock; regular sans once typing.
+            draft.length === 0 && { fontFamily: FONTS.serifItalic, fontSize: 14.5 },
+          ]}
+          placeholder="Add your voice…"
           placeholderTextColor={colors.textTertiary}
           value={draft}
           onChangeText={(t) => setDraft(t.slice(0, MAX_LEN))}
@@ -135,64 +169,113 @@ export function CommentsSection({ proposalId }: { proposalId: number | string })
           maxLength={MAX_LEN}
           accessibilityLabel="Write a comment"
         />
-        <TouchableOpacity
-          onPress={handlePost}
-          disabled={!draft.trim() || posting}
-          style={[
-            styles.postBtn,
-            { backgroundColor: draft.trim() ? colors.gold : colors.border },
-          ]}
-          accessibilityRole="button"
-          accessibilityLabel="Post comment"
-          accessibilityState={{ disabled: !draft.trim() || posting }}
-        >
-          {posting ? (
-            <ActivityIndicator size="small" color="#000" />
-          ) : (
-            <Ionicons name="arrow-up" size={18} color={draft.trim() ? '#000' : colors.textTertiary} />
-          )}
-        </TouchableOpacity>
+        <View style={styles.composerRight}>
+          <Text
+            style={[
+              styles.counter,
+              { color: remaining <= 20 ? colors.error : colors.textTertiary },
+            ]}
+          >
+            {remaining}
+          </Text>
+          <TouchableOpacity
+            onPress={handlePost}
+            disabled={!draft.trim() || posting}
+            style={[
+              styles.postBtn,
+              { backgroundColor: draft.trim() ? colors.goldFill : colors.border },
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel="Post comment"
+            accessibilityState={{ disabled: !draft.trim() || posting }}
+          >
+            {posting ? (
+              <ActivityIndicator size="small" color="#000" />
+            ) : (
+              <Ionicons
+                name="arrow-up"
+                size={16}
+                color={draft.trim() ? '#000' : colors.textTertiary}
+              />
+            )}
+          </TouchableOpacity>
+        </View>
       </View>
-      {draft.length > MAX_LEN - 60 && (
-        <Text style={[styles.counter, { color: colors.textTertiary }]}>
-          {MAX_LEN - draft.length} characters left
-        </Text>
-      )}
 
       {/* List */}
       {loading ? (
         <ActivityIndicator color={colors.gold} style={{ marginVertical: SPACING.xl }} />
       ) : visible.length === 0 ? (
         <Text style={[styles.empty, { color: colors.textTertiary }]}>
-          No comments yet. Start the discussion.
+          No voices yet. Start the discussion.
         </Text>
       ) : (
-        visible.map((comment) => {
-          const isOwn = user?.id && String(comment.userId) === String(user.id);
-          return (
-            <TouchableOpacity
-              key={comment.id}
-              onLongPress={() => handleLongPress(comment)}
-              delayLongPress={350}
-              activeOpacity={0.8}
-              style={[styles.comment, { borderBottomColor: colors.border }]}
-              accessibilityHint={isOwn ? 'Long-press to delete' : 'Long-press to report'}
-            >
-              <View style={styles.commentHeader}>
-                <Text style={[styles.author, { color: colors.text }]} numberOfLines={1}>
-                  {isOwn ? 'You' : (comment.authorName || 'Member')}
+        <View style={styles.list}>
+          {visible.map((comment) => {
+            const isOwn = !!(user?.id && String(comment.userId) === String(user.id));
+            return (
+              <TouchableOpacity
+                key={comment.id}
+                onLongPress={() => handleLongPress(comment)}
+                delayLongPress={350}
+                activeOpacity={0.85}
+                style={[
+                  styles.card,
+                  { backgroundColor: colors.surface, borderColor: colors.borderSubtle },
+                ]}
+                accessibilityHint={isOwn ? 'Long-press to delete' : 'Long-press to report'}
+              >
+                <View style={styles.cardHeader}>
+                  <View style={[styles.avatar, { backgroundColor: colors.surfaceHighlight }]}>
+                    <Text style={[styles.avatarText, { color: colors.text }]}>
+                      {isOwn ? initialOf(user?.name) : initialOf(comment.authorName)}
+                    </Text>
+                  </View>
+                  <View style={styles.authorCol}>
+                    <View style={styles.authorRow}>
+                      <Text style={[styles.author, { color: colors.text }]} numberOfLines={1}>
+                        {isOwn ? 'You' : (comment.authorName || 'Member')}
+                      </Text>
+                      {comment.authorVerified && (
+                        <Ionicons name="shield-checkmark" size={11} color={colors.gold} />
+                      )}
+                    </View>
+                    <Text style={[styles.time, { color: colors.textTertiary }]}>
+                      {timeAgo(comment.createdAt).toUpperCase()}
+                    </Text>
+                  </View>
+                </View>
+                <Text style={[styles.body, { color: colors.textSecondary }]}>
+                  {comment.body}
                 </Text>
-                {comment.authorVerified && (
-                  <Ionicons name="checkmark-circle" size={13} color={colors.success} />
-                )}
-                <Text style={[styles.time, { color: colors.textTertiary }]}>
-                  {timeAgo(comment.createdAt)}
-                </Text>
-              </View>
-              <Text style={[styles.body, { color: colors.textSecondary }]}>{comment.body}</Text>
-            </TouchableOpacity>
-          );
-        })
+                <View style={styles.cardFooter}>
+                  {isOwn ? (
+                    <TouchableOpacity
+                      onPress={() => handleDelete(comment)}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      accessibilityRole="button"
+                      accessibilityLabel="Delete your comment"
+                    >
+                      <Text style={[styles.action, { color: colors.textTertiary }]}>Delete</Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <TouchableOpacity
+                      onPress={() => handleReport(comment)}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      accessibilityRole="button"
+                      accessibilityLabel="Report this comment"
+                    >
+                      <Text style={[styles.action, { color: colors.textTertiary }]}>Report</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </TouchableOpacity>
+            );
+          })}
+          <Text style={[styles.trustNote, { color: colors.textTertiary }]}>
+            Moderated for civility, never for position.
+          </Text>
+        </View>
       )}
     </View>
   );
@@ -200,39 +283,144 @@ export function CommentsSection({ proposalId }: { proposalId: number | string })
 
 const styles = StyleSheet.create({
   wrap: { marginTop: SPACING.xl },
-  header: { flexDirection: 'row', alignItems: 'center', marginBottom: SPACING.md },
-  title: { ...TYPOGRAPHY.headlineSmall, fontFamily: FONTS.serif },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 8,
+    marginBottom: 13,
+  },
+  title: {
+    fontFamily: FONTS.serif,
+    fontSize: 19,
+    lineHeight: 24,
+  },
+  headerCount: {
+    fontFamily: FONTS.mono,
+    fontSize: 10.5,
+    letterSpacing: 1,
+    fontVariant: ['tabular-nums'],
+  },
   composer: {
     flexDirection: 'row',
     alignItems: 'flex-end',
     borderWidth: 1,
-    borderRadius: BORDER_RADIUS.lg,
-    paddingLeft: SPACING.md,
-    paddingRight: SPACING.xs,
-    paddingVertical: SPACING.xs,
-    gap: SPACING.xs,
+    borderRadius: 15,
+    paddingLeft: 13,
+    paddingRight: 8,
+    paddingVertical: 8,
+    gap: 11,
+    marginBottom: 13,
   },
-  input: {
-    flex: 1,
-    ...TYPOGRAPHY.bodyMedium,
-    maxHeight: 110,
-    paddingVertical: SPACING.sm,
-  },
-  postBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+  composerAvatar: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 3,
   },
-  counter: { ...TYPOGRAPHY.labelSmall, fontFamily: FONTS.mono, fontVariant: ['tabular-nums'], marginTop: 4, textAlign: 'right' },
-  empty: { ...TYPOGRAPHY.bodyMedium, textAlign: 'center', marginVertical: SPACING.xl },
-  comment: { paddingVertical: SPACING.md, borderBottomWidth: 1 },
-  commentHeader: { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 4 },
-  author: { ...TYPOGRAPHY.labelMedium, maxWidth: '60%' },
-  time: { ...TYPOGRAPHY.labelSmall, fontFamily: FONTS.mono, fontVariant: ['tabular-nums'], marginLeft: 'auto' },
-  body: { ...TYPOGRAPHY.bodyMedium, lineHeight: 21 },
+  composerAvatarText: {
+    fontFamily: FONTS.serif,
+    fontSize: 12,
+  },
+  input: {
+    flex: 1,
+    fontFamily: FONTS.sans,
+    fontSize: 13.5,
+    lineHeight: 19,
+    maxHeight: 110,
+    paddingVertical: 9,
+  },
+  composerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 3,
+  },
+  counter: {
+    fontFamily: FONTS.mono,
+    fontSize: 10,
+    fontVariant: ['tabular-nums'],
+  },
+  postBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  empty: {
+    fontFamily: FONTS.sans,
+    fontSize: 13,
+    lineHeight: 20,
+    textAlign: 'center',
+    marginVertical: SPACING.xl,
+  },
+  list: { gap: 9 },
+  card: {
+    borderWidth: 1,
+    borderRadius: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 15,
+    gap: 9,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 9,
+  },
+  avatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarText: {
+    fontFamily: FONTS.serif,
+    fontSize: 13,
+  },
+  authorCol: { flex: 1, gap: 1 },
+  authorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  author: {
+    fontFamily: FONTS.sansSemiBold,
+    fontSize: 13,
+    lineHeight: 17,
+    maxWidth: '80%',
+  },
+  time: {
+    fontFamily: FONTS.mono,
+    fontSize: 9,
+    letterSpacing: 0.54,
+    fontVariant: ['tabular-nums'],
+  },
+  body: {
+    fontFamily: FONTS.sans,
+    fontSize: 13,
+    lineHeight: 20,
+  },
+  cardFooter: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+  },
+  action: {
+    fontFamily: FONTS.sansMedium,
+    fontSize: 11,
+    lineHeight: 15,
+  },
+  trustNote: {
+    fontFamily: FONTS.sans,
+    fontSize: 11,
+    lineHeight: 16,
+    textAlign: 'center',
+    marginTop: 4,
+  },
 });
 
 export default CommentsSection;
