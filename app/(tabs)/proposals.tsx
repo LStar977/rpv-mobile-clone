@@ -140,53 +140,6 @@ function getDossierRef(proposal: Proposal): string {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// SWIPE HINT OVERLAY - One-time gesture instructions
-// ═══════════════════════════════════════════════════════════════════════════════
-function SwipeHintOverlay({ visible, onDismiss }: { visible: boolean; onDismiss: () => void }) {
-  const pc = useProposalColors();
-
-  if (!visible) return null;
-
-  return (
-    <TouchableOpacity
-      style={styles.swipeHintOverlay}
-      activeOpacity={1}
-      onPress={onDismiss}
-    >
-      <Animated.View
-        entering={FadeIn.duration(300)}
-        style={[styles.swipeHintCard, { backgroundColor: pc.BG_CARD, borderColor: pc.LINE }]}
-      >
-        <Text style={[styles.swipeHintTitle, { color: pc.GOLD }]}>How to Vote</Text>
-
-        <View style={styles.swipeHintRow}>
-          <View style={[styles.swipeHintIcon, { borderColor: pc.SUPPORT }]}>
-            <Ionicons name="arrow-forward" size={20} color={pc.SUPPORT} />
-          </View>
-          <Text style={[styles.swipeHintText, { color: pc.FG }]}>Swipe right to support</Text>
-        </View>
-
-        <View style={styles.swipeHintRow}>
-          <View style={[styles.swipeHintIcon, { borderColor: pc.OPPOSE }]}>
-            <Ionicons name="arrow-back" size={20} color={pc.OPPOSE} />
-          </View>
-          <Text style={[styles.swipeHintText, { color: pc.FG }]}>Swipe left to oppose</Text>
-        </View>
-
-        <View style={styles.swipeHintRow}>
-          <View style={[styles.swipeHintIcon, { borderColor: pc.FG_MUTED }]}>
-            <Ionicons name="arrow-up" size={20} color={pc.FG_MUTED} />
-          </View>
-          <Text style={[styles.swipeHintText, { color: pc.FG }]}>Swipe up to skip</Text>
-        </View>
-
-        <Text style={[styles.swipeHintDismiss, { color: pc.FG_FAINT }]}>Tap anywhere to start</Text>
-      </Animated.View>
-    </TouchableOpacity>
-  );
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
 // M2 · VOTE QUEUE HEADER — filter rail, mono queue counter, 4px gold progress
 // ═══════════════════════════════════════════════════════════════════════════════
 function VoteHeader({
@@ -475,13 +428,11 @@ function FilterChip({
 
 // ── M2 · QUEUE PROPOSAL CARD ────────────────────────────────────────────────
 // Scope chips · serif question · description · captioned attachment ·
-// proposer · TallyBar with ledger line. Swiping a side no longer casts —
-// it snaps back and opens the mandatory X1 confirm sheet.
+// proposer · TallyBar with ledger line. M2 is button-driven: the tinted
+// Support/Oppose buttons below the stack are the only way to cast, and
+// tapping the card opens the full proposal detail.
 interface SwipeCardProps {
   proposal: Proposal;
-  onSwipeLeft: () => void;
-  onSwipeRight: () => void;
-  onSwipeUp: () => void;
   onTap: () => void;
   isTopCard: boolean;
   cardIndex: number;
@@ -492,25 +443,19 @@ const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 // Space reserved for the header, vote buttons, skip control and tab bar.
 const BASE_CARD_HEIGHT_OFFSET = 420;
 
-function SwipeCard({ proposal, onSwipeLeft, onSwipeRight, onSwipeUp, onTap, isTopCard, cardIndex, cardHeight }: SwipeCardProps) {
+function SwipeCard({ proposal, onTap, isTopCard, cardIndex, cardHeight }: SwipeCardProps) {
   const { colors } = useTheme();
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
   const rotation = useSharedValue(0);
   const scale = useSharedValue(isTopCard ? 1 : 0.95 - cardIndex * 0.02);
 
-  // Use refs to avoid stale callback issues with gesture handler worklets
-  const onSwipeRightRef = useRef(onSwipeRight);
-  const onSwipeLeftRef = useRef(onSwipeLeft);
-  const onSwipeUpRef = useRef(onSwipeUp);
+  // Ref avoids stale callback issues in the gesture worklet
   const onTapRef = useRef(onTap);
 
   useEffect(() => {
-    onSwipeRightRef.current = onSwipeRight;
-    onSwipeLeftRef.current = onSwipeLeft;
-    onSwipeUpRef.current = onSwipeUp;
     onTapRef.current = onTap;
-  }, [onSwipeRight, onSwipeLeft, onSwipeUp, onTap]);
+  }, [onTap]);
 
   const category = proposal.category || 'General';
   const timeRemaining = getTimeRemaining(proposal.deadline);
@@ -520,66 +465,20 @@ function SwipeCard({ proposal, onSwipeLeft, onSwipeRight, onSwipeUp, onTap, isTo
     scale.value = withSpring(isTopCard ? 1 : 0.95 - cardIndex * 0.02, { damping: 15 });
   }, [isTopCard, cardIndex]);
 
-  // Wrapper functions that use the refs - prevents stale closure in worklets
-  const handleSwipeRight = useCallback(() => {
-    onSwipeRightRef.current();
-  }, []);
-
-  const handleSwipeLeft = useCallback(() => {
-    onSwipeLeftRef.current();
-  }, []);
-
-  const handleSwipeUp = useCallback(() => {
-    onSwipeUpRef.current();
-  }, []);
-
+  // Wrapper uses the ref — prevents stale closure in the worklet
   const handleTap = useCallback(() => {
     onTapRef.current();
   }, []);
 
-  const gesture = Gesture.Pan()
-    .enabled(isTopCard && !isEnded)
-    .onUpdate((event) => {
-      translateX.value = event.translationX;
-      // Allow full Y movement when swiping up, dampen when swiping down
-      translateY.value = event.translationY < 0 ? event.translationY : event.translationY * 0.2;
-      rotation.value = interpolate(event.translationX, [-SCREEN_WIDTH, 0, SCREEN_WIDTH], [-12, 0, 12]);
-    })
-    .onEnd((event) => {
-      // Swipe UP to skip (check first, negative Y = upward)
-      if (event.translationY < -SWIPE_THRESHOLD) {
-        translateY.value = withTiming(-SCREEN_HEIGHT, { duration: 300 });
-        runOnJS(Haptics.impactAsync)(Haptics.ImpactFeedbackStyle.Light);
-        runOnJS(handleSwipeUp)();
-      } else if (event.translationX > SWIPE_THRESHOLD) {
-        // Side chosen — snap back; the X1 confirm sheet is mandatory before
-        // any ballot is cast, so the card stays until the user confirms.
-        translateX.value = withSpring(0, { damping: 15 });
-        translateY.value = withSpring(0, { damping: 15 });
-        rotation.value = withSpring(0, { damping: 15 });
-        runOnJS(Haptics.impactAsync)(Haptics.ImpactFeedbackStyle.Medium);
-        runOnJS(handleSwipeRight)();
-      } else if (event.translationX < -SWIPE_THRESHOLD) {
-        translateX.value = withSpring(0, { damping: 15 });
-        translateY.value = withSpring(0, { damping: 15 });
-        rotation.value = withSpring(0, { damping: 15 });
-        runOnJS(Haptics.impactAsync)(Haptics.ImpactFeedbackStyle.Medium);
-        runOnJS(handleSwipeLeft)();
-      } else {
-        translateX.value = withSpring(0, { damping: 15 });
-        translateY.value = withSpring(0, { damping: 15 });
-        rotation.value = withSpring(0, { damping: 15 });
-      }
-    });
-
-  const tapGesture = Gesture.Tap()
+  // M2 is button-driven: the tinted Support/Oppose buttons and Skip below
+  // the card are the only way to act. Swipe-to-vote is gone — tapping the
+  // card opens the full proposal detail.
+  const composedGesture = Gesture.Tap()
     .enabled(isTopCard)
     .onEnd(() => {
       runOnJS(Haptics.impactAsync)(Haptics.ImpactFeedbackStyle.Light);
       runOnJS(handleTap)();
     });
-
-  const composedGesture = Gesture.Race(gesture, tapGesture);
 
   const cardStyle = useAnimatedStyle(() => ({
     transform: [
@@ -590,18 +489,6 @@ function SwipeCard({ proposal, onSwipeLeft, onSwipeRight, onSwipeUp, onTap, isTo
     ],
     zIndex: 100 - cardIndex,
     opacity: isTopCard ? 1 : 0.85 - cardIndex * 0.15,
-  }));
-
-  const supportIndicatorStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(translateX.value, [0, SWIPE_THRESHOLD], [0, 1], Extrapolation.CLAMP),
-  }));
-
-  const opposeIndicatorStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(translateX.value, [-SWIPE_THRESHOLD, 0], [1, 0], Extrapolation.CLAMP),
-  }));
-
-  const skipIndicatorStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(translateY.value, [-SWIPE_THRESHOLD, 0], [1, 0], Extrapolation.CLAMP),
   }));
 
   const tierLabel = getTierLabel(proposal.geoRestrictions);
@@ -621,27 +508,6 @@ function SwipeCard({ proposal, onSwipeLeft, onSwipeRight, onSwipeUp, onTap, isTo
           cardStyle,
         ]}
       >
-        {/* Swipe Indicators */}
-        {isTopCard && !isEnded && (
-          <>
-            <Animated.View style={[premiumCardStyles.swipeVeil, { backgroundColor: colors.supportSurface }, supportIndicatorStyle]}>
-              <View style={[premiumCardStyles.swipeStamp, { borderColor: colors.support }]}>
-                <Text style={[premiumCardStyles.swipeStampText, { color: colors.support }]}>SUPPORT</Text>
-              </View>
-            </Animated.View>
-            <Animated.View style={[premiumCardStyles.swipeVeil, { backgroundColor: colors.opposeSurface }, opposeIndicatorStyle]}>
-              <View style={[premiumCardStyles.swipeStamp, { borderColor: colors.oppose, right: 24, left: undefined }]}>
-                <Text style={[premiumCardStyles.swipeStampText, { color: colors.oppose }]}>OPPOSE</Text>
-              </View>
-            </Animated.View>
-            <Animated.View style={[premiumCardStyles.swipeVeilTop, { backgroundColor: colors.goldSurface }, skipIndicatorStyle]}>
-              <View style={[premiumCardStyles.swipeStamp, { borderColor: colors.gold }]}>
-                <Text style={[premiumCardStyles.swipeStampText, { color: colors.gold }]}>SKIP</Text>
-              </View>
-            </Animated.View>
-          </>
-        )}
-
         {/* Scope chips + time left */}
         <View style={premiumCardStyles.chipRow}>
           <View style={premiumCardStyles.chipGroup}>
@@ -2548,15 +2414,12 @@ export default function ProposalsScreen() {
                 onHowVotingWorks={() => setShowHowVoting(true)}
               />
 
-              {/* Card stack — swiping a side opens the mandatory X1 confirm sheet */}
+              {/* Card stack — tap opens the full detail; the buttons below cast */}
               <View ref={swipeCardRef} style={[styles.cardStack, { marginTop: 8 }]} collapsable={false}>
                 {visibleSwipeCards.map((proposal, idx) => (
                   <SwipeCard
                     key={proposal.id}
                     proposal={proposal}
-                    onSwipeLeft={() => { dismissSwipeHint(); requestVote(proposal, 'oppose', 'swipe'); }}
-                    onSwipeRight={() => { dismissSwipeHint(); requestVote(proposal, 'support', 'swipe'); }}
-                    onSwipeUp={() => { dismissSwipeHint(); handleSkip(); }}
                     onTap={() => openProposal(proposal)}
                     isTopCard={idx === 0}
                     cardIndex={idx}
@@ -2565,12 +2428,13 @@ export default function ProposalsScreen() {
                 )).reverse()}
               </View>
 
-              {/* M2 vote controls — big tinted Support / Oppose + skip */}
+              {/* M2 vote controls — big tinted Support / Oppose + skip.
+                  Bottom padding clears the floating tab bar. */}
               {(() => {
                 const topCard = visibleSwipeCards[0];
                 const topVoteType = topCard ? ((topCard as any).voteType || 'yes-no') : 'yes-no';
                 return (
-                  <View style={styles.voteControls}>
+                  <View style={[styles.voteControls, { paddingBottom: insets.bottom + 74 }]}>
                     {topVoteType !== 'yes-no' ? (
                       <TouchableOpacity
                         style={[styles.openBallotBtn, { backgroundColor: colors.goldFill }]}
@@ -2642,9 +2506,6 @@ export default function ProposalsScreen() {
                   </View>
                 );
               })()}
-
-              {/* Swipe hint overlay for first-time users */}
-              <SwipeHintOverlay visible={showSwipeHint} onDismiss={dismissSwipeHint} />
             </View>
           )}
         </GestureHandlerRootView>
