@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { useTheme, responsive } from '../../lib/theme';
+import { useTheme, responsive, FONTS } from '../../lib/theme';
 import { useAuthStore } from '../../lib/auth';
 
 const { width } = Dimensions.get('window');
@@ -215,19 +215,19 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1 },
   backButton: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { fontFamily: 'Georgia', fontSize: 20, fontWeight: '500' },
+  headerTitle: { fontFamily: FONTS.serif, fontSize: 20 },
   statsContainer: { marginHorizontal: 16, marginTop: 16, padding: 16, borderRadius: 16, borderWidth: 1 },
   statsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', marginBottom: 16 },
   statItem: { alignItems: 'center' },
-  statValue: { fontFamily: 'Georgia', fontSize: responsive(24, 26, 28), fontWeight: '500' },
-  statLabel: { fontSize: 12, marginTop: 4 },
+  statValue: { fontFamily: FONTS.mono, fontSize: responsive(24, 26, 28), fontVariant: ['tabular-nums'] },
+  statLabel: { fontFamily: FONTS.sans, fontSize: 12, marginTop: 4 },
   statDivider: { width: 1, height: 40 },
   progressBar: { height: 8, borderRadius: 4, overflow: 'hidden' },
   progressFill: { height: '100%', borderRadius: 4 },
   filterContainer: { marginTop: 16, maxHeight: 50 },
   filterContent: { paddingHorizontal: 16, gap: 8, flexDirection: 'row' },
   filterChip: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, borderWidth: 1 },
-  filterText: { fontSize: 14, fontWeight: '500' },
+  filterText: { fontFamily: FONTS.sansMedium, fontSize: 14 },
   loadingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   badgesList: { flex: 1, marginTop: 16 },
   badgesGrid: { paddingHorizontal: 16, flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
@@ -235,9 +235,9 @@ const styles = StyleSheet.create({
   badgeIconContainer: { position: 'relative', marginBottom: 12 },
   badgeIcon: { fontSize: 40 },
   checkmark: { position: 'absolute', bottom: -4, right: -4, width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  badgeName: { fontFamily: 'Georgia', fontSize: 14, fontWeight: '500', textAlign: 'center', marginBottom: 6 },
+  badgeName: { fontFamily: FONTS.serif, fontSize: 14, textAlign: 'center', marginBottom: 6 },
   tierBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8, marginBottom: 8 },
-  tierText: { fontSize: 10, fontWeight: 'bold' },
-  badgeDesc: { fontSize: 11, textAlign: 'center', lineHeight: 16 },
-  earnedDate: { fontSize: 10, marginTop: 8, fontWeight: '500' },
+  tierText: { fontFamily: FONTS.sansSemiBold, fontSize: 10, letterSpacing: 1 },
+  badgeDesc: { fontFamily: FONTS.sans, fontSize: 11, textAlign: 'center', lineHeight: 16 },
+  earnedDate: { fontFamily: FONTS.mono, fontSize: 10, marginTop: 8, fontVariant: ['tabular-nums'] },
 });

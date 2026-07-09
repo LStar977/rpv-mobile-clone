@@ -10,7 +10,7 @@ import Animated, {
   withSpring,
   interpolate,
 } from 'react-native-reanimated';
-import { useTheme, SHADOWS, ANIMATION } from '../../lib/theme';
+import { useTheme, ANIMATION, FONTS } from '../../lib/theme';
 import { useAuthStore } from '../../lib/auth';
 import { Onboarding, hasCompletedOnboarding, resetOnboarding } from '../../components/Onboarding';
 import {
@@ -34,55 +34,37 @@ function TabIcon({
   premiumBadge?: boolean;
 }) {
   const { colors } = useTheme();
-  const scale = useSharedValue(focused ? 1 : 0.85);
   const opacity = useSharedValue(focused ? 1 : 0);
 
-  scale.value = withSpring(focused ? 1 : 0.85, ANIMATION.spring.gentle);
   opacity.value = withSpring(focused ? 1 : 0, ANIMATION.spring.gentle);
 
-  const iconAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-  }));
-
-  const dotAnimatedStyle = useAnimatedStyle(() => ({
+  // Redesign spec: the active tab's icon sits in a 52×30 gold-tinted pill.
+  const pillAnimatedStyle = useAnimatedStyle(() => ({
     opacity: opacity.value,
-    transform: [{ scale: interpolate(opacity.value, [0, 1], [0.5, 1]) }],
-  }));
-
-  const glowAnimatedStyle = useAnimatedStyle(() => ({
-    opacity: opacity.value * 0.3,
-    transform: [{ scale: interpolate(opacity.value, [0, 1], [0.8, 1.2]) }],
+    transform: [{ scale: interpolate(opacity.value, [0, 1], [0.7, 1]) }],
   }));
 
   return (
     <View style={styles.iconContainer}>
-      {/* Glow effect behind active icon */}
       <Animated.View
         style={[
-          styles.iconGlow,
-          { backgroundColor: colors.gold },
-          glowAnimatedStyle,
+          styles.activePill,
+          { backgroundColor: colors.goldSurfaceStrong },
+          pillAnimatedStyle,
         ]}
       />
-      <Animated.View style={iconAnimatedStyle}>
+      <View>
         <Ionicons
           name={focused ? name.replace('-outline', '') as any : name}
-          size={24}
+          size={20}
           color={color}
         />
         {premiumBadge && (
-          <View style={[styles.premiumBadge, { backgroundColor: colors.gold }]}>
+          <View style={[styles.premiumBadge, { backgroundColor: colors.goldFill }]}>
             <Ionicons name="lock-closed" size={7} color="#000" />
           </View>
         )}
-      </Animated.View>
-      <Animated.View
-        style={[
-          styles.activeDot,
-          { backgroundColor: colors.gold },
-          dotAnimatedStyle,
-        ]}
-      />
+      </View>
     </View>
   );
 }
@@ -95,11 +77,6 @@ export default function TabLayout() {
   const { user, token } = useAuthStore();
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [onboardingChecked, setOnboardingChecked] = useState(false);
-  // Premium-gated tabs show a small lock badge for non-premium users.
-  const isPremiumUser =
-    user?.email === DEMO_EMAIL ||
-    !!user?.isPremium ||
-    user?.subscriptionStatus === 'active';
 
   useEffect(() => {
     const checkOnboarding = async () => {
@@ -162,41 +139,37 @@ export default function TabLayout() {
       }}
       screenOptions={{
         headerShown: false,
+        // Redesign spec: opaque obsidian (ivory in light) tab bar with a
+        // hairline top border — no blur, no shadow.
         tabBarStyle: {
           position: 'absolute',
           bottom: 0,
           left: 0,
           right: 0,
-          backgroundColor: isDark ? 'rgba(10, 10, 12, 0.98)' : 'rgba(255, 255, 255, 0.98)',
-          borderTopColor: isDark ? 'rgba(201, 162, 39, 0.15)' : 'rgba(0, 0, 0, 0.06)',
+          backgroundColor: colors.background,
+          borderTopColor: colors.border,
           borderTopWidth: 1,
-          paddingBottom: Platform.OS === 'ios' ? insets.bottom : 14,
-          paddingTop: 14,
-          height: Platform.OS === 'ios' ? 60 + insets.bottom : 74,
-          ...SHADOWS.lg,
+          paddingBottom: Platform.OS === 'ios' ? insets.bottom : 12,
+          paddingTop: 10,
+          height: Platform.OS === 'ios' ? 62 + insets.bottom : 74,
+          elevation: 0,
+          shadowOpacity: 0,
         },
         tabBarActiveTintColor: colors.gold,
         tabBarInactiveTintColor: colors.textTertiary,
         tabBarLabelStyle: {
+          fontFamily: FONTS.sansSemiBold,
           fontSize: 10,
-          fontWeight: '600',
-          marginTop: 4,
-          letterSpacing: 0.4,
+          marginTop: 3,
+          letterSpacing: 0.2,
         },
         tabBarItemStyle: {
-          paddingTop: 4,
+          paddingTop: 2,
         },
       }}
     >
-      <Tabs.Screen
-        name="dashboard"
-        options={{
-          title: 'Home',
-          tabBarIcon: ({ color, focused }) => (
-            <TabIcon name="home-outline" color={color} focused={focused} />
-          ),
-        }}
-      />
+      {/* 4-tab IA per the 1b redesign: Vote is home. The dashboard route
+          stays alive (href: null) for deep links and legacy navigation. */}
       <Tabs.Screen
         name="proposals"
         options={{
@@ -207,23 +180,33 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="dashboard"
+        options={{
+          href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="results"
+        options={{
+          title: 'Results',
+          tabBarIcon: ({ color, focused }) => (
+            <TabIcon name="stats-chart-outline" color={color} focused={focused} />
+          ),
+        }}
+      />
+      {/* Sentinel left the tab bar in the 4-tab redesign IA but the route
+          stays alive (href: null) so dashboard/profile entry points can
+          still router.push('/(tabs)/sentinel'). */}
+      <Tabs.Screen
         name="sentinel"
         options={{
-          title: 'Sentinel',
-          tabBarIcon: ({ color, focused }) => (
-            <TabIcon
-              name="sparkles-outline"
-              color={color}
-              focused={focused}
-              premiumBadge={!isPremiumUser}
-            />
-          ),
+          href: null,
         }}
       />
       <Tabs.Screen
         name="groups"
         options={{
-          title: 'Groups',
+          title: 'Orgs',
           tabBarIcon: ({ color, focused }) => (
             <TabIcon name="people-outline" color={color} focused={focused} />
           ),
@@ -232,9 +215,9 @@ export default function TabLayout() {
       <Tabs.Screen
         name="profile"
         options={{
-          title: 'Profile',
+          title: 'Identity',
           tabBarIcon: ({ color, focused }) => (
-            <TabIcon name="person-outline" color={color} focused={focused} />
+            <TabIcon name="shield-outline" color={color} focused={focused} />
           ),
         }}
       />
@@ -257,20 +240,14 @@ const styles = StyleSheet.create({
   iconContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    width: 50,
+    width: 52,
     height: 30,
   },
-  iconGlow: {
+  activePill: {
     position: 'absolute',
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-  },
-  activeDot: {
-    width: 5,
-    height: 5,
-    borderRadius: 2.5,
-    marginTop: 4,
+    width: 52,
+    height: 30,
+    borderRadius: 15,
   },
   premiumBadge: {
     position: 'absolute',

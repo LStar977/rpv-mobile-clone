@@ -510,10 +510,16 @@ interface UploadResponse {
   metadata: { name: string; size: number; contentType: string };
 }
 
+// A request that never resolves leaves whatever spinner triggered it
+// spinning forever — every call gets a hard timeout instead.
+const REQUEST_TIMEOUT_MS = 20000;
+
 async function apiRequest<T>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<ApiResponse<T>> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   try {
     const token = await getAuthToken();
     const headers: Record<string, string> = {
@@ -526,10 +532,19 @@ async function apiRequest<T>(
     const response = await fetch(`${API_BASE_URL}${endpoint}`, {
       ...options,
       headers,
+      signal: controller.signal,
     });
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      console.error(`API Error: ${response.status}`, errorData);
+      // Endpoints that don't exist on the backend yet and have client-side
+      // fallbacks log quietly — console.error triggers the red dev-mode
+      // LogBox toast on every screen that touches them.
+      const expectedFailure = endpoint === '/api/user/limits' || endpoint === '/api/user/mutes';
+      if (expectedFailure) {
+        console.log(`API (expected, using fallback): ${response.status} ${endpoint}`);
+      } else {
+        console.error(`API Error: ${response.status}`, errorData);
+      }
 
       // Handle auth expiration - trigger re-auth flow.
       // TODO: implement transparent refresh+retry. Requires backend changes:
@@ -582,8 +597,16 @@ async function apiRequest<T>(
       return { data: null, error: 'Server returned invalid response' };
     }
   } catch (error) {
-    console.error('API Request failed:', error);
-    return { data: null, error: error instanceof Error ? error.message : 'Network error' };
+    const aborted = error instanceof Error && error.name === 'AbortError';
+    console.error('API Request failed:', aborted ? `timeout after ${REQUEST_TIMEOUT_MS}ms: ${endpoint}` : error);
+    return {
+      data: null,
+      error: aborted
+        ? 'The server took too long to respond. Please try again.'
+        : error instanceof Error ? error.message : 'Network error',
+    };
+  } finally {
+    clearTimeout(timeout);
   }
 }
 

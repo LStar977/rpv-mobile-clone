@@ -16,7 +16,7 @@ import * as Haptics from 'expo-haptics';
 import Animated, { FadeIn, FadeInUp } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Papa from 'papaparse';
-import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY } from '../../lib/theme';
+import { useTheme, SPACING, RADIUS, FONTS } from '../../lib/theme';
 import { organizationsApi } from '../../lib/api';
 import { UpgradeModal } from '../../components/ui/UpgradeModal';
 
@@ -120,6 +120,7 @@ export default function ImportRosterScreen() {
   const [stage, setStage] = useState<Stage>('pick');
   const [headers, setHeaders] = useState<string[]>([]);
   const [rawRows, setRawRows] = useState<string[][]>([]);
+  const [fileName, setFileName] = useState<string | null>(null);
   const [mapping, setMapping] = useState<Record<number, ReturnType<typeof classifyHeader>>>({});
   const [result, setResult] = useState<ImportResult | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -138,6 +139,7 @@ export default function ImportRosterScreen() {
   );
 
   const emailMapped = Object.values(mapping).includes('email');
+  const matchedColumns = Object.values(mapping).filter(Boolean).length;
 
   const handlePickFile = async () => {
     setErrorMsg(null);
@@ -182,6 +184,7 @@ export default function ImportRosterScreen() {
 
       setHeaders(hs);
       setRawRows(rows);
+      setFileName(file.name ?? 'roster.csv');
       setMapping(initialMapping);
       setStage('preview');
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -269,6 +272,14 @@ export default function ImportRosterScreen() {
     router.back();
   };
 
+  const handleReplaceFile = () => {
+    setStage('pick');
+    setHeaders([]);
+    setRawRows([]);
+    setFileName(null);
+    setErrorMsg(null);
+  };
+
   const labelForRole = (r: ReturnType<typeof classifyHeader>) => {
     if (r === 'email') return 'Email';
     if (r === 'firstName') return 'First name';
@@ -277,164 +288,257 @@ export default function ImportRosterScreen() {
     return 'Skip';
   };
 
+  const stepNumber = stage === 'pick' ? 1 : stage === 'done' ? 3 : 2;
+
   // ---------- Render ----------
 
-  const renderPick = () => (
-    <Animated.View entering={FadeIn.duration(300)} style={styles.centerContent}>
-      <View style={[styles.iconCircle, { backgroundColor: `${colors.gold}15` }]}>
-        <Ionicons name="cloud-upload-outline" size={48} color={colors.gold} />
+  const renderStepHeader = () => (
+    <View style={{ gap: 16 }}>
+      <View style={styles.headerRow}>
+        <TouchableOpacity
+          onPress={handleClose}
+          disabled={stage === 'importing'}
+          style={[styles.closeButton, { backgroundColor: colors.surface, borderColor: colors.borderSubtle, opacity: stage === 'importing' ? 0.4 : 1 }]}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="close" size={18} color={colors.textSecondary} />
+        </TouchableOpacity>
+        <Text style={[styles.stepLabel, { color: colors.textTertiary }]}>STEP {stepNumber} OF 3</Text>
       </View>
-      <Text style={[styles.title, { color: colors.text }]}>Import members from CSV</Text>
-      <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-        Upload a CSV with member emails. Each invited person gets an email with a magic link to join {orgName ? `"${orgName}"` : 'your organization'}.
-      </Text>
+      <View style={styles.stepBars}>
+        {[1, 2, 3].map(n => (
+          <View
+            key={n}
+            style={[styles.stepBar, { backgroundColor: n <= stepNumber ? colors.goldFill : colors.surfaceHighlight }]}
+          />
+        ))}
+      </View>
+    </View>
+  );
 
-      <View style={[styles.requirementsBox, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-        <Text style={[styles.requirementsTitle, { color: colors.text }]}>Your CSV needs:</Text>
+  const renderPick = () => (
+    <Animated.View entering={FadeIn.duration(300)} style={styles.stageBody}>
+      <View style={{ gap: 8 }}>
+        <Text style={[styles.title, { color: colors.text }]}>Import Your Roster</Text>
+        <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
+          Upload a CSV with member emails. Each invited person gets an email with a magic link to join {orgName ? `"${orgName}"` : 'your organization'} — and verifies their own identity before they can vote.
+        </Text>
+      </View>
+
+      <View style={[styles.requirementsBox, { backgroundColor: colors.surface, borderColor: colors.borderSubtle }]}>
+        <Text style={[styles.requirementsTitle, { color: colors.textTertiary }]}>YOUR CSV NEEDS</Text>
         <View style={styles.requirementRow}>
           <Ionicons name="checkmark-circle" size={16} color={colors.success} />
-          <Text style={[styles.requirementText, { color: colors.text }]}>An <Text style={{ fontWeight: '700' }}>Email</Text> column (required)</Text>
+          <Text style={[styles.requirementText, { color: colors.text }]}>An <Text style={{ fontFamily: FONTS.sansSemiBold }}>Email</Text> column (required)</Text>
         </View>
         <View style={styles.requirementRow}>
-          <Ionicons name="checkmark-circle" size={16} color={colors.textSecondary} />
+          <Ionicons name="checkmark-circle" size={16} color={colors.textTertiary} />
           <Text style={[styles.requirementText, { color: colors.textSecondary }]}>First Name and Last Name columns (optional)</Text>
         </View>
         <View style={styles.requirementRow}>
-          <Ionicons name="checkmark-circle" size={16} color={colors.textSecondary} />
+          <Ionicons name="checkmark-circle" size={16} color={colors.textTertiary} />
           <Text style={[styles.requirementText, { color: colors.textSecondary }]}>Up to {MAX_ROWS} rows per upload</Text>
         </View>
       </View>
 
-      <TouchableOpacity onPress={handlePickFile} style={[styles.primaryButton, { backgroundColor: colors.gold }]}>
-        <Ionicons name="document-attach-outline" size={20} color="#000" />
-        <Text style={styles.primaryButtonText}>Choose CSV file</Text>
+      <TouchableOpacity
+        onPress={handlePickFile}
+        style={[styles.uploadCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
+        activeOpacity={0.7}
+      >
+        <View style={[styles.uploadIconBox, { backgroundColor: colors.goldSurface }]}>
+          <Ionicons name="cloud-upload-outline" size={22} color={colors.gold} />
+        </View>
+        <View style={{ flex: 1, gap: 1 }}>
+          <Text style={[styles.uploadCardTitle, { color: colors.text }]}>Choose a CSV file</Text>
+          <Text style={[styles.uploadCardMeta, { color: colors.textTertiary }]}>UP TO {MAX_ROWS} ROWS · UTF-8</Text>
+        </View>
+        <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />
       </TouchableOpacity>
 
       {errorMsg && (
-        <Text style={[styles.errorText, { color: colors.error }]}>{errorMsg}</Text>
+        <View style={[styles.errorBanner, { backgroundColor: colors.errorSurface, borderColor: colors.error }]}>
+          <Ionicons name="alert-circle-outline" size={16} color={colors.error} style={{ flexShrink: 0 }} />
+          <Text style={[styles.errorBannerText, { color: colors.text }]}>{errorMsg}</Text>
+        </View>
       )}
+
+      <View style={{ marginTop: 'auto' }}>
+        <TouchableOpacity onPress={handlePickFile} style={[styles.primaryButton, { backgroundColor: colors.goldFill }]} activeOpacity={0.8}>
+          <Text style={styles.primaryButtonText}>Choose CSV File</Text>
+        </TouchableOpacity>
+      </View>
     </Animated.View>
   );
 
-  const renderPreview = () => (
-    <ScrollView contentContainerStyle={styles.previewContent} showsVerticalScrollIndicator={false}>
-      <Animated.View entering={FadeIn.duration(300)}>
-        <Text style={[styles.title, { color: colors.text }]}>Review and import</Text>
-        <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-          {rawRows.length} rows in your file. Tap a column header to change how it's used.
-        </Text>
+  const renderPreview = () => {
+    // Mixed row preview — ready rows plus flagged rows, honestly labeled.
+    const flaggedShown = Math.min(invalid.length, 2);
+    const readyShown = Math.min(parsed.length, 4 - flaggedShown);
+    const previewRows: Array<{ name: string; detail: string; flagged: boolean }> = [
+      ...parsed.slice(0, readyShown).map(r => ({
+        name: [r.firstName, r.lastName].filter(Boolean).join(' ') || '—',
+        detail: r.email,
+        flagged: false,
+      })),
+      ...invalid.slice(0, flaggedShown).map(r => ({
+        name: '—',
+        detail: r.email ? `${r.email} — ${r.reason}` : r.reason,
+        flagged: true,
+      })),
+    ];
 
-        {/* Counts summary */}
-        <View style={styles.countsRow}>
-          <View style={[styles.countCard, { backgroundColor: `${colors.success}15`, borderColor: colors.success }]}>
-            <Text style={[styles.countNumber, { color: colors.success }]}>{parsed.length}</Text>
-            <Text style={[styles.countLabel, { color: colors.text }]}>Will invite</Text>
+    return (
+      <ScrollView contentContainerStyle={styles.previewContent} showsVerticalScrollIndicator={false}>
+        <Animated.View entering={FadeIn.duration(300)} style={{ gap: 16 }}>
+          <View style={{ gap: 8 }}>
+            <Text style={[styles.title, { color: colors.text }]}>Review Your Roster</Text>
+            <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
+              We matched your CSV columns. Members get an invite — each verifies their own identity before they can vote.
+            </Text>
           </View>
-          {invalid.length > 0 && (
-            <View style={[styles.countCard, { backgroundColor: `${colors.error}15`, borderColor: colors.error }]}>
-              <Text style={[styles.countNumber, { color: colors.error }]}>{invalid.length}</Text>
-              <Text style={[styles.countLabel, { color: colors.text }]}>Invalid email</Text>
+
+          {/* File card */}
+          <View style={[styles.fileCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <View style={[styles.fileIconBox, { backgroundColor: colors.goldSurface }]}>
+              <Ionicons name="document-text-outline" size={18} color={colors.gold} />
+            </View>
+            <View style={{ flex: 1, gap: 1 }}>
+              <Text style={[styles.fileName, { color: colors.text }]} numberOfLines={1}>
+                {fileName ?? 'roster.csv'}
+              </Text>
+              <Text style={[styles.fileMeta, { color: colors.textTertiary }]}>
+                {rawRows.length.toLocaleString()} ROWS · {matchedColumns} {matchedColumns === 1 ? 'COLUMN' : 'COLUMNS'} MATCHED
+              </Text>
+            </View>
+            <TouchableOpacity onPress={handleReplaceFile} activeOpacity={0.7}>
+              <Text style={[styles.replaceText, { color: colors.textSecondary }]}>Replace</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Column mapping — tap a column to cycle how it's used */}
+          <View style={{ gap: 7 }}>
+            <Text style={[styles.sectionEyebrow, { color: colors.textTertiary }]}>COLUMN MAPPING · TAP TO CHANGE</Text>
+            <View style={[styles.mappingCard, { backgroundColor: colors.surface, borderColor: colors.borderSubtle }]}>
+              {headers.map((header, i) => (
+                <TouchableOpacity
+                  key={`${header}-${i}`}
+                  onPress={() => cycleMapping(i)}
+                  activeOpacity={0.7}
+                  style={[styles.columnRow, i < headers.length - 1 && { borderBottomColor: colors.borderSubtle, borderBottomWidth: 1 }]}
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.columnHeaderName, { color: colors.text }]} numberOfLines={1}>
+                      {header || `(column ${i + 1})`}
+                    </Text>
+                    <Text style={[styles.columnSample, { color: colors.textTertiary }]} numberOfLines={1}>
+                      e.g. {String(rawRows[0]?.[i] ?? '').slice(0, 30) || '—'}
+                    </Text>
+                  </View>
+                  <View style={[
+                    styles.columnRoleBadge,
+                    {
+                      backgroundColor: mapping[i] ? colors.goldSurface : colors.surfaceHighlight,
+                      borderColor: mapping[i] ? 'rgba(234,186,88,0.3)' : 'transparent',
+                    },
+                  ]}>
+                    <Text style={[styles.columnRoleText, { color: mapping[i] ? colors.gold : colors.textTertiary }]}>
+                      {labelForRole(mapping[i])}
+                    </Text>
+                    <Ionicons name="chevron-forward" size={12} color={mapping[i] ? colors.gold : colors.textTertiary} />
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+
+          {!emailMapped && (
+            <View style={[styles.warnBanner, { backgroundColor: colors.warningSurface, borderColor: colors.warning }]}>
+              <Ionicons name="warning-outline" size={16} color={colors.warning} style={{ flexShrink: 0 }} />
+              <Text style={[styles.warnBannerText, { color: colors.textSecondary }]}>
+                <Text style={{ fontFamily: FONTS.sansSemiBold, color: colors.text }}>No email column mapped.</Text> Tap a column above to mark it as Email — at least one is required.
+              </Text>
             </View>
           )}
-        </View>
 
-        {/* Column mapping */}
-        <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>Column mapping</Text>
-        <View style={[styles.columnsList, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          {headers.map((header, i) => (
-            <TouchableOpacity
-              key={`${header}-${i}`}
-              onPress={() => cycleMapping(i)}
-              style={[styles.columnRow, i < headers.length - 1 && { borderBottomColor: colors.border, borderBottomWidth: 1 }]}
-            >
-              <View style={styles.columnHeaderInfo}>
-                <Text style={[styles.columnHeaderName, { color: colors.text }]} numberOfLines={1}>
-                  {header || `(column ${i + 1})`}
-                </Text>
-                <Text style={[styles.columnSample, { color: colors.textSecondary }]} numberOfLines={1}>
-                  e.g. {String(rawRows[0]?.[i] ?? '').slice(0, 30) || '—'}
-                </Text>
+          {/* Row preview table */}
+          {emailMapped && previewRows.length > 0 && (
+            <View style={[styles.table, { backgroundColor: colors.surface, borderColor: colors.borderSubtle }]}>
+              <View style={[styles.tableHeader, { backgroundColor: colors.backgroundSecondary, borderBottomColor: colors.borderSubtle }]}>
+                <Text style={[styles.tableHeaderCell, { color: colors.textTertiary, flex: 1.2 }]}>NAME</Text>
+                <Text style={[styles.tableHeaderCell, { color: colors.textTertiary, flex: 1.6 }]}>EMAIL</Text>
+                <Text style={[styles.tableHeaderCell, { color: colors.textTertiary, flex: 0.8, textAlign: 'right' }]}>STATUS</Text>
               </View>
-              <View style={[
-                styles.columnRoleBadge,
-                {
-                  backgroundColor: mapping[i] ? `${colors.gold}25` : `${colors.textSecondary}15`,
-                  borderColor: mapping[i] ? colors.gold : 'transparent',
-                },
-              ]}>
-                <Text style={[styles.columnRoleText, { color: mapping[i] ? colors.gold : colors.textSecondary }]}>
-                  {labelForRole(mapping[i])}
-                </Text>
-                <Ionicons name="chevron-forward" size={14} color={mapping[i] ? colors.gold : colors.textSecondary} />
-              </View>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        {!emailMapped && (
-          <View style={[styles.warningBox, { backgroundColor: `${colors.warning}15`, borderColor: colors.warning }]}>
-            <Ionicons name="warning-outline" size={18} color={colors.warning} />
-            <Text style={[styles.warningText, { color: colors.text }]}>
-              Tap a column to mark it as <Text style={{ fontWeight: '700' }}>Email</Text>. At least one email column is required.
-            </Text>
-          </View>
-        )}
-
-        {/* Preview rows */}
-        {parsed.length > 0 && (
-          <>
-            <Text style={[styles.sectionLabel, { color: colors.textSecondary, marginTop: SPACING.lg }]}>
-              First {Math.min(5, parsed.length)} of {parsed.length}
-            </Text>
-            <View style={[styles.previewRowsList, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-              {parsed.slice(0, 5).map((row, i) => (
+              {previewRows.map((row, i) => (
                 <View
                   key={i}
-                  style={[styles.previewRow, i < Math.min(5, parsed.length) - 1 && { borderBottomColor: colors.border, borderBottomWidth: 1 }]}
+                  style={[styles.tableRow, i < previewRows.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.borderSubtle }]}
                 >
-                  <Text style={[styles.previewEmail, { color: colors.text }]} numberOfLines={1}>{row.email}</Text>
-                  {(row.firstName || row.lastName) && (
-                    <Text style={[styles.previewName, { color: colors.textSecondary }]} numberOfLines={1}>
-                      {[row.firstName, row.lastName].filter(Boolean).join(' ')}
-                    </Text>
-                  )}
+                  <Text style={[styles.tableName, { color: colors.text, flex: 1.2 }]} numberOfLines={1}>{row.name}</Text>
+                  <Text
+                    style={[styles.tableEmail, { color: row.flagged ? colors.error : colors.textTertiary, flex: 1.6 }]}
+                    numberOfLines={1}
+                  >
+                    {row.detail}
+                  </Text>
+                  <Text style={[styles.tableStatus, { color: row.flagged ? colors.warning : colors.success, flex: 0.8 }]}>
+                    {row.flagged ? 'FIX' : 'READY'}
+                  </Text>
                 </View>
               ))}
             </View>
-          </>
-        )}
+          )}
+          {emailMapped && (parsed.length + invalid.length) > previewRows.length && (
+            <Text style={[styles.tableFootnote, { color: colors.textTertiary }]}>
+              SHOWING {previewRows.length} OF {(parsed.length + invalid.length).toLocaleString()} ROWS
+            </Text>
+          )}
 
-        <TouchableOpacity
-          onPress={handleConfirmImport}
-          disabled={!emailMapped || parsed.length === 0}
-          style={[
-            styles.primaryButton,
-            {
-              backgroundColor: !emailMapped || parsed.length === 0 ? colors.surfacePressed : colors.gold,
-              marginTop: SPACING.xl,
-            },
-          ]}
-        >
-          <Ionicons name="send-outline" size={20} color="#000" />
-          <Text style={styles.primaryButtonText}>
-            Send {parsed.length} {parsed.length === 1 ? 'invite' : 'invites'}
-          </Text>
-        </TouchableOpacity>
+          {/* Invalid-rows banner — honest about what's wrong and what happens */}
+          {invalid.length > 0 && (
+            <View style={[styles.warnBanner, { backgroundColor: colors.warningSurface, borderColor: colors.warning }]}>
+              <Ionicons name="warning-outline" size={16} color={colors.warning} style={{ flexShrink: 0 }} />
+              <Text style={[styles.warnBannerText, { color: colors.textSecondary }]}>
+                <Text style={{ fontFamily: FONTS.sansSemiBold, color: colors.text }}>{invalid.length} {invalid.length === 1 ? 'row needs' : 'rows need'} attention.</Text> {invalid.length === 1 ? 'It has an invalid email and will be skipped' : 'They have invalid emails and will be skipped'} — fix the CSV and re-upload, or import the {parsed.length.toLocaleString()} ready {parsed.length === 1 ? 'row' : 'rows'}.
+              </Text>
+            </View>
+          )}
 
-        <TouchableOpacity onPress={() => { setStage('pick'); setHeaders([]); setRawRows([]); }} style={styles.secondaryButton}>
-          <Text style={[styles.secondaryButtonText, { color: colors.textSecondary }]}>Choose a different file</Text>
-        </TouchableOpacity>
+          {errorMsg && (
+            <View style={[styles.errorBanner, { backgroundColor: colors.errorSurface, borderColor: colors.error }]}>
+              <Ionicons name="alert-circle-outline" size={16} color={colors.error} style={{ flexShrink: 0 }} />
+              <Text style={[styles.errorBannerText, { color: colors.text }]}>{errorMsg}</Text>
+            </View>
+          )}
 
-        {errorMsg && <Text style={[styles.errorText, { color: colors.error }]}>{errorMsg}</Text>}
-      </Animated.View>
-    </ScrollView>
-  );
+          <View style={{ gap: 9, marginTop: SPACING.sm }}>
+            <TouchableOpacity
+              onPress={handleConfirmImport}
+              disabled={!emailMapped || parsed.length === 0}
+              activeOpacity={0.8}
+              style={[
+                styles.primaryButton,
+                { backgroundColor: !emailMapped || parsed.length === 0 ? colors.surfacePressed : colors.goldFill },
+              ]}
+            >
+              <Text style={[styles.primaryButtonText, (!emailMapped || parsed.length === 0) && { color: colors.textTertiary }]}>
+                Import {parsed.length.toLocaleString()} {parsed.length === 1 ? 'Member' : 'Members'}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={handleReplaceFile} style={styles.textButton} activeOpacity={0.7}>
+              <Text style={[styles.textButtonLabel, { color: colors.textSecondary }]}>Choose a Different File</Text>
+            </TouchableOpacity>
+          </View>
+        </Animated.View>
+      </ScrollView>
+    );
+  };
 
   const renderImporting = () => (
     <View style={styles.centerContent}>
       <ActivityIndicator size="large" color={colors.gold} />
-      <Text style={[styles.title, { color: colors.text, marginTop: SPACING.lg }]}>Sending invites…</Text>
-      <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
+      <Text style={[styles.title, { color: colors.text, textAlign: 'center', marginTop: SPACING.lg }]}>Sending invites…</Text>
+      <Text style={[styles.subtitle, { color: colors.textSecondary, textAlign: 'center' }]}>
         This usually takes a few seconds.
       </Text>
     </View>
@@ -445,62 +549,64 @@ export default function ImportRosterScreen() {
     const skipped = result.skippedExistingMembers.length + result.skippedAlreadyInvited.length;
     return (
       <ScrollView contentContainerStyle={styles.previewContent}>
-        <Animated.View entering={FadeInUp.duration(400)} style={styles.centerContent}>
-          <View style={[styles.iconCircle, { backgroundColor: `${colors.success}15` }]}>
-            <Ionicons name="checkmark-circle" size={48} color={colors.success} />
-          </View>
-          <Text style={[styles.title, { color: colors.text }]}>Import complete</Text>
-          <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-            {result.created} {result.created === 1 ? 'invite' : 'invites'} sent. Members will receive an email with a link to join.
-          </Text>
-        </Animated.View>
-
-        <View style={[styles.summaryCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <View style={styles.summaryRow}>
-            <Text style={[styles.summaryLabel, { color: colors.text }]}>Invites sent</Text>
-            <Text style={[styles.summaryValue, { color: colors.success }]}>{result.created}</Text>
-          </View>
-          {skipped > 0 && (
-            <View style={[styles.summaryRow, { borderTopColor: colors.border, borderTopWidth: 1 }]}>
-              <Text style={[styles.summaryLabel, { color: colors.textSecondary }]}>Already in org / already invited</Text>
-              <Text style={[styles.summaryValue, { color: colors.textSecondary }]}>{skipped}</Text>
+        <Animated.View entering={FadeInUp.duration(400)} style={{ gap: 16 }}>
+          <View style={{ alignItems: 'center', gap: 8, paddingVertical: SPACING.lg }}>
+            <View style={[styles.doneIconCircle, { backgroundColor: colors.successSurface }]}>
+              <Ionicons name="checkmark" size={30} color={colors.success} />
             </View>
-          )}
+            <Text style={[styles.title, { color: colors.text, textAlign: 'center' }]}>Import Complete</Text>
+            <Text style={[styles.subtitle, { color: colors.textSecondary, textAlign: 'center' }]}>
+              {result.created.toLocaleString()} {result.created === 1 ? 'invite' : 'invites'} sent. Members will receive an email with a link to join.
+            </Text>
+          </View>
+
+          <View style={{ gap: 7 }}>
+            <Text style={[styles.sectionEyebrow, { color: colors.textTertiary }]}>IMPORT SUMMARY</Text>
+            <View style={[styles.summaryCard, { backgroundColor: colors.surface, borderColor: colors.borderSubtle }]}>
+              <View style={[styles.summaryRow, (skipped > 0 || result.invalid.length > 0) && { borderBottomWidth: 1, borderBottomColor: colors.borderSubtle }]}>
+                <Text style={[styles.summaryLabel, { color: colors.textSecondary }]}>INVITES SENT</Text>
+                <Text style={[styles.summaryValue, { color: colors.success }]}>{result.created.toLocaleString()}</Text>
+              </View>
+              {skipped > 0 && (
+                <View style={[styles.summaryRow, result.invalid.length > 0 && { borderBottomWidth: 1, borderBottomColor: colors.borderSubtle }]}>
+                  <Text style={[styles.summaryLabel, { color: colors.textSecondary }]}>ALREADY IN ORG / INVITED</Text>
+                  <Text style={[styles.summaryValue, { color: colors.textSecondary }]}>{skipped.toLocaleString()}</Text>
+                </View>
+              )}
+              {result.invalid.length > 0 && (
+                <View style={styles.summaryRow}>
+                  <Text style={[styles.summaryLabel, { color: colors.textSecondary }]}>INVALID ROWS</Text>
+                  <Text style={[styles.summaryValue, { color: colors.error }]}>{result.invalid.length.toLocaleString()}</Text>
+                </View>
+              )}
+            </View>
+          </View>
+
           {result.invalid.length > 0 && (
-            <View style={[styles.summaryRow, { borderTopColor: colors.border, borderTopWidth: 1 }]}>
-              <Text style={[styles.summaryLabel, { color: colors.textSecondary }]}>Invalid rows</Text>
-              <Text style={[styles.summaryValue, { color: colors.error }]}>{result.invalid.length}</Text>
-            </View>
+            <TouchableOpacity
+              onPress={() => Alert.alert(
+                'Invalid rows',
+                result.invalid.slice(0, 20).map(r => `${r.email || '(empty)'} — ${r.reason}`).join('\n') + (result.invalid.length > 20 ? `\n…and ${result.invalid.length - 20} more` : '')
+              )}
+              style={styles.textButton}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.textButtonLabel, { color: colors.textSecondary }]}>View Invalid Rows</Text>
+            </TouchableOpacity>
           )}
-        </View>
 
-        {result.invalid.length > 0 && (
-          <TouchableOpacity
-            onPress={() => Alert.alert(
-              'Invalid rows',
-              result.invalid.slice(0, 20).map(r => `${r.email || '(empty)'} — ${r.reason}`).join('\n') + (result.invalid.length > 20 ? `\n…and ${result.invalid.length - 20} more` : '')
-            )}
-            style={styles.secondaryButton}
-          >
-            <Text style={[styles.secondaryButtonText, { color: colors.textSecondary }]}>View invalid rows</Text>
+          <TouchableOpacity onPress={() => router.back()} style={[styles.primaryButton, { backgroundColor: colors.goldFill }]} activeOpacity={0.8}>
+            <Text style={styles.primaryButtonText}>Done</Text>
           </TouchableOpacity>
-        )}
-
-        <TouchableOpacity onPress={() => router.back()} style={[styles.primaryButton, { backgroundColor: colors.gold, marginTop: SPACING.lg }]}>
-          <Text style={styles.primaryButtonText}>Done</Text>
-        </TouchableOpacity>
+        </Animated.View>
       </ScrollView>
     );
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={[styles.header, { borderBottomColor: colors.border, paddingTop: insets.top + 8 }]}>
-        <TouchableOpacity onPress={handleClose} style={styles.backButton} disabled={stage === 'importing'}>
-          <Ionicons name="close" size={24} color={colors.text} />
-        </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>Import members</Text>
-        <View style={{ width: 40 }} />
+    <View style={[styles.container, { backgroundColor: colors.background, paddingTop: insets.top + 8 }]}>
+      <View style={{ paddingHorizontal: SPACING.screenPadding, gap: 16, paddingBottom: 16 }}>
+        {renderStepHeader()}
       </View>
 
       {stage === 'pick' && renderPick()}
@@ -528,187 +634,300 @@ export default function ImportRosterScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  header: {
+  headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: SPACING.lg,
-    paddingTop: SPACING.xl,
-    paddingBottom: SPACING.md,
-    borderBottomWidth: 1,
   },
-  backButton: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { fontFamily: 'Georgia', fontSize: 20, fontWeight: '500' },
+  closeButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stepLabel: {
+    fontFamily: FONTS.mono,
+    fontSize: 10.5,
+    letterSpacing: 1.68,
+    fontVariant: ['tabular-nums'],
+  },
+  stepBars: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  stepBar: {
+    flex: 1,
+    height: 4,
+    borderRadius: 2,
+  },
+  stageBody: {
+    flex: 1,
+    paddingHorizontal: SPACING.screenPadding,
+    paddingBottom: 34,
+    gap: 16,
+  },
   centerContent: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: SPACING.lg,
-    gap: SPACING.md,
-  },
-  iconCircle: {
-    width: 96, height: 96, borderRadius: 48,
-    alignItems: 'center', justifyContent: 'center',
-    marginBottom: SPACING.md,
+    paddingHorizontal: SPACING.screenPadding,
+    gap: SPACING.sm,
   },
   title: {
-    fontFamily: 'Georgia',
-    fontSize: 22,
-    fontWeight: '500',
-    textAlign: 'center',
+    fontFamily: FONTS.serif,
+    fontSize: 27,
+    lineHeight: 30,
+    letterSpacing: -0.32,
   },
   subtitle: {
-    ...TYPOGRAPHY.bodyMedium,
-    textAlign: 'center',
-    marginBottom: SPACING.md,
+    fontFamily: FONTS.sans,
+    fontSize: 13.5,
+    lineHeight: 20,
   },
   requirementsBox: {
-    width: '100%',
     borderWidth: 1,
-    borderRadius: BORDER_RADIUS.lg,
+    borderRadius: RADIUS.lg,
     padding: SPACING.lg,
-    marginBottom: SPACING.lg,
     gap: SPACING.sm,
   },
   requirementsTitle: {
-    ...TYPOGRAPHY.labelMedium,
-    fontWeight: '600',
+    fontFamily: FONTS.sansSemiBold,
+    fontSize: 10,
+    letterSpacing: 1.4,
     marginBottom: SPACING.xs,
   },
   requirementRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm },
-  requirementText: { ...TYPOGRAPHY.bodySmall, flex: 1 },
-  primaryButton: {
+  requirementText: {
+    fontFamily: FONTS.sans,
+    fontSize: 13,
+    lineHeight: 19,
+    flex: 1,
+  },
+  uploadCard: {
     flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderWidth: 1,
+    borderRadius: RADIUS.lg,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+  },
+  uploadIconBox: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: SPACING.md,
-    paddingHorizontal: SPACING.lg,
-    borderRadius: BORDER_RADIUS.lg,
-    gap: SPACING.sm,
-    minWidth: '60%',
   },
-  primaryButtonText: {
-    ...TYPOGRAPHY.labelLarge,
-    color: '#000',
-    fontWeight: '600',
+  uploadCardTitle: {
+    fontFamily: FONTS.sansSemiBold,
+    fontSize: 13.5,
   },
-  secondaryButton: {
-    alignItems: 'center',
-    paddingVertical: SPACING.md,
+  uploadCardMeta: {
+    fontFamily: FONTS.mono,
+    fontSize: 10.5,
+    fontVariant: ['tabular-nums'],
   },
-  secondaryButtonText: {
-    ...TYPOGRAPHY.labelMedium,
-  },
-  errorText: {
-    ...TYPOGRAPHY.bodySmall,
-    textAlign: 'center',
-    marginTop: SPACING.md,
-  },
-  previewContent: { padding: SPACING.lg, paddingBottom: SPACING.xl },
-  countsRow: {
+  fileCard: {
     flexDirection: 'row',
-    gap: SPACING.md,
-    marginVertical: SPACING.lg,
-  },
-  countCard: {
-    flex: 1,
-    borderWidth: 1,
-    borderRadius: BORDER_RADIUS.lg,
-    padding: SPACING.md,
     alignItems: 'center',
-  },
-  countNumber: {
-    fontFamily: 'Georgia',
-    fontSize: 28,
-    fontWeight: '500',
-  },
-  countLabel: {
-    ...TYPOGRAPHY.labelSmall,
-    marginTop: SPACING.xxs,
-  },
-  sectionLabel: {
-    ...TYPOGRAPHY.labelSmall,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: SPACING.sm,
-  },
-  columnsList: {
-    borderRadius: BORDER_RADIUS.lg,
+    gap: 12,
     borderWidth: 1,
-    overflow: 'hidden',
+    borderRadius: RADIUS.lg,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+  },
+  fileIconBox: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  fileName: {
+    fontFamily: FONTS.sansSemiBold,
+    fontSize: 13.5,
+  },
+  fileMeta: {
+    fontFamily: FONTS.mono,
+    fontSize: 10.5,
+    fontVariant: ['tabular-nums'],
+  },
+  replaceText: {
+    fontFamily: FONTS.sansMedium,
+    fontSize: 12,
+  },
+  sectionEyebrow: {
+    fontFamily: FONTS.sansSemiBold,
+    fontSize: 10.5,
+    letterSpacing: 1.47,
+  },
+  mappingCard: {
+    borderRadius: RADIUS.lg,
+    borderWidth: 1,
+    paddingHorizontal: 16,
   },
   columnRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: SPACING.md,
+    paddingVertical: 11,
     gap: SPACING.md,
   },
-  columnHeaderInfo: { flex: 1 },
   columnHeaderName: {
-    ...TYPOGRAPHY.labelMedium,
-    fontWeight: '600',
+    fontFamily: FONTS.sansMedium,
+    fontSize: 13,
   },
   columnSample: {
-    ...TYPOGRAPHY.bodySmall,
+    fontFamily: FONTS.mono,
+    fontSize: 10.5,
     marginTop: 2,
+    fontVariant: ['tabular-nums'],
   },
   columnRoleBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: SPACING.xs,
-    paddingHorizontal: SPACING.sm,
-    borderRadius: BORDER_RADIUS.full,
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderRadius: RADIUS.chip,
     borderWidth: 1,
     gap: 4,
   },
   columnRoleText: {
-    ...TYPOGRAPHY.labelSmall,
-    fontWeight: '600',
+    fontFamily: FONTS.sansSemiBold,
+    fontSize: 11,
   },
-  warningBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.sm,
-    padding: SPACING.md,
-    borderRadius: BORDER_RADIUS.md,
-    borderWidth: 1,
-    marginTop: SPACING.md,
-  },
-  warningText: { ...TYPOGRAPHY.bodySmall, flex: 1 },
-  previewRowsList: {
-    borderRadius: BORDER_RADIUS.lg,
+  table: {
+    borderRadius: RADIUS.lg,
     borderWidth: 1,
     overflow: 'hidden',
   },
-  previewRow: {
-    padding: SPACING.md,
+  tableHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
   },
-  previewEmail: {
-    ...TYPOGRAPHY.labelMedium,
+  tableHeaderCell: {
+    fontFamily: FONTS.monoSemiBold,
+    fontSize: 9,
+    letterSpacing: 1.08,
+    fontVariant: ['tabular-nums'],
   },
-  previewName: {
-    ...TYPOGRAPHY.bodySmall,
-    marginTop: 2,
+  tableRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 11,
+    paddingHorizontal: 16,
+  },
+  tableName: {
+    fontFamily: FONTS.sansMedium,
+    fontSize: 12,
+    paddingRight: 6,
+  },
+  tableEmail: {
+    fontFamily: FONTS.monoRegular,
+    fontSize: 11,
+    paddingRight: 6,
+    fontVariant: ['tabular-nums'],
+  },
+  tableStatus: {
+    fontFamily: FONTS.monoSemiBold,
+    fontSize: 9,
+    textAlign: 'right',
+    letterSpacing: 0.5,
+  },
+  tableFootnote: {
+    fontFamily: FONTS.mono,
+    fontSize: 9.5,
+    letterSpacing: 0.5,
+    fontVariant: ['tabular-nums'],
+  },
+  warnBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 11,
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 15,
+  },
+  warnBannerText: {
+    fontFamily: FONTS.sans,
+    fontSize: 12,
+    lineHeight: 17,
+    flex: 1,
+  },
+  errorBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 11,
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 15,
+  },
+  errorBannerText: {
+    fontFamily: FONTS.sans,
+    fontSize: 12,
+    lineHeight: 17,
+    flex: 1,
+  },
+  primaryButton: {
+    height: 54,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  primaryButtonText: {
+    fontFamily: FONTS.sansSemiBold,
+    fontSize: 16,
+    color: '#040707',
+  },
+  textButton: {
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  textButtonLabel: {
+    fontFamily: FONTS.sansMedium,
+    fontSize: 14,
+  },
+  doneIconCircle: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  previewContent: {
+    paddingHorizontal: SPACING.screenPadding,
+    paddingBottom: 34,
   },
   summaryCard: {
+    borderRadius: RADIUS.lg,
     borderWidth: 1,
-    borderRadius: BORDER_RADIUS.lg,
-    marginVertical: SPACING.lg,
+    paddingHorizontal: 16,
+    paddingVertical: 4,
   },
   summaryRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: SPACING.md,
+    paddingVertical: 12,
   },
   summaryLabel: {
-    ...TYPOGRAPHY.labelMedium,
+    fontFamily: FONTS.mono,
+    fontSize: 11,
+    letterSpacing: 0.3,
+    fontVariant: ['tabular-nums'],
     flex: 1,
   },
   summaryValue: {
-    ...TYPOGRAPHY.labelLarge,
-    fontFamily: 'Georgia',
-    fontWeight: '600',
+    fontFamily: FONTS.monoSemiBold,
+    fontSize: 13,
+    fontVariant: ['tabular-nums'],
   },
 });

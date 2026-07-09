@@ -1,3 +1,21 @@
+// CREATE ORGANIZATION — a 3-step founding (design7 mocks CO1–CO3).
+//
+// CO1 · IDENTITY: name (live counter, gold focus ring), purpose, monogram
+//       tile that doubles as the existing logo picker.
+// CO2 · MEMBERSHIP: "Who can join?" — member capacity by plan. The mock's
+//       admission models (invite / roster / region) and governance toggles
+//       have no backing API fields, so the step maps to the existing tier
+//       selection: caps, verification unlocks, and invite codes are what the
+//       plans actually control.
+// CO3 · CHARTER REVIEW: the founding record re-stated as a charter card with
+//       mono facts, billing stated before the one gold action, then the
+//       existing create-org + payment flow (unchanged).
+//
+// All pre-existing logic is preserved verbatim: field validation, logo
+// upload, tier selection, government mailto, free-tier shortcut semantics
+// (free skips payment processing inside handleCreateOrganization), org
+// creation API call, IAP/Stripe payment, demo-account bypass, error handling.
+
 import {
   View,
   Text,
@@ -16,91 +34,49 @@ import { useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import Animated, { FadeIn, FadeInDown, FadeInUp, FadeOut } from 'react-native-reanimated';
+import Animated, { FadeIn } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuthStore } from '../../lib/auth';
 import { organizationsApi, uploadsApi } from '../../lib/api';
-import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS } from '../../lib/theme';
+import { useTheme, SPACING, FONTS } from '../../lib/theme';
 import { showPaymentError, showPaymentSuccess } from '../../lib/stripe';
 import { processOrganizationPayment } from '../../lib/payment';
 import { ORG_TIERS, type OrgTier } from '../../lib/org-tiers';
 import { SubscriptionLegal } from '../../components/ui/SubscriptionLegal';
 import { TierCard } from '../../components/ui/TierCard';
 
-type Step = 'details' | 'tier' | 'payment';
+// 1 = identity · 2 = membership (plan) · 3 = charter review
+type Step = 1 | 2 | 3;
 
-// Step Indicator Component
-function StepIndicator({ currentStep }: { currentStep: Step }) {
-  const { colors } = useTheme();
-  const steps: { key: Step; label: string }[] = [
-    { key: 'details', label: 'Details' },
-    { key: 'tier', label: 'Plan' },
-    { key: 'payment', label: 'Payment' },
-  ];
-
-  const currentIndex = steps.findIndex(s => s.key === currentStep);
-
-  return (
-    <View style={styles.stepIndicator}>
-      {steps.map((step, index) => {
-        const isActive = index === currentIndex;
-        const isCompleted = index < currentIndex;
-
-        return (
-          <View key={step.key} style={styles.stepItem}>
-            <View
-              style={[
-                styles.stepCircle,
-                {
-                  backgroundColor: isActive || isCompleted ? colors.gold : colors.surfaceHighlight,
-                  borderColor: isActive ? colors.gold : 'transparent',
-                },
-              ]}
-            >
-              {isCompleted ? (
-                <Ionicons name="checkmark" size={14} color="#000" />
-              ) : (
-                <Text style={[styles.stepNumber, { color: isActive ? '#000' : colors.textTertiary }]}>
-                  {index + 1}
-                </Text>
-              )}
-            </View>
-            <Text
-              style={[
-                styles.stepLabel,
-                { color: isActive ? colors.gold : colors.textSecondary },
-              ]}
-            >
-              {step.label}
-            </Text>
-            {index < steps.length - 1 && (
-              <View
-                style={[
-                  styles.stepLine,
-                  { backgroundColor: isCompleted ? colors.gold : colors.border },
-                ]}
-              />
-            )}
-          </View>
-        );
-      })}
-    </View>
-  );
+// Monogram from the org name — first character of the first two words
+// ("Ward 8 Community League" → "W8"). No logo needed to found.
+function monogramFromName(name: string): string {
+  return name
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((w) => w[0])
+    .join('')
+    .toUpperCase();
 }
 
 export default function CreateOrganizationScreen() {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const { token, user } = useAuthStore();
+  const insets = useSafeAreaInsets();
 
   // Step state
-  const [currentStep, setCurrentStep] = useState<Step>('details');
+  const [currentStep, setCurrentStep] = useState<Step>(1);
 
   // Details form state
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [logoUri, setLogoUri] = useState<string | null>(null);
   const [uploadingLogo, setUploadingLogo] = useState(false);
+  // Which field is focused — drives the gold active-field border.
+  const [focusField, setFocusField] = useState<'name' | 'purpose' | null>(null);
 
   // Tier selection state
   const [selectedTier, setSelectedTier] = useState<OrgTier>('free');
@@ -151,7 +127,7 @@ export default function CreateOrganizationScreen() {
   const handleNextStep = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
-    if (currentStep === 'details') {
+    if (currentStep === 1) {
       if (!name.trim()) {
         Alert.alert('Missing Information', 'Please enter your organization name.');
         return;
@@ -160,8 +136,8 @@ export default function CreateOrganizationScreen() {
         Alert.alert('Missing Information', 'Please enter a description for your organization.');
         return;
       }
-      setCurrentStep('tier');
-    } else if (currentStep === 'tier') {
+      setCurrentStep(2);
+    } else if (currentStep === 2) {
       // Government tier opens email instead of payment.
       if (selectedTier === 'government') {
         const subject = encodeURIComponent(`Government Inquiry: ${name.trim()}`);
@@ -169,23 +145,18 @@ export default function CreateOrganizationScreen() {
         Linking.openURL(`mailto:sales@representvote.com?subject=${subject}&body=${body}`);
         return;
       }
-      // Free tier doesn't go through the payment step — create the org
-      // immediately at tier='free'. Upgrade later via the billing screen.
-      if (selectedTier === 'free') {
-        handleCreateOrganization();
-        return;
-      }
-      setCurrentStep('payment');
+      // Every plan (free included) reviews the charter before founding.
+      setCurrentStep(3);
     }
   };
 
   const handlePreviousStep = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
-    if (currentStep === 'tier') {
-      setCurrentStep('details');
-    } else if (currentStep === 'payment') {
-      setCurrentStep('tier');
+    if (currentStep === 2) {
+      setCurrentStep(1);
+    } else if (currentStep === 3) {
+      setCurrentStep(2);
     }
   };
 
@@ -267,90 +238,139 @@ export default function CreateOrganizationScreen() {
     }
   };
 
-  const renderDetailsStep = () => (
+  const tier = ORG_TIERS[selectedTier];
+  const monogram = monogramFromName(name);
+  const founderName = user?.name?.trim() || '';
+  const founderVerified = !!user?.verified;
+
+  // ── CO1 · Identity ─────────────────────────────────────────────────────────
+  const renderIdentityStep = () => (
     <Animated.View entering={FadeIn.duration(300)} style={styles.stepContent}>
-      <Text style={[styles.stepTitle, { color: colors.text }]}>Organization Details</Text>
-      <Text style={[styles.stepSubtitle, { color: colors.textSecondary }]}>
-        Tell us about your organization
-      </Text>
-
-      {/* Logo Picker */}
-      <TouchableOpacity
-        style={[styles.logoPicker, { backgroundColor: colors.surface, borderColor: colors.border }]}
-        onPress={handlePickLogo}
-        disabled={uploadingLogo}
-      >
-        {uploadingLogo ? (
-          <ActivityIndicator size="large" color={colors.gold} />
-        ) : logoUri ? (
-          <Image source={{ uri: logoUri }} style={styles.logoPreview} />
-        ) : (
-          <>
-            <View style={[styles.logoPlaceholder, { backgroundColor: `${colors.gold}15` }]}>
-              <Ionicons name="camera-outline" size={32} color={colors.gold} />
-            </View>
-            <Text style={[styles.logoHint, { color: colors.textSecondary }]}>
-              Tap to upload logo (optional)
-            </Text>
-          </>
-        )}
-        {logoUri && (
-          <View style={[styles.logoEditBadge, { backgroundColor: colors.gold }]}>
-            <Ionicons name="pencil" size={12} color="#000" />
-          </View>
-        )}
-      </TouchableOpacity>
-
-      {/* Name Input */}
-      <View style={styles.inputGroup}>
-        <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>Organization Name *</Text>
-        <TextInput
-          style={[styles.textInput, { backgroundColor: colors.surface, borderColor: colors.border, color: colors.text }]}
-          placeholder="e.g., Local Teachers Union"
-          placeholderTextColor={colors.textTertiary}
-          value={name}
-          onChangeText={setName}
-          maxLength={60}
-        />
-        <Text style={[styles.charCount, { color: colors.textTertiary }]}>{name.length}/60</Text>
+      <View style={styles.headBlock}>
+        <Text style={[styles.headline, { color: colors.text }]}>Found an Organization</Text>
+        <Text style={[styles.subhead, { color: colors.textSecondary }]}>
+          Verified governance for a group you lead — a union, league, board, or association.
+        </Text>
       </View>
 
-      {/* Description Input */}
-      <View style={styles.inputGroup}>
-        <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>Description *</Text>
-        <TextInput
-          style={[styles.textArea, { backgroundColor: colors.surface, borderColor: colors.border, color: colors.text }]}
-          placeholder="Describe your organization's mission and purpose..."
-          placeholderTextColor={colors.textTertiary}
-          value={description}
-          onChangeText={setDescription}
-          multiline
-          numberOfLines={4}
-          textAlignVertical="top"
-          maxLength={500}
-        />
-        <Text style={[styles.charCount, { color: colors.textTertiary }]}>{description.length}/500</Text>
+      {/* Monogram / logo tile — same upload logic, no logo needed to found */}
+      <View style={styles.monogramRow}>
+        <TouchableOpacity
+          style={[
+            styles.monogramTile,
+            {
+              backgroundColor: colors.surfaceHighlight,
+              borderColor: colors.borderStrong,
+              borderStyle: logoUri ? 'solid' : 'dashed',
+            },
+          ]}
+          onPress={handlePickLogo}
+          disabled={uploadingLogo}
+          accessibilityRole="button"
+          accessibilityLabel="Add a logo"
+        >
+          {uploadingLogo ? (
+            <ActivityIndicator size="small" color={colors.gold} />
+          ) : logoUri ? (
+            <Image source={{ uri: logoUri }} style={styles.monogramImage} />
+          ) : monogram ? (
+            <Text style={[styles.monogramText, { color: colors.textSecondary }]}>{monogram}</Text>
+          ) : (
+            <Ionicons name="business-outline" size={22} color={colors.textTertiary} />
+          )}
+        </TouchableOpacity>
+        <View style={styles.monogramCopy}>
+          <Text style={[styles.monogramTitle, { color: colors.text }]}>
+            {logoUri ? 'Logo added' : 'Monogram from your name'}
+          </Text>
+          <Text style={[styles.monogramSub, { color: colors.textTertiary }]}>
+            {logoUri ? 'Tap to change it anytime' : 'Add a logo anytime — no logo needed to found'}
+          </Text>
+        </View>
+      </View>
+
+      {/* Organization name */}
+      <View style={styles.fieldBlock}>
+        <View style={styles.fieldHeadRow}>
+          <Text style={[styles.fieldLabel, { color: colors.textTertiary }]}>ORGANIZATION NAME</Text>
+          <Text style={[styles.fieldCount, { color: colors.textTertiary }]}>{name.length} / 60</Text>
+        </View>
+        <View
+          style={[
+            styles.inputCard,
+            {
+              backgroundColor: colors.surface,
+              borderColor: focusField === 'name' ? 'rgba(234, 186, 88, 0.4)' : colors.border,
+            },
+          ]}
+        >
+          <TextInput
+            style={[styles.nameInput, { color: colors.text }]}
+            placeholder="e.g., Local Teachers Union"
+            placeholderTextColor={colors.textTertiary}
+            value={name}
+            onChangeText={setName}
+            onFocus={() => setFocusField('name')}
+            onBlur={() => setFocusField(null)}
+            maxLength={60}
+          />
+        </View>
+      </View>
+
+      {/* Purpose */}
+      <View style={styles.fieldBlock}>
+        <View style={styles.fieldHeadRow}>
+          <Text style={[styles.fieldLabel, { color: colors.textTertiary }]}>
+            PURPOSE <Text style={styles.fieldLabelSoft}>· shown to every member</Text>
+          </Text>
+          <Text style={[styles.fieldCount, { color: colors.textTertiary }]}>{description.length} / 500</Text>
+        </View>
+        <View
+          style={[
+            styles.inputCard,
+            {
+              backgroundColor: colors.surface,
+              borderColor: focusField === 'purpose' ? 'rgba(234, 186, 88, 0.4)' : colors.border,
+            },
+          ]}
+        >
+          <TextInput
+            style={[styles.purposeInput, { color: colors.text }]}
+            placeholder="Describe your organization's mission and purpose..."
+            placeholderTextColor={colors.textTertiary}
+            value={description}
+            onChangeText={setDescription}
+            onFocus={() => setFocusField('purpose')}
+            onBlur={() => setFocusField(null)}
+            multiline
+            textAlignVertical="top"
+            maxLength={500}
+          />
+        </View>
       </View>
     </Animated.View>
   );
 
-  const renderTierStep = () => (
+  // ── CO2 · Membership (plan) ────────────────────────────────────────────────
+  const renderMembershipStep = () => (
     <Animated.View entering={FadeIn.duration(300)} style={styles.stepContent}>
-      <Text style={[styles.stepTitle, { color: colors.text }]}>Choose Your Plan</Text>
-      <Text style={[styles.stepSubtitle, { color: colors.textSecondary }]}>
-        Select the plan that fits your organization's needs
-      </Text>
+      <View style={styles.headBlock}>
+        <Text style={[styles.headline, { color: colors.text }]}>Who can join?</Text>
+        <Text style={[styles.subhead, { color: colors.textSecondary }]}>
+          Every member verifies their own identity — pick the plan that fits your membership.
+        </Text>
+      </View>
 
       {/* Hide Government tier from the public picker — it's set by sales
           via direct DB update for cities, counties, and agencies. The
           "Need more?" link below opens a sales email. */}
       {(Object.entries(ORG_TIERS) as [OrgTier, typeof ORG_TIERS.free][])
         .filter(([key]) => key !== 'government')
-        .map(([key, tier]) => (
+        .map(([key, t]) => (
           <TierCard
             key={key}
             tierKey={key}
-            tier={tier}
+            tier={t}
             selected={selectedTier === key}
             onSelect={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -364,98 +384,180 @@ export default function CreateOrganizationScreen() {
           const subject = encodeURIComponent(`Government / Agency inquiry`);
           Linking.openURL(`mailto:sales@representvote.com?subject=${subject}`);
         }}
-        style={{ paddingVertical: SPACING.md, alignItems: 'center' }}
+        style={styles.salesLink}
+        accessibilityRole="button"
+        accessibilityLabel="Contact sales"
       >
-        <Text style={{ color: colors.gold, ...TYPOGRAPHY.bodySmall, fontWeight: '600' }}>
+        <Text style={[styles.salesLinkText, { color: colors.gold }]}>
           Need more than Business? Contact sales →
         </Text>
       </TouchableOpacity>
     </Animated.View>
   );
 
-  const renderPaymentStep = () => {
-    const tier = ORG_TIERS[selectedTier];
-
-    return (
-      <Animated.View entering={FadeIn.duration(300)} style={styles.stepContent}>
-        <Text style={[styles.stepTitle, { color: colors.text }]}>Review & Pay</Text>
-        <Text style={[styles.stepSubtitle, { color: colors.textSecondary }]}>
-          Review your organization details and complete payment
+  // ── CO3 · Charter review ───────────────────────────────────────────────────
+  const renderCharterStep = () => (
+    <Animated.View entering={FadeIn.duration(300)} style={styles.stepContent}>
+      <View style={styles.headBlock}>
+        <Text style={[styles.headline, { color: colors.text }]}>The charter.</Text>
+        <Text style={[styles.subhead, { color: colors.textSecondary }]}>
+          Your organization's founding record, exactly as members will see it.
         </Text>
+      </View>
 
-        {/* Summary Card */}
-        <View style={[styles.summaryCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <View style={styles.summaryHeader}>
+      {/* Founding charter card */}
+      <LinearGradient
+        colors={
+          isDark
+            ? [colors.surface, colors.backgroundElevated, colors.background]
+            : [colors.surfaceElevated, colors.surface, colors.surface]
+        }
+        start={{ x: 0, y: 0 }}
+        end={{ x: 0.6, y: 1 }}
+        style={[styles.charterCard, { borderColor: 'rgba(234, 186, 88, 0.4)' }]}
+      >
+        <View style={styles.charterHeadRow}>
+          <Text style={[styles.charterKicker, { color: colors.gold }]}>FOUNDING CHARTER</Text>
+          <View style={[styles.charterTile, { backgroundColor: colors.surfaceHighlight }]}>
             {logoUri ? (
-              <Image source={{ uri: logoUri }} style={styles.summaryLogo} />
+              <Image source={{ uri: logoUri }} style={styles.charterTileImage} />
             ) : (
-              <View style={[styles.summaryLogoPlaceholder, { backgroundColor: `${colors.gold}15` }]}>
-                <Ionicons name="business" size={24} color={colors.gold} />
-              </View>
+              <Text style={[styles.charterTileText, { color: colors.text }]}>{monogram || '—'}</Text>
             )}
-            <View style={styles.summaryInfo}>
-              <Text style={[styles.summaryName, { color: colors.text }]}>{name}</Text>
-              <Text style={[styles.summaryDescription, { color: colors.textSecondary }]} numberOfLines={2}>
-                {description}
-              </Text>
-            </View>
-          </View>
-
-          <View style={[styles.summaryDivider, { backgroundColor: colors.border }]} />
-
-          <View style={styles.summaryRow}>
-            <Text style={[styles.summaryLabel, { color: colors.textSecondary }]}>Plan</Text>
-            <View style={styles.summaryValue}>
-              <Ionicons name={tier.icon} size={16} color={colors.gold} />
-              <Text style={[styles.summaryValueText, { color: colors.text }]}>{tier.name}</Text>
-            </View>
-          </View>
-
-          <View style={styles.summaryRow}>
-            <Text style={[styles.summaryLabel, { color: colors.textSecondary }]}>Billing</Text>
-            <Text style={[styles.summaryValueText, { color: colors.text }]}>Monthly</Text>
-          </View>
-
-          <View style={[styles.summaryDivider, { backgroundColor: colors.border }]} />
-
-          <View style={styles.summaryRow}>
-            <Text style={[styles.summaryTotalLabel, { color: colors.text }]}>Total Today</Text>
-            <Text style={[styles.summaryTotalValue, { color: colors.gold }]}>{tier.price}</Text>
           </View>
         </View>
 
-        {/* Info Note */}
-        <View style={[styles.infoNote, { backgroundColor: `${colors.info}10`, borderColor: `${colors.info}25` }]}>
-          <Ionicons name="information-circle-outline" size={18} color={colors.info} />
-          <Text style={[styles.infoNoteText, { color: colors.textSecondary }]}>
-            You'll be charged {tier.price}/month. Cancel anytime from your organization settings.
+        <View style={styles.charterNameBlock}>
+          <Text style={[styles.charterName, { color: colors.text }]}>{name.trim()}</Text>
+          <Text style={[styles.charterPurpose, { color: colors.textSecondary }]} numberOfLines={3}>
+            {description.trim()}
           </Text>
         </View>
 
-        {/* Apple Guideline 3.1.2(c) — subscription disclosure */}
+        <View style={[styles.charterHairline, { backgroundColor: colors.borderSubtle }]} />
+
+        <View style={styles.charterFacts}>
+          <View style={styles.charterFactRow}>
+            <Text style={[styles.charterFactLabel, { color: colors.textTertiary }]}>PLAN</Text>
+            <Text style={[styles.charterFactValue, { color: colors.text }]}>
+              {tier.name.toUpperCase()}
+            </Text>
+          </View>
+          <View style={styles.charterFactRow}>
+            <Text style={[styles.charterFactLabel, { color: colors.textTertiary }]}>SEATS</Text>
+            <Text style={[styles.charterFactValue, { color: colors.text }]}>
+              {tier.features[0].toUpperCase()}
+            </Text>
+          </View>
+          <View style={styles.charterFactRow}>
+            <Text style={[styles.charterFactLabel, { color: colors.textTertiary }]}>BILLING</Text>
+            <Text style={[styles.charterFactValue, { color: colors.text }]}>
+              {selectedTier === 'free' ? 'FREE' : `${tier.price}/MO`}
+            </Text>
+          </View>
+          {!!founderName && (
+            <View style={styles.charterFactRow}>
+              <Text style={[styles.charterFactLabel, { color: colors.textTertiary }]}>FOUNDER</Text>
+              <View style={styles.charterFounderValue}>
+                <Text style={[styles.charterFactValue, { color: colors.text }]} numberOfLines={1}>
+                  {founderName.toUpperCase()}
+                </Text>
+                {founderVerified && <Ionicons name="shield-checkmark" size={11} color={colors.gold} />}
+              </View>
+            </View>
+          )}
+        </View>
+      </LinearGradient>
+
+      {/* Billing stated before the gold action — no invented trials */}
+      <View
+        style={[
+          styles.billingCard,
+          { backgroundColor: colors.backgroundSecondary, borderColor: colors.borderSubtle },
+        ]}
+      >
+        <Text style={[styles.billingKicker, { color: colors.textTertiary }]}>
+          {selectedTier === 'free' ? 'FREE PLAN' : 'BILLED MONTHLY · CANCEL ANYTIME'}
+        </Text>
+        <View style={styles.billingRow}>
+          <Text style={[styles.billingName, { color: colors.text }]}>
+            {tier.name} plan · {tier.features[0].toLowerCase()}
+          </Text>
+          <Text style={[styles.billingPrice, { color: colors.text }]}>
+            {tier.price}
+            {selectedTier !== 'free' && (
+              <Text style={[styles.billingPeriod, { color: colors.textTertiary }]}>/mo</Text>
+            )}
+          </Text>
+        </View>
+        <Text style={[styles.billingSub, { color: colors.textTertiary }]}>
+          {selectedTier === 'free'
+            ? 'No charge. Upgrade anytime from your organization settings.'
+            : `You'll be charged ${tier.price}/month. Cancel anytime from your organization settings.`}
+        </Text>
+      </View>
+
+      {/* Apple Guideline 3.1.2(c) — subscription disclosure (paid plans) */}
+      {selectedTier !== 'free' && (
         <SubscriptionLegal
           mode="subscription"
           productTitle={`${tier.name} — Organization plan`}
           productLength="1 month"
           productPrice={`${tier.price}/month`}
         />
-      </Animated.View>
-    );
-  };
+      )}
+    </Animated.View>
+  );
+
+  // Footer copy per step
+  const ctaLabel =
+    currentStep === 1
+      ? 'Continue'
+      : currentStep === 2
+      ? selectedTier === 'government'
+        ? 'Contact Us'
+        : 'Continue'
+      : selectedTier === 'free'
+      ? 'Found This Organization'
+      : `Found This Organization · ${tier.price}/mo`;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Header */}
-      <View style={[styles.header, { borderBottomColor: colors.border }]}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="close" size={24} color={colors.text} />
+      {/* Step chrome — 40px circular close/back, STEP X OF 3 mono label,
+          3-segment progress bar (same pattern as onboarding). */}
+      <View style={styles.topBar}>
+        <TouchableOpacity
+          onPress={() => {
+            if (currentStep === 1) {
+              router.back();
+            } else {
+              handlePreviousStep();
+            }
+          }}
+          style={[styles.circleBtn, { backgroundColor: colors.surface, borderColor: colors.borderSubtle }]}
+          disabled={processing}
+          accessibilityRole="button"
+          accessibilityLabel={currentStep === 1 ? 'Close' : 'Back'}
+        >
+          <Ionicons
+            name={currentStep === 1 ? 'close' : 'chevron-back'}
+            size={currentStep === 1 ? 18 : 20}
+            color={colors.textSecondary}
+          />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>Create Organization</Text>
-        <View style={{ width: 40 }} />
+        <Text style={[styles.stepLabel, { color: colors.textTertiary }]}>STEP {currentStep} OF 3</Text>
       </View>
-
-      {/* Step Indicator */}
-      <StepIndicator currentStep={currentStep} />
+      <View style={styles.progressRow}>
+        {[1, 2, 3].map((seg) => (
+          <View
+            key={seg}
+            style={[
+              styles.progressSeg,
+              { backgroundColor: currentStep >= seg ? colors.goldFill : colors.surfaceHighlight },
+            ]}
+          />
+        ))}
+      </View>
 
       {/* Content */}
       <KeyboardAvoidingView
@@ -468,79 +570,55 @@ export default function CreateOrganizationScreen() {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          {currentStep === 'details' && renderDetailsStep()}
-          {currentStep === 'tier' && renderTierStep()}
-          {currentStep === 'payment' && renderPaymentStep()}
-
-          <View style={styles.bottomSpacer} />
+          {currentStep === 1 && renderIdentityStep()}
+          {currentStep === 2 && renderMembershipStep()}
+          {currentStep === 3 && renderCharterStep()}
         </ScrollView>
 
-        {/* Bottom Actions */}
-        <View style={[styles.bottomActions, { backgroundColor: colors.background, borderTopColor: colors.border }]}>
-          {currentStep !== 'details' && (
-            <TouchableOpacity
-              style={[styles.backStepButton, { borderColor: colors.border }]}
-              onPress={handlePreviousStep}
-              disabled={processing}
-            >
-              <Ionicons name="chevron-back" size={20} color={colors.text} />
-              <Text style={[styles.backStepText, { color: colors.text }]}>Back</Text>
-            </TouchableOpacity>
-          )}
+        {/* Pinned footer — one gold CTA per screen */}
+        <View
+          style={[
+            styles.footer,
+            {
+              backgroundColor: colors.background,
+              borderTopColor: colors.borderSubtle,
+              paddingBottom: Math.max(insets.bottom, 16),
+            },
+          ]}
+        >
+          <TouchableOpacity
+            style={[styles.ctaBtn, { backgroundColor: colors.goldFill }, processing && styles.ctaDisabled]}
+            onPress={currentStep === 3 ? handleCreateOrganization : handleNextStep}
+            disabled={processing}
+            activeOpacity={0.85}
+            accessibilityRole="button"
+            accessibilityLabel={ctaLabel}
+          >
+            {processing ? (
+              <ActivityIndicator size="small" color="#040707" />
+            ) : (
+              <Text style={styles.ctaText} numberOfLines={1}>
+                {ctaLabel}
+              </Text>
+            )}
+          </TouchableOpacity>
 
-          {currentStep === 'payment' ? (
-            <TouchableOpacity
-              style={[styles.actionButton, currentStep !== 'details' && styles.actionButtonFlex]}
-              onPress={handleCreateOrganization}
-              disabled={processing}
-              activeOpacity={0.8}
-            >
-              <LinearGradient
-                colors={[colors.gold, colors.goldDark || '#A68523']}
-                style={styles.gradientButton}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-              >
-                {processing ? (
-                  <ActivityIndicator size="small" color="#000" />
-                ) : (
-                  <>
-                    <Ionicons name="card-outline" size={20} color="#000" />
-                    <Text style={styles.actionButtonText}>Pay {ORG_TIERS[selectedTier].price}</Text>
-                  </>
-                )}
-              </LinearGradient>
-            </TouchableOpacity>
+          {currentStep === 1 && !!founderName ? (
+            <View style={styles.founderRow}>
+              {founderVerified && <Ionicons name="shield-checkmark" size={11} color={colors.gold} />}
+              <Text style={[styles.footerNote, { color: colors.textTertiary }]} numberOfLines={1}>
+                Founded by <Text style={[styles.footerNoteStrong, { color: colors.textSecondary }]}>{founderName}</Text>
+                {founderVerified ? ' — verified founders only' : ''}
+              </Text>
+            </View>
           ) : (
-            <TouchableOpacity
-              style={[styles.actionButton, currentStep !== 'details' && styles.actionButtonFlex]}
-              onPress={handleNextStep}
-              activeOpacity={0.8}
-            >
-              <LinearGradient
-                colors={[colors.gold, colors.goldDark || '#A68523']}
-                style={styles.gradientButton}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-              >
-                {currentStep === 'tier' && selectedTier === 'government' ? (
-                  <>
-                    <Ionicons name="mail-outline" size={20} color="#000" />
-                    <Text style={styles.actionButtonText}>Contact Us</Text>
-                  </>
-                ) : currentStep === 'tier' && selectedTier === 'free' ? (
-                  <>
-                    <Ionicons name="checkmark-circle" size={20} color="#000" />
-                    <Text style={styles.actionButtonText}>Create free org</Text>
-                  </>
-                ) : (
-                  <>
-                    <Text style={styles.actionButtonText}>Continue</Text>
-                    <Ionicons name="chevron-forward" size={20} color="#000" />
-                  </>
-                )}
-              </LinearGradient>
-            </TouchableOpacity>
+            <Text style={[styles.footerNote, { color: colors.textTertiary }]}>
+              {currentStep === 2
+                ? 'You can change plans later from organization settings'
+                : currentStep === 3
+                ? 'Your name is attached to the founding record'
+                : 'Verified governance for the group you lead'}
+            </Text>
           )}
         </View>
       </KeyboardAvoidingView>
@@ -552,58 +630,38 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  header: {
+  // ── Step chrome ──
+  topBar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: SPACING.lg,
-    paddingTop: SPACING.xl,
-    paddingBottom: SPACING.md,
-    borderBottomWidth: 1,
+    paddingHorizontal: SPACING.screenPadding,
+    paddingTop: 14,
   },
-  backButton: {
+  circleBtn: {
     width: 40,
     height: 40,
+    borderRadius: 20,
+    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  headerTitle: {
-    fontFamily: 'Georgia',
-    fontSize: 20,
-    fontWeight: '500',
-  },
-  stepIndicator: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: SPACING.lg,
-    paddingHorizontal: SPACING.xl,
-  },
-  stepItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  stepCircle: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-  },
-  stepNumber: {
-    ...TYPOGRAPHY.labelSmall,
-    fontWeight: '600',
   },
   stepLabel: {
-    ...TYPOGRAPHY.labelSmall,
-    marginLeft: SPACING.xs,
-    fontWeight: '500',
+    fontFamily: FONTS.mono,
+    fontSize: 10.5,
+    letterSpacing: 1.68, // .16em
+    fontVariant: ['tabular-nums'],
   },
-  stepLine: {
-    width: 40,
-    height: 2,
-    marginHorizontal: SPACING.sm,
+  progressRow: {
+    flexDirection: 'row',
+    gap: 6,
+    paddingHorizontal: SPACING.screenPadding,
+    paddingTop: 12,
+  },
+  progressSeg: {
+    flex: 1,
+    height: 4,
+    borderRadius: 2,
   },
   keyboardAvoid: {
     flex: 1,
@@ -612,305 +670,270 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   contentContainer: {
-    padding: SPACING.lg,
+    paddingHorizontal: SPACING.screenPadding,
+    paddingTop: 16,
+    paddingBottom: 24,
   },
   stepContent: {
-    flex: 1,
+    gap: 16,
   },
-  stepTitle: {
-    fontFamily: 'Georgia',
-    fontSize: 22,
-    fontWeight: '500',
-    marginBottom: SPACING.xs,
+  headBlock: {
+    gap: 6,
   },
-  stepSubtitle: {
-    ...TYPOGRAPHY.bodyMedium,
-    marginBottom: SPACING.xl,
+  headline: {
+    fontFamily: FONTS.serif,
+    fontSize: 30,
+    lineHeight: 34,
+    letterSpacing: -0.36,
   },
-
-  // Logo Picker
-  logoPicker: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    alignItems: 'center',
-    justifyContent: 'center',
-    alignSelf: 'center',
-    borderWidth: 2,
-    borderStyle: 'dashed',
-    marginBottom: SPACING.xl,
-    overflow: 'hidden',
-  },
-  logoPlaceholder: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: SPACING.sm,
-  },
-  logoHint: {
-    ...TYPOGRAPHY.labelSmall,
-    textAlign: 'center',
-  },
-  logoPreview: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 60,
-  },
-  logoEditBadge: {
-    position: 'absolute',
-    bottom: 4,
-    right: 4,
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-
-  // Input styles
-  inputGroup: {
-    marginBottom: SPACING.lg,
-  },
-  inputLabel: {
-    ...TYPOGRAPHY.labelMedium,
-    marginBottom: SPACING.sm,
-  },
-  textInput: {
-    borderWidth: 1,
-    borderRadius: BORDER_RADIUS.lg,
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.md,
-    ...TYPOGRAPHY.bodyMedium,
-  },
-  textArea: {
-    borderWidth: 1,
-    borderRadius: BORDER_RADIUS.lg,
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.md,
-    ...TYPOGRAPHY.bodyMedium,
-    minHeight: 120,
-  },
-  charCount: {
-    ...TYPOGRAPHY.labelSmall,
-    textAlign: 'right',
-    marginTop: SPACING.xs,
-  },
-
-  // Tier Card
-  tierCard: {
-    borderRadius: BORDER_RADIUS.xl,
-    padding: SPACING.lg,
-    marginBottom: SPACING.md,
-    ...SHADOWS.sm,
-  },
-  popularBadge: {
-    position: 'absolute',
-    top: -10,
-    alignSelf: 'center',
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.xxs,
-    borderRadius: BORDER_RADIUS.full,
-  },
-  popularText: {
-    ...TYPOGRAPHY.labelSmall,
-    color: '#000',
-    fontWeight: '700',
-    fontSize: 10,
-  },
-  tierHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: SPACING.md,
-  },
-  tierIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: SPACING.md,
-  },
-  tierInfo: {
-    flex: 1,
-  },
-  tierName: {
-    fontFamily: 'Georgia',
-    fontSize: 16,
-    fontWeight: '500',
-  },
-  tierPriceRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-  },
-  tierPrice: {
-    fontFamily: 'Georgia',
-    fontSize: 20,
-    fontWeight: '500',
-  },
-  tierPeriod: {
-    ...TYPOGRAPHY.labelSmall,
-    marginLeft: 2,
-  },
-  radioOuter: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    borderWidth: 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  radioInner: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-  },
-  tierDescription: {
-    ...TYPOGRAPHY.bodySmall,
-    marginBottom: SPACING.md,
-  },
-  tierFeatures: {
-    gap: SPACING.sm,
-  },
-  featureRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.sm,
-  },
-  featureText: {
-    ...TYPOGRAPHY.bodySmall,
-    flex: 1,
-  },
-
-  // Summary Card
-  summaryCard: {
-    borderRadius: BORDER_RADIUS.xl,
-    borderWidth: 1,
-    padding: SPACING.lg,
-    marginBottom: SPACING.lg,
-  },
-  summaryHeader: {
-    flexDirection: 'row',
-    marginBottom: SPACING.lg,
-  },
-  summaryLogo: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    marginRight: SPACING.md,
-  },
-  summaryLogoPlaceholder: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: SPACING.md,
-  },
-  summaryInfo: {
-    flex: 1,
-  },
-  summaryName: {
-    fontFamily: 'Georgia',
-    fontSize: 16,
-    fontWeight: '500',
-    marginBottom: SPACING.xxs,
-  },
-  summaryDescription: {
-    ...TYPOGRAPHY.bodySmall,
-    lineHeight: 18,
-  },
-  summaryDivider: {
-    height: 1,
-    marginVertical: SPACING.md,
-  },
-  summaryRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: SPACING.sm,
-  },
-  summaryLabel: {
-    ...TYPOGRAPHY.bodyMedium,
-  },
-  summaryValue: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.xs,
-  },
-  summaryValueText: {
-    ...TYPOGRAPHY.labelMedium,
-    fontWeight: '500',
-  },
-  summaryTotalLabel: {
-    ...TYPOGRAPHY.labelLarge,
-    fontWeight: '600',
-  },
-  summaryTotalValue: {
-    fontFamily: 'Georgia',
-    fontSize: 20,
-    fontWeight: '500',
-  },
-
-  // Info Note
-  infoNote: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    padding: SPACING.lg,
-    borderRadius: BORDER_RADIUS.lg,
-    borderWidth: 1,
-    gap: SPACING.md,
-  },
-  infoNoteText: {
-    ...TYPOGRAPHY.bodySmall,
-    flex: 1,
+  subhead: {
+    fontFamily: FONTS.sans,
+    fontSize: 13.5,
     lineHeight: 20,
   },
 
-  // Bottom Actions
-  bottomActions: {
-    flexDirection: 'row',
-    padding: SPACING.lg,
-    paddingBottom: SPACING.xl,
-    borderTopWidth: 1,
-    gap: SPACING.md,
-  },
-  backStepButton: {
+  // ── CO1 · monogram / logo tile ──
+  monogramRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 14,
+  },
+  monogramTile: {
+    width: 64,
+    height: 64,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: SPACING.md,
-    paddingHorizontal: SPACING.lg,
-    borderRadius: BORDER_RADIUS.lg,
-    borderWidth: 1,
-    gap: SPACING.xs,
+    overflow: 'hidden',
   },
-  backStepText: {
-    ...TYPOGRAPHY.labelMedium,
-    fontWeight: '500',
+  monogramImage: {
+    width: '100%',
+    height: '100%',
   },
-  actionButton: {
+  monogramText: {
+    fontFamily: FONTS.serifSemiBold,
+    fontSize: 22,
+  },
+  monogramCopy: {
     flex: 1,
+    gap: 3,
   },
-  actionButtonFlex: {
-    flex: 2,
+  monogramTitle: {
+    fontFamily: FONTS.sansSemiBold,
+    fontSize: 13,
   },
-  gradientButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: SPACING.lg,
-    borderRadius: BORDER_RADIUS.lg,
-    gap: SPACING.sm,
-  },
-  actionButtonText: {
-    ...TYPOGRAPHY.labelLarge,
-    color: '#000',
-    fontWeight: '600',
+  monogramSub: {
+    fontFamily: FONTS.sans,
+    fontSize: 11.5,
+    lineHeight: 15,
   },
 
-  bottomSpacer: {
-    height: 40,
+  // ── CO1 · fields ──
+  fieldBlock: {
+    gap: 7,
+  },
+  fieldHeadRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+  },
+  fieldLabel: {
+    fontFamily: FONTS.sansSemiBold,
+    fontSize: 10.5,
+    letterSpacing: 1.47, // .14em
+  },
+  fieldLabelSoft: {
+    fontFamily: FONTS.sans,
+    letterSpacing: 0,
+  },
+  fieldCount: {
+    fontFamily: FONTS.mono,
+    fontSize: 10,
+    fontVariant: ['tabular-nums'],
+  },
+  inputCard: {
+    borderWidth: 1.5,
+    borderRadius: 15,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  nameInput: {
+    fontFamily: FONTS.sansMedium,
+    fontSize: 17,
+    padding: 0,
+  },
+  purposeInput: {
+    fontFamily: FONTS.sans,
+    fontSize: 13,
+    lineHeight: 19,
+    padding: 0,
+    minHeight: 96,
+  },
+
+  // ── CO2 · sales link ──
+  salesLink: {
+    paddingVertical: SPACING.md,
+    alignItems: 'center',
+  },
+  salesLinkText: {
+    fontFamily: FONTS.sansMedium,
+    fontSize: 13,
+  },
+
+  // ── CO3 · charter card ──
+  charterCard: {
+    borderWidth: 1,
+    borderRadius: 22,
+    padding: 22,
+    gap: 15,
+  },
+  charterHeadRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  charterKicker: {
+    fontFamily: FONTS.monoSemiBold,
+    fontSize: 9.5,
+    letterSpacing: 1.9, // .2em
+    fontVariant: ['tabular-nums'],
+  },
+  charterTile: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  charterTileImage: {
+    width: '100%',
+    height: '100%',
+  },
+  charterTileText: {
+    fontFamily: FONTS.serifSemiBold,
+    fontSize: 14,
+  },
+  charterNameBlock: {
+    gap: 3,
+  },
+  charterName: {
+    fontFamily: FONTS.serif,
+    fontSize: 23,
+    lineHeight: 26.5,
+  },
+  charterPurpose: {
+    fontFamily: FONTS.sans,
+    fontSize: 12.5,
+    lineHeight: 19,
+  },
+  charterHairline: {
+    height: 1,
+  },
+  charterFacts: {
+    gap: 9,
+  },
+  charterFactRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  charterFactLabel: {
+    fontFamily: FONTS.mono,
+    fontSize: 10.5,
+    letterSpacing: 0.4,
+    fontVariant: ['tabular-nums'],
+  },
+  charterFactValue: {
+    fontFamily: FONTS.mono,
+    fontSize: 10.5,
+    letterSpacing: 0.4,
+    fontVariant: ['tabular-nums'],
+    flexShrink: 1,
+    textAlign: 'right',
+  },
+  charterFounderValue: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    flexShrink: 1,
+  },
+
+  // ── CO3 · billing card ──
+  billingCard: {
+    borderWidth: 1,
+    borderRadius: 16,
+    paddingHorizontal: 17,
+    paddingVertical: 14,
+    gap: 8,
+  },
+  billingKicker: {
+    fontFamily: FONTS.sansSemiBold,
+    fontSize: 10,
+    letterSpacing: 1.4, // .14em
+  },
+  billingRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  billingName: {
+    fontFamily: FONTS.sansMedium,
+    fontSize: 14,
+    flexShrink: 1,
+  },
+  billingPrice: {
+    fontFamily: FONTS.monoSemiBold,
+    fontSize: 16,
+    fontVariant: ['tabular-nums'],
+  },
+  billingPeriod: {
+    fontFamily: FONTS.sans,
+    fontSize: 11,
+  },
+  billingSub: {
+    fontFamily: FONTS.sans,
+    fontSize: 11,
+    lineHeight: 16,
+  },
+
+  // ── Footer ──
+  footer: {
+    paddingHorizontal: SPACING.screenPadding,
+    paddingTop: 12,
+    gap: 9,
+    borderTopWidth: 1,
+  },
+  ctaBtn: {
+    height: 54,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+  },
+  ctaDisabled: {
+    opacity: 0.6,
+  },
+  ctaText: {
+    fontFamily: FONTS.sansSemiBold,
+    fontSize: 16,
+    color: '#040707',
+  },
+  founderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  footerNote: {
+    fontFamily: FONTS.sans,
+    fontSize: 11.5,
+    textAlign: 'center',
+  },
+  footerNoteStrong: {
+    fontFamily: FONTS.sansSemiBold,
   },
 });

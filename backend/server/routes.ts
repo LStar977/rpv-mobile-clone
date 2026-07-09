@@ -5,6 +5,7 @@ import { baseNetwork } from "./base-network";
 import { log } from "./app";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { setupBadgeRoutes } from "./badge-routes";
+import { renderShareCardPNG, shareCardsEnabled } from "./shareCard";
 import { passportNFTs, activatedRidings, electoralRidingQRCodes, proposals, votes, voteTokenClaims, organizations, transactions, proposalReports, userMutes, proposalComments, users as usersTable } from "@shared/schema";
 import { getMemberLimit, getTierLimits, isFeatureEnabled, tierDisplayName, type OrgTier } from "@shared/tier-limits";
 import {
@@ -396,6 +397,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     String(s ?? "").replace(/[&<>"']/g, (c) =>
       ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c] as string));
 
+  // OG share-card image (design states OG1–OG5). Served only when the
+  // optional renderer is available; see backend/server/shareCard.ts.
+  app.get("/og/p/:proposalId", async (req: any, res: any) => {
+    try {
+      const proposal = await storage.getProposal(req.params.proposalId);
+      if (!proposal || (proposal as any).hiddenAt) return res.status(404).end();
+      const geo: string[] = Array.isArray(proposal.geoRestrictions) ? proposal.geoRestrictions : [];
+      const scopeLabel =
+        geo.length === 0
+          ? "GLOBAL"
+          : geo.length === 1
+            ? `${geo[0]} · FEDERAL`
+            : geo.length === 2
+              ? `${geo[1]} · PROVINCIAL`
+              : `${geo[geo.length - 1]} · MUNICIPAL`;
+      const png = await renderShareCardPNG(String(proposal.id), {
+        title: proposal.title || "Untitled proposal",
+        scopeLabel,
+        supportVotes: Number(proposal.supportVotes) || 0,
+        opposeVotes: Number(proposal.opposeVotes) || 0,
+        deadline: proposal.deadline ? String(proposal.deadline) : null,
+        ended: !!(proposal.deadline && new Date(proposal.deadline).getTime() < Date.now()),
+      });
+      if (!png) return res.status(404).end();
+      res.setHeader("Content-Type", "image/png");
+      res.setHeader("Cache-Control", "public, max-age=120");
+      return res.end(png);
+    } catch (e: any) {
+      log(`Share card render failed: ${e?.message || e}`);
+      return res.status(500).end();
+    }
+  });
+
   app.get("/p/:proposalId", async (req: any, res: any) => {
     try {
       const proposal = await storage.getProposal(req.params.proposalId);
@@ -430,7 +464,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 <meta property="og:type" content="website">
 <meta property="og:url" content="${pageUrl}">
 <meta property="og:site_name" content="Represent Vote">
-<meta name="twitter:card" content="summary">
+${shareCardsEnabled() ? `<meta property="og:image" content="https://representportal.com/og/p/${escapeHtml(String(proposal.id))}">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://representportal.com/og/p/${escapeHtml(String(proposal.id))}">` : `<meta name="twitter:card" content="summary">`}
 <meta name="twitter:title" content="${title}">
 <meta name="twitter:description" content="${total.toLocaleString()} verified votes · ${pct}% support. One person, one verified ballot.">
 <style>

@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import Animated, { FadeIn, LinearTransition } from 'react-native-reanimated';
-import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY } from '../../lib/theme';
+import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, FONTS } from '../../lib/theme';
 
 interface MultipleChoiceBallotProps {
   options: string[];
@@ -59,7 +59,7 @@ export function MultipleChoiceBallot({ options, onSubmit, submitting }: Multiple
                   <Text
                     style={[
                       styles.optionText,
-                      { color: isSelected ? colors.text : colors.textSecondary, fontWeight: isSelected ? '600' : '500' },
+                      { color: isSelected ? colors.text : colors.textSecondary, fontFamily: isSelected ? FONTS.sansSemiBold : FONTS.sansMedium },
                     ]}
                     numberOfLines={3}
                   >
@@ -105,7 +105,6 @@ const styles = StyleSheet.create({
   },
   label: {
     ...TYPOGRAPHY.labelSmall,
-    fontWeight: '700',
     letterSpacing: 1.5,
     marginBottom: SPACING.md,
   },
@@ -147,7 +146,6 @@ const styles = StyleSheet.create({
   },
   submitButtonText: {
     ...TYPOGRAPHY.labelLarge,
-    fontWeight: '700',
     color: '#000',
   },
 });

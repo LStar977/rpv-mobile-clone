@@ -1,9 +1,16 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, { FadeInUp } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
-import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS } from '../../lib/theme';
+import { useTheme, SPACING, FONTS, withAlpha } from '../../lib/theme';
+import { Button } from './Button';
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// EMPTY STATE — 22b spec
+// 64px icon tile on surface · serif title · sans body · a single CTA (Button).
+// Copy stays honest: an empty list says what will appear here, nothing more.
+// ═══════════════════════════════════════════════════════════════════════════════
 
 interface EmptyStateProps {
   icon: keyof typeof Ionicons.glyphMap;
@@ -27,7 +34,7 @@ export function EmptyState({
   delay = 200,
 }: EmptyStateProps) {
   const { colors } = useTheme();
-  const accent = accentColor || colors.gold;
+  const iconColor = accentColor || colors.textTertiary;
 
   const handlePress = () => {
     if (onCtaPress) {
@@ -37,24 +44,108 @@ export function EmptyState({
   };
 
   return (
-    <Animated.View
-      entering={FadeInUp.delay(delay).duration(400)}
-      style={[styles.container, { backgroundColor: colors.surface, borderColor: colors.border }]}
-    >
-      <View style={[styles.iconContainer, { backgroundColor: `${accent}15` }]}>
-        <Ionicons name={icon} size={32} color={accent} />
+    <Animated.View entering={FadeInUp.delay(delay).duration(400)} style={styles.container}>
+      <View
+        style={[
+          styles.iconTile,
+          { backgroundColor: colors.surface, borderColor: colors.border },
+        ]}
+      >
+        <Ionicons name={icon} size={28} color={iconColor} />
       </View>
       <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
       <Text style={[styles.subtitle, { color: colors.textSecondary }]}>{subtitle}</Text>
       {ctaLabel && onCtaPress && (
-        <TouchableOpacity
-          style={[styles.ctaButton, { backgroundColor: accent }]}
-          onPress={handlePress}
-          activeOpacity={0.8}
+        <View style={styles.ctaWrap}>
+          <Button
+            title={ctaLabel}
+            onPress={handlePress}
+            variant="primary"
+            size="lg"
+            icon={ctaIcon}
+            fullWidth
+          />
+        </View>
+      )}
+    </Animated.View>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ERROR STATE — 22c spec
+// Failure must look like failure — never "nothing here", and never the user's
+// fault. Red-tinted icon tile · serif title · honest body · gold Try Again CTA
+// · optional mono error reference.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+interface ErrorStateProps {
+  title?: string;
+  message?: string;
+  onRetry?: () => void;
+  retryLabel?: string;
+  /** Optional machine-readable reference (error code / server message), mono. */
+  errorRef?: string;
+  icon?: keyof typeof Ionicons.glyphMap;
+  delay?: number;
+}
+
+export function ErrorState({
+  title = 'Something went wrong',
+  message = "That was on our side, not yours. Nothing was lost — you can safely try again.",
+  onRetry,
+  retryLabel = 'Try Again',
+  errorRef,
+  icon = 'cloud-offline-outline',
+  delay = 100,
+}: ErrorStateProps) {
+  const { colors } = useTheme();
+
+  const handleRetry = () => {
+    if (onRetry) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      onRetry();
+    }
+  };
+
+  return (
+    <Animated.View entering={FadeInUp.delay(delay).duration(400)} style={styles.container}>
+      <View
+        style={[
+          styles.iconTile,
+          {
+            backgroundColor: withAlpha(colors.error, 0.06),
+            borderColor: withAlpha(colors.error, 0.25),
+          },
+        ]}
+      >
+        <Ionicons name={icon} size={28} color={colors.error} />
+      </View>
+      <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
+      <Text style={[styles.subtitle, { color: colors.textSecondary }]}>{message}</Text>
+      {errorRef ? (
+        <View
+          style={[
+            styles.refCard,
+            { backgroundColor: colors.surface, borderColor: colors.borderSubtle },
+          ]}
         >
-          {ctaIcon && <Ionicons name={ctaIcon} size={20} color="#000" />}
-          <Text style={styles.ctaText}>{ctaLabel}</Text>
-        </TouchableOpacity>
+          <Text style={[styles.refLabel, { color: colors.textTertiary }]}>REF</Text>
+          <Text style={[styles.refValue, { color: colors.text }]} numberOfLines={2}>
+            {errorRef}
+          </Text>
+        </View>
+      ) : null}
+      {onRetry && (
+        <View style={styles.ctaWrap}>
+          <Button
+            title={retryLabel}
+            onPress={handleRetry}
+            variant="primary"
+            size="lg"
+            icon="refresh"
+            fullWidth
+          />
+        </View>
       )}
     </Animated.View>
   );
@@ -62,44 +153,61 @@ export function EmptyState({
 
 const styles = StyleSheet.create({
   container: {
-    padding: SPACING.xl,
-    borderRadius: BORDER_RADIUS.xl,
-    borderWidth: 1,
     alignItems: 'center',
-    marginHorizontal: SPACING.lg,
-    ...SHADOWS.sm,
+    paddingHorizontal: SPACING.screenPadding,
+    paddingVertical: SPACING['3xl'],
   },
-  iconContainer: {
+  iconTile: {
     width: 64,
     height: 64,
-    borderRadius: 32,
+    borderRadius: 20,
+    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: SPACING.md,
+    marginBottom: SPACING.xl,
   },
   title: {
-    ...TYPOGRAPHY.headlineSmall,
+    fontFamily: FONTS.serif,
+    fontSize: 24,
+    lineHeight: 29,
+    letterSpacing: -0.29,
     textAlign: 'center',
-    marginBottom: SPACING.xs,
+    marginBottom: SPACING.sm,
   },
   subtitle: {
-    ...TYPOGRAPHY.bodyMedium,
-    textAlign: 'center',
+    fontFamily: FONTS.sans,
+    fontSize: 14,
     lineHeight: 22,
-    marginBottom: SPACING.lg,
+    textAlign: 'center',
+    maxWidth: 280,
   },
-  ctaButton: {
+  ctaWrap: {
+    width: '100%',
+    maxWidth: 280,
+    marginTop: SPACING.xl,
+  },
+  refCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: SPACING.xs,
-    paddingVertical: SPACING.md,
-    paddingHorizontal: SPACING.xl,
-    borderRadius: BORDER_RADIUS.full,
+    gap: SPACING.md,
+    maxWidth: 300,
+    borderWidth: 1,
+    borderRadius: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    marginTop: SPACING.lg,
   },
-  ctaText: {
-    ...TYPOGRAPHY.labelLarge,
-    color: '#000',
-    fontWeight: '600',
+  refLabel: {
+    fontFamily: FONTS.mono,
+    fontSize: 10.5,
+    letterSpacing: 1,
+    fontVariant: ['tabular-nums'],
+  },
+  refValue: {
+    flexShrink: 1,
+    fontFamily: FONTS.mono,
+    fontSize: 10.5,
+    fontVariant: ['tabular-nums'],
   },
 });
 

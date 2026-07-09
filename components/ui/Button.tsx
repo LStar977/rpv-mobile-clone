@@ -18,7 +18,7 @@ import Animated, {
   interpolate,
   Extrapolation,
 } from 'react-native-reanimated';
-import { useTheme, SHADOWS, RADIUS, SPACING, TYPOGRAPHY, EASING } from '../../lib/theme';
+import { useTheme, RADIUS, SPACING, EASING, FONTS, withAlpha as withAlphaLocal } from '../../lib/theme';
 import { haptics } from '../../lib/haptics';
 
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
@@ -60,15 +60,16 @@ export function Button({
   const scale = useSharedValue(1);
   const pressed = useSharedValue(0);
 
+  // Motion spec: Instant (120ms) press — scale .965 + light haptic.
   const handlePressIn = () => {
     haptics.light();
-    scale.value = withSpring(0.97, EASING.springSnappy);
-    pressed.value = withTiming(1, { duration: 100 });
+    scale.value = withSpring(0.965, EASING.springSnappy);
+    pressed.value = withTiming(1, { duration: 120 });
   };
 
   const handlePressOut = () => {
     scale.value = withSpring(1, EASING.springSnappy);
-    pressed.value = withTiming(0, { duration: 150 });
+    pressed.value = withTiming(0, { duration: 120 });
   };
 
   const animatedContainerStyle = useAnimatedStyle(() => ({
@@ -76,14 +77,15 @@ export function Button({
     opacity: interpolate(pressed.value, [0, 1], [1, 0.9], Extrapolation.CLAMP),
   }));
 
+  // Redesign spec: buttons radius 14–16, primary height 54–56, min hit 44.
   const sizeConfig = {
     sm: {
       paddingVertical: 10,
       paddingHorizontal: 16,
-      borderRadius: RADIUS.md,
+      borderRadius: RADIUS.button,
       fontSize: 13,
       iconSize: 16,
-      minHeight: 36,
+      minHeight: 44,
     },
     md: {
       paddingVertical: 14,
@@ -96,7 +98,7 @@ export function Button({
     lg: {
       paddingVertical: 16,
       paddingHorizontal: 28,
-      borderRadius: RADIUS.lg,
+      borderRadius: 16,
       fontSize: 16,
       iconSize: 20,
       minHeight: 54,
@@ -104,10 +106,10 @@ export function Button({
     xl: {
       paddingVertical: 18,
       paddingHorizontal: 32,
-      borderRadius: RADIUS.xl,
+      borderRadius: 16,
       fontSize: 17,
       iconSize: 22,
-      minHeight: 60,
+      minHeight: 58,
     },
   };
 
@@ -122,18 +124,15 @@ export function Button({
 
     switch (variant) {
       case 'primary':
+        // Flat Sovereign Gold per redesign — no gradient, no glow.
+        // Disabled = same gold at .4 opacity (spec), not a muted surface.
         return {
           container: {
-            backgroundColor: isDisabled ? colors.goldSurface : colors.gold,
-            ...(isDisabled ? {} : SHADOWS.glow),
+            backgroundColor: colors.goldFill,
+            opacity: isDisabled ? 0.4 : 1,
           },
-          text: {
-            color: isDisabled ? colors.textTertiary : colors.black,
-            fontWeight: '600'
-          },
-          iconColor: isDisabled ? colors.textTertiary : colors.black,
-          useGradient: !isDisabled,
-          gradientColors: [colors.goldLight, colors.gold, colors.goldDark],
+          text: { color: '#040707' },
+          iconColor: '#040707',
         };
       case 'secondary':
         return {
@@ -142,10 +141,7 @@ export function Button({
             borderWidth: 1,
             borderColor: colors.border,
           },
-          text: {
-            color: isDisabled ? colors.textDisabled : colors.text,
-            fontWeight: '600'
-          },
+          text: { color: isDisabled ? colors.textDisabled : colors.text },
           iconColor: isDisabled ? colors.textDisabled : colors.gold,
         };
       case 'outline':
@@ -155,10 +151,7 @@ export function Button({
             borderWidth: 1.5,
             borderColor: isDisabled ? colors.border : colors.gold,
           },
-          text: {
-            color: isDisabled ? colors.textDisabled : colors.gold,
-            fontWeight: '600'
-          },
+          text: { color: isDisabled ? colors.textDisabled : colors.gold },
           iconColor: isDisabled ? colors.textDisabled : colors.gold,
         };
       case 'ghost':
@@ -166,35 +159,33 @@ export function Button({
           container: {
             backgroundColor: 'transparent',
           },
-          text: {
-            color: isDisabled ? colors.textDisabled : colors.gold,
-            fontWeight: '600'
-          },
-          iconColor: isDisabled ? colors.textDisabled : colors.gold,
+          text: { color: isDisabled ? colors.textDisabled : colors.textSecondary },
+          iconColor: isDisabled ? colors.textDisabled : colors.textSecondary,
         };
       case 'danger':
+        // Destructive per redesign — outline, never a filled red slab.
         return {
           container: {
-            backgroundColor: isDisabled ? colors.errorSurface : colors.error,
-            ...(isDisabled ? {} : SHADOWS.glowError),
+            backgroundColor: 'transparent',
+            borderWidth: 1.5,
+            borderColor: isDisabled ? colors.border : withAlphaLocal(colors.oppose, 0.5),
           },
-          text: { color: colors.white, fontWeight: '600' },
-          iconColor: colors.white,
+          text: { color: isDisabled ? colors.textDisabled : colors.oppose },
+          iconColor: isDisabled ? colors.textDisabled : colors.oppose,
         };
       case 'success':
         return {
           container: {
             backgroundColor: isDisabled ? colors.successSurface : colors.success,
-            ...(isDisabled ? {} : SHADOWS.glowSuccess),
           },
-          text: { color: colors.black, fontWeight: '600' },
+          text: { color: colors.black },
           iconColor: colors.black,
         };
       default:
         return {
-          container: { backgroundColor: colors.gold },
-          text: { color: colors.black, fontWeight: '600' },
-          iconColor: colors.black,
+          container: { backgroundColor: colors.goldFill },
+          text: { color: '#040707' },
+          iconColor: '#040707',
         };
     }
   };
@@ -418,8 +409,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   text: {
+    fontFamily: FONTS.sansSemiBold,
     textAlign: 'center',
-    letterSpacing: 0.3,
+    letterSpacing: 0.1,
   },
   iconLeft: {
     marginRight: SPACING.sm,

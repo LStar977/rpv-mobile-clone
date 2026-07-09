@@ -2,7 +2,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Linking } from 'r
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useTheme } from '../../lib/theme';
+import { useTheme, FONTS } from '../../lib/theme';
 
 const TERMS_URL = 'https://representportal.com/terms';
 const PRIVACY_URL = 'https://representportal.com/privacy';
@@ -93,9 +93,9 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
   },
   backButton: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { fontFamily: 'Georgia', fontSize: 20, fontWeight: '600' },
+  headerTitle: { fontFamily: FONTS.serif, fontSize: 20 },
   content: { padding: 20, paddingBottom: 60 },
-  intro: { fontSize: 14, lineHeight: 21, marginBottom: 24 },
+  intro: { fontFamily: FONTS.sans, fontSize: 14, lineHeight: 21, marginBottom: 24 },
   row: {
     flexDirection: 'row', alignItems: 'center', gap: 14,
     padding: 16, borderRadius: 12, borderWidth: 1, marginBottom: 12,
@@ -104,7 +104,7 @@ const styles = StyleSheet.create({
     width: 40, height: 40, borderRadius: 20,
     alignItems: 'center', justifyContent: 'center',
   },
-  rowTitle: { fontSize: 15, fontWeight: '600', marginBottom: 2 },
-  rowSub: { fontSize: 12 },
-  footer: { fontSize: 11, textAlign: 'center', marginTop: 24 },
+  rowTitle: { fontFamily: FONTS.sansSemiBold, fontSize: 15, marginBottom: 2 },
+  rowSub: { fontFamily: FONTS.sans, fontSize: 12 },
+  footer: { fontFamily: FONTS.sans, fontSize: 11, textAlign: 'center', marginTop: 24 },
 });

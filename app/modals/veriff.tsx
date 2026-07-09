@@ -4,7 +4,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useTheme } from '../../lib/theme';
+import * as Haptics from 'expo-haptics';
+import { useTheme, FONTS } from '../../lib/theme';
 import { veriffApi, kycApi } from '../../lib/api';
 import { useAuthStore } from '../../lib/auth';
 
@@ -24,6 +25,14 @@ function isTrustedKycUrl(url: string | undefined): url is string {
     return false;
   }
 }
+
+// Retry checklist shown on every failure state (P1). Every retry re-enters
+// the capture flow, so the capture tips apply regardless of what failed.
+const RETRY_CHECKLIST = [
+  'Place the ID on a flat, dark surface',
+  'Avoid glare — tilt away from direct light',
+  'Keep all four corners inside the frame',
+];
 
 export default function VeriffScreen() {
   const { colors } = useTheme();
@@ -48,6 +57,10 @@ export default function VeriffScreen() {
   // if that auto-create actually fails.
   const [errorState, setErrorState] = useState<ErrorState>(null);
   const [retrying, setRetrying] = useState(!params.sessionUrl);
+  // Branded intro (X4) shown before handing off to the verifier WebView.
+  const [stage, setStage] = useState<'intro' | 'webview'>('intro');
+  // Failed tries so far — drives the "Attempt N of 5" line on P1 states.
+  const [failures, setFailures] = useState(0);
 
   const handleClose = () => {
     // Refresh auth in the background — if the user actually completed
@@ -111,6 +124,11 @@ export default function VeriffScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Count every entry into a failure state, for the P1 attempt line.
+  useEffect(() => {
+    if (errorState) setFailures((f) => f + 1);
+  }, [errorState]);
+
   const handleNavigationStateChange = (navState: any) => {
     const url = navState.url || '';
 
@@ -140,58 +158,180 @@ export default function VeriffScreen() {
     }
   };
 
+  const CloseCircle = (
+    <TouchableOpacity
+      onPress={handleClose}
+      style={[styles.closeCircle, { backgroundColor: colors.surface, borderColor: colors.borderSubtle }]}
+      accessibilityLabel="Close"
+    >
+      <Ionicons name="close" size={18} color={colors.textSecondary} />
+    </TouchableOpacity>
+  );
+
+  // ── P1 · failure / decline states — honest retry layout ─────────────
   if (errorState) {
     const messages: Record<Exclude<ErrorState, null>, { title: string; subtitle: string; icon: keyof typeof Ionicons.glyphMap }> = {
       'no-session': {
         title: "Couldn't start verification",
-        subtitle: 'No verification session was found. Tap retry to start a new one.',
-        icon: 'warning-outline',
+        subtitle: 'No verification session was found. Nothing was saved. Tap Try Again to start a new one.',
+        icon: 'card-outline',
       },
       'webview-error': {
         title: "Couldn't load verification",
-        subtitle: 'Something went wrong loading the verification page. Please check your connection and try again.',
+        subtitle: 'Something went wrong loading the verification page. Nothing was saved — check your connection and try again.',
         icon: 'cloud-offline-outline',
       },
       cancelled: {
         title: "Verification didn't complete",
-        subtitle: 'It looks like verification was cancelled. You can try again whenever you\'re ready.',
-        icon: 'refresh-circle-outline',
+        subtitle: 'The check was cancelled before it finished. Nothing was saved — any images have already been discarded.',
+        icon: 'card-outline',
       },
     };
     const msg = messages[errorState];
+    const attempt = Math.min(failures + 1, 5);
 
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-        <View style={[styles.header, { borderBottomColor: colors.border }]}>
-          <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
-            <Ionicons name="close" size={28} color={colors.text} />
-          </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: colors.text }]}>Identity Verification</Text>
-          <View style={{ width: 40 }} />
-        </View>
-        <View style={styles.errorContainer}>
-          <Ionicons name={msg.icon} size={56} color={colors.gold} />
-          <Text style={[styles.errorTitle, { color: colors.text }]}>{msg.title}</Text>
-          <Text style={[styles.errorSubtitle, { color: colors.textSecondary }]}>{msg.subtitle}</Text>
-          <TouchableOpacity
-            style={[styles.button, { backgroundColor: colors.gold, opacity: retrying ? 0.6 : 1 }]}
-            onPress={handleRetry}
-            disabled={retrying}
-          >
-            {retrying ? (
-              <ActivityIndicator color="#000" />
-            ) : (
-              <Text style={styles.buttonText}>Try again</Text>
-            )}
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.secondaryButton} onPress={handleClose} disabled={retrying}>
-            <Text style={[styles.secondaryButtonText, { color: colors.textSecondary }]}>Cancel</Text>
-          </TouchableOpacity>
+        <View style={styles.brandedBody}>
+          {/* Top row */}
+          <View style={styles.topRow}>
+            {CloseCircle}
+            <Text style={[styles.stepLabel, { color: colors.textTertiary }]}>STEP 2 OF 3</Text>
+          </View>
+          {/* Progress — middle segment failed */}
+          <View style={styles.progressRow}>
+            <View style={[styles.progressSeg, { backgroundColor: colors.goldFill }]} />
+            <View style={[styles.progressSeg, { backgroundColor: colors.error }]} />
+            <View style={[styles.progressSeg, { backgroundColor: colors.surfaceHighlight }]} />
+          </View>
+
+          <View style={styles.errorCenter}>
+            <View style={[styles.errorCircle, { backgroundColor: colors.errorSurface, borderColor: `${colors.error}40` }]}>
+              <Ionicons name={msg.icon} size={38} color={colors.error} />
+            </View>
+            <Text style={[styles.errorTitle, { color: colors.text }]}>{msg.title}</Text>
+            <Text style={[styles.errorSubtitle, { color: colors.textSecondary }]}>{msg.subtitle}</Text>
+
+            {/* Retry checklist */}
+            <View style={[styles.checklistCard, { backgroundColor: colors.surface, borderColor: colors.borderSubtle }]}>
+              {RETRY_CHECKLIST.map((item, i) => (
+                <View
+                  key={item}
+                  style={[
+                    styles.checklistRow,
+                    i < RETRY_CHECKLIST.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.borderSubtle },
+                  ]}
+                >
+                  <Ionicons name="checkmark" size={15} color={colors.gold} />
+                  <Text style={[styles.checklistText, { color: colors.textSecondary }]}>{item}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+
+          <View style={styles.bottomStack}>
+            <TouchableOpacity
+              style={[styles.primaryButton, { backgroundColor: colors.goldFill, opacity: retrying ? 0.6 : 1 }]}
+              onPress={handleRetry}
+              disabled={retrying}
+              activeOpacity={0.8}
+            >
+              {retrying ? (
+                <ActivityIndicator color="#040707" />
+              ) : (
+                <Text style={styles.primaryButtonText}>Try Again</Text>
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.secondaryButton} onPress={handleClose} disabled={retrying}>
+              <Text style={[styles.secondaryButtonText, { color: colors.textSecondary }]}>Cancel</Text>
+            </TouchableOpacity>
+            <Text style={[styles.attemptLine, { color: colors.textTertiary }]}>
+              Attempt {attempt} of 5 · then a human review takes over
+            </Text>
+          </View>
         </View>
       </SafeAreaView>
     );
   }
 
+  // ── X4 · branded intro before handing off to the verifier ───────────
+  if (stage === 'intro') {
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+        <View style={styles.brandedBody}>
+          <View style={styles.topRow}>
+            {CloseCircle}
+            <Text style={[styles.stepLabel, { color: colors.textTertiary }]}>STEP 2 OF 3</Text>
+          </View>
+          <View style={styles.progressRow}>
+            <View style={[styles.progressSeg, { backgroundColor: colors.goldFill }]} />
+            <View style={[styles.progressSeg, { backgroundColor: colors.goldFill }]} />
+            <View style={[styles.progressSeg, { backgroundColor: colors.surfaceHighlight }]} />
+          </View>
+
+          <View style={styles.introHeading}>
+            <Text style={[styles.introTitle, { color: colors.text }]}>Scan Your ID</Text>
+            <Text style={[styles.introSubtitle, { color: colors.textSecondary }]}>
+              {flow === 'citizen'
+                ? 'Have your passport and a proof-of-address document ready, then place each inside the frame.'
+                : "Place your driver's licence, passport, or provincial ID inside the frame."}
+            </Text>
+          </View>
+
+          {/* Capture area with gold corner brackets */}
+          <View style={styles.frameWrap}>
+            <View style={styles.frame}>
+              <View style={[StyleSheet.absoluteFill, styles.frameFill, { backgroundColor: colors.surface }]} />
+              <View style={[styles.corner, styles.cornerTL, { borderColor: colors.gold }]} />
+              <View style={[styles.corner, styles.cornerTR, { borderColor: colors.gold }]} />
+              <View style={[styles.corner, styles.cornerBL, { borderColor: colors.gold }]} />
+              <View style={[styles.corner, styles.cornerBR, { borderColor: colors.gold }]} />
+              <View style={styles.frameCenter}>
+                <Ionicons name="card-outline" size={30} color={colors.textTertiary} />
+                <Text style={[styles.frameLabel, { color: colors.textTertiary }]}>ALIGN ID WITHIN FRAME</Text>
+              </View>
+            </View>
+          </View>
+
+          {/* Auto-capture note */}
+          <View style={styles.autoRow}>
+            <View style={[styles.autoDot, { backgroundColor: colors.goldFill }]} />
+            <Text style={[styles.autoText, { color: colors.text }]}>Hold steady — it captures automatically</Text>
+          </View>
+
+          {/* Encrypted-to-verifier trust note */}
+          <View style={[styles.trustCard, { backgroundColor: colors.goldSurface, borderColor: colors.goldSurfaceIntense }]}>
+            <Ionicons name="shield-outline" size={15} color={colors.gold} style={{ marginTop: 1 }} />
+            <Text style={[styles.trustText, { color: colors.textSecondary }]}>
+              <Text style={[styles.trustLead, { color: colors.text }]}>Checked, never kept.</Text>
+              {' '}Encrypted directly to the verifier — Represent never sees or stores this image; it's discarded after the check.
+            </Text>
+          </View>
+
+          <View style={styles.bottomStack}>
+            <TouchableOpacity
+              style={[styles.primaryButton, { backgroundColor: colors.goldFill, opacity: retrying || !sessionUrl ? 0.6 : 1 }]}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                setStage('webview');
+              }}
+              disabled={retrying || !sessionUrl}
+              activeOpacity={0.8}
+            >
+              {retrying || !sessionUrl ? (
+                <ActivityIndicator color="#040707" />
+              ) : (
+                <Text style={styles.primaryButtonText}>Start Capture</Text>
+              )}
+            </TouchableOpacity>
+            <Text style={[styles.attemptLine, { color: colors.textTertiary }]}>Takes about two minutes</Text>
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // ── Verifier WebView (wiring unchanged) ──────────────────────────────
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
       <View style={[styles.header, { borderBottomColor: colors.border }]}>
@@ -228,17 +368,58 @@ export default function VeriffScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+
+  // Branded (intro / P1) layout
+  brandedBody: { flex: 1, paddingHorizontal: 28, paddingTop: 8, paddingBottom: 40, gap: 18 },
+  topRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  closeCircle: { width: 40, height: 40, borderRadius: 20, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  stepLabel: { fontFamily: FONTS.mono, fontSize: 10.5, letterSpacing: 1.7 },
+  progressRow: { flexDirection: 'row', gap: 6 },
+  progressSeg: { flex: 1, height: 4, borderRadius: 2 },
+
+  // X4 intro
+  introHeading: { gap: 6 },
+  introTitle: { fontFamily: FONTS.serif, fontSize: 26, lineHeight: 30, letterSpacing: -0.3 },
+  introSubtitle: { fontFamily: FONTS.sans, fontSize: 13.5, lineHeight: 20 },
+  frameWrap: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  frame: { width: '100%', aspectRatio: 1.586, maxHeight: 220 },
+  frameFill: { borderRadius: 18, opacity: 0.6 },
+  corner: { position: 'absolute', width: 44, height: 44 },
+  cornerTL: { top: 0, left: 0, borderTopWidth: 3, borderLeftWidth: 3, borderTopLeftRadius: 18 },
+  cornerTR: { top: 0, right: 0, borderTopWidth: 3, borderRightWidth: 3, borderTopRightRadius: 18 },
+  cornerBL: { bottom: 0, left: 0, borderBottomWidth: 3, borderLeftWidth: 3, borderBottomLeftRadius: 18 },
+  cornerBR: { bottom: 0, right: 0, borderBottomWidth: 3, borderRightWidth: 3, borderBottomRightRadius: 18 },
+  frameCenter: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', gap: 8 },
+  frameLabel: { fontFamily: FONTS.mono, fontSize: 11, letterSpacing: 1.5 },
+  autoRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 },
+  autoDot: { width: 7, height: 7, borderRadius: 4 },
+  autoText: { fontFamily: FONTS.sansSemiBold, fontSize: 12.5 },
+  trustCard: { flexDirection: 'row', gap: 11, alignItems: 'flex-start', borderWidth: 1, borderRadius: 14, paddingVertical: 13, paddingHorizontal: 15 },
+  trustText: { flex: 1, fontFamily: FONTS.sans, fontSize: 12, lineHeight: 18 },
+  trustLead: { fontFamily: FONTS.sansSemiBold },
+
+  // P1 failure
+  errorCenter: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 20 },
+  errorCircle: { width: 92, height: 92, borderRadius: 46, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  errorTitle: { fontFamily: FONTS.serif, fontSize: 27, lineHeight: 31, textAlign: 'center' },
+  errorSubtitle: { fontFamily: FONTS.sans, fontSize: 14, lineHeight: 22, textAlign: 'center', maxWidth: 290 },
+  checklistCard: { width: '100%', borderWidth: 1, borderRadius: 16, paddingVertical: 6, paddingHorizontal: 17 },
+  checklistRow: { flexDirection: 'row', alignItems: 'center', gap: 11, paddingVertical: 11 },
+  checklistText: { fontFamily: FONTS.sans, fontSize: 13, flex: 1 },
+
+  // Shared bottom stack
+  bottomStack: { gap: 10 },
+  primaryButton: { height: 56, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  primaryButtonText: { fontFamily: FONTS.sansSemiBold, fontSize: 17, color: '#040707' },
+  secondaryButton: { height: 46, alignItems: 'center', justifyContent: 'center' },
+  secondaryButtonText: { fontFamily: FONTS.sansMedium, fontSize: 14.5 },
+  attemptLine: { fontFamily: FONTS.mono, fontSize: 11.5, textAlign: 'center', fontVariant: ['tabular-nums'] },
+
+  // WebView stage (unchanged)
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1 },
   closeButton: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { fontSize: 18, fontWeight: '600' },
+  headerTitle: { fontFamily: FONTS.serif, fontSize: 18 },
   webview: { flex: 1 },
   loading: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
-  loadingText: { marginTop: 12, fontSize: 14 },
-  errorContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
-  errorTitle: { fontSize: 20, fontWeight: '600', marginTop: 20, textAlign: 'center' },
-  errorSubtitle: { fontSize: 14, lineHeight: 20, marginTop: 8, textAlign: 'center', paddingHorizontal: 16 },
-  button: { marginTop: 32, paddingHorizontal: 32, paddingVertical: 14, borderRadius: 12, minWidth: 160, alignItems: 'center' },
-  buttonText: { color: '#000', fontSize: 16, fontWeight: '600' },
-  secondaryButton: { marginTop: 16, paddingHorizontal: 24, paddingVertical: 10 },
-  secondaryButtonText: { fontSize: 14, fontWeight: '500' },
+  loadingText: { marginTop: 12, fontFamily: FONTS.sans, fontSize: 14 },
 });

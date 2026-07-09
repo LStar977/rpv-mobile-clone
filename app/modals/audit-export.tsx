@@ -16,7 +16,7 @@ import * as Sharing from 'expo-sharing';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { organizationsApi } from '../../lib/api';
-import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS } from '../../lib/theme';
+import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS, FONTS } from '../../lib/theme';
 import { UpgradeModal } from '../../components/ui/UpgradeModal';
 
 type Format = 'csv' | 'json';
@@ -232,7 +232,6 @@ const styles = StyleSheet.create({
   backButton: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   headerTitle: {
     ...TYPOGRAPHY.headlineSmall,
-    fontWeight: '600',
     flex: 1,
     textAlign: 'center',
   },
@@ -248,7 +247,6 @@ const styles = StyleSheet.create({
   },
   title: {
     ...TYPOGRAPHY.headlineMedium,
-    fontWeight: '700',
     textAlign: 'center',
     marginBottom: SPACING.sm,
   },
@@ -267,7 +265,6 @@ const styles = StyleSheet.create({
   },
   cardLabel: {
     ...TYPOGRAPHY.labelSmall,
-    fontWeight: '600',
     letterSpacing: 1.5,
     marginBottom: SPACING.sm,
   },
@@ -284,7 +281,6 @@ const styles = StyleSheet.create({
   },
   formatLabel: {
     ...TYPOGRAPHY.labelLarge,
-    fontWeight: '700',
   },
   formatSub: {
     ...TYPOGRAPHY.bodySmall,
@@ -296,7 +292,6 @@ const styles = StyleSheet.create({
   },
   toggleTitle: {
     ...TYPOGRAPHY.bodyMedium,
-    fontWeight: '600',
     marginBottom: 4,
   },
   toggleSubtitle: {
@@ -315,7 +310,6 @@ const styles = StyleSheet.create({
   },
   primaryButtonText: {
     ...TYPOGRAPHY.labelLarge,
-    fontWeight: '700',
     color: '#000',
   },
   successCard: {
@@ -326,7 +320,6 @@ const styles = StyleSheet.create({
   },
   successTitle: {
     ...TYPOGRAPHY.labelLarge,
-    fontWeight: '700',
     marginBottom: SPACING.sm,
   },
   successField: {
@@ -334,7 +327,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   mono: {
-    fontFamily: 'JetBrainsMono-Regular',
+    fontFamily: FONTS.mono,
     fontSize: 12,
   },
   secondaryButton: {
@@ -349,7 +342,6 @@ const styles = StyleSheet.create({
   },
   secondaryButtonText: {
     ...TYPOGRAPHY.labelMedium,
-    fontWeight: '600',
   },
   helpText: {
     ...TYPOGRAPHY.bodySmall,

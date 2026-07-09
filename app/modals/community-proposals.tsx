@@ -1,12 +1,12 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   FlatList,
+  TextInput,
   TouchableOpacity,
   RefreshControl,
-  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -14,8 +14,19 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { proposalsApi, Proposal } from '../../lib/api';
-import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS } from '../../lib/theme';
-import { SkeletonProposal, EmptyState } from '../../components/ui';
+import { useAuthStore } from '../../lib/auth';
+import { canUserVoteOnProposal, getTierLabel, getLocationLabel } from '../../lib/proposalGeo';
+import { useTheme, SPACING, RADIUS, FONTS } from '../../lib/theme';
+import { SkeletonProposal, EmptyState, TallyBar } from '../../components/ui';
+import { ErrorState } from '../../components/ui/EmptyState';
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// COMMUNITY · ALL PROPOSALS — screen 17 (Across Canada / discovery)
+// You can watch any public ballot, but only vote where you're eligible.
+// Proposals outside the viewer's votable scope render watch-only — no vote
+// affordance, a WATCH-ONLY · OUTSIDE YOUR SCOPE chip. Tallies go through
+// TallyBar, which enforces the 25-ballot threshold rules.
+// ═══════════════════════════════════════════════════════════════════════════════
 
 type Scope = 'country' | 'state' | 'city' | 'ward';
 
@@ -41,19 +52,33 @@ function matchesScope(proposal: Proposal, scope: Scope, scopeName: string): bool
   return geo.some((r) => r.toLowerCase() === target);
 }
 
+// "BC · PROVINCIAL"-style region chip text.
+function regionChipLabel(geoRestrictions?: string[]): string {
+  const tier = getTierLabel(geoRestrictions);
+  const loc = getLocationLabel(geoRestrictions).toUpperCase();
+  return loc === tier ? tier : `${loc} · ${tier}`;
+}
+
 export default function CommunityProposalsScreen() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ scope?: string; scopeName?: string; icon?: string }>();
+  const { user } = useAuthStore();
 
   const scope = (params.scope as Scope) || 'country';
   const scopeName = params.scopeName || 'Community';
   const icon = params.icon || '🌐';
 
+  const userCountry = user?.country || '';
+  const userState = user?.state || '';
+  const userCity = user?.city || '';
+  const isVerified = user?.verified ?? false;
+
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [proposals, setProposals] = useState<Proposal[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const fetchData = useCallback(async () => {
     try {
@@ -91,155 +116,180 @@ export default function CommunityProposalsScreen() {
     fetchData();
   };
 
+  const visibleProposals = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return proposals;
+    return proposals.filter(
+      (p) =>
+        (p.title || '').toLowerCase().includes(q) ||
+        (p.description || '').toLowerCase().includes(q),
+    );
+  }, [proposals, searchQuery]);
+
+  // In-scope non-yes-no proposals open the shared detail/ballot modal — the
+  // same target the Proposals tab routes to. Yes-no cards on this screen have
+  // never navigated (the tab's inline detail modal owns that flow), so they
+  // stay static. Watch-only cards never navigate.
+  const openProposal = (p: Proposal) => {
+    const voteType = (p as any).voteType;
+    if (!voteType || voteType === 'yes-no') return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    router.push({
+      pathname: '/modals/proposal-detail',
+      params: {
+        proposalId: String(p.id),
+        title: p.title || '',
+        description: p.description || '',
+        category: p.category || 'General',
+        deadline: p.deadline || '',
+        voteType,
+        options: JSON.stringify((p as any).options ?? []),
+        creatorId: String((p as any).creatorId ?? (p as any).userId ?? ''),
+        creatorName: p.creatorName || 'Community Member',
+        requiresCitizenship: (p as any).requiresCitizenship ? '1' : '',
+      },
+    });
+  };
+
   const renderItem = ({ item, index }: { item: Proposal; index: number }) => {
     const support = item.supportVotes || 0;
     const oppose = item.opposeVotes || 0;
-    const total = support + oppose;
-    const supportPct = total > 0 ? (support / total) * 100 : 50;
-    const ended = getTimeRemaining(item.deadline) === 'Ended';
+    const timeLabel = getTimeRemaining(item.deadline).toUpperCase();
+    const canVote = canUserVoteOnProposal(item, userCountry, userState, userCity, isVerified);
+    const voteType = (item as any).voteType;
+    const navigable = canVote && voteType && voteType !== 'yes-no';
 
-    return (
-      <Animated.View entering={FadeInUp.delay(index * 50).duration(350)}>
-        <View
-          style={[
-            styles.card,
-            { backgroundColor: colors.surface, borderColor: colors.border },
-          ]}
-        >
-          <View style={styles.cardHeader}>
-            <View
-              style={[
-                styles.statusPill,
-                {
-                  backgroundColor: ended
-                    ? `${colors.textTertiary}20`
-                    : `${colors.success}20`,
-                },
-              ]}
-            >
-              <View
-                style={[
-                  styles.statusDot,
-                  { backgroundColor: ended ? colors.textTertiary : colors.success },
-                ]}
-              />
-              <Text
-                style={[
-                  styles.statusText,
-                  { color: ended ? colors.textTertiary : colors.success },
-                ]}
-              >
-                {ended ? 'Ended' : 'Active'}
-              </Text>
-            </View>
-            <Text style={[styles.timeText, { color: colors.textTertiary }]}>
-              {getTimeRemaining(item.deadline)}
+    const card = (
+      <View
+        style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.borderSubtle }]}
+      >
+        {/* Region chip + eligibility / deadline */}
+        <View style={styles.cardHeader}>
+          <View style={[styles.regionChip, { backgroundColor: colors.surfaceHighlight }]}>
+            <Text style={[styles.regionChipText, { color: colors.textTertiary }]}>
+              {regionChipLabel(item.geoRestrictions)}
             </Text>
           </View>
+          {canVote ? (
+            <Text style={[styles.timeText, { color: colors.textTertiary }]}>{timeLabel}</Text>
+          ) : (
+            <View style={[styles.watchChip, { borderColor: colors.border }]}>
+              <Ionicons name="eye-outline" size={10} color={colors.textTertiary} />
+              <Text style={[styles.watchChipText, { color: colors.textTertiary }]}>
+                WATCH-ONLY · OUTSIDE YOUR SCOPE
+              </Text>
+            </View>
+          )}
+        </View>
 
-          <Text style={[styles.title, { color: colors.text }]} numberOfLines={2}>
-            {item.title}
-          </Text>
+        <Text style={[styles.title, { color: colors.text }]} numberOfLines={3}>
+          {item.title}
+        </Text>
+        {!!item.description && (
           <Text style={[styles.description, { color: colors.textSecondary }]} numberOfLines={2}>
             {item.description}
           </Text>
+        )}
 
-          <View style={[styles.categoryBadge, { backgroundColor: `${colors.gold}15` }]}>
-            <Text style={[styles.categoryText, { color: colors.gold }]}>{item.category}</Text>
-          </View>
-
-          {/* Support / Oppose bar */}
-          <View style={styles.voteBarContainer}>
-            <View style={styles.voteBarLabels}>
-              <View style={styles.voteLabelLeft}>
-                <Ionicons name="thumbs-up" size={12} color={colors.success} />
-                <Text style={[styles.voteLabelText, { color: colors.success }]}>
-                  {support} ({Math.round(supportPct)}%)
-                </Text>
-              </View>
-              <View style={styles.voteLabelRight}>
-                <Text style={[styles.voteLabelText, { color: colors.error }]}>
-                  ({Math.round(100 - supportPct)}%) {oppose}
-                </Text>
-                <Ionicons name="thumbs-down" size={12} color={colors.error} />
-              </View>
-            </View>
-            <View style={[styles.voteBar, { backgroundColor: `${colors.error}30` }]}>
-              <View
-                style={[
-                  styles.voteBarFill,
-                  {
-                    backgroundColor: colors.success,
-                    width: total > 0 ? `${supportPct}%` : '0%',
-                  },
-                ]}
-              />
-            </View>
-            <Text style={[styles.participantText, { color: colors.textTertiary }]}>
-              {total.toLocaleString()} participant{total !== 1 ? 's' : ''}
+        <View style={styles.metaRow}>
+          <View style={[styles.categoryChip, { backgroundColor: colors.surfaceHighlight }]}>
+            <Text style={[styles.categoryText, { color: colors.textTertiary }]}>
+              {(item.category || 'General').toUpperCase()}
             </Text>
           </View>
+          {!canVote && (
+            <Text style={[styles.timeText, { color: colors.textTertiary }]}>{timeLabel}</Text>
+          )}
         </View>
+
+        {/* Two-tone tally — TallyBar enforces the 25-ballot threshold */}
+        <TallyBar supportCount={support} opposeCount={oppose} variant="compact" />
+      </View>
+    );
+
+    return (
+      <Animated.View entering={FadeInUp.delay(Math.min(index, 8) * 50).duration(350)}>
+        {navigable ? (
+          <TouchableOpacity activeOpacity={0.85} onPress={() => openProposal(item)}>
+            {card}
+          </TouchableOpacity>
+        ) : (
+          card
+        )}
       </Animated.View>
     );
   };
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Header */}
+      {/* Header — 40px circular back button + serif title (mock 17) */}
       <Animated.View
         entering={FadeInDown.duration(300)}
-        style={[
-          styles.header,
-          {
-            paddingTop: insets.top + SPACING.md,
-            borderBottomColor: colors.border,
-            backgroundColor: colors.background,
-          },
-        ]}
+        style={[styles.header, { paddingTop: insets.top + SPACING.md }]}
       >
         <TouchableOpacity
           onPress={() => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             router.back();
           }}
-          style={styles.closeButton}
-          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          style={[
+            styles.backButton,
+            { backgroundColor: colors.surface, borderColor: colors.borderSubtle },
+          ]}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          accessibilityLabel="Go back"
+          accessibilityRole="button"
         >
-          <Ionicons name="close" size={24} color={colors.text} />
+          <Ionicons name="chevron-back" size={20} color={colors.textSecondary} />
         </TouchableOpacity>
-        <View style={styles.headerTitleBlock}>
-          <View style={styles.headerTitleRow}>
-            <Text style={styles.headerIcon}>{icon}</Text>
-            <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>
-              {scopeName}
-            </Text>
-          </View>
-          <View style={[styles.readOnlyPill, { backgroundColor: `${colors.gold}18` }]}>
-            <Ionicons name="eye-outline" size={12} color={colors.gold} />
-            <Text style={[styles.readOnlyText, { color: colors.gold }]}>
-              Read-only — observing
-            </Text>
-          </View>
-        </View>
-        <View style={{ width: 24 }} />
+        <Text style={styles.headerIcon}>{icon}</Text>
+        <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>
+          {scopeName}
+        </Text>
       </Animated.View>
+
+      {/* Search + scope note */}
+      <View style={styles.topBlock}>
+        <View
+          style={[styles.searchBar, { backgroundColor: colors.surface, borderColor: colors.border }]}
+        >
+          <Ionicons name="search" size={16} color={colors.textTertiary} />
+          <TextInput
+            style={[styles.searchInput, { color: colors.text }]}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder="Search all public proposals"
+            placeholderTextColor={colors.textTertiary}
+            autoCorrect={false}
+            returnKeyType="search"
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={() => setSearchQuery('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Ionicons name="close-circle" size={16} color={colors.textTertiary} />
+            </TouchableOpacity>
+          )}
+        </View>
+        <Text style={[styles.scopeNote, { color: colors.textSecondary }]}>
+          Beyond your scope — you can watch any public ballot, but only vote where you're eligible.
+        </Text>
+      </View>
 
       {loading ? (
         <View style={styles.skeletonList}>
           {[0, 1, 2].map((i) => (
-            <SkeletonProposal key={i} style={{ marginBottom: SPACING.md }} />
+            <SkeletonProposal key={i} style={{ marginBottom: SPACING.md, opacity: 1 - i * 0.3 }} />
           ))}
+          <Text style={[styles.fetchingText, { color: colors.textTertiary }]}>
+            FETCHING THE VERIFIED COUNT…
+          </Text>
         </View>
       ) : error ? (
         <View style={styles.centered}>
-          <EmptyState
-            icon="cloud-offline-outline"
+          <ErrorState
             title="Couldn't load proposals"
-            subtitle={error}
-            ctaLabel="Try again"
-            ctaIcon="refresh"
-            onCtaPress={() => {
+            message="That was on our side, not yours. Nothing was lost — you can safely try again."
+            errorRef={error}
+            onRetry={() => {
               setLoading(true);
               fetchData();
             }}
@@ -249,27 +299,38 @@ export default function CommunityProposalsScreen() {
         <View style={styles.centered}>
           <EmptyState
             icon="document-text-outline"
-            title={`No active proposals in ${scopeName}`}
-            subtitle="Check back soon — this community hasn't posted anything yet."
+            title={`Nothing on the ballot in ${scopeName}`}
+            subtitle="No proposals have been posted here yet. New public ballots appear the moment they open."
+          />
+        </View>
+      ) : visibleProposals.length === 0 ? (
+        <View style={styles.centered}>
+          <EmptyState
+            icon="search-outline"
+            title="No matches"
+            subtitle={`No proposals in ${scopeName} match "${searchQuery.trim()}".`}
+            ctaLabel="Clear Search"
+            onCtaPress={() => setSearchQuery('')}
           />
         </View>
       ) : (
         <FlatList
-          data={proposals}
+          data={visibleProposals}
           keyExtractor={(item) => String(item.id)}
           renderItem={renderItem}
-          contentContainerStyle={styles.listContent}
+          contentContainerStyle={[
+            styles.listContent,
+            { paddingBottom: insets.bottom + SPACING.xxxl },
+          ]}
           showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
           refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              tintColor={colors.gold}
-            />
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.gold} />
           }
           ListHeaderComponent={
-            <Text style={[styles.listHeader, { color: colors.textSecondary }]}>
-              {proposals.length} proposal{proposals.length !== 1 ? 's' : ''} in this jurisdiction
+            <Text style={[styles.listHeader, { color: colors.textTertiary }]}>
+              {visibleProposals.length} PROPOSAL{visibleProposals.length !== 1 ? 'S' : ''} IN THIS
+              JURISDICTION
             </Text>
           }
         />
@@ -289,141 +350,144 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: SPACING.lg,
+    gap: 14,
+    paddingHorizontal: SPACING.screenPadding,
     paddingBottom: SPACING.md,
-    borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  closeButton: {
-    width: 24,
-    alignItems: 'flex-start',
-  },
-  headerTitleBlock: {
-    flex: 1,
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 1,
     alignItems: 'center',
-    gap: 6,
-  },
-  headerTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.xs,
+    justifyContent: 'center',
   },
   headerIcon: {
-    fontSize: 20,
+    fontSize: 22,
   },
   headerTitle: {
-    ...TYPOGRAPHY.headlineSmall,
-    fontWeight: '600',
-    maxWidth: 200,
+    flex: 1,
+    fontFamily: FONTS.serif,
+    fontSize: 28,
+    lineHeight: 31,
+    letterSpacing: -0.34,
   },
-  readOnlyPill: {
+  topBlock: {
+    paddingHorizontal: SPACING.screenPadding,
+    gap: SPACING.md,
+    paddingBottom: SPACING.md,
+  },
+  searchBar: {
+    height: 46,
+    borderRadius: 14,
+    borderWidth: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: SPACING.sm,
-    paddingVertical: 3,
-    borderRadius: BORDER_RADIUS.full,
+    gap: 10,
+    paddingHorizontal: 15,
   },
-  readOnlyText: {
-    ...TYPOGRAPHY.labelSmall,
-    fontWeight: '600',
-    fontSize: 11,
+  searchInput: {
+    flex: 1,
+    fontFamily: FONTS.sans,
+    fontSize: 14,
+    paddingVertical: 0,
+  },
+  scopeNote: {
+    fontFamily: FONTS.sans,
+    fontSize: 12.5,
+    lineHeight: 19,
   },
   listContent: {
-    padding: SPACING.lg,
+    paddingHorizontal: SPACING.screenPadding,
     gap: SPACING.md,
-    paddingBottom: SPACING.xxxl,
   },
   listHeader: {
-    ...TYPOGRAPHY.labelMedium,
-    marginBottom: SPACING.sm,
+    fontFamily: FONTS.monoSemiBold,
+    fontSize: 10,
+    letterSpacing: 1.4,
+    fontVariant: ['tabular-nums'],
+    marginBottom: SPACING.xs,
   },
   skeletonList: {
-    padding: SPACING.lg,
+    padding: SPACING.screenPadding,
+    paddingTop: SPACING.md,
+  },
+  fetchingText: {
+    fontFamily: FONTS.mono,
+    fontSize: 10,
+    letterSpacing: 1.6,
+    textAlign: 'center',
+    marginTop: SPACING.sm,
+    fontVariant: ['tabular-nums'],
   },
   card: {
-    borderRadius: BORDER_RADIUS.xl,
+    borderRadius: RADIUS.card,
     borderWidth: 1,
-    padding: SPACING.lg,
-    ...SHADOWS.sm,
+    paddingVertical: 16,
+    paddingHorizontal: 18,
+    gap: 11,
   },
   cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: SPACING.sm,
+    gap: SPACING.sm,
   },
-  statusPill: {
+  regionChip: {
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: RADIUS.chip,
+    flexShrink: 1,
+  },
+  regionChipText: {
+    fontFamily: FONTS.sansSemiBold,
+    fontSize: 9.5,
+    letterSpacing: 1.14,
+  },
+  watchChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: SPACING.sm,
-    paddingVertical: 4,
-    borderRadius: BORDER_RADIUS.full,
     gap: 4,
+    borderWidth: 1,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: RADIUS.chip,
+    flexShrink: 1,
   },
-  statusDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-  },
-  statusText: {
-    ...TYPOGRAPHY.labelSmall,
-    fontWeight: '600',
+  watchChipText: {
+    fontFamily: FONTS.sansSemiBold,
+    fontSize: 9.5,
+    letterSpacing: 0.76,
   },
   timeText: {
-    ...TYPOGRAPHY.labelSmall,
+    fontFamily: FONTS.mono,
+    fontSize: 10.5,
+    fontVariant: ['tabular-nums'],
   },
   title: {
-    ...TYPOGRAPHY.headlineSmall,
-    marginBottom: SPACING.xs,
+    fontFamily: FONTS.serif,
+    fontSize: 17,
+    lineHeight: 22,
   },
   description: {
-    ...TYPOGRAPHY.bodyMedium,
-    marginBottom: SPACING.sm,
-    lineHeight: 20,
+    fontFamily: FONTS.sans,
+    fontSize: 12.5,
+    lineHeight: 18,
   },
-  categoryBadge: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: SPACING.sm,
-    paddingVertical: 4,
-    borderRadius: BORDER_RADIUS.sm,
-    marginBottom: SPACING.md,
-  },
-  categoryText: {
-    ...TYPOGRAPHY.labelSmall,
-    fontWeight: '600',
-  },
-  voteBarContainer: {
-    gap: 6,
-  },
-  voteBarLabels: {
+  metaRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-  },
-  voteLabelLeft: {
-    flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: SPACING.sm,
   },
-  voteLabelRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
+  categoryChip: {
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: RADIUS.chip,
   },
-  voteLabelText: {
-    ...TYPOGRAPHY.labelSmall,
-    fontWeight: '600',
-  },
-  voteBar: {
-    height: 6,
-    borderRadius: 3,
-    overflow: 'hidden',
-  },
-  voteBarFill: {
-    height: '100%',
-    borderRadius: 3,
-  },
-  participantText: {
-    ...TYPOGRAPHY.labelSmall,
-    marginTop: 2,
+  categoryText: {
+    fontFamily: FONTS.sansSemiBold,
+    fontSize: 9,
+    letterSpacing: 1.08,
   },
 });

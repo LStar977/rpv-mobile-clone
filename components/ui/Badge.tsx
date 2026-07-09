@@ -12,7 +12,7 @@ import Animated, {
   withSequence,
   Easing,
 } from 'react-native-reanimated';
-import { useTheme, RADIUS, SPACING, TYPOGRAPHY } from '../../lib/theme';
+import { useTheme, RADIUS, SPACING, FONTS } from '../../lib/theme';
 
 type BadgeVariant = 'default' | 'success' | 'error' | 'warning' | 'info' | 'gold' | 'premium';
 type BadgeSize = 'sm' | 'md' | 'lg';
@@ -41,28 +41,29 @@ export function Badge({
   const { colors } = useTheme();
 
   const sizeConfig = {
+    // Redesign spec: chips are pills (radius 100), Onest 600 10px +0.1em.
     sm: {
       paddingHorizontal: SPACING.sm,
       paddingVertical: 3,
-      fontSize: 10,
+      fontSize: 9.5,
       iconSize: 10,
-      borderRadius: RADIUS.xs,
+      borderRadius: RADIUS.chip,
       gap: 4,
     },
     md: {
-      paddingHorizontal: SPACING.md,
-      paddingVertical: 5,
-      fontSize: 11,
-      iconSize: 12,
-      borderRadius: RADIUS.badge,
+      paddingHorizontal: 11,
+      paddingVertical: 6,
+      fontSize: 10,
+      iconSize: 11,
+      borderRadius: RADIUS.chip,
       gap: 5,
     },
     lg: {
       paddingHorizontal: SPACING.lg,
       paddingVertical: SPACING.sm,
-      fontSize: 12,
-      iconSize: 14,
-      borderRadius: RADIUS.md,
+      fontSize: 11,
+      iconSize: 13,
+      borderRadius: RADIUS.chip,
       gap: 6,
     },
   };
@@ -461,8 +462,8 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
   },
   label: {
-    fontWeight: '600',
-    letterSpacing: 0.5,
+    fontFamily: FONTS.sansSemiBold,
+    letterSpacing: 1,
     textTransform: 'uppercase',
   },
   countBadge: {
@@ -471,8 +472,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   countText: {
-    fontWeight: '700',
+    fontFamily: FONTS.monoSemiBold,
     textAlign: 'center',
+    fontVariant: ['tabular-nums'],
   },
   statusDotContainer: {
     alignItems: 'center',
@@ -490,7 +492,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   liveText: {
-    fontWeight: '700',
+    fontFamily: FONTS.sansBold,
     letterSpacing: 1,
   },
   verificationBadge: {

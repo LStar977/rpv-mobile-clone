@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -9,14 +9,10 @@ import {
   Platform,
   Image,
   Alert,
-  Dimensions,
   ActivityIndicator,
   Linking,
 } from 'react-native';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
-import { BlurView } from 'expo-blur';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Ionicons } from '@expo/vector-icons';
 import Animated, {
   FadeIn,
   FadeInDown,
@@ -24,29 +20,17 @@ import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withSpring,
-  withTiming,
-  withDelay,
-  withSequence,
-  withRepeat,
-  interpolate,
-  Extrapolation,
-  Easing,
-  runOnJS,
-  useAnimatedProps,
 } from 'react-native-reanimated';
-import Svg, { Circle, Defs, LinearGradient as SvgLinearGradient, Stop } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useTheme, SPACING, RADIUS, TYPOGRAPHY, SHADOWS, EASING, responsive } from '../lib/theme';
+import { useTheme, SPACING, RADIUS, EASING, FONTS } from '../lib/theme';
 import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { useAuthStore } from '../lib/auth';
 import { referralsApi } from '../lib/api';
 import { router, useRootNavigationState } from 'expo-router';
 import { isBiometricAvailable, getBiometricType, authenticateWithBiometrics, isBiometricEnabled } from '../lib/biometrics';
-import { Button, Input, Card, Badge } from '../components/ui';
+import { Button, Input } from '../components/ui';
 import { haptics } from '../lib/haptics';
-
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 GoogleSignin.configure({
   iosClientId: '945878560232-blus90hj4nqh6h32msts24971t72f8g7.apps.googleusercontent.com',
@@ -55,764 +39,60 @@ GoogleSignin.configure({
 });
 
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
-const AnimatedLinearGradient = Animated.createAnimatedComponent(LinearGradient);
-const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// PREMIUM VISUAL EFFECTS - Billion Dollar Feel
+// Welcome page dots — active is a 22×6 gold pill, inactive 6×6 surface dots.
 // ═══════════════════════════════════════════════════════════════════════════════
-
-// Floating Particle Component
-function Particle({ delay, color }: { delay: number; color: string }) {
-  const translateY = useSharedValue(SCREEN_HEIGHT);
-  const translateX = useSharedValue(0);
-  const opacity = useSharedValue(0);
-  const scale = useSharedValue(1);
-
-  const startX = useMemo(() => Math.random() * SCREEN_WIDTH, []);
-  const size = useMemo(() => 2 + Math.random() * 4, []);
-  const duration = useMemo(() => 4000 + Math.random() * 3000, []);
-  const swayAmount = useMemo(() => 20 + Math.random() * 30, []);
-
-  useEffect(() => {
-    const timeout = setTimeout(() => {
-      // Vertical movement
-      translateY.value = withRepeat(
-        withTiming(-100, { duration, easing: Easing.linear }),
-        -1,
-        false
-      );
-      // Horizontal sway
-      translateX.value = withRepeat(
-        withSequence(
-          withTiming(swayAmount, { duration: duration / 2, easing: Easing.inOut(Easing.ease) }),
-          withTiming(-swayAmount, { duration: duration / 2, easing: Easing.inOut(Easing.ease) })
-        ),
-        -1,
-        true
-      );
-      // Fade in/out based on position
-      opacity.value = withRepeat(
-        withSequence(
-          withTiming(0.6 + Math.random() * 0.4, { duration: duration * 0.2 }),
-          withTiming(0.6 + Math.random() * 0.4, { duration: duration * 0.6 }),
-          withTiming(0, { duration: duration * 0.2 })
-        ),
-        -1,
-        false
-      );
-      // Subtle scale pulse
-      scale.value = withRepeat(
-        withSequence(
-          withTiming(1.2, { duration: 1500, easing: Easing.inOut(Easing.ease) }),
-          withTiming(0.8, { duration: 1500, easing: Easing.inOut(Easing.ease) })
-        ),
-        -1,
-        true
-      );
-    }, delay);
-    return () => clearTimeout(timeout);
-  }, []);
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [
-      { translateX: translateX.value },
-      { translateY: translateY.value },
-      { scale: scale.value },
-    ],
-    opacity: opacity.value,
-  }));
-
-  return (
-    <Animated.View
-      style={[
-        {
-          position: 'absolute',
-          left: startX,
-          width: size,
-          height: size,
-          borderRadius: size / 2,
-          backgroundColor: color,
-        },
-        animatedStyle,
-      ]}
-    />
-  );
-}
-
-// Particle Field - Floating particles background
-function ParticleField() {
+function PageDots({ count, index }: { count: number; index: number }) {
   const { colors } = useTheme();
-  const particles = useMemo(() =>
-    Array.from({ length: 25 }, (_, i) => ({
-      id: i,
-      delay: i * 200,
-    })),
-    []
-  );
-
   return (
-    <View style={StyleSheet.absoluteFill} pointerEvents="none">
-      {particles.map((particle) => (
-        <Particle key={particle.id} delay={particle.delay} color={colors.gold + '60'} />
-      ))}
-    </View>
-  );
-}
-
-// Animated Glow Orb - Multi-layered ethereal glow
-function AnimatedGlowOrb({ color }: { color: string }) {
-  const scale1 = useSharedValue(1);
-  const scale2 = useSharedValue(1);
-  const scale3 = useSharedValue(1);
-  const opacity1 = useSharedValue(0.15);
-  const opacity2 = useSharedValue(0.1);
-  const opacity3 = useSharedValue(0.05);
-
-  useEffect(() => {
-    // Layer 1 - Inner glow
-    scale1.value = withRepeat(
-      withSequence(
-        withTiming(1.1, { duration: 2000, easing: Easing.inOut(Easing.ease) }),
-        withTiming(1, { duration: 2000, easing: Easing.inOut(Easing.ease) })
-      ),
-      -1,
-      true
-    );
-    opacity1.value = withRepeat(
-      withSequence(
-        withTiming(0.25, { duration: 2000, easing: Easing.inOut(Easing.ease) }),
-        withTiming(0.15, { duration: 2000, easing: Easing.inOut(Easing.ease) })
-      ),
-      -1,
-      true
-    );
-    // Layer 2 - Middle glow (offset timing)
-    scale2.value = withDelay(500, withRepeat(
-      withSequence(
-        withTiming(1.3, { duration: 2500, easing: Easing.inOut(Easing.ease) }),
-        withTiming(1.1, { duration: 2500, easing: Easing.inOut(Easing.ease) })
-      ),
-      -1,
-      true
-    ));
-    opacity2.value = withDelay(500, withRepeat(
-      withSequence(
-        withTiming(0.15, { duration: 2500, easing: Easing.inOut(Easing.ease) }),
-        withTiming(0.08, { duration: 2500, easing: Easing.inOut(Easing.ease) })
-      ),
-      -1,
-      true
-    ));
-    // Layer 3 - Outer glow (offset timing)
-    scale3.value = withDelay(1000, withRepeat(
-      withSequence(
-        withTiming(1.6, { duration: 3000, easing: Easing.inOut(Easing.ease) }),
-        withTiming(1.3, { duration: 3000, easing: Easing.inOut(Easing.ease) })
-      ),
-      -1,
-      true
-    ));
-    opacity3.value = withDelay(1000, withRepeat(
-      withSequence(
-        withTiming(0.1, { duration: 3000, easing: Easing.inOut(Easing.ease) }),
-        withTiming(0.04, { duration: 3000, easing: Easing.inOut(Easing.ease) })
-      ),
-      -1,
-      true
-    ));
-  }, []);
-
-  const layer1Style = useAnimatedStyle(() => ({
-    transform: [{ scale: scale1.value }],
-    opacity: opacity1.value,
-  }));
-  const layer2Style = useAnimatedStyle(() => ({
-    transform: [{ scale: scale2.value }],
-    opacity: opacity2.value,
-  }));
-  const layer3Style = useAnimatedStyle(() => ({
-    transform: [{ scale: scale3.value }],
-    opacity: opacity3.value,
-  }));
-
-  const baseStyle = {
-    position: 'absolute' as const,
-    width: 140,
-    height: 140,
-    borderRadius: 70,
-    backgroundColor: color,
-  };
-
-  return (
-    <View style={{ position: 'absolute', width: 140, height: 140, alignItems: 'center', justifyContent: 'center' }}>
-      <Animated.View style={[baseStyle, { width: 200, height: 200, borderRadius: 100, marginLeft: -30, marginTop: -30 }, layer3Style]} />
-      <Animated.View style={[baseStyle, { width: 170, height: 170, borderRadius: 85, marginLeft: -15, marginTop: -15 }, layer2Style]} />
-      <Animated.View style={[baseStyle, layer1Style]} />
-    </View>
-  );
-}
-
-// Self-Drawing Ring - SVG circle that animates its stroke
-function SelfDrawingRing({ size, color }: { size: number; color: string }) {
-  const progress = useSharedValue(0);
-  const glowOpacity = useSharedValue(0);
-  const circumference = Math.PI * (size - 4);
-
-  useEffect(() => {
-    // Draw the ring
-    progress.value = withDelay(300, withTiming(1, { duration: 1500, easing: Easing.out(Easing.ease) }));
-    // Glow after drawing
-    glowOpacity.value = withDelay(1500, withRepeat(
-      withSequence(
-        withTiming(0.6, { duration: 1500, easing: Easing.inOut(Easing.ease) }),
-        withTiming(0.2, { duration: 1500, easing: Easing.inOut(Easing.ease) })
-      ),
-      -1,
-      true
-    ));
-  }, []);
-
-  const animatedProps = useAnimatedProps(() => ({
-    strokeDashoffset: circumference * (1 - progress.value),
-  }));
-
-  const glowStyle = useAnimatedStyle(() => ({
-    opacity: glowOpacity.value,
-  }));
-
-  return (
-    <View style={{ position: 'absolute', width: size, height: size }}>
-      {/* Glow layer */}
-      <Animated.View style={[{ position: 'absolute', width: size, height: size }, glowStyle]}>
-        <Svg width={size} height={size}>
-          <Circle
-            cx={size / 2}
-            cy={size / 2}
-            r={(size - 4) / 2}
-            stroke={color}
-            strokeWidth={6}
-            fill="none"
-            opacity={0.3}
-          />
-        </Svg>
-      </Animated.View>
-      {/* Main ring */}
-      <Svg width={size} height={size}>
-        <Defs>
-          <SvgLinearGradient id="ringGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-            <Stop offset="0%" stopColor={color} stopOpacity={1} />
-            <Stop offset="50%" stopColor={color} stopOpacity={0.8} />
-            <Stop offset="100%" stopColor={color} stopOpacity={0.4} />
-          </SvgLinearGradient>
-        </Defs>
-        <AnimatedCircle
-          cx={size / 2}
-          cy={size / 2}
-          r={(size - 4) / 2}
-          stroke="url(#ringGradient)"
-          strokeWidth={2}
-          fill="none"
-          strokeLinecap="round"
-          strokeDasharray={circumference}
-          animatedProps={animatedProps}
-          rotation={-90}
-          origin={`${size / 2}, ${size / 2}`}
-        />
-      </Svg>
-    </View>
-  );
-}
-
-// Shimmer Effect - Diagonal light sweep
-function ShimmerOverlay({ width, height }: { width: number; height: number }) {
-  const translateX = useSharedValue(-width * 2);
-
-  useEffect(() => {
-    const runShimmer = () => {
-      translateX.value = -width * 2;
-      translateX.value = withDelay(
-        4000,
-        withTiming(width * 2, { duration: 800, easing: Easing.inOut(Easing.ease) })
-      );
-    };
-    runShimmer();
-    const interval = setInterval(runShimmer, 5000);
-    return () => clearInterval(interval);
-  }, [width]);
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: translateX.value }, { rotate: '20deg' }],
-  }));
-
-  return (
-    <View style={{ position: 'absolute', width, height, borderRadius: height / 2, overflow: 'hidden' }} pointerEvents="none">
-      <Animated.View style={[{ position: 'absolute', width: width * 0.5, height: height * 2, top: -height / 2 }, animatedStyle]}>
-        <LinearGradient
-          colors={['transparent', 'rgba(255,255,255,0.3)', 'rgba(255,255,255,0.4)', 'rgba(255,255,255,0.3)', 'transparent']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-          style={{ width: '100%', height: '100%' }}
-        />
-      </Animated.View>
-    </View>
-  );
-}
-
-// Animated Gradient Text - Premium title effect
-function AnimatedGradientTitle({ children }: { children: string }) {
-  const { colors } = useTheme();
-  const gradientPosition = useSharedValue(0);
-
-  useEffect(() => {
-    gradientPosition.value = withRepeat(
-      withTiming(1, { duration: 3000, easing: Easing.inOut(Easing.ease) }),
-      -1,
-      true
-    );
-  }, []);
-
-  // Since MaskedView isn't available, we'll create a shimmer text effect
-  const shimmerX = useSharedValue(-200);
-
-  useEffect(() => {
-    const runShimmer = () => {
-      shimmerX.value = -200;
-      shimmerX.value = withDelay(
-        3000,
-        withTiming(400, { duration: 1200, easing: Easing.inOut(Easing.ease) })
-      );
-    };
-    runShimmer();
-    const interval = setInterval(runShimmer, 5000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const shimmerStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: shimmerX.value }],
-  }));
-
-  return (
-    <View style={{ position: 'relative' }}>
-      <Text style={[styles.brandName, { color: colors.gold }]}>{children}</Text>
-      <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, overflow: 'hidden' }} pointerEvents="none">
-        <Animated.View style={[{ position: 'absolute', width: 100, height: '100%', top: 0 }, shimmerStyle]}>
-          <LinearGradient
-            colors={['transparent', 'rgba(255,255,255,0.4)', 'transparent']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={{ width: '100%', height: '100%' }}
-          />
-        </Animated.View>
-      </View>
-    </View>
-  );
-}
-
-// Premium CTA Button with glow and shimmer
-function PremiumCTAButton({ title, onPress }: { title: string; onPress: () => void }) {
-  const { colors } = useTheme();
-  const scale = useSharedValue(1);
-  const glowOpacity = useSharedValue(0.3);
-  const shimmerX = useSharedValue(-300);
-
-  useEffect(() => {
-    // Pulsing glow
-    glowOpacity.value = withRepeat(
-      withSequence(
-        withTiming(0.6, { duration: 1500, easing: Easing.inOut(Easing.ease) }),
-        withTiming(0.3, { duration: 1500, easing: Easing.inOut(Easing.ease) })
-      ),
-      -1,
-      true
-    );
-    // Periodic shimmer
-    const runShimmer = () => {
-      shimmerX.value = -300;
-      shimmerX.value = withDelay(
-        2000,
-        withTiming(400, { duration: 600, easing: Easing.out(Easing.ease) })
-      );
-    };
-    runShimmer();
-    const interval = setInterval(runShimmer, 4000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const handlePressIn = () => {
-    scale.value = withSpring(0.97, EASING.springSnappy);
-  };
-
-  const handlePressOut = () => {
-    scale.value = withSpring(1, EASING.springSnappy);
-  };
-
-  const buttonStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-  }));
-
-  const glowStyle = useAnimatedStyle(() => ({
-    opacity: glowOpacity.value,
-  }));
-
-  const shimmerStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: shimmerX.value }, { rotate: '20deg' }],
-  }));
-
-  return (
-    <AnimatedTouchable
-      onPress={onPress}
-      onPressIn={handlePressIn}
-      onPressOut={handlePressOut}
-      activeOpacity={1}
-      style={[styles.premiumCTAContainer, buttonStyle]}
-    >
-      {/* Glow layer */}
-      <Animated.View style={[styles.premiumCTAGlow, { backgroundColor: colors.gold }, glowStyle]} />
-
-      {/* Button */}
-      <LinearGradient
-        colors={[colors.goldLight, colors.gold, colors.goldDark] as any}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.premiumCTAButton}
-      >
-        <Text style={[styles.premiumCTAText, { color: colors.black }]}>{title}</Text>
-
-        {/* Shimmer */}
-        <View style={styles.premiumCTAShimmerContainer}>
-          <Animated.View style={[styles.premiumCTAShimmer, shimmerStyle]}>
-            <LinearGradient
-              colors={['transparent', 'rgba(255,255,255,0.4)', 'transparent']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={{ width: '100%', height: '100%' }}
-            />
-          </Animated.View>
-        </View>
-      </LinearGradient>
-    </AnimatedTouchable>
-  );
-}
-
-// Light Rays - Ambient rays from behind logo
-function LightRays({ color }: { color: string }) {
-  const rotation = useSharedValue(0);
-  const opacity = useSharedValue(0.1);
-
-  useEffect(() => {
-    rotation.value = withRepeat(
-      withTiming(360, { duration: 60000, easing: Easing.linear }),
-      -1,
-      false
-    );
-    opacity.value = withRepeat(
-      withSequence(
-        withTiming(0.15, { duration: 3000, easing: Easing.inOut(Easing.ease) }),
-        withTiming(0.05, { duration: 3000, easing: Easing.inOut(Easing.ease) })
-      ),
-      -1,
-      true
-    );
-  }, []);
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ rotate: `${rotation.value}deg` }],
-    opacity: opacity.value,
-  }));
-
-  return (
-    <Animated.View style={[styles.lightRaysContainer, animatedStyle]} pointerEvents="none">
-      {[0, 45, 90, 135, 180, 225, 270, 315].map((angle) => (
+    <View style={styles.dotsRow}>
+      {Array.from({ length: count }).map((_, i) => (
         <View
-          key={angle}
+          key={i}
           style={[
-            styles.lightRay,
+            styles.dot,
             {
-              backgroundColor: color,
-              transform: [{ rotate: `${angle}deg` }],
+              width: i === index ? 22 : 6,
+              backgroundColor: i === index ? colors.goldFill : colors.surfaceHighlight,
             },
           ]}
         />
       ))}
-    </Animated.View>
-  );
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// ORIGINAL COMPONENTS (Enhanced)
-// ═══════════════════════════════════════════════════════════════════════════════
-
-// Pulsing Ring Component - single expanding ring
-function PulsingRing({ delay, color }: { delay: number; color: string }) {
-  const scale = useSharedValue(0.5);
-  const opacity = useSharedValue(0);
-
-  useEffect(() => {
-    const timeout = setTimeout(() => {
-      scale.value = withRepeat(
-        withTiming(2.5, { duration: 3000, easing: Easing.out(Easing.ease) }),
-        -1,
-        false
-      );
-      opacity.value = withRepeat(
-        withSequence(
-          withTiming(0.4, { duration: 300 }),
-          withTiming(0, { duration: 2700 })
-        ),
-        -1,
-        false
-      );
-    }, delay);
-    return () => clearTimeout(timeout);
-  }, []);
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-    opacity: opacity.value,
-  }));
-
-  return (
-    <Animated.View
-      style={[
-        {
-          position: 'absolute',
-          width: 140,
-          height: 140,
-          borderRadius: 70,
-          borderWidth: 1,
-          borderColor: color,
-        },
-        animatedStyle,
-      ]}
-    />
-  );
-}
-
-// Pulsing Rings Container - expanding circles from logo center
-function PulsingRings() {
-  const { colors } = useTheme();
-
-  return (
-    <View style={{ position: 'absolute', alignItems: 'center', justifyContent: 'center', width: 140, height: 140 }} pointerEvents="none">
-      {[0, 1, 2].map((index) => (
-        <PulsingRing key={index} delay={index * 1000} color={colors.gold} />
-      ))}
     </View>
   );
 }
 
-// Animated Aurora Background - enhanced with horizontal movement
-function AuroraBackground() {
-  const { colors } = useTheme();
-  const translateY = useSharedValue(0);
-  const translateX = useSharedValue(0);
-  const opacity = useSharedValue(0.3);
-
-  useEffect(() => {
-    translateY.value = withRepeat(
-      withSequence(
-        withTiming(-80, { duration: 5000, easing: Easing.inOut(Easing.ease) }),
-        withTiming(80, { duration: 5000, easing: Easing.inOut(Easing.ease) })
-      ),
-      -1,
-      true
-    );
-    translateX.value = withRepeat(
-      withSequence(
-        withTiming(30, { duration: 7000, easing: Easing.inOut(Easing.ease) }),
-        withTiming(-30, { duration: 7000, easing: Easing.inOut(Easing.ease) })
-      ),
-      -1,
-      true
-    );
-    opacity.value = withRepeat(
-      withSequence(
-        withTiming(0.6, { duration: 3000, easing: Easing.inOut(Easing.ease) }),
-        withTiming(0.2, { duration: 3000, easing: Easing.inOut(Easing.ease) })
-      ),
-      -1,
-      true
-    );
-  }, []);
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [
-      { translateY: translateY.value },
-      { translateX: translateX.value },
-    ],
-    opacity: opacity.value,
-  }));
-
-  return (
-    <Animated.View style={[StyleSheet.absoluteFill, animatedStyle]} pointerEvents="none">
-      <LinearGradient
-        colors={[
-          'transparent',
-          colors.gold + '20',
-          colors.gold + '10',
-          'transparent',
-        ]}
-        locations={[0, 0.4, 0.6, 1]}
-        style={StyleSheet.absoluteFill}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-      />
-    </Animated.View>
-  );
-}
-
-// Animated Logo Glow Component
-function PulsingLogoGlow({ color }: { color: string }) {
-  const glowOpacity = useSharedValue(0.15);
-  const glowScale = useSharedValue(1);
-
-  useEffect(() => {
-    glowOpacity.value = withRepeat(
-      withSequence(
-        withTiming(0.3, { duration: 1500, easing: Easing.inOut(Easing.ease) }),
-        withTiming(0.15, { duration: 1500, easing: Easing.inOut(Easing.ease) })
-      ),
-      -1,
-      true
-    );
-    glowScale.value = withRepeat(
-      withSequence(
-        withTiming(1.1, { duration: 1500, easing: Easing.inOut(Easing.ease) }),
-        withTiming(1, { duration: 1500, easing: Easing.inOut(Easing.ease) })
-      ),
-      -1,
-      true
-    );
-  }, []);
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    opacity: glowOpacity.value,
-    transform: [{ scale: glowScale.value }],
-  }));
-
-  return (
-    <Animated.View
-      style={[
-        {
-          position: 'absolute',
-          top: 10,
-          left: 10,
-          right: 10,
-          bottom: 10,
-          borderRadius: 70,
-          backgroundColor: color,
-          zIndex: -1,
-        },
-        animatedStyle,
-      ]}
-    />
-  );
-}
-
-// Premium Feature Card Component
-function FeatureCard({
+// Welcome page 2 — feature row: gold-surface icon tile + title + body.
+function FeatureRow({
   icon,
-  label,
-  tagline,
+  title,
+  body,
   delay,
-  IconComponent = Ionicons,
 }: {
-  icon: string;
-  label: string;
-  tagline: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  title: string;
+  body: string;
   delay: number;
-  IconComponent?: any;
 }) {
   const { colors } = useTheme();
-  const floatY = useSharedValue(0);
-  const iconGlow = useSharedValue(0.3);
-  const iconScale = useSharedValue(1);
-  const borderOpacity = useSharedValue(0.3);
-
-  useEffect(() => {
-    // Gentle floating animation
-    floatY.value = withDelay(delay, withRepeat(
-      withSequence(
-        withTiming(-6, { duration: 2000, easing: Easing.inOut(Easing.ease) }),
-        withTiming(6, { duration: 2000, easing: Easing.inOut(Easing.ease) })
-      ),
-      -1,
-      true
-    ));
-    // Icon glow pulse
-    iconGlow.value = withDelay(delay, withRepeat(
-      withSequence(
-        withTiming(0.6, { duration: 1500, easing: Easing.inOut(Easing.ease) }),
-        withTiming(0.3, { duration: 1500, easing: Easing.inOut(Easing.ease) })
-      ),
-      -1,
-      true
-    ));
-    // Subtle icon scale
-    iconScale.value = withDelay(delay, withRepeat(
-      withSequence(
-        withTiming(1.1, { duration: 1500, easing: Easing.inOut(Easing.ease) }),
-        withTiming(1, { duration: 1500, easing: Easing.inOut(Easing.ease) })
-      ),
-      -1,
-      true
-    ));
-    // Border glow animation
-    borderOpacity.value = withDelay(delay, withRepeat(
-      withSequence(
-        withTiming(0.6, { duration: 2000, easing: Easing.inOut(Easing.ease) }),
-        withTiming(0.2, { duration: 2000, easing: Easing.inOut(Easing.ease) })
-      ),
-      -1,
-      true
-    ));
-  }, []);
-
-  const floatStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: floatY.value }],
-  }));
-
-  const glowStyle = useAnimatedStyle(() => ({
-    opacity: iconGlow.value,
-  }));
-
-  const iconAnimStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: iconScale.value }],
-  }));
-
-  const borderStyle = useAnimatedStyle(() => ({
-    opacity: borderOpacity.value,
-  }));
-
   return (
-    <Animated.View
-      entering={FadeInUp.delay(delay).duration(600).springify()}
-      style={[floatStyle]}
-    >
-      <View style={[styles.featureCard, { backgroundColor: colors.surface }]}>
-        {/* Animated border glow */}
-        <Animated.View style={[styles.featureCardBorderGlow, { borderColor: colors.gold }, borderStyle]} />
-
-        {/* Icon with glow */}
-        <View style={styles.featureCardIconContainer}>
-          <Animated.View style={[styles.featureCardIconGlow, { backgroundColor: colors.gold }, glowStyle]} />
-          <Animated.View style={[styles.featureCardIconWrapper, { backgroundColor: colors.goldSurface }, iconAnimStyle]}>
-            <IconComponent name={icon} size={24} color={colors.gold} />
-          </Animated.View>
-        </View>
-
-        {/* Label */}
-        <Text style={[styles.featureCardLabel, { color: colors.text }]}>{label}</Text>
-
-        {/* Tagline */}
-        <Text style={[styles.featureCardTagline, { color: colors.textTertiary }]}>{tagline}</Text>
+    <Animated.View entering={FadeInDown.delay(delay).duration(400)} style={styles.featureRow}>
+      <View style={[styles.featureIconTile, { backgroundColor: colors.goldSurface }]}>
+        <Ionicons name={icon} size={20} color={colors.gold} />
+      </View>
+      <View style={styles.featureRowText}>
+        <Text style={[styles.featureRowTitle, { color: colors.text }]}>{title}</Text>
+        <Text style={[styles.featureRowBody, { color: colors.textSecondary }]}>{body}</Text>
       </View>
     </Animated.View>
   );
 }
 
-// Premium Social Button
+// ═══════════════════════════════════════════════════════════════════════════════
+// Full-width social sign-in buttons per mock 02 — Apple: solid on-theme fill,
+// Google: surface with hairline border. Loading/disabled logic preserved.
+// ═══════════════════════════════════════════════════════════════════════════════
 function SocialButton({
   provider,
   onPress,
@@ -824,7 +104,7 @@ function SocialButton({
   disabled?: boolean;
   loading?: boolean;
 }) {
-  const { colors, isDark } = useTheme();
+  const { colors } = useTheme();
   const scale = useSharedValue(1);
 
   const handlePressIn = () => {
@@ -843,8 +123,10 @@ function SocialButton({
   }));
 
   const isGoogle = provider === 'google';
-  const bgColor = isGoogle ? '#FFFFFF' : (isDark ? '#FFFFFF' : '#000000');
-  const textColor = isGoogle ? '#1F1F1F' : (isDark ? '#000000' : '#FFFFFF');
+  // Apple button inverts the theme (light button on dark, dark on light);
+  // Google is a bordered surface — both hold in either theme.
+  const bgColor = isGoogle ? colors.surface : colors.text;
+  const textColor = isGoogle ? colors.text : colors.background;
 
   return (
     <AnimatedTouchable
@@ -853,9 +135,16 @@ function SocialButton({
       onPressOut={handlePressOut}
       disabled={disabled || loading}
       activeOpacity={1}
+      accessibilityRole="button"
+      accessibilityLabel={isGoogle ? 'Continue with Google' : 'Continue with Apple'}
       style={[
         styles.socialButton,
-        { backgroundColor: bgColor, opacity: disabled ? 0.5 : 1 },
+        {
+          backgroundColor: bgColor,
+          borderColor: isGoogle ? colors.border : 'transparent',
+          borderWidth: isGoogle ? 1 : 0,
+          opacity: disabled ? 0.5 : 1,
+        },
         animatedStyle,
       ]}
     >
@@ -863,13 +152,9 @@ function SocialButton({
         <ActivityIndicator size="small" color={textColor} />
       ) : (
         <>
-          <Ionicons
-            name={isGoogle ? 'logo-google' : 'logo-apple'}
-            size={20}
-            color={textColor}
-          />
+          <Ionicons name={isGoogle ? 'logo-google' : 'logo-apple'} size={18} color={textColor} />
           <Text style={[styles.socialButtonText, { color: textColor }]}>
-            {isGoogle ? 'Google' : 'Apple'}
+            {isGoogle ? 'Continue with Google' : 'Continue with Apple'}
           </Text>
         </>
       )}
@@ -877,72 +162,11 @@ function SocialButton({
   );
 }
 
-// Biometric Quick Login Button
-function BiometricButton({
-  type,
-  onPress,
-}: {
-  type: string;
-  onPress: () => void;
-}) {
-  const { colors } = useTheme();
-  const scale = useSharedValue(1);
-  const glow = useSharedValue(0);
-
-  useEffect(() => {
-    glow.value = withSequence(
-      withTiming(1, { duration: 1500 }),
-      withTiming(0.5, { duration: 1500 })
-    );
-  }, []);
-
-  const handlePress = () => {
-    haptics.medium();
-    scale.value = withSequence(
-      withSpring(0.92, EASING.springSnappy),
-      withSpring(1, EASING.springSnappy)
-    );
-    onPress();
-  };
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-  }));
-
-  const glowStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(glow.value, [0, 1], [0.3, 0.6], Extrapolation.CLAMP),
-  }));
-
-  const isFaceID = type === 'Face ID';
-
-  return (
-    <AnimatedTouchable
-      onPress={handlePress}
-      activeOpacity={1}
-      style={[styles.biometricContainer, animatedStyle]}
-    >
-      <Animated.View style={[styles.biometricGlow, { backgroundColor: colors.gold }, glowStyle]} />
-      <LinearGradient
-        colors={[colors.goldLight, colors.gold, colors.goldDark] as any}
-        style={styles.biometricButton}
-      >
-        <Ionicons
-          name={isFaceID ? 'scan-outline' : 'finger-print-outline'}
-          size={32}
-          color={colors.black}
-        />
-      </LinearGradient>
-      <Text style={[styles.biometricLabel, { color: colors.textSecondary }]}>
-        {type}
-      </Text>
-    </AnimatedTouchable>
-  );
-}
-
 export default function AuthScreen() {
-  const { colors, isDark } = useTheme();
+  const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const [view, setView] = useState<'welcome' | 'login' | 'signup'>('welcome');
+  const [welcomePage, setWelcomePage] = useState<0 | 1>(0);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
@@ -959,22 +183,6 @@ export default function AuthScreen() {
   const demoTapCount = useRef(0);
   const demoTapTimeout = useRef<NodeJS.Timeout | null>(null);
   const { login, emailLogin, demoLogin, isAuthenticated, checkAuth } = useAuthStore();
-
-  // Animations
-  const logoScale = useSharedValue(0.8);
-  const logoOpacity = useSharedValue(0);
-  const contentOpacity = useSharedValue(0);
-
-  useEffect(() => {
-    logoOpacity.value = withTiming(1, { duration: 800 });
-    logoScale.value = withSpring(1, EASING.springGentle);
-    contentOpacity.value = withDelay(400, withTiming(1, { duration: 600 }));
-  }, []);
-
-  const logoAnimatedStyle = useAnimatedStyle(() => ({
-    opacity: logoOpacity.value,
-    transform: [{ scale: logoScale.value }],
-  }));
 
   // Check biometric availability
   useEffect(() => {
@@ -1007,7 +215,7 @@ export default function AuthScreen() {
   useEffect(() => {
     if (!rootNavState?.key) return;
     if (isAuthenticated) {
-      router.replace('/(tabs)/dashboard');
+      router.replace('/(tabs)/proposals');
     }
   }, [isAuthenticated, rootNavState?.key]);
 
@@ -1024,7 +232,7 @@ export default function AuthScreen() {
       haptics.success();
       await checkAuth();
       if (useAuthStore.getState().isAuthenticated) {
-        router.replace('/(tabs)/dashboard');
+        router.replace('/(tabs)/proposals');
       } else {
         haptics.error();
         Alert.alert('Session Expired', 'Please sign in again.');
@@ -1048,7 +256,7 @@ export default function AuthScreen() {
 
       if (success) {
         haptics.success();
-        router.replace('/(tabs)/dashboard');
+        router.replace('/(tabs)/proposals');
       } else {
         haptics.error();
         Alert.alert('Login Failed', 'Could not authenticate. Please try again.');
@@ -1090,7 +298,7 @@ export default function AuthScreen() {
 
       if (success) {
         haptics.success();
-        router.replace('/(tabs)/dashboard');
+        router.replace('/(tabs)/proposals');
       } else {
         haptics.error();
         Alert.alert('Login Failed', 'Could not authenticate. Please try again.');
@@ -1132,7 +340,7 @@ export default function AuthScreen() {
       if (isSignup && referralCode.trim()) {
         referralsApi.redeem(referralCode).catch(() => {});
       }
-      router.replace('/(tabs)/dashboard');
+      router.replace('/(tabs)/proposals');
     } else {
       haptics.error();
       setError(result.error || 'Authentication failed. Please try again.');
@@ -1195,7 +403,7 @@ export default function AuthScreen() {
 
       if (success) {
         haptics.success();
-        router.replace('/(tabs)/dashboard');
+        router.replace('/(tabs)/proposals');
       } else {
         haptics.error();
         Alert.alert('Demo Login Failed', 'Could not authenticate demo account.');
@@ -1205,114 +413,188 @@ export default function AuthScreen() {
     }
   };
 
-  // Welcome Screen
+  // ─────────────────────────────────────────────────────────────────────────────
+  // WELCOME — mocks 01a / 01b
+  // ─────────────────────────────────────────────────────────────────────────────
   if (view === 'welcome') {
     return (
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
-        {/* Floating particles background */}
-        <ParticleField />
+      <View
+        style={[
+          styles.container,
+          styles.welcomeScreen,
+          { backgroundColor: colors.background, paddingTop: insets.top, paddingBottom: Math.max(insets.bottom, 24) + 16 },
+        ]}
+      >
+        {welcomePage === 0 ? (
+          <View key="w0" style={styles.welcomeBody}>
+            <View style={styles.welcomeHero}>
+              {/* Logo — 5 taps triggers the hidden demo account entry */}
+              <Animated.View entering={FadeInDown.duration(500)}>
+                <TouchableOpacity onPress={handleLogoTap} activeOpacity={1} disabled={demoLoading}>
+                  <View style={[styles.welcomeLogo, { backgroundColor: colors.surface }]}>
+                    {demoLoading ? (
+                      <ActivityIndicator size="large" color={colors.gold} />
+                    ) : (
+                      <Image
+                        source={require('../assets/logo.png')}
+                        style={styles.welcomeLogoImage}
+                        resizeMode="cover"
+                      />
+                    )}
+                  </View>
+                </TouchableOpacity>
+              </Animated.View>
 
-        {/* Background gradient */}
-        <LinearGradient
-          colors={['transparent', colors.goldSurface, 'transparent']}
-          locations={[0, 0.5, 1]}
-          style={styles.backgroundGradient}
-        />
+              <Animated.Text
+                entering={FadeInDown.delay(80).duration(500)}
+                style={[styles.eyebrow, { color: colors.gold }]}
+              >
+                REPRESENT
+              </Animated.Text>
 
-        {/* Content */}
-        <View style={[styles.welcomeContent, { paddingTop: insets.top + 60 }]}>
-          {/* Logo with premium effects - 5 taps triggers demo login */}
-          <TouchableOpacity onPress={handleLogoTap} activeOpacity={1} disabled={demoLoading}>
-            <Animated.View style={[styles.logoWrapper, logoAnimatedStyle]}>
-              {/* Light rays behind everything */}
-              <LightRays color={colors.gold} />
+              <Animated.Text
+                entering={FadeInDown.delay(160).duration(500)}
+                style={[styles.welcomeDisplay, { color: colors.text }]}
+              >
+                Your verified voice, on the record.
+              </Animated.Text>
 
-              {/* Animated glow orb */}
-              <AnimatedGlowOrb color={colors.gold} />
+              <Animated.Text
+                entering={FadeInDown.delay(240).duration(500)}
+                style={[styles.welcomeBodyText, { color: colors.textSecondary }]}
+              >
+                Verify once with your government ID. Vote on the issues that govern your street,
+                your city, your province — and watch the real count.
+              </Animated.Text>
 
-              {/* Self-drawing ring */}
-              <SelfDrawingRing size={160} color={colors.gold} />
-
-              {/* Pulsing rings emanating from logo */}
-              <PulsingRings />
-
-              {/* Logo container */}
-              <View style={[styles.logoOuter, { borderColor: colors.gold + '30' }]}>
-                <LinearGradient
-                  colors={[colors.surface, colors.surfaceElevated] as any}
-                  style={styles.logoInner}
-                >
-                  {demoLoading ? (
-                    <ActivityIndicator size="large" color={colors.gold} />
-                  ) : (
-                    <Image
-                      source={require('../assets/logo.png')}
-                      style={styles.logoImage}
-                      resizeMode="cover"
+              {/* Biometric quick sign-in (only when a stored session exists) */}
+              {biometricAvailable && (
+                <Animated.View entering={FadeInDown.delay(320).duration(500)}>
+                  <TouchableOpacity
+                    onPress={handleBiometricLogin}
+                    activeOpacity={0.8}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Sign in with ${biometricType}`}
+                    style={[styles.biometricRow, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                  >
+                    <Ionicons
+                      name={biometricType === 'Face ID' ? 'scan-outline' : 'finger-print-outline'}
+                      size={18}
+                      color={colors.gold}
                     />
-                  )}
-                </LinearGradient>
-                {/* Shimmer overlay on logo */}
-                <ShimmerOverlay width={115} height={115} />
+                    <Text style={[styles.biometricRowText, { color: colors.text }]}>
+                      Sign in with {biometricType}
+                    </Text>
+                  </TouchableOpacity>
+                </Animated.View>
+              )}
+            </View>
+
+            <PageDots count={2} index={0} />
+
+            <Animated.View entering={FadeInUp.delay(300).duration(500)} style={styles.welcomeActions}>
+              <Button
+                title="Get Started"
+                onPress={() => {
+                  haptics.light();
+                  setWelcomePage(1);
+                }}
+                variant="primary"
+                size="lg"
+                fullWidth
+              />
+              <TouchableOpacity
+                onPress={() => {
+                  haptics.light();
+                  setView('login');
+                }}
+                activeOpacity={0.7}
+                style={styles.ghostAction}
+                accessibilityRole="button"
+              >
+                <Text style={[styles.ghostActionText, { color: colors.textSecondary }]}>
+                  I already have an account
+                </Text>
+              </TouchableOpacity>
+            </Animated.View>
+
+            <Text style={[styles.ledgerFootnote, { color: colors.textTertiary }]}>
+              ONE PERSON · ONE BALLOT
+            </Text>
+          </View>
+        ) : (
+          <View key="w1" style={styles.welcomeBody}>
+            <View style={styles.welcomeHero}>
+              <Animated.Text
+                entering={FadeInDown.duration(400)}
+                style={[styles.eyebrow, { color: colors.gold }]}
+              >
+                THE PUBLIC RECORD
+              </Animated.Text>
+
+              <Animated.Text
+                entering={FadeInDown.delay(80).duration(400)}
+                style={[styles.welcomeDisplaySmall, { color: colors.text }]}
+              >
+                Every ballot counted. Every count checkable.
+              </Animated.Text>
+
+              <View style={styles.featureList}>
+                <FeatureRow
+                  icon="shield-checkmark-outline"
+                  title="Verified identity"
+                  body="Government ID, verified once. No bots, no duplicates, no guessing."
+                  delay={160}
+                />
+                <FeatureRow
+                  icon="checkmark-circle-outline"
+                  title="One person, one ballot"
+                  body="Every number you see is one verified citizen. Counted, not estimated."
+                  delay={240}
+                />
+                <FeatureRow
+                  icon="library-outline"
+                  title="A public ledger"
+                  body="Ballots are recorded on a tamper-evident public record anyone can audit."
+                  delay={320}
+                />
               </View>
-              <PulsingLogoGlow color={colors.gold} />
+            </View>
+
+            <PageDots count={2} index={1} />
+
+            <Animated.View entering={FadeInUp.delay(240).duration(500)} style={styles.welcomeActions}>
+              <Button
+                title="Continue"
+                onPress={() => {
+                  haptics.light();
+                  setView('signup');
+                }}
+                variant="primary"
+                size="lg"
+                fullWidth
+              />
+              <TouchableOpacity
+                onPress={() => {
+                  haptics.light();
+                  setView('signup');
+                }}
+                activeOpacity={0.7}
+                style={styles.ghostAction}
+                accessibilityRole="button"
+              >
+                <Text style={[styles.ghostActionText, { color: colors.textSecondary }]}>Skip</Text>
+              </TouchableOpacity>
             </Animated.View>
-          </TouchableOpacity>
-
-          {/* Animated Brand Title */}
-          <Animated.View entering={FadeInDown.delay(300).duration(600)}>
-            <AnimatedGradientTitle>Represent</AnimatedGradientTitle>
-          </Animated.View>
-
-          <Animated.Text
-            entering={FadeInDown.delay(400).duration(600)}
-            style={[styles.tagline, { color: colors.textSecondary }]}
-          >
-            Democracy in your pocket.
-          </Animated.Text>
-
-
-          {/* Biometric login (if available) */}
-          {biometricAvailable && (
-            <Animated.View
-              entering={FadeInUp.delay(800).duration(500)}
-              style={styles.biometricSection}
-            >
-              <BiometricButton type={biometricType} onPress={handleBiometricLogin} />
-            </Animated.View>
-          )}
-
-          {/* Premium CTA buttons */}
-          <Animated.View
-            entering={FadeInUp.delay(900).duration(500)}
-            style={styles.welcomeButtons}
-          >
-            <PremiumCTAButton
-              title="Get Started"
-              onPress={() => setView('signup')}
-            />
-            <Button
-              title="Sign In"
-              onPress={() => setView('login')}
-              variant="ghost"
-              size="lg"
-              fullWidth
-            />
-          </Animated.View>
-        </View>
-
-        {/* Bottom accent */}
-        <LinearGradient
-          colors={[colors.goldLight, colors.gold, colors.goldDark] as any}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-          style={[styles.bottomAccent, { bottom: insets.bottom }]}
-        />
+          </View>
+        )}
       </View>
     );
   }
 
-  // Login/Signup Screen
+  // ─────────────────────────────────────────────────────────────────────────────
+  // SIGN IN / SIGN UP — mock 02
+  // ─────────────────────────────────────────────────────────────────────────────
   const isLogin = view === 'login';
 
   return (
@@ -1321,58 +603,75 @@ export default function AuthScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <ScrollView
-        contentContainerStyle={[styles.authContent, { paddingTop: insets.top + 20 }]}
+        contentContainerStyle={[styles.authContent, { paddingTop: insets.top + 8 }]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
         {/* Back button */}
         <Animated.View entering={FadeIn.duration(300)}>
           <TouchableOpacity
-            style={[styles.backButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
+            style={[styles.backButton, { backgroundColor: colors.surface, borderColor: colors.borderSubtle }]}
             onPress={() => {
               haptics.light();
               setView('welcome');
               setError('');
             }}
             activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel="Back"
           >
-            <Ionicons name="chevron-back" size={22} color={colors.text} />
+            <Ionicons name="chevron-back" size={20} color={colors.textSecondary} />
           </TouchableOpacity>
         </Animated.View>
 
         {/* Header */}
-        <Animated.View
-          entering={FadeInDown.delay(100).duration(400)}
-          style={styles.authHeader}
-        >
-          <View style={[styles.authLogo, { backgroundColor: colors.goldSurface }]}>
-            <Image
-              source={require('../assets/logo.png')}
-              style={styles.authLogoImage}
-              resizeMode="contain"
-            />
-          </View>
-          <Text style={[styles.authTitle, { color: colors.text }]}>
-            {isLogin ? 'Welcome back' : 'Create account'}
-          </Text>
+        <Animated.View entering={FadeInDown.delay(100).duration(400)} style={styles.authHeader}>
+          <Text style={[styles.authTitle, { color: colors.text }]}>Welcome</Text>
           <Text style={[styles.authSubtitle, { color: colors.textSecondary }]}>
-            {isLogin
-              ? 'Sign in to continue to Represent'
-              : 'Join the future of civic engagement'}
+            Sign in or create your verified account.
           </Text>
         </Animated.View>
 
-        {/* Social login buttons */}
+        {/* Sign Up / Log In segmented control */}
         <Animated.View
-          entering={FadeInUp.delay(200).duration(400)}
-          style={styles.socialButtons}
+          entering={FadeInDown.delay(150).duration(400)}
+          style={[styles.segmented, { backgroundColor: colors.backgroundSecondary, borderColor: colors.borderSubtle }]}
         >
-          <SocialButton
-            provider="google"
-            onPress={handleGoogleLogin}
-            disabled={googleLoading || appleLoading}
-            loading={googleLoading}
-          />
+          {(['signup', 'login'] as const).map((tab) => {
+            const selected = view === tab;
+            return (
+              <TouchableOpacity
+                key={tab}
+                onPress={() => {
+                  if (!selected) {
+                    haptics.light();
+                    setView(tab);
+                    setError('');
+                  }
+                }}
+                activeOpacity={0.8}
+                accessibilityRole="button"
+                accessibilityState={{ selected }}
+                style={[
+                  styles.segmentedTab,
+                  selected && { backgroundColor: colors.surfaceHighlight },
+                ]}
+              >
+                <Text
+                  style={[
+                    selected ? styles.segmentedTabTextActive : styles.segmentedTabText,
+                    { color: selected ? colors.text : colors.textTertiary },
+                  ]}
+                >
+                  {tab === 'signup' ? 'Sign Up' : 'Log In'}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </Animated.View>
+
+        {/* Social sign-in */}
+        <Animated.View entering={FadeInUp.delay(200).duration(400)} style={styles.socialButtons}>
           {Platform.OS === 'ios' && appleAvailable && (
             <SocialButton
               provider="apple"
@@ -1381,20 +680,23 @@ export default function AuthScreen() {
               loading={appleLoading}
             />
           )}
+          <SocialButton
+            provider="google"
+            onPress={handleGoogleLogin}
+            disabled={googleLoading || appleLoading}
+            loading={googleLoading}
+          />
         </Animated.View>
 
         {/* Divider */}
-        <Animated.View
-          entering={FadeIn.delay(300).duration(400)}
-          style={styles.divider}
-        >
+        <Animated.View entering={FadeIn.delay(250).duration(400)} style={styles.divider}>
           <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
           <Text style={[styles.dividerText, { color: colors.textTertiary }]}>or</Text>
           <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
         </Animated.View>
 
         {/* Form */}
-        <Animated.View entering={FadeInUp.delay(350).duration(400)}>
+        <Animated.View entering={FadeInUp.delay(300).duration(400)}>
           {error ? (
             <View style={[styles.errorBox, { backgroundColor: colors.errorSurface, borderColor: colors.error }]}>
               <Ionicons name="alert-circle" size={18} color={colors.error} />
@@ -1404,8 +706,7 @@ export default function AuthScreen() {
 
           {!isLogin && (
             <Input
-              label="Full Name"
-              placeholder="Enter your name"
+              placeholder="Full name"
               value={name}
               onChangeText={setName}
               autoCapitalize="words"
@@ -1414,8 +715,7 @@ export default function AuthScreen() {
           )}
 
           <Input
-            label="Email"
-            placeholder="Enter your email"
+            placeholder="Email address"
             value={email}
             onChangeText={setEmail}
             keyboardType="email-address"
@@ -1425,8 +725,7 @@ export default function AuthScreen() {
           />
 
           <Input
-            label="Password"
-            placeholder={isLogin ? 'Enter password' : 'Create a password'}
+            placeholder={isLogin ? 'Password' : 'Create a password'}
             value={password}
             onChangeText={setPassword}
             secureTextEntry
@@ -1435,8 +734,7 @@ export default function AuthScreen() {
 
           {!isLogin && (
             <Input
-              label="Referral code (optional)"
-              placeholder="e.g. REP7K9X2"
+              placeholder="Referral code (optional)"
               value={referralCode}
               onChangeText={(t) => setReferralCode(t.toUpperCase())}
               autoCapitalize="characters"
@@ -1448,11 +746,11 @@ export default function AuthScreen() {
           {isLogin && (
             <TouchableOpacity
               onPress={handleForgotPassword}
-              style={{ alignSelf: 'flex-end', marginTop: -6, marginBottom: 10, paddingVertical: 4 }}
+              style={styles.forgotPassword}
               accessibilityRole="button"
               accessibilityLabel="Forgot password"
             >
-              <Text style={{ color: colors.textSecondary, fontSize: 13.5, fontWeight: '500' }}>
+              <Text style={[styles.forgotPasswordText, { color: colors.textSecondary }]}>
                 Forgot password?
               </Text>
             </TouchableOpacity>
@@ -1465,32 +763,32 @@ export default function AuthScreen() {
                 haptics.selection();
                 setAcceptedTerms((v) => !v);
               }}
-              style={styles.termsRow}
+              accessibilityRole="checkbox"
+              accessibilityState={{ checked: acceptedTerms }}
+              style={[styles.termsCard, { backgroundColor: colors.backgroundSecondary, borderColor: colors.borderSubtle }]}
             >
               <View
                 style={[
                   styles.termsCheckbox,
                   {
-                    borderColor: acceptedTerms ? colors.gold : colors.border,
-                    backgroundColor: acceptedTerms ? colors.gold : 'transparent',
+                    borderColor: acceptedTerms ? colors.gold : colors.borderStrong,
+                    backgroundColor: acceptedTerms ? colors.goldSurface : 'transparent',
                   },
                 ]}
               >
-                {acceptedTerms && (
-                  <Ionicons name="checkmark" size={13} color={colors.background} />
-                )}
+                {acceptedTerms && <Ionicons name="checkmark" size={12} color={colors.gold} />}
               </View>
               <Text style={[styles.termsText, { color: colors.textSecondary }]}>
                 I agree to the{' '}
                 <Text
-                  style={[styles.termsLink, { color: colors.text }]}
+                  style={[styles.termsLink, { color: colors.gold }]}
                   onPress={() => Linking.openURL('https://representportal.com/terms')}
                 >
-                  Terms
+                  Terms of Service
                 </Text>
-                {' and '}
+                {' '}and acknowledge the{' '}
                 <Text
-                  style={[styles.termsLink, { color: colors.text }]}
+                  style={[styles.termsLink, { color: colors.gold }]}
                   onPress={() => Linking.openURL('https://representportal.com/privacy')}
                 >
                   Privacy Policy
@@ -1501,7 +799,7 @@ export default function AuthScreen() {
           )}
 
           <Button
-            title={isLogin ? 'Sign In' : 'Create Account'}
+            title="Continue"
             onPress={handleEmailAuth}
             variant="primary"
             size="lg"
@@ -1512,33 +810,9 @@ export default function AuthScreen() {
           />
         </Animated.View>
 
-        {/* Switch auth */}
-        <Animated.View
-          entering={FadeIn.delay(450).duration(400)}
-          style={styles.switchAuth}
-        >
-          <Text style={[styles.switchAuthText, { color: colors.textSecondary }]}>
-            {isLogin ? "Don't have an account? " : 'Already have an account? '}
-          </Text>
-          <TouchableOpacity
-            onPress={() => {
-              haptics.light();
-              setView(isLogin ? 'signup' : 'login');
-              setError('');
-            }}
-          >
-            <Text style={[styles.switchAuthLink, { color: colors.gold }]}>
-              {isLogin ? 'Sign up' : 'Sign in'}
-            </Text>
-          </TouchableOpacity>
-        </Animated.View>
-
-        {/* Terms */}
-        <Animated.View
-          entering={FadeIn.delay(500).duration(400)}
-          style={styles.termsContainer}
-        >
-          <Text style={[styles.terms, { color: colors.textTertiary }]}>
+        {/* Legal footnote + trust line */}
+        <Animated.View entering={FadeIn.delay(400).duration(400)} style={styles.authFooter}>
+          <Text style={[styles.legalFootnote, { color: colors.textTertiary }]}>
             By continuing, you agree to our{' '}
             <Text
               style={[styles.termsLink, { color: colors.gold }]}
@@ -1559,6 +833,10 @@ export default function AuthScreen() {
             >
               Privacy Policy
             </Text>
+            .
+          </Text>
+          <Text style={[styles.ledgerFootnote, { color: colors.textTertiary }]}>
+            VERIFIED CITIZENS · PUBLIC COUNT
           </Text>
         </Animated.View>
       </ScrollView>
@@ -1570,380 +848,268 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  loadingContainer: {
+
+  // ── Welcome (01a / 01b) ──────────────────────────────────────────────────────
+  welcomeScreen: {
+    paddingHorizontal: SPACING.screenPadding + 6, // mock: 30px gutters
+  },
+  welcomeBody: {
+    flex: 1,
+  },
+  welcomeHero: {
+    flex: 1,
+    justifyContent: 'center',
+    gap: 22,
+  },
+  welcomeLogo: {
+    width: 76,
+    height: 76,
+    borderRadius: 38,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  loadingLogo: {
-    borderRadius: RADIUS['2xl'],
     overflow: 'hidden',
   },
-  loadingLogoGradient: {
-    width: 80,
-    height: 80,
-    alignItems: 'center',
-    justifyContent: 'center',
+  welcomeLogoImage: {
+    width: 76,
+    height: 76,
+    borderRadius: 38,
   },
-  loadingLogoImage: {
-    width: 56,
-    height: 56,
+  eyebrow: {
+    fontFamily: FONTS.sansSemiBold,
+    fontSize: 11,
+    letterSpacing: 1.98, // .18em
   },
-  loadingDots: {},
-  backgroundGradient: {
-    ...StyleSheet.absoluteFillObject,
-    opacity: 0.5,
+  welcomeDisplay: {
+    fontFamily: FONTS.serif,
+    fontSize: 45,
+    lineHeight: 49,
+    letterSpacing: -0.54,
   },
-  welcomeContent: {
-    flex: 1,
-    paddingHorizontal: SPACING.xl,
-    alignItems: 'center',
+  welcomeDisplaySmall: {
+    fontFamily: FONTS.serif,
+    fontSize: 40,
+    lineHeight: 44,
+    letterSpacing: -0.48,
   },
-  logoWrapper: {
-    marginBottom: SPACING['3xl'],
-    position: 'relative',
-    width: 160,
-    height: 160,
-    alignItems: 'center',
-    justifyContent: 'center',
+  welcomeBodyText: {
+    fontFamily: FONTS.sans,
+    fontSize: 16,
+    lineHeight: 25,
+    maxWidth: 320,
   },
-  logoOuter: {
-    width: 140,
-    height: 140,
-    borderRadius: 70,
-    borderWidth: 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 8,
-  },
-  logoInner: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 62,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  logoImage: {
-    width: 115,
-    height: 115,
-    borderRadius: 58,
-  },
-  logoGlow: {
-    position: 'absolute',
-    top: 20,
-    left: 20,
-    right: 20,
-    bottom: 20,
-    borderRadius: 60,
-    opacity: 0.15,
-    zIndex: -1,
-  },
-  brandName: {
-    fontSize: responsive(32, 36, 48),
-    fontWeight: '700',
-    letterSpacing: -1.5,
-    marginBottom: SPACING.md,
-  },
-  tagline: {
-    ...TYPOGRAPHY.bodyLarge,
-    textAlign: 'center',
-    lineHeight: 26,
-    marginBottom: SPACING['3xl'],
-  },
-  featurePills: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-    gap: responsive(SPACING.sm, SPACING.md, SPACING.md),
-    marginBottom: SPACING['3xl'],
-  },
-  featurePill: {
+  biometricRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: responsive(SPACING.xs, SPACING.sm, SPACING.sm),
-    paddingHorizontal: responsive(SPACING.sm, SPACING.md, SPACING.lg),
-    paddingVertical: SPACING.sm,
-    borderRadius: RADIUS.full,
+    alignSelf: 'flex-start',
+    gap: 9,
+    paddingHorizontal: 16,
+    height: 44,
+    borderRadius: RADIUS.chip,
     borderWidth: 1,
   },
-  // Feature Cards
-  featureCards: {
+  biometricRowText: {
+    fontFamily: FONTS.sansSemiBold,
+    fontSize: 14,
+  },
+  featureList: {
+    gap: 18,
+    marginTop: 6,
+  },
+  featureRow: {
     flexDirection: 'row',
-    justifyContent: 'center',
-    gap: SPACING.md,
-    marginBottom: SPACING['3xl'],
-    paddingHorizontal: SPACING.sm,
+    alignItems: 'flex-start',
+    gap: 14,
   },
-  featureCard: {
+  featureIconTile: {
+    width: 42,
+    height: 42,
+    borderRadius: 13,
     alignItems: 'center',
-    paddingVertical: SPACING.lg,
-    paddingHorizontal: SPACING.md,
-    borderRadius: RADIUS.xl,
-    width: responsive(95, 105, 115),
-    position: 'relative',
-    overflow: 'hidden',
+    justifyContent: 'center',
   },
-  featureCardBorderGlow: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    borderRadius: RADIUS.xl,
-    borderWidth: 1.5,
+  featureRowText: {
+    flex: 1,
+    gap: 3,
   },
-  featureCardIconContainer: {
-    position: 'relative',
-    marginBottom: SPACING.sm,
+  featureRowTitle: {
+    fontFamily: FONTS.sansSemiBold,
+    fontSize: 15,
   },
-  featureCardIconGlow: {
-    position: 'absolute',
-    top: -8,
-    left: -8,
-    right: -8,
-    bottom: -8,
-    borderRadius: 30,
+  featureRowBody: {
+    fontFamily: FONTS.sans,
+    fontSize: 13.5,
+    lineHeight: 20,
   },
-  featureCardIconWrapper: {
-    width: 48,
+  dotsRow: {
+    flexDirection: 'row',
+    gap: 7,
+    marginBottom: 26,
+  },
+  dot: {
+    height: 6,
+    borderRadius: 3,
+  },
+  welcomeActions: {
+    gap: 10,
+  },
+  ghostAction: {
     height: 48,
-    borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  featureCardLabel: {
-    ...TYPOGRAPHY.label,
-    marginBottom: SPACING.xs,
+  ghostActionText: {
+    fontFamily: FONTS.sansMedium,
+    fontSize: 15,
+  },
+  ledgerFootnote: {
+    fontFamily: FONTS.mono,
+    fontSize: 10,
+    letterSpacing: 2.2, // .22em
     textAlign: 'center',
+    marginTop: 14,
+    fontVariant: ['tabular-nums'],
   },
-  featureCardTagline: {
-    ...TYPOGRAPHY.captionSmall,
-    textAlign: 'center',
-  },
-  featurePillText: {
-    ...TYPOGRAPHY.labelSmall,
-  },
-  biometricSection: {
-    marginBottom: SPACING['2xl'],
-    alignItems: 'center',
-  },
-  biometricContainer: {
-    alignItems: 'center',
-  },
-  biometricGlow: {
-    position: 'absolute',
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    top: 4,
-    left: 4,
-  },
-  biometricButton: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  biometricLabel: {
-    ...TYPOGRAPHY.caption,
-    marginTop: SPACING.sm,
-  },
-  welcomeButtons: {
-    width: '100%',
-    gap: SPACING.md,
-    marginTop: 'auto',
-    marginBottom: SPACING['2xl'],
-  },
-  bottomAccent: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    height: 3,
-    opacity: 0.6,
-  },
-  // Auth screen
+
+  // ── Sign in / sign up (02) ───────────────────────────────────────────────────
   authContent: {
     flexGrow: 1,
-    paddingHorizontal: SPACING.xl,
+    paddingHorizontal: SPACING.screenPadding + 6, // mock: 30px gutters
     paddingBottom: SPACING['3xl'],
+    gap: 22,
   },
   backButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    marginBottom: SPACING.xl,
   },
   authHeader: {
-    alignItems: 'center',
-    marginBottom: SPACING['2xl'],
-  },
-  authLogo: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: SPACING.lg,
-  },
-  authLogoImage: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+    gap: 8,
   },
   authTitle: {
-    ...TYPOGRAPHY.h2,
-    marginBottom: SPACING.xs,
+    fontFamily: FONTS.serif,
+    fontSize: 38,
+    lineHeight: 42,
+    letterSpacing: -0.46,
   },
   authSubtitle: {
-    ...TYPOGRAPHY.body,
-    textAlign: 'center',
+    fontFamily: FONTS.sans,
+    fontSize: 15,
+    lineHeight: 22,
+  },
+  segmented: {
+    flexDirection: 'row',
+    borderRadius: 13,
+    borderWidth: 1,
+    padding: 3,
+  },
+  segmentedTab: {
+    flex: 1,
+    height: 40,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  segmentedTabText: {
+    fontFamily: FONTS.sansMedium,
+    fontSize: 14,
+  },
+  segmentedTabTextActive: {
+    fontFamily: FONTS.sansSemiBold,
+    fontSize: 14,
   },
   socialButtons: {
-    flexDirection: 'row',
-    gap: SPACING.md,
-    marginBottom: SPACING.xl,
+    gap: 10,
   },
   socialButton: {
-    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: SPACING.sm,
-    height: 52,
-    borderRadius: RADIUS.md,
+    gap: 9,
+    height: 54,
+    borderRadius: 15,
   },
   socialButtonText: {
-    ...TYPOGRAPHY.label,
+    fontFamily: FONTS.sansSemiBold,
+    fontSize: 16,
   },
   divider: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: SPACING.xl,
+    gap: 14,
   },
   dividerLine: {
     flex: 1,
     height: 1,
   },
   dividerText: {
-    ...TYPOGRAPHY.caption,
-    marginHorizontal: SPACING.lg,
+    fontFamily: FONTS.sansMedium,
+    fontSize: 12,
   },
   errorBox: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: SPACING.sm,
     padding: SPACING.md,
-    borderRadius: RADIUS.md,
+    borderRadius: RADIUS.input,
     borderWidth: 1,
     marginBottom: SPACING.lg,
   },
   errorText: {
-    ...TYPOGRAPHY.bodySmall,
+    fontFamily: FONTS.sans,
+    fontSize: 13,
+    lineHeight: 19,
     flex: 1,
   },
-  termsRow: {
+  forgotPassword: {
+    alignSelf: 'flex-end',
+    marginTop: -6,
+    marginBottom: 10,
+    paddingVertical: 4,
+  },
+  forgotPasswordText: {
+    fontFamily: FONTS.sansMedium,
+    fontSize: 13.5,
+  },
+  termsCard: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 10,
-    paddingHorizontal: 4,
-    paddingVertical: SPACING.sm,
-    marginTop: SPACING.xs,
+    gap: 11,
+    borderRadius: 14,
+    borderWidth: 1,
+    paddingVertical: 13,
+    paddingHorizontal: 15,
+    marginBottom: SPACING.sm,
   },
   termsCheckbox: {
     width: 20,
     height: 20,
-    borderRadius: 5,
+    borderRadius: 6,
     borderWidth: 1.5,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 2,
+    marginTop: 1,
   },
   termsText: {
-    ...TYPOGRAPHY.bodySmall,
-    flex: 1,
+    fontFamily: FONTS.sans,
+    fontSize: 12.5,
     lineHeight: 19,
-  },
-  switchAuth: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginTop: SPACING.xl,
-  },
-  switchAuthText: {
-    ...TYPOGRAPHY.body,
-  },
-  switchAuthLink: {
-    ...TYPOGRAPHY.body,
-    fontWeight: '600',
-  },
-  termsContainer: {
-    marginTop: SPACING.xl,
-    paddingHorizontal: SPACING.lg,
-  },
-  terms: {
-    ...TYPOGRAPHY.captionSmall,
-    textAlign: 'center',
+    flex: 1,
   },
   termsLink: {
-    ...TYPOGRAPHY.captionSmall,
-    fontWeight: '600',
     textDecorationLine: 'underline',
   },
-  // Premium CTA Button styles
-  premiumCTAContainer: {
-    width: '100%',
-    position: 'relative',
+  authFooter: {
+    marginTop: 'auto',
+    gap: 14,
+    paddingTop: SPACING.lg,
   },
-  premiumCTAGlow: {
-    position: 'absolute',
-    top: -8,
-    left: -8,
-    right: -8,
-    bottom: -8,
-    borderRadius: RADIUS.lg + 8,
-  },
-  premiumCTAButton: {
-    width: '100%',
-    height: 56,
-    borderRadius: RADIUS.lg,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-  },
-  premiumCTAText: {
-    ...TYPOGRAPHY.labelLarge,
-    fontWeight: '700',
-  },
-  premiumCTAShimmerContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    overflow: 'hidden',
-    borderRadius: RADIUS.lg,
-  },
-  premiumCTAShimmer: {
-    position: 'absolute',
-    width: 100,
-    height: '200%',
-    top: '-50%',
-  },
-  // Light rays styles
-  lightRaysContainer: {
-    position: 'absolute',
-    width: 300,
-    height: 300,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  lightRay: {
-    position: 'absolute',
-    width: 2,
-    height: 150,
-    borderRadius: 1,
-    transformOrigin: 'center bottom',
+  legalFootnote: {
+    fontFamily: FONTS.sans,
+    fontSize: 11,
+    lineHeight: 16,
+    textAlign: 'center',
   },
 });

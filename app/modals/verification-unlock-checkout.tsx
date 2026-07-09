@@ -17,7 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import * as Haptics from 'expo-haptics';
-import { useTheme, SPACING, BORDER_RADIUS, SHADOWS } from '../../lib/theme';
+import { useTheme, SPACING, BORDER_RADIUS, SHADOWS, FONTS } from '../../lib/theme';
 import { organizationsApi, type Organization } from '../../lib/api';
 import { iapAvailable, purchaseProduct, unlockSkuForTier } from '../../lib/iap';
 import { useAuthStore } from '../../lib/auth';
@@ -215,7 +215,7 @@ export default function VerificationUnlockCheckoutScreen() {
         <TouchableOpacity onPress={() => router.back()} style={{ width: 40, height: 40, alignItems: 'flex-start', justifyContent: 'center' }}>
           <Ionicons name="close" size={24} color={colors.text} />
         </TouchableOpacity>
-        <Text style={{ flex: 1, textAlign: 'center', fontSize: 16, fontWeight: '600', color: colors.text }}>
+        <Text style={{ flex: 1, textAlign: 'center', fontSize: 16, fontFamily: FONTS.serif, color: colors.text }}>
           Unlock verification
         </Text>
         <View style={{ width: 40 }} />
@@ -233,13 +233,13 @@ export default function VerificationUnlockCheckoutScreen() {
           marginBottom: SPACING.lg,
           ...SHADOWS.sm,
         }}>
-          <Text style={{ fontSize: 11, fontWeight: '600', letterSpacing: 2, textTransform: 'uppercase', color: colors.textSecondary, marginBottom: 6 }}>
+          <Text style={{ fontSize: 11, fontFamily: FONTS.sansSemiBold, letterSpacing: 2, textTransform: 'uppercase', color: colors.textSecondary, marginBottom: 6 }}>
             {tierName} plan · one-time
           </Text>
-          <Text style={{ fontSize: 44, fontWeight: '700', color: colors.gold, letterSpacing: -1 }}>
+          <Text style={{ fontSize: 44, fontFamily: FONTS.monoSemiBold, fontVariant: ['tabular-nums'], color: colors.gold, letterSpacing: -1 }}>
             {priceLabel}
           </Text>
-          <Text style={{ fontSize: 13, color: colors.textSecondary, marginTop: 4 }}>
+          <Text style={{ fontSize: 13, fontFamily: FONTS.sans, color: colors.textSecondary, marginTop: 4 }}>
             Unlimited verifications, no per-vote cost
           </Text>
         </View>
@@ -253,7 +253,7 @@ export default function VerificationUnlockCheckoutScreen() {
           padding: SPACING.lg,
           marginBottom: SPACING.lg,
         }}>
-          <Text style={{ fontSize: 14, fontWeight: '700', color: colors.text, marginBottom: SPACING.sm }}>
+          <Text style={{ fontSize: 14, fontFamily: FONTS.sansBold, color: colors.text, marginBottom: SPACING.sm }}>
             What you get
           </Text>
           <Bullet color={colors.success} text="Members must verify their identity (Veriff/Didit) before voting in this org." textColor={colors.text} />
@@ -273,7 +273,7 @@ export default function VerificationUnlockCheckoutScreen() {
             marginBottom: SPACING.lg, gap: 10,
           }}>
             <ActivityIndicator size="small" color={colors.gold} />
-            <Text style={{ flex: 1, fontSize: 13, color: colors.text }}>
+            <Text style={{ flex: 1, fontSize: 13, fontFamily: FONTS.sans, color: colors.text }}>
               Confirming payment… complete the checkout in your browser, then return to the app.
             </Text>
           </View>
@@ -287,7 +287,7 @@ export default function VerificationUnlockCheckoutScreen() {
             borderRadius: BORDER_RADIUS.md,
             marginBottom: SPACING.lg,
           }}>
-            <Text style={{ fontSize: 13, color: colors.error }}>{errorMessage}</Text>
+            <Text style={{ fontSize: 13, fontFamily: FONTS.sans, color: colors.error }}>{errorMessage}</Text>
           </View>
         )}
 
@@ -299,7 +299,7 @@ export default function VerificationUnlockCheckoutScreen() {
             borderRadius: BORDER_RADIUS.md,
             marginBottom: SPACING.lg,
           }}>
-            <Text style={{ fontSize: 13, color: colors.success, fontWeight: '600' }}>
+            <Text style={{ fontSize: 13, fontFamily: FONTS.sansSemiBold, color: colors.success }}>
               Verification unlocked. Members will now be required to verify before voting.
             </Text>
           </View>
@@ -333,7 +333,7 @@ export default function VerificationUnlockCheckoutScreen() {
             {phase === 'starting' || phase === 'awaiting' ? (
               <ActivityIndicator size="small" color="#000" />
             ) : (
-              <Text style={{ fontSize: 15, fontWeight: '700', color: '#000' }}>
+              <Text style={{ fontSize: 15, fontFamily: FONTS.sansBold, color: '#000' }}>
                 Unlock for {priceLabel}
               </Text>
             )}
@@ -349,11 +349,11 @@ export default function VerificationUnlockCheckoutScreen() {
               alignItems: 'center',
             }}
           >
-            <Text style={{ fontSize: 15, fontWeight: '700', color: '#000' }}>Done</Text>
+            <Text style={{ fontSize: 15, fontFamily: FONTS.sansBold, color: '#000' }}>Done</Text>
           </TouchableOpacity>
         )}
 
-        <Text style={{ fontSize: 11, color: colors.textSecondary, textAlign: 'center', marginTop: SPACING.lg, lineHeight: 16 }}>
+        <Text style={{ fontSize: 11, fontFamily: FONTS.sans, color: colors.textSecondary, textAlign: 'center', marginTop: SPACING.lg, lineHeight: 16 }}>
           {Platform.OS === 'ios'
             ? 'Charged through your Apple ID and credited to your organization. Manage refunds in iOS Settings.'
             : paymentProvider === 'iap'
@@ -371,7 +371,7 @@ function Bullet({ color, text, textColor }: { color: string; text: string; textC
       <View style={{ marginTop: 2 }}>
         <Ionicons name="checkmark-circle" size={16} color={color} />
       </View>
-      <Text style={{ flex: 1, fontSize: 13, color: textColor, lineHeight: 18 }}>{text}</Text>
+      <Text style={{ flex: 1, fontSize: 13, fontFamily: FONTS.sans, color: textColor, lineHeight: 18 }}>{text}</Text>
     </View>
   );
 }

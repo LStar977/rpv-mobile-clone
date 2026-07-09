@@ -165,14 +165,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  title: { ...TYPOGRAPHY.labelLarge, fontWeight: '600' },
+  title: { ...TYPOGRAPHY.labelLarge,},
   sub: { ...TYPOGRAPHY.bodySmall, marginTop: 2 },
   generateBtn: {
     borderRadius: BORDER_RADIUS.full,
     paddingVertical: SPACING.md,
     alignItems: 'center',
   },
-  generateBtnText: { ...TYPOGRAPHY.labelMedium, fontWeight: '700', color: '#000' },
+  generateBtnText: { ...TYPOGRAPHY.labelMedium, color: '#000' },
   codeRow: { flexDirection: 'row', gap: SPACING.sm },
   codeBox: {
     flex: 1,
@@ -186,7 +186,6 @@ const styles = StyleSheet.create({
   },
   codeText: {
     ...TYPOGRAPHY.labelLarge,
-    fontWeight: '700',
     letterSpacing: 2,
     fontVariant: ['tabular-nums'],
   },
@@ -197,7 +196,7 @@ const styles = StyleSheet.create({
     borderRadius: BORDER_RADIUS.lg,
     paddingHorizontal: SPACING.lg,
   },
-  shareBtnText: { ...TYPOGRAPHY.labelMedium, fontWeight: '700', color: '#000' },
+  shareBtnText: { ...TYPOGRAPHY.labelMedium, color: '#000' },
   progressRow: {
     flexDirection: 'row',
     alignItems: 'center',

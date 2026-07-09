@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
-  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -18,14 +17,12 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { organizationsApi, proposalsApi } from '../../lib/api';
 import { useAuthStore } from '../../lib/auth';
 import { CommentsSection } from '../../components/comments/CommentsSection';
-import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS } from '../../lib/theme';
+import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS, FONTS } from '../../lib/theme';
 import { RCVBallotInput } from '../../components/ui/RCVBallotInput';
 import { RCVResults } from '../../components/ui/RCVResults';
 import { MultipleChoiceBallot } from '../../components/ui/MultipleChoiceBallot';
 import { MultipleChoiceResults } from '../../components/ui/MultipleChoiceResults';
 import { ProposalModerationMenu } from '../../components/moderation/ProposalModerationMenu';
-
-const SERIF_FONT = Platform.OS === 'ios' ? 'Georgia' : 'serif';
 
 function getTimeRemaining(deadline: string | null): { text: string; urgent: boolean } {
   if (!deadline) return { text: 'Open indefinitely', urgent: false };
@@ -385,11 +382,11 @@ export default function OrgProposalDetailScreen() {
 
           {/* Progress Bar */}
           <View style={styles.progressContainer}>
-            <View style={[styles.progressBg, { backgroundColor: colors.error + '30' }]}>
+            <View style={[styles.progressBg, { backgroundColor: colors.oppose }]}>
               <View
                 style={[
                   styles.progressFill,
-                  { width: `${supportPct}%`, backgroundColor: colors.success },
+                  { width: `${supportPct}%`, backgroundColor: colors.support },
                 ]}
               />
             </View>
@@ -398,8 +395,8 @@ export default function OrgProposalDetailScreen() {
           {/* Vote Counts */}
           <View style={styles.voteCountsRow}>
             <View style={styles.voteCount}>
-              <Ionicons name="thumbs-up" size={20} color={colors.success} />
-              <Text style={[styles.voteCountNumber, { color: colors.success }]}>
+              <Ionicons name="thumbs-up" size={20} color={colors.support} />
+              <Text style={[styles.voteCountNumber, { color: colors.support }]}>
                 {(supportVotes ?? 0).toLocaleString()}
               </Text>
               <Text style={[styles.voteCountLabel, { color: colors.textSecondary }]}>
@@ -407,8 +404,8 @@ export default function OrgProposalDetailScreen() {
               </Text>
             </View>
             <View style={styles.voteCount}>
-              <Ionicons name="thumbs-down" size={20} color={colors.error} />
-              <Text style={[styles.voteCountNumber, { color: colors.error }]}>
+              <Ionicons name="thumbs-down" size={20} color={colors.oppose} />
+              <Text style={[styles.voteCountNumber, { color: colors.oppose }]}>
                 {(opposeVotes ?? 0).toLocaleString()}
               </Text>
               <Text style={[styles.voteCountLabel, { color: colors.textSecondary }]}>
@@ -506,7 +503,7 @@ export default function OrgProposalDetailScreen() {
                 activeOpacity={0.8}
               >
                 <LinearGradient
-                  colors={[colors.success, '#1a7a3a']}
+                  colors={[colors.support, '#1a7a3a']}
                   style={styles.voteButtonGradient}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
@@ -531,7 +528,7 @@ export default function OrgProposalDetailScreen() {
                 activeOpacity={0.8}
               >
                 <LinearGradient
-                  colors={[colors.error, '#8B0000']}
+                  colors={[colors.oppose, '#8B0000']}
                   style={styles.voteButtonGradient}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
@@ -577,7 +574,6 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     ...TYPOGRAPHY.labelLarge,
-    fontWeight: '600',
   },
   content: {
     flex: 1,
@@ -601,11 +597,10 @@ const styles = StyleSheet.create({
   },
   badgeText: {
     ...TYPOGRAPHY.labelSmall,
-    fontWeight: '600',
   },
   title: {
     ...TYPOGRAPHY.headlineMedium,
-    fontFamily: SERIF_FONT,
+    fontFamily: FONTS.serif,
     marginBottom: SPACING.md,
   },
   timeCard: {
@@ -620,7 +615,6 @@ const styles = StyleSheet.create({
   },
   timeText: {
     ...TYPOGRAPHY.labelMedium,
-    fontWeight: '600',
   },
   descriptionCard: {
     padding: SPACING.lg,
@@ -674,7 +668,8 @@ const styles = StyleSheet.create({
   },
   voteCountNumber: {
     ...TYPOGRAPHY.headlineSmall,
-    fontWeight: '700',
+    fontFamily: FONTS.monoSemiBold,
+    fontVariant: ['tabular-nums'],
   },
   voteCountLabel: {
     ...TYPOGRAPHY.labelSmall,
@@ -691,7 +686,8 @@ const styles = StyleSheet.create({
   },
   totalValue: {
     ...TYPOGRAPHY.labelLarge,
-    fontWeight: '600',
+    fontFamily: FONTS.monoSemiBold,
+    fontVariant: ['tabular-nums'],
   },
   voteContainer: {
     padding: SPACING.lg,
@@ -707,7 +703,6 @@ const styles = StyleSheet.create({
   },
   votedText: {
     ...TYPOGRAPHY.labelMedium,
-    fontWeight: '600',
     flex: 1,
   },
   voteButtonsRow: {
@@ -734,6 +729,6 @@ const styles = StyleSheet.create({
   voteButtonText: {
     ...TYPOGRAPHY.labelLarge,
     color: '#fff',
-    fontWeight: '700',
+    fontFamily: FONTS.sansBold,
   },
 });

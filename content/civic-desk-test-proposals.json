@@ -1,0 +1,81 @@
+{
+  "_comment": "Design-QA test slate. Published via scripts/publish-test-proposals.mjs. Every title is prefixed 'Test:' so the slate is easy to find and delete from the admin dashboard when testing is done. Deadlines are relative ('+15m', '+2h', '+10d') and resolved at publish time — the short ones close quickly so the Results tab gets real closed proposals.",
+  "proposals": [
+    {
+      "title": "Test: Should this proposal close within the hour?",
+      "description": "Design QA — closes ~15 minutes after publishing. Use it to watch a proposal move from OPEN (live tally, minutes-level countdown) to the CLOSED section of Results. With only a handful of ballots it should close as BELOW THRESHOLD — count shown, split never.",
+      "category": "Other",
+      "geoRestrictions": [],
+      "voteType": "yes-no",
+      "deadlineIn": "+15m"
+    },
+    {
+      "title": "Test: Does the closing-tonight strip work?",
+      "description": "Design QA — closes ~2 hours after publishing, so it should appear in the Home closing strip and show an hours-level mono countdown in Results and on its card.",
+      "category": "Other",
+      "geoRestrictions": [],
+      "voteType": "yes-no",
+      "deadlineIn": "+2h"
+    },
+    {
+      "title": "Test: Zero ballots — who casts the first?",
+      "description": "Design QA — a fresh proposal with no ballots. The card and detail must show the 25-dot threshold row with 'Be the first verified ballot' and never an empty tally bar. Cast a few ballots to watch the dots fill (3 of 25, 4 of 25…).",
+      "category": "Other",
+      "geoRestrictions": [],
+      "voteType": "yes-no",
+      "deadlineIn": "+10d"
+    },
+    {
+      "title": "Test: A second open question for the queue",
+      "description": "Design QA — keeps the vote queue populated so the M2 review session (progress counter, skip, X1 confirm sheet, gold seal) can be exercised more than once.",
+      "category": "Other",
+      "geoRestrictions": [],
+      "voteType": "yes-no",
+      "deadlineIn": "+14d"
+    },
+    {
+      "title": "Test: Multiple choice — which option wins?",
+      "description": "Design QA — X2 multiple-choice ballot. Radio selection, pick one of four, mandatory confirm before casting, results on the detail screen.",
+      "category": "Other",
+      "geoRestrictions": [],
+      "voteType": "multiple-choice",
+      "options": [
+        "Option A — fund transit first",
+        "Option B — fund housing first",
+        "Option C — split it evenly",
+        "Option D — neither, reduce taxes"
+      ],
+      "deadlineIn": "+12d"
+    },
+    {
+      "title": "Test: Ranked choice — order your priorities",
+      "description": "Design QA — screen 07 ranked ballot. Tap to rank all four options; the first choice takes the gold badge; reorder freely until you cast.",
+      "category": "Other",
+      "geoRestrictions": [],
+      "voteType": "ranked-choice",
+      "options": [
+        "Bike lanes on every arterial road",
+        "Free transit on high-smog days",
+        "Congestion pricing downtown",
+        "More park-and-ride capacity"
+      ],
+      "deadlineIn": "+12d"
+    },
+    {
+      "title": "Test: Alberta-scoped — does scope filtering work?",
+      "description": "Design QA — restricted to verified Alberta residents. Albertans see it in the queue with a provincial scope chip; everyone else should only find it in Across Canada as WATCH-ONLY.",
+      "category": "Other",
+      "geoRestrictions": ["Canada", "Alberta"],
+      "voteType": "yes-no",
+      "deadlineIn": "+10d"
+    },
+    {
+      "title": "Test: Calgary-scoped — municipal level",
+      "description": "Design QA — restricted to verified Calgary residents, for the municipal scope chip and the Home level-split bar's municipal segment.",
+      "category": "Other",
+      "geoRestrictions": ["Canada", "Alberta", "Calgary"],
+      "voteType": "yes-no",
+      "deadlineIn": "+9d"
+    }
+  ]
+}

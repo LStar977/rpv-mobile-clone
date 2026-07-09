@@ -1,24 +1,15 @@
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Platform, RefreshControl } from 'react-native';
 import * as Haptics from 'expo-haptics';
+import * as Clipboard from 'expo-clipboard';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useState, useEffect, useCallback } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { LinearGradient } from 'expo-linear-gradient';
-import Animated, {
-  FadeIn,
-  FadeInDown,
-  FadeInUp,
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
-} from 'react-native-reanimated';
-import Svg, { Circle } from 'react-native-svg';
+import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { useAuthStore } from '../../lib/auth';
-import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS, ThemePreference, responsive } from '../../lib/theme';
-import { Button, TierBadge } from '../../components/ui';
-import { adminApi, organizationsApi, userApi, veriffApi } from '../../lib/api';
+import { useTheme, SPACING, FONTS, ThemePreference } from '../../lib/theme';
+import { adminApi, organizationsApi, userApi } from '../../lib/api';
 import { restorePurchases } from '../../lib/iap';
 import { PassportCard, type PassportStatus } from '../../components/identity/PassportCard';
 import { InviteFriendsCard } from '../../components/referrals/InviteFriendsCard';
@@ -27,603 +18,249 @@ import type { UserTier } from '../../components/ui';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://representportal.com';
 
-// ── Profile colors - static fallbacks for StyleSheet ─────────────────
-// These are dark mode defaults; components override with useProfileColors()
-const PR_G = '#EABA58';
-const PR_GD = '#C89A3E';
-const PR_GL = '#F4D28C';
-const PR_BG = '#040707';
-const PR_BG_CARD = '#0D0F12';
-const PR_BG_RAISED = '#15181C';
-const PR_LINE = '#1E2228';
-const PR_LINE_STRONG = '#2A2F37';
-const PR_FG = '#F4F5F6';
-const PR_FG_MUTED = '#C7CACD';
-const PR_FG_FAINT = '#8E9297';
-const PR_GREEN = '#34C759';
+const BADGES_TOTAL = 15;
 
-// Dynamic hook for components to get theme-aware colors
-function useProfileColors() {
+// Compact badge metadata for the CIVIC BADGES tiles (full list lives in
+// /modals/badges). Ionicons stand in for the mock's Lucide icons.
+const BADGE_META: { id: string; name: string; icon: keyof typeof Ionicons.glyphMap }[] = [
+  { id: 'first_vote', name: 'First Vote', icon: 'checkbox-outline' },
+  { id: 'first_vote_country', name: 'National Voice', icon: 'flag-outline' },
+  { id: 'first_vote_state', name: 'State Advocate', icon: 'map-outline' },
+  { id: 'first_vote_city', name: 'Local Champion', icon: 'business-outline' },
+  { id: 'vote_streak_5', name: 'Consistent Voter', icon: 'flame-outline' },
+  { id: 'vote_streak_25', name: 'Dedicated Citizen', icon: 'star-outline' },
+  { id: 'vote_streak_100', name: 'Democracy Hero', icon: 'trophy-outline' },
+  { id: 'first_proposal', name: 'Proposal Pioneer', icon: 'create-outline' },
+  { id: 'proposal_5', name: 'Active Legislator', icon: 'documents-outline' },
+  { id: 'referral_5', name: 'Community Builder', icon: 'people-outline' },
+  { id: 'referral_20', name: 'Movement Leader', icon: 'people-circle-outline' },
+  { id: 'passport_minted', name: 'Verified Citizen', icon: 'shield-checkmark-outline' },
+  { id: 'early_adopter', name: 'Early Adopter', icon: 'rocket-outline' },
+  { id: 'democratic_spirit', name: 'Democratic Spirit', icon: 'scale-outline' },
+  { id: 'global_citizen', name: 'Global Citizen', icon: 'globe-outline' },
+];
+
+// ── Section label (mock 14 row styling) ──────────────────────────────
+function SectionLabel({ children }: { children: React.ReactNode }) {
   const { colors } = useTheme();
-  return {
-    G: colors.gold,
-    GD: colors.goldDark,
-    GL: colors.goldLight,
-    BG: colors.background,
-    BG_CARD: colors.surface,
-    BG_RAISED: colors.surfaceElevated,
-    LINE: colors.border,
-    LINE_STRONG: colors.borderStrong,
-    FG: colors.text,
-    FG_MUTED: colors.textSecondary,
-    FG_FAINT: colors.textTertiary,
-    GREEN: colors.success,
-  };
+  return <Text style={[styles.sectionLabel, { color: colors.textTertiary }]}>{children}</Text>;
 }
 
-const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
-
-// Menu Item Component
-function MenuItem({
-  icon,
-  label,
-  onPress,
-  delay = 0,
-  showBorder = true,
-}: {
-  icon: keyof typeof Ionicons.glyphMap;
-  label: string;
-  onPress: () => void;
-  delay?: number;
-  showBorder?: boolean;
-}) {
-  const { colors } = useTheme();
-  const scale = useSharedValue(1);
-
-  const handlePressIn = () => {
-    scale.value = withSpring(0.98, { damping: 15, stiffness: 300 });
-  };
-
-  const handlePressOut = () => {
-    scale.value = withSpring(1, { damping: 15, stiffness: 300 });
-  };
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-  }));
-
-  return (
-    <AnimatedTouchable
-      entering={FadeInUp.delay(delay).duration(300)}
-      style={[
-        styles.menuItem,
-        { borderBottomColor: showBorder ? colors.border : 'transparent' },
-        animatedStyle,
-      ]}
-      onPress={onPress}
-      onPressIn={handlePressIn}
-      onPressOut={handlePressOut}
-      activeOpacity={1}
-    >
-      <View style={[styles.menuIconBg, { backgroundColor: `${colors.gold}15` }]}>
-        <Ionicons name={icon} size={20} color={colors.gold} />
-      </View>
-      <Text style={[styles.menuLabel, { color: colors.text }]}>{label}</Text>
-      <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
-    </AnimatedTouchable>
-  );
-}
-
-function ThemeChip({
-  label,
-  value,
-  selected,
-  onPress,
-}: {
-  label: string;
-  value: ThemePreference;
-  selected: boolean;
-  onPress: (v: ThemePreference) => void;
-}) {
-  const { colors } = useTheme();
-  const scale = useSharedValue(1);
-
-  const handlePressIn = () => {
-    scale.value = withSpring(0.98, { damping: 16, stiffness: 300 });
-  };
-
-  const handlePressOut = () => {
-    scale.value = withSpring(1, { damping: 16, stiffness: 300 });
-  };
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-  }));
-
-  return (
-    <AnimatedTouchable
-      style={[
-        styles.themeChip,
-        {
-          backgroundColor: selected ? colors.gold : colors.surface,
-          borderColor: selected ? colors.gold : colors.border,
-        },
-        animatedStyle,
-      ]}
-      onPress={() => onPress(value)}
-      onPressIn={handlePressIn}
-      onPressOut={handlePressOut}
-      activeOpacity={1}
-    >
-      <Text style={[styles.themeChipText, { color: selected ? '#000' : colors.text }]}>
-        {label}
-      </Text>
-    </AnimatedTouchable>
-  );
-}
-
-// ══════════════════════════════════════════════════════════════════════
-// ══ PREMIUM PROFILE UI COMPONENTS ═════════════════════════════════════
-// ══════════════════════════════════════════════════════════════════════
-
-// ── Premium Eyebrow ──────────────────────────────────────────────────
-function PrEyebrow({ children, color }: { children: React.ReactNode; color?: string }) {
-  const pr = useProfileColors();
-  return (
-    <Text style={{
-      fontFamily: 'System',
-      fontSize: 10,
-      fontWeight: '600',
-      letterSpacing: 2.2,
-      textTransform: 'uppercase',
-      color: color || pr.FG_FAINT,
-    }}>{children}</Text>
-  );
-}
-
-// ── Header ───────────────────────────────────────────────────────────
-function PrHeader({ folio }: { folio: string }) {
-  return (
-    <Animated.View entering={FadeInDown.duration(400)} style={prStyles.header}>
-      <PrEyebrow>Profile</PrEyebrow>
-    </Animated.View>
-  );
-}
-
-// ── Section Heading ──────────────────────────────────────────────────
-function PrSectionHeading({ roman, title, sub }: { roman?: string; title: string; sub?: string }) {
-  const pr = useProfileColors();
-  return (
-    <View style={prStyles.sectionHeading}>
-      {roman && <Text style={[prStyles.sectionRoman, { color: pr.FG_FAINT }]}>{roman}</Text>}
-      <View style={{ flex: 1 }}>
-        <Text style={[prStyles.sectionTitle, { color: pr.FG }]}>{title}</Text>
-        {sub && <Text style={[prStyles.sectionSub, { color: pr.FG_FAINT }]}>{sub}</Text>}
-      </View>
-    </View>
-  );
-}
-
-// ── Directory Row ────────────────────────────────────────────────────
-function PrRow({
-  icon,
+// ── Settings row (mock 14) ───────────────────────────────────────────
+function SettingsRow({
   label,
   sub,
   value,
+  valueMono,
   valueColor,
   last,
   onPress,
 }: {
-  icon: keyof typeof Ionicons.glyphMap;
   label: string;
   sub?: string;
   value?: string;
+  valueMono?: boolean;
   valueColor?: string;
   last?: boolean;
   onPress?: () => void;
 }) {
-  const pr = useProfileColors();
+  const { colors } = useTheme();
   const Container: any = onPress ? TouchableOpacity : View;
   return (
     <Container
-      style={[prStyles.row, !last && { borderBottomWidth: 1, borderBottomColor: pr.LINE }]}
+      style={[styles.row, !last && { borderBottomWidth: 1, borderBottomColor: colors.borderSubtle }]}
       {...(onPress ? { onPress, activeOpacity: 0.7 } : {})}
     >
-      <View style={[prStyles.rowIcon, { backgroundColor: pr.BG_RAISED, borderColor: pr.LINE }]}>
-        <Ionicons name={icon} size={18} color={pr.GL} />
+      <View style={{ flex: 1, minWidth: 0, gap: 1 }}>
+        <Text style={[styles.rowLabel, { color: colors.text }]}>{label}</Text>
+        {sub && <Text style={[styles.rowSub, { color: colors.textTertiary }]}>{sub}</Text>}
       </View>
-      <View style={{ flex: 1, minWidth: 0 }}>
-        <Text style={[prStyles.rowLabel, { color: pr.FG }]}>{label}</Text>
-        {sub && <Text style={[prStyles.rowSub, { color: pr.FG_FAINT }]}>{sub}</Text>}
-      </View>
-      {value && <Text style={[prStyles.rowValue, { color: valueColor || pr.FG_MUTED }]}>{value}</Text>}
-      {onPress && <Ionicons name="chevron-forward" size={14} color={pr.FG_FAINT} />}
+      {value && (
+        <Text
+          style={[
+            valueMono ? styles.rowValueMono : styles.rowValue,
+            { color: valueColor || colors.textTertiary },
+          ]}
+        >
+          {value}
+        </Text>
+      )}
+      {onPress && <Text style={[styles.rowArrow, { color: colors.textTertiary }]}>→</Text>}
     </Container>
   );
 }
 
-// ── Section Card Wrapper ─────────────────────────────────────────────
-function PrSection({
-  children,
-  delay = 0,
-}: {
-  children: React.ReactNode;
-  delay?: number;
-}) {
-  const pr = useProfileColors();
+// ── Row card wrapper (mock 14 grouped list) ──────────────────────────
+function RowCard({ children }: { children: React.ReactNode }) {
+  const { colors } = useTheme();
   return (
-    <Animated.View entering={FadeInUp.delay(delay).duration(400)} style={prStyles.section}>
-      <View style={[prStyles.sectionCard, { backgroundColor: pr.BG_CARD, borderColor: pr.LINE }]}>
-        {children}
-      </View>
-    </Animated.View>
+    <View style={[styles.rowCard, { backgroundColor: colors.surface, borderColor: colors.borderSubtle }]}>
+      {children}
+    </View>
   );
 }
 
-// ── Premium Appearance Picker ────────────────────────────────────────
-function PrAppearance({
+// ── Scope row (mock X3 hierarchy treatment) ──────────────────────────
+function ScopeRow({
+  icon,
+  name,
+  sub,
+  indent,
+  eligible,
+  last,
+  onVerify,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  name: string;
+  sub: string;
+  indent: number;
+  eligible: boolean;
+  last?: boolean;
+  onVerify?: () => void;
+}) {
+  const { colors } = useTheme();
+  const Container: any = !eligible && onVerify ? TouchableOpacity : View;
+  return (
+    <Container
+      style={[styles.scopeRow, !last && { borderBottomWidth: 1, borderBottomColor: colors.borderSubtle }]}
+      {...(!eligible && onVerify ? { onPress: onVerify, activeOpacity: 0.7 } : {})}
+    >
+      <View
+        style={[
+          styles.scopeIcon,
+          { backgroundColor: eligible ? colors.goldSurface : colors.surfaceHighlight, marginLeft: indent },
+        ]}
+      >
+        <Ionicons name={icon} size={16} color={eligible ? colors.gold : colors.textTertiary} />
+      </View>
+      <View style={{ flex: 1, minWidth: 0, gap: 1 }}>
+        <Text style={[styles.scopeName, { color: colors.text }]} numberOfLines={1}>{name}</Text>
+        <Text style={[styles.scopeSub, { color: colors.textTertiary }]} numberOfLines={1}>{sub}</Text>
+      </View>
+      {eligible ? (
+        <View style={styles.scopeStatus}>
+          <Ionicons name="checkmark" size={12} color={colors.gold} />
+          <Text style={[styles.scopeStatusText, { color: colors.gold }]}>ELIGIBLE</Text>
+        </View>
+      ) : (
+        <View style={styles.scopeStatus}>
+          <Text style={[styles.scopeStatusText, { color: colors.textTertiary }]}>VERIFY</Text>
+          <Ionicons name="chevron-forward" size={12} color={colors.textTertiary} />
+        </View>
+      )}
+    </Container>
+  );
+}
+
+// ── Record stat tile (mock 10) ───────────────────────────────────────
+function StatTile({ value, label }: { value: number | null; label: string }) {
+  const { colors } = useTheme();
+  return (
+    <View style={[styles.statTile, { backgroundColor: colors.surface, borderColor: colors.borderSubtle }]}>
+      <Text style={[styles.statValue, { color: colors.text }]}>
+        {value !== null ? value.toLocaleString() : '—'}
+      </Text>
+      <Text style={[styles.statLabel, { color: colors.textTertiary }]}>{label}</Text>
+    </View>
+  );
+}
+
+// ── Badge tile (mock 10 civic badges) ────────────────────────────────
+function BadgeTile({
+  name,
+  icon,
+  earned,
+  onPress,
+}: {
+  name: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  earned: boolean;
+  onPress: () => void;
+}) {
+  const { colors } = useTheme();
+  return (
+    <TouchableOpacity
+      style={[
+        styles.badgeTile,
+        { backgroundColor: colors.surface, borderColor: colors.borderSubtle },
+        !earned && { opacity: 0.5 },
+      ]}
+      onPress={onPress}
+      activeOpacity={0.7}
+    >
+      <View
+        style={[
+          styles.badgeTileIcon,
+          { backgroundColor: earned ? colors.goldSurface : colors.surfaceHighlight },
+        ]}
+      >
+        <Ionicons
+          name={earned ? icon : 'lock-closed-outline'}
+          size={17}
+          color={earned ? colors.gold : colors.textTertiary}
+        />
+      </View>
+      <Text
+        style={[styles.badgeTileName, { color: earned ? colors.text : colors.textSecondary }]}
+        numberOfLines={1}
+      >
+        {name}
+      </Text>
+    </TouchableOpacity>
+  );
+}
+
+// ── Theme segmented control (mock 14 "Theme · Dark/Light/Auto") ──────
+function ThemeSegments({
   currentTheme,
   onThemeChange,
 }: {
   currentTheme: ThemePreference;
   onThemeChange: (t: ThemePreference) => void;
 }) {
-  const pr = useProfileColors();
-  const themeLabel = currentTheme === 'system' ? 'System' : currentTheme === 'dark' ? 'Dark' : 'Light';
-
+  const { colors } = useTheme();
+  const options: { value: ThemePreference; label: string }[] = [
+    { value: 'dark', label: 'Dark' },
+    { value: 'light', label: 'Light' },
+    { value: 'system', label: 'Auto' },
+  ];
   return (
-    <Animated.View entering={FadeInUp.delay(400).duration(400)} style={prStyles.section}>
-      <View style={[prStyles.appearanceCard, { backgroundColor: pr.BG_CARD, borderColor: pr.LINE }]}>
-        <Text style={[prStyles.appearanceLabel, { color: pr.FG_MUTED, marginBottom: 14 }]}>
-          Currently set to <Text style={{ color: pr.GL, fontWeight: '600' }}>{themeLabel}</Text>
-        </Text>
-        <View style={prStyles.appearanceRow}>
-          {(['system', 'dark', 'light'] as ThemePreference[]).map((mode) => {
-            const active = currentTheme === mode;
-            const label = mode.charAt(0).toUpperCase() + mode.slice(1);
-            return (
-              <TouchableOpacity
-                key={mode}
-                style={[
-                  prStyles.appearanceChip,
-                  { borderColor: active ? pr.GD : pr.LINE_STRONG },
-                  active && { backgroundColor: `${pr.G}2E` }
-                ]}
-                onPress={() => onThemeChange(mode)}
-                activeOpacity={0.7}
-              >
-                <Text style={[
-                  prStyles.appearanceChipText,
-                  { color: active ? pr.GL : pr.FG_MUTED },
-                  active && { fontWeight: '600' }
-                ]}>
-                  {label}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-      </View>
-    </Animated.View>
+    <View
+      style={[styles.segments, { backgroundColor: colors.backgroundSecondary, borderColor: colors.borderSubtle }]}
+    >
+      {options.map(({ value, label }) => {
+        const active = currentTheme === value;
+        return (
+          <TouchableOpacity
+            key={value}
+            style={[styles.segment, active && { backgroundColor: colors.surfaceHighlight }]}
+            onPress={() => onThemeChange(value)}
+            activeOpacity={0.7}
+          >
+            <Text
+              style={[
+                styles.segmentText,
+                { color: active ? colors.text : colors.textTertiary },
+                active && { fontFamily: FONTS.sansSemiBold },
+              ]}
+            >
+              {label}
+            </Text>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
   );
 }
-
-// ── Sign Out Button ──────────────────────────────────────────────────
-function PrSignOut({ onPress }: { onPress: () => void }) {
-  const pr = useProfileColors();
-  return (
-    <Animated.View entering={FadeInUp.delay(500).duration(400)} style={prStyles.signOutContainer}>
-      <TouchableOpacity style={[prStyles.signOutButton, { borderColor: pr.LINE_STRONG }]} onPress={onPress} activeOpacity={0.7}>
-        <Ionicons name="log-out-outline" size={14} color={pr.FG_MUTED} />
-        <Text style={[prStyles.signOutText, { color: pr.FG_MUTED }]}>Sign out</Text>
-      </TouchableOpacity>
-      <Text style={[prStyles.footerVersion, { color: pr.FG_FAINT }]}>
-        Represent <Text style={prStyles.footerVersionMono}>v1.0.0</Text>
-      </Text>
-    </Animated.View>
-  );
-}
-
-// ── Premium Styles ───────────────────────────────────────────────────
-const prStyles = StyleSheet.create({
-  // Header
-  header: {
-    paddingHorizontal: 24,
-    paddingTop: 8,
-    paddingBottom: 14,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  folioCode: {
-    fontFamily: 'Courier',
-    fontSize: 9,
-    color: PR_FG_FAINT,
-    letterSpacing: 1,
-  },
-
-  // Portrait Card
-  portraitCard: {
-    marginHorizontal: 24,
-    marginBottom: 28,
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: PR_LINE_STRONG,
-    padding: 24,
-    paddingBottom: 22,
-    overflow: 'hidden',
-    position: 'relative',
-  },
-  cornerTick: {
-    position: 'absolute',
-    width: 10,
-    height: 10,
-  },
-  portraitMain: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-  },
-  monogramContainer: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
-  },
-  monogramGradient: {
-    ...StyleSheet.absoluteFillObject,
-    borderRadius: 32,
-  },
-  monogramText: {
-    fontFamily: 'Georgia',
-    fontSize: 28,
-    fontWeight: '500',
-    color: '#1A1308',
-    letterSpacing: 0.5,
-  },
-  monogramRing: {
-    position: 'absolute',
-    top: -5,
-    left: -5,
-  },
-  portraitName: {
-    fontFamily: 'Georgia',
-    fontSize: 28,
-    fontWeight: '500',
-    color: PR_FG,
-    letterSpacing: -0.4,
-    marginTop: 4,
-    marginBottom: 4,
-  },
-  portraitEmail: {
-    fontFamily: 'Courier',
-    fontSize: 11,
-    color: PR_FG_MUTED,
-    letterSpacing: 0.2,
-  },
-
-  // Membership strip
-  membershipStrip: {
-    marginTop: 18,
-    paddingTop: 14,
-    borderTopWidth: 1,
-    borderTopColor: PR_LINE,
-    flexDirection: 'row',
-  },
-  membershipCell: {
-    flex: 1,
-  },
-  membershipLabel: {
-    fontFamily: 'System',
-    fontSize: 8.5,
-    fontWeight: '600',
-    color: PR_FG_FAINT,
-    letterSpacing: 2,
-    marginBottom: 4,
-  },
-  membershipValue: {
-    fontFamily: 'Georgia',
-    fontSize: 16,
-    fontWeight: '500',
-    color: PR_FG,
-    letterSpacing: -0.1,
-  },
-  tierValue: {
-    fontStyle: 'italic',
-    color: PR_GL,
-  },
-  standingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-  },
-  statusDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    shadowColor: PR_GREEN,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.4,
-    shadowRadius: 4,
-  },
-
-  // Section
-  section: {
-    marginBottom: 22,
-  },
-  sectionHeading: {
-    paddingHorizontal: 24,
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: 12,
-    marginBottom: 10,
-  },
-  sectionRoman: {
-    fontFamily: 'Courier',
-    fontSize: 9,
-    color: PR_FG_FAINT,
-    letterSpacing: 1.8,
-  },
-  sectionTitle: {
-    fontFamily: 'Georgia',
-    fontSize: 18,
-    fontWeight: '500',
-    color: PR_FG,
-    letterSpacing: -0.1,
-  },
-  sectionSub: {
-    fontFamily: 'System',
-    fontSize: 10.5,
-    color: PR_FG_FAINT,
-    marginTop: 3,
-    letterSpacing: 0.05,
-  },
-  sectionCard: {
-    backgroundColor: PR_BG_CARD,
-    borderWidth: 1,
-    borderColor: PR_LINE,
-    borderRadius: 16,
-    paddingHorizontal: 18,
-  },
-
-  // Row
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 16,
-    gap: 14,
-  },
-  rowBorder: {
-    borderBottomWidth: 1,
-    borderBottomColor: PR_LINE,
-  },
-  rowIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
-    backgroundColor: PR_BG_RAISED,
-    borderWidth: 1,
-    borderColor: PR_LINE,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  rowLabel: {
-    fontFamily: 'System',
-    fontSize: 16,
-    fontWeight: '500',
-    color: PR_FG,
-    letterSpacing: -0.1,
-  },
-  rowSub: {
-    fontFamily: 'System',
-    fontSize: 12.5,
-    color: PR_FG_FAINT,
-    marginTop: 2,
-  },
-  rowValue: {
-    fontFamily: 'System',
-    fontSize: 14,
-    fontWeight: '500',
-  },
-
-  // Appearance
-  appearanceCard: {
-    backgroundColor: PR_BG_CARD,
-    borderWidth: 1,
-    borderColor: PR_LINE,
-    borderRadius: 16,
-    padding: 18,
-  },
-  appearanceHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'baseline',
-    marginBottom: 12,
-  },
-  appearanceLabel: {
-    fontFamily: 'System',
-    fontSize: 12,
-    color: PR_FG_MUTED,
-  },
-  appearanceVersion: {
-    fontFamily: 'Courier',
-    fontSize: 9,
-    color: PR_FG_FAINT,
-    letterSpacing: 1,
-  },
-  appearanceRow: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  appearanceChip: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: PR_LINE_STRONG,
-    alignItems: 'center',
-  },
-  appearanceChipActive: {
-    borderColor: PR_GD,
-    backgroundColor: `${PR_G}2E`,
-  },
-  appearanceChipText: {
-    fontFamily: 'System',
-    fontSize: 13,
-    fontWeight: '500',
-    color: PR_FG_MUTED,
-    letterSpacing: -0.1,
-  },
-  appearanceChipTextActive: {
-    fontWeight: '600',
-    color: PR_GL,
-  },
-
-  // Sign out
-  signOutContainer: {
-    paddingHorizontal: 24,
-    paddingTop: 8,
-    alignItems: 'center',
-  },
-  signOutButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingHorizontal: 28,
-    paddingVertical: 14,
-    borderWidth: 1,
-    borderColor: PR_LINE_STRONG,
-    borderRadius: 999,
-  },
-  signOutText: {
-    fontFamily: 'Georgia',
-    fontSize: 16,
-    fontStyle: 'italic',
-    color: PR_FG_MUTED,
-    letterSpacing: -0.1,
-  },
-  footerVersion: {
-    marginTop: 18,
-    fontFamily: 'Georgia',
-    fontSize: 12,
-    fontStyle: 'italic',
-    color: PR_FG_FAINT,
-  },
-  footerVersionMono: {
-    fontFamily: 'Courier',
-    fontStyle: 'normal',
-  },
-});
 
 export default function ProfileScreen() {
-  const { colors, themePreference, setThemePreference, isDark } = useTheme();
+  const { colors, themePreference, setThemePreference } = useTheme();
   const { user, logout, token, isAuthenticated } = useAuthStore();
   const insets = useSafeAreaInsets();
   const [userTier, setUserTier] = useState<UserTier>('free');
   const [refreshing, setRefreshing] = useState(false);
   const [badgesEarned, setBadgesEarned] = useState<number | null>(null);
+  const [earnedBadgeIds, setEarnedBadgeIds] = useState<string[] | null>(null);
   const [adminOrgCount, setAdminOrgCount] = useState<number | null>(null);
   const [votesCast, setVotesCast] = useState<number | null>(null);
   const [verification, setVerification] = useState<{ verified: boolean; status: PassportStatus; verifiedAt?: string | null; citizenshipVerified: boolean }>({
@@ -635,7 +272,6 @@ export default function ProfileScreen() {
   const [profileLocation, setProfileLocation] = useState<{ country?: string; state?: string; city?: string } | null>(null);
   const [startingKyc, setStartingKyc] = useState(false);
   const { isActive: tutorialActive, completeAction: completeTutorialAction } = useTutorialStore();
-  const BADGES_TOTAL = 15;
 
   // Fetch user's subscription tier
   const fetchTier = useCallback(async () => {
@@ -683,8 +319,8 @@ export default function ProfileScreen() {
     fetchTier();
   }, [fetchTier]);
 
-  // Live badge count for the profile menu row. Falls back to null on
-  // failure so the row label degrades gracefully ("Badges & achievements").
+  // Live badge data for the CIVIC BADGES tiles + count. Falls back to null
+  // on failure so the section degrades gracefully (no stale counts).
   useEffect(() => {
     if (!token || !user?.id) return;
     (async () => {
@@ -694,17 +330,23 @@ export default function ProfileScreen() {
         });
         if (response.ok) {
           const earned = await response.json();
-          setBadgesEarned(Array.isArray(earned) ? earned.length : 0);
+          if (Array.isArray(earned)) {
+            setBadgesEarned(earned.length);
+            setEarnedBadgeIds(earned.map((b: any) => b.badgeId || b.badge?.id || b.id).filter(Boolean));
+          } else {
+            setBadgesEarned(0);
+            setEarnedBadgeIds([]);
+          }
         }
       } catch {
-        // Keep null; row will hide the count.
+        // Keep null; section will hide the count.
       }
     })();
   }, [token, user?.id]);
 
-  // Live counts for Activity rows + verification status for the passport
-  // card. Each falls back to null on failure so the row hides its secondary
-  // label rather than showing a stale value.
+  // Live counts for record stats + verification status for the credential
+  // card. Each falls back to null on failure so the tile shows an em dash
+  // rather than a stale value.
   const fetchProfileData = useCallback(async () => {
     if (!token) return;
     try {
@@ -813,17 +455,22 @@ export default function ProfileScreen() {
 
   const navigateTo = (screen: string) => router.push(screen as any);
 
-  const getLocationString = () => {
+  const getLocationParts = () => {
     // Demo account should use hardcoded location for App Store review
     const isDemoAccount = user?.email === 'demo@represent.app';
     if (isDemoAccount) {
-      return 'Toronto, Ontario, Canada';
+      return { city: 'Toronto', state: 'Ontario', country: 'Canada' };
     }
-    const parts = [
-      profileLocation?.city || user?.city,
-      profileLocation?.state || user?.state,
-      profileLocation?.country || user?.country,
-    ].filter(Boolean);
+    return {
+      city: profileLocation?.city || user?.city,
+      state: profileLocation?.state || user?.state,
+      country: profileLocation?.country || user?.country,
+    };
+  };
+
+  const getLocationString = () => {
+    const { city, state, country } = getLocationParts();
+    const parts = [city, state, country].filter(Boolean);
     return parts.length > 0 ? parts.join(', ') : null;
   };
 
@@ -837,22 +484,49 @@ export default function ProfileScreen() {
   // Get tier label for display
   const tierLabel = userTier === 'premium' ? 'Premium' : userTier === 'verified' ? 'Verified' : 'Free';
 
-  // Generate folio code from user id
+  // Credential ID from the user id, styled after the mock's RV-CIT-88291-CA
   const getFolioCode = () => {
-    const base = user?.id?.slice(-4)?.toUpperCase() || '1719';
-    return `${base}/2033`;
+    const base = user?.id?.replace(/[^a-zA-Z0-9]/g, '')?.slice(-5)?.toUpperCase() || '88291';
+    const country = getLocationParts().country;
+    const cc = country ? `-${country.slice(0, 2).toUpperCase()}` : '';
+    return `RV-CIT-${base}${cc}`;
   };
+
+  const { city, state, country } = getLocationParts();
+  const hasScope = !!(city || state || country);
+
+  // Badge tiles: earned first (up to 3), locked fillers after.
+  const earnedSet = new Set(earnedBadgeIds ?? []);
+  const earnedTiles = BADGE_META.filter((b) => earnedSet.has(b.id)).slice(0, 3);
+  const lockedTiles = BADGE_META.filter((b) => !earnedSet.has(b.id)).slice(0, Math.max(0, 3 - earnedTiles.length));
+  const badgeTiles = [
+    ...earnedTiles.map((b) => ({ ...b, earned: true })),
+    ...lockedTiles.map((b) => ({ ...b, earned: false })),
+  ];
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView
-        contentContainerStyle={[styles.content, { paddingTop: insets.top + 16 }]}
+        contentContainerStyle={[styles.content, { paddingTop: insets.top + 14 }]}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.gold} />
         }
       >
-        {/* Passport Card (replaces former PortraitCard) */}
+        {/* Header: Identity + settings entry */}
+        <Animated.View entering={FadeInDown.duration(400)} style={styles.header}>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>Identity</Text>
+          <TouchableOpacity
+            style={[styles.headerGear, { backgroundColor: colors.surface, borderColor: colors.borderSubtle }]}
+            onPress={() => navigateTo('/modals/privacy')}
+            activeOpacity={0.7}
+            accessibilityLabel="Settings"
+          >
+            <Ionicons name="settings-outline" size={18} color={colors.textSecondary} />
+          </TouchableOpacity>
+        </Animated.View>
+
+        {/* Civic credential card + verify prompt for unverified users */}
         <PassportCard
           name={user?.name || 'Citizen'}
           location={getLocationString() || ''}
@@ -860,64 +534,196 @@ export default function ProfileScreen() {
           status={verification.status}
           folio={getFolioCode()}
           memberSince={getMemberSinceShort()}
+          country={country || undefined}
           onVerify={handleStartKyc}
           startingKyc={startingKyc}
         />
 
-        {/* Section I: Civic Record */}
-        <PrSection delay={200}>
-          <PrRow
-            icon="shield-checkmark-outline"
-            label="Citizenship"
-            sub={verification.citizenshipVerified ? 'Verified citizen' : 'Passport + proof of address required for citizens-only proposals'}
-            value={verification.citizenshipVerified ? 'Verified' : 'Verify'}
-            valueColor={verification.citizenshipVerified ? colors.success : colors.goldLight}
-            onPress={verification.citizenshipVerified ? undefined : handleStartCitizenKyc}
-          />
-          <PrRow icon="time-outline" label="Voting history" sub={votesCast !== null ? `${votesCast.toLocaleString()} ballots cast` : undefined} onPress={() => navigateTo('/modals/voting-history')} />
-          <PrRow icon="analytics-outline" label="Analytics" sub="Patterns & impact" onPress={() => navigateTo('/modals/analytics')} />
-          <PrRow icon="trophy-outline" label="Badges & achievements" value={badgesEarned !== null ? `${badgesEarned} / ${BADGES_TOTAL}` : undefined} valueColor={colors.goldLight} last onPress={() => navigateTo('/modals/badges')} />
-        </PrSection>
+        {/* Record stats */}
+        <Animated.View entering={FadeInUp.delay(200).duration(400)} style={styles.statsRow}>
+          <StatTile value={votesCast} label="BALLOTS CAST" />
+          <StatTile value={adminOrgCount} label="ORGANIZATIONS" />
+        </Animated.View>
 
-        {/* Section II: Membership */}
-        <PrSection delay={250}>
-          <PrRow icon="card-outline" label="Subscription" sub={`${tierLabel} tier`} value="Upgrade" valueColor={colors.goldLight} onPress={() => navigateTo('/modals/subscription')} />
-          {Platform.OS === 'ios' && (
-            <PrRow
-              icon="refresh-outline"
-              label="Restore purchases"
-              last={!adminApi.isAdmin()}
-              onPress={async () => {
-                const result = await restorePurchases(token);
-                if (result.restored) {
-                  Alert.alert('Purchases Restored', 'Your previous purchases have been restored successfully.');
-                } else if (result.error) {
-                  Alert.alert('Error', result.error);
-                } else {
-                  Alert.alert('No Purchases Found', 'No previous purchases were found to restore.');
-                }
-              }}
+        {/* Voting scope (X3 treatment) */}
+        <Animated.View entering={FadeInUp.delay(250).duration(400)} style={styles.section}>
+          <SectionLabel>VOTING SCOPE</SectionLabel>
+          <RowCard>
+            {hasScope ? (
+              <>
+                {country && (
+                  <ScopeRow
+                    icon="globe-outline"
+                    name={country}
+                    sub={
+                      verification.citizenshipVerified
+                        ? 'Federal proposals · citizens only'
+                        : 'Citizens only · passport + proof of address required'
+                    }
+                    indent={0}
+                    eligible={verification.citizenshipVerified}
+                    onVerify={handleStartCitizenKyc}
+                    last={!state && !city}
+                  />
+                )}
+                {state && (
+                  <ScopeRow
+                    icon="business-outline"
+                    name={state}
+                    sub="Provincial & state proposals"
+                    indent={country ? 18 : 0}
+                    eligible={verification.verified}
+                    onVerify={handleStartKyc}
+                    last={!city}
+                  />
+                )}
+                {city && (
+                  <ScopeRow
+                    icon="location-outline"
+                    name={city}
+                    sub="Municipal proposals"
+                    indent={(country ? 18 : 0) + (state ? 18 : 0)}
+                    eligible={verification.verified}
+                    onVerify={handleStartKyc}
+                    last
+                  />
+                )}
+              </>
+            ) : (
+              <ScopeRow
+                icon="location-outline"
+                name="Residence not set"
+                sub="Verify your address to unlock your voting scope"
+                indent={0}
+                eligible={false}
+                onVerify={handleStartKyc}
+                last
+              />
+            )}
+          </RowCard>
+          <Text style={[styles.scopeCaption, { color: colors.textTertiary }]}>
+            Where you can vote is determined by your verified residence and citizenship — not by choice.
+          </Text>
+        </Animated.View>
+
+        {/* Civic badges section removed for launch — the badges modal and
+            its data plumbing stay intact for when it returns. */}
+
+        {/* Civic record */}
+        <Animated.View entering={FadeInUp.delay(350).duration(400)} style={styles.section}>
+          <SectionLabel>CIVIC RECORD</SectionLabel>
+          <RowCard>
+            <SettingsRow
+              label="Voting History"
+              value={votesCast !== null ? votesCast.toLocaleString() : undefined}
+              valueMono
+              onPress={() => navigateTo('/modals/voting-history')}
             />
-          )}
-        </PrSection>
+            <SettingsRow
+              label="Analytics"
+              sub="Patterns & impact"
+              last
+              onPress={() => navigateTo('/modals/analytics')}
+            />
+          </RowCard>
+        </Animated.View>
+
+        {/* Membership */}
+        <Animated.View entering={FadeInUp.delay(400).duration(400)} style={styles.section}>
+          <SectionLabel>MEMBERSHIP</SectionLabel>
+          <RowCard>
+            <SettingsRow
+              label="Sentinel"
+              sub="AI governance analysis"
+              value={userTier === 'premium' ? undefined : 'Premium'}
+              valueColor={userTier === 'premium' ? undefined : colors.gold}
+              onPress={() => navigateTo('/(tabs)/sentinel')}
+            />
+            <SettingsRow
+              label="Subscription"
+              sub={`${tierLabel} tier`}
+              value={userTier === 'premium' ? undefined : 'Upgrade'}
+              valueColor={userTier === 'premium' ? undefined : colors.gold}
+              last={Platform.OS !== 'ios'}
+              onPress={() => navigateTo('/modals/subscription')}
+            />
+            {Platform.OS === 'ios' && (
+              <SettingsRow
+                label="Restore purchases"
+                last
+                onPress={async () => {
+                  const result = await restorePurchases(token);
+                  if (result.restored) {
+                    Alert.alert('Purchases Restored', 'Your previous purchases have been restored successfully.');
+                  } else if (result.error) {
+                    Alert.alert('Error', result.error);
+                  } else {
+                    Alert.alert('No Purchases Found', 'No previous purchases were found to restore.');
+                  }
+                }}
+              />
+            )}
+          </RowCard>
+        </Animated.View>
 
         {/* Referral program */}
-        <InviteFriendsCard delay={275} />
+        <InviteFriendsCard delay={425} />
 
-        {/* Section III: Administration */}
-        <PrSection delay={300}>
-          {adminApi.isAdmin() && (
-            <PrRow icon="shield-checkmark-outline" label="Admin dashboard" sub={adminOrgCount !== null ? `${adminOrgCount} organization${adminOrgCount === 1 ? '' : 's'}` : undefined} onPress={() => navigateTo('/modals/admin')} />
-          )}
-          <PrRow icon="settings-outline" label="Settings & privacy" onPress={() => navigateTo('/modals/privacy')} />
-          <PrRow icon="document-text-outline" label="Legal" last onPress={() => navigateTo('/modals/legal')} />
-        </PrSection>
+        {/* Account */}
+        <Animated.View entering={FadeInUp.delay(450).duration(400)} style={styles.section}>
+          <SectionLabel>ACCOUNT</SectionLabel>
+          <RowCard>
+            {adminApi.isAdmin() && (
+              <SettingsRow
+                label="Admin dashboard"
+                sub={adminOrgCount !== null ? `${adminOrgCount} organization${adminOrgCount === 1 ? '' : 's'}` : undefined}
+                onPress={() => navigateTo('/modals/admin')}
+              />
+            )}
+            <SettingsRow label="Notifications" onPress={() => navigateTo('/modals/notifications')} />
+            <SettingsRow label="Settings & privacy" onPress={() => navigateTo('/modals/privacy')} />
+            {/* Dev builds only: exposes the session token for local tooling
+                (e.g. scripts/publish-test-proposals.mjs). Never ships. */}
+            {__DEV__ && (
+              <SettingsRow
+                label="Copy API token"
+                sub="Dev only — for local scripts"
+                onPress={async () => {
+                  if (!token) {
+                    Alert.alert('No token', 'Sign in first.');
+                    return;
+                  }
+                  await Clipboard.setStringAsync(token);
+                  Alert.alert('Token copied', 'Paste it into REPRESENT_TOKEN in your terminal.');
+                }}
+              />
+            )}
+            <SettingsRow label="Legal" last onPress={() => navigateTo('/modals/legal')} />
+          </RowCard>
+        </Animated.View>
 
-        {/* Section IV: Appearance */}
-        <PrAppearance currentTheme={themePreference} onThemeChange={setThemePreference} />
+        {/* Appearance */}
+        <Animated.View entering={FadeInUp.delay(500).duration(400)} style={styles.section}>
+          <SectionLabel>APPEARANCE</SectionLabel>
+          <RowCard>
+            <View style={styles.themeRow}>
+              <Text style={[styles.rowLabel, { color: colors.text }]}>Theme</Text>
+              <ThemeSegments currentTheme={themePreference} onThemeChange={setThemePreference} />
+            </View>
+          </RowCard>
+        </Animated.View>
 
-        {/* Sign Out */}
-        <PrSignOut onPress={handleLogout} />
+        {/* Sign out + version */}
+        <Animated.View entering={FadeInUp.delay(550).duration(400)} style={styles.signOutSection}>
+          <TouchableOpacity
+            style={[styles.signOutButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
+            onPress={handleLogout}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.signOutText, { color: colors.text }]}>Sign Out</Text>
+          </TouchableOpacity>
+          <Text style={[styles.versionText, { color: colors.textTertiary }]}>REPRESENT v1.0.0</Text>
+        </Animated.View>
 
         <View style={styles.bottomPadding} />
       </ScrollView>
@@ -928,121 +734,233 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   content: {
-    paddingHorizontal: SPACING.lg,
+    paddingHorizontal: SPACING.screenPadding,
     // paddingTop is set dynamically via insets
     paddingBottom: 40,
   },
 
-  // Profile Card
-  profileCard: {
-    alignItems: 'center',
-    padding: SPACING.xxxl,
-    borderRadius: BORDER_RADIUS['2xl'],
-    borderWidth: 1.5,
-    marginBottom: SPACING.xl,
-    overflow: 'hidden',
-    ...SHADOWS.md,
-  },
-  avatar: {
-    width: 88,
-    height: 88,
-    borderRadius: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: SPACING.lg,
-  },
-  avatarText: { fontSize: 36, fontWeight: '700' },
-  userName: { ...TYPOGRAPHY.headlineLarge, fontSize: responsive(20, 22, 24), marginBottom: SPACING.xs },
-  userEmail: { ...TYPOGRAPHY.bodyMedium, marginBottom: SPACING.sm },
-  tierBadgeContainer: {
-    marginBottom: SPACING.lg,
-  },
-
-  locationBadge: {
+  // Header
+  header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.sm,
-    borderRadius: BORDER_RADIUS.full,
-    gap: SPACING.sm,
+    justifyContent: 'space-between',
+    marginBottom: 16,
   },
-  locationText: { ...TYPOGRAPHY.labelMedium },
-
-  // Menu Card
-  menuCard: {
-    borderRadius: BORDER_RADIUS['2xl'],
-    borderWidth: 1,
-    overflow: 'hidden',
-    marginBottom: SPACING.xl,
+  headerTitle: {
+    fontFamily: FONTS.serif,
+    fontSize: 32,
+    lineHeight: 35,
+    letterSpacing: -0.38,
   },
-  menuItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: SPACING.lg,
-    borderBottomWidth: 1,
-  },
-  menuIconBg: {
+  headerGear: {
     width: 40,
     height: 40,
-    borderRadius: BORDER_RADIUS.lg,
+    borderRadius: 20,
+    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: SPACING.md,
   },
-  menuLabel: {
-    ...TYPOGRAPHY.bodyLarge,
+
+  // Section
+  section: {
+    marginBottom: 16,
+    gap: 7,
+  },
+  sectionLabel: {
+    fontFamily: FONTS.sansSemiBold,
+    fontSize: 10.5,
+    letterSpacing: 1.47,
+  },
+
+  // Record stats
+  statsRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 16,
+  },
+  statTile: {
     flex: 1,
-    fontWeight: '500',
+    borderRadius: 16,
+    borderWidth: 1,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    gap: 2,
+  },
+  statValue: {
+    fontFamily: FONTS.monoSemiBold,
+    fontVariant: ['tabular-nums'],
+    fontSize: 24,
+  },
+  statLabel: {
+    fontFamily: FONTS.sansMedium,
+    fontSize: 10,
+    letterSpacing: 1.2,
   },
 
-  // Theme Card
-  themeCard: {
-    borderRadius: BORDER_RADIUS['2xl'],
+  // Grouped row card (mock 14)
+  rowCard: {
+    borderRadius: 16,
     borderWidth: 1,
-    padding: SPACING.lg,
-    marginBottom: SPACING.xl,
-    ...SHADOWS.sm,
+    paddingHorizontal: 16,
+    paddingVertical: 4,
   },
-  themeHeader: {
+  row: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: SPACING.md,
-    marginBottom: SPACING.lg,
+    paddingVertical: 13,
+    gap: 8,
   },
-  themeIconBg: {
-    width: 40,
-    height: 40,
-    borderRadius: BORDER_RADIUS.lg,
+  rowLabel: {
+    fontFamily: FONTS.sansMedium,
+    fontSize: 14,
+  },
+  rowSub: {
+    fontFamily: FONTS.sans,
+    fontSize: 11,
+  },
+  rowValue: {
+    fontFamily: FONTS.sans,
+    fontSize: 12,
+  },
+  rowValueMono: {
+    fontFamily: FONTS.mono,
+    fontVariant: ['tabular-nums'],
+    fontSize: 11,
+  },
+  rowArrow: {
+    fontFamily: FONTS.sansMedium,
+    fontSize: 13,
+  },
+
+  // Scope (X3)
+  scopeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 13,
+    paddingVertical: 14,
+  },
+  scopeIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 11,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  themeTitle: {
-    ...TYPOGRAPHY.labelLarge,
-    fontWeight: '700',
+  scopeName: {
+    fontFamily: FONTS.sansSemiBold,
+    fontSize: 14,
   },
-  themeSubtitle: {
-    ...TYPOGRAPHY.bodySmall,
-    marginTop: SPACING.xxs,
+  scopeSub: {
+    fontFamily: FONTS.sans,
+    fontSize: 11.5,
   },
+  scopeStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  scopeStatusText: {
+    fontFamily: FONTS.sansSemiBold,
+    fontSize: 9.5,
+    letterSpacing: 0.76,
+  },
+  scopeCaption: {
+    fontFamily: FONTS.sans,
+    fontSize: 11.5,
+    lineHeight: 16,
+  },
+
+  // Badges
+  badgesHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  badgesLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  badgesCount: {
+    fontFamily: FONTS.mono,
+    fontVariant: ['tabular-nums'],
+    fontSize: 11,
+  },
+  badgesGrid: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  badgeTile: {
+    flex: 1,
+    borderRadius: 16,
+    borderWidth: 1,
+    paddingVertical: 13,
+    paddingHorizontal: 10,
+    alignItems: 'center',
+    gap: 7,
+  },
+  badgeTileIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  badgeTileName: {
+    fontFamily: FONTS.sansSemiBold,
+    fontSize: 10.5,
+    textAlign: 'center',
+  },
+
+  // Theme row
   themeRow: {
     flexDirection: 'row',
-    gap: SPACING.sm,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 10,
+    gap: 12,
   },
-  themeChip: {
-    flex: 1,
+  segments: {
+    flexDirection: 'row',
+    borderRadius: 11,
+    borderWidth: 1,
+    padding: 3,
+  },
+  segment: {
+    height: 30,
+    paddingHorizontal: 12,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: SPACING.md,
-    borderRadius: BORDER_RADIUS.full,
-    borderWidth: 1,
   },
-  themeChipText: {
-    ...TYPOGRAPHY.labelMedium,
-    fontWeight: '700',
+  segmentText: {
+    fontFamily: FONTS.sansMedium,
+    fontSize: 12,
   },
 
-  // Logout
-  logoutContainer: { marginBottom: SPACING.xl },
-  versionText: { ...TYPOGRAPHY.bodySmall, textAlign: 'center' },
+  // Sign out
+  signOutSection: {
+    gap: 10,
+    marginTop: 4,
+  },
+  signOutButton: {
+    height: 50,
+    borderRadius: 14,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  signOutText: {
+    fontFamily: FONTS.sansSemiBold,
+    fontSize: 14.5,
+  },
+  versionText: {
+    fontFamily: FONTS.mono,
+    fontVariant: ['tabular-nums'],
+    fontSize: 9.5,
+    letterSpacing: 1.33,
+    textAlign: 'center',
+  },
+
   bottomPadding: { height: 100 },
 });

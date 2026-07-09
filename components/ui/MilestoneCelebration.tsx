@@ -336,7 +336,6 @@ const styles = StyleSheet.create({
   },
   title: {
     ...TYPOGRAPHY.headlineMedium,
-    fontWeight: '700',
     textAlign: 'center',
     marginBottom: SPACING.xs,
   },
@@ -352,7 +351,6 @@ const styles = StyleSheet.create({
   },
   tierText: {
     ...TYPOGRAPHY.labelSmall,
-    fontWeight: '700',
     letterSpacing: 1.5,
   },
 });

@@ -21,7 +21,7 @@ import Animated, {
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuthStore } from '../../lib/auth';
-import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS } from '../../lib/theme';
+import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS, FONTS } from '../../lib/theme';
 import { adminApi, proposalsApi, Proposal, AdminStats } from '../../lib/api';
 import { FeaturedStat, StatsGrid } from '../../components/ui';
 
@@ -105,11 +105,11 @@ function AdminProposalCard({
         </View>
         <View style={styles.voteStats}>
           <View style={styles.voteStat}>
-            <Ionicons name="thumbs-up" size={12} color={colors.success} />
+            <Ionicons name="thumbs-up" size={12} color={colors.support} />
             <Text style={[styles.voteText, { color: colors.textSecondary }]}>{proposal.supportVotes}</Text>
           </View>
           <View style={styles.voteStat}>
-            <Ionicons name="thumbs-down" size={12} color={colors.error} />
+            <Ionicons name="thumbs-down" size={12} color={colors.oppose} />
             <Text style={[styles.voteText, { color: colors.textSecondary }]}>{proposal.opposeVotes}</Text>
           </View>
         </View>
@@ -508,9 +508,8 @@ const styles = StyleSheet.create({
     gap: SPACING.xs,
   },
   headerTitle: {
-    fontFamily: 'Georgia',
+    fontFamily: FONTS.serif,
     fontSize: 20,
-    fontWeight: '500',
   },
   headerSpacer: {
     width: 40,
@@ -533,7 +532,7 @@ const styles = StyleSheet.create({
   },
   tabButtonText: {
     fontSize: TYPOGRAPHY.bodySmall.fontSize,
-    fontWeight: '600',
+    fontFamily: FONTS.sansSemiBold,
   },
   content: {
     paddingHorizontal: SPACING.lg,
@@ -547,6 +546,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: TYPOGRAPHY.body.fontSize,
+    fontFamily: FONTS.sans,
   },
   unauthorizedContainer: {
     flex: 1,
@@ -563,13 +563,13 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.lg,
   },
   unauthorizedTitle: {
-    fontFamily: 'Georgia',
+    fontFamily: FONTS.serif,
     fontSize: 22,
-    fontWeight: '500',
     marginBottom: SPACING.sm,
   },
   unauthorizedText: {
     fontSize: TYPOGRAPHY.body.fontSize,
+    fontFamily: FONTS.sans,
     textAlign: 'center',
     marginBottom: SPACING.xl,
   },
@@ -581,7 +581,7 @@ const styles = StyleSheet.create({
   },
   backBtnText: {
     fontSize: TYPOGRAPHY.body.fontSize,
-    fontWeight: '600',
+    fontFamily: FONTS.sansSemiBold,
   },
   adminBadge: {
     flexDirection: 'row',
@@ -596,12 +596,11 @@ const styles = StyleSheet.create({
   },
   adminBadgeText: {
     fontSize: TYPOGRAPHY.body.fontSize,
-    fontWeight: '600',
+    fontFamily: FONTS.sansSemiBold,
   },
   sectionTitle: {
-    fontFamily: 'Georgia',
+    fontFamily: FONTS.serif,
     fontSize: 18,
-    fontWeight: '500',
     marginBottom: SPACING.md,
   },
   activityCard: {
@@ -610,9 +609,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   activityTitle: {
-    fontFamily: 'Georgia',
+    fontFamily: FONTS.serif,
     fontSize: 18,
-    fontWeight: '500',
     marginBottom: SPACING.lg,
   },
   activityRow: {
@@ -625,12 +623,13 @@ const styles = StyleSheet.create({
     gap: SPACING.xs,
   },
   activityValue: {
-    fontFamily: 'Georgia',
+    fontFamily: FONTS.mono,
+    fontVariant: ['tabular-nums'],
     fontSize: 24,
-    fontWeight: '500',
   },
   activityLabel: {
     fontSize: TYPOGRAPHY.caption.fontSize,
+    fontFamily: FONTS.sans,
   },
   activityDivider: {
     width: 1,
@@ -649,12 +648,12 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.xs,
   },
   proposalsHeaderText: {
-    fontFamily: 'Georgia',
+    fontFamily: FONTS.serif,
     fontSize: 18,
-    fontWeight: '500',
   },
   proposalsHeaderNote: {
     fontSize: TYPOGRAPHY.caption.fontSize,
+    fontFamily: FONTS.sans,
   },
   proposalCard: {
     padding: SPACING.md,
@@ -682,13 +681,13 @@ const styles = StyleSheet.create({
   },
   seedBadgeText: {
     fontSize: 10,
-    fontWeight: '700',
+    fontFamily: FONTS.sansSemiBold,
+    letterSpacing: 1,
   },
   proposalTitle: {
     flex: 1,
-    fontFamily: 'Georgia',
+    fontFamily: FONTS.serif,
     fontSize: 15,
-    fontWeight: '500',
     lineHeight: 20,
   },
   deleteButton: {
@@ -711,7 +710,7 @@ const styles = StyleSheet.create({
   },
   categoryText: {
     fontSize: TYPOGRAPHY.caption.fontSize,
-    fontWeight: '600',
+    fontFamily: FONTS.sansSemiBold,
   },
   voteStats: {
     flexDirection: 'row',
@@ -724,10 +723,13 @@ const styles = StyleSheet.create({
   },
   voteText: {
     fontSize: TYPOGRAPHY.caption.fontSize,
+    fontFamily: FONTS.mono,
+    fontVariant: ['tabular-nums'],
   },
   proposalId: {
     fontSize: 10,
-    fontFamily: 'monospace',
+    fontFamily: FONTS.mono,
+    fontVariant: ['tabular-nums'],
   },
   emptyState: {
     alignItems: 'center',
@@ -737,6 +739,7 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: TYPOGRAPHY.body.fontSize,
+    fontFamily: FONTS.sans,
   },
   bottomPadding: {
     height: SPACING['2xl'],

@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { isBiometricAvailable, isBiometricEnabled, setBiometricEnabled as saveBiometricEnabled, getBiometricType } from '../../lib/biometrics';
+import { FONTS } from '../../lib/theme';
 import { useAuthStore } from '../../lib/auth';
 
 export default function PrivacyScreen() {
@@ -63,7 +64,7 @@ export default function PrivacyScreen() {
         <TouchableOpacity onPress={() => router.back()} style={{ width: 40, height: 40, alignItems: 'center', justifyContent: 'center' }}>
           <Ionicons name="chevron-back" size={24} color={colors.text} />
         </TouchableOpacity>
-        <Text style={{ fontFamily: 'Georgia', fontSize: 20, fontWeight: '600', color: colors.text }}>Settings & Privacy</Text>
+        <Text style={{ fontFamily: FONTS.serif, fontSize: 20, color: colors.text }}>Settings & Privacy</Text>
         <View style={{ width: 40 }} />
       </View>
       <ScrollView style={styles.content}>
@@ -181,11 +182,11 @@ const styles = StyleSheet.create({
   card: { borderRadius: 12, padding: 16, marginBottom: 12, borderWidth: 1 },
   row: { flexDirection: 'row', alignItems: 'center' },
   info: { flex: 1, marginLeft: 12 },
-  cardTitle: { fontFamily: 'Georgia', fontSize: 16, fontWeight: '500' },
-  cardSubtitle: { fontSize: 13, marginTop: 2 },
+  cardTitle: { fontFamily: FONTS.serif, fontSize: 16 },
+  cardSubtitle: { fontFamily: FONTS.sans, fontSize: 13, marginTop: 2 },
   infoBox: { flexDirection: 'row', alignItems: 'flex-start', borderRadius: 10, padding: 14, marginTop: 8, gap: 10 },
-  infoBoxText: { fontSize: 13, flex: 1, lineHeight: 18 },
+  infoBoxText: { fontFamily: FONTS.sans, fontSize: 13, flex: 1, lineHeight: 18 },
   deleteCard: { marginTop: 24 },
   deleteButton: { marginTop: 12, alignItems: 'center', paddingVertical: 12, borderRadius: 10, borderWidth: 1, borderColor: '#ff3b30' },
-  deleteButtonText: { color: '#ff3b30', fontSize: 15, fontWeight: '600' },
+  deleteButtonText: { color: '#ff3b30', fontFamily: FONTS.sansSemiBold, fontSize: 15 },
 });

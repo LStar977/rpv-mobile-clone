@@ -29,9 +29,11 @@ export function Skeleton({
   const shimmerValue = useSharedValue(0);
   const containerWidthValue = useSharedValue(200);
 
+  // Spec (22a): shimmer sweeps surfaceHighlight → surfaceElevated →
+  // surfaceHighlight on a 1.4s linear loop.
   useEffect(() => {
     shimmerValue.value = withRepeat(
-      withTiming(1, { duration: 1500, easing: Easing.bezier(0.4, 0, 0.2, 1) }),
+      withTiming(1, { duration: 1400, easing: Easing.linear }),
       -1,
       false
     );
@@ -60,9 +62,11 @@ export function Skeleton({
       case 'circular':
         return 9999;
       case 'text':
-        return RADIUS.xs;
+        // 22a: text lines are ~17px tall with an 8px radius.
+        return 8;
       default:
-        return RADIUS.md;
+        // 22a: bars round to half their height, capped at the card radius.
+        return Math.min(Math.round(height / 2), RADIUS.md);
     }
   };
 
@@ -75,7 +79,7 @@ export function Skeleton({
           width,
           height: variant === 'circular' ? width : height,
           borderRadius: getRadius(),
-          backgroundColor: colors.shimmer,
+          backgroundColor: colors.surfaceHighlight,
           overflow: 'hidden',
         },
         style,
@@ -84,9 +88,9 @@ export function Skeleton({
       <Animated.View style={[styles.shimmer, animatedStyle]}>
         <LinearGradient
           colors={[
-            'transparent',
-            colors.shimmerHighlight,
-            'transparent',
+            colors.surfaceHighlight,
+            colors.surfaceElevated,
+            colors.surfaceHighlight,
           ]}
           start={{ x: 0, y: 0.5 }}
           end={{ x: 1, y: 0.5 }}
@@ -246,7 +250,9 @@ export function SkeletonProfile() {
   );
 }
 
-// Skeleton Proposal Card
+// Skeleton Proposal Card — 22a spec: 18-radius card on surface with a
+// chip-shaped header row, two title lines (17px / r8), a 6px tally bar,
+// and a mono footer row (11px / r5).
 export function SkeletonProposal({ style }: { style?: ViewStyle }) {
   const { colors } = useTheme();
 
@@ -254,27 +260,20 @@ export function SkeletonProposal({ style }: { style?: ViewStyle }) {
     <View
       style={[
         styles.proposalCard,
-        { backgroundColor: colors.surface, borderColor: colors.border },
+        { backgroundColor: colors.surface, borderColor: colors.borderSubtle },
         style,
       ]}
     >
       <View style={styles.proposalHeader}>
-        <View style={styles.proposalHeaderLeft}>
-          <Skeleton width={70} height={22} borderRadius={RADIUS.sm} />
-          <Skeleton width={90} height={18} borderRadius={RADIUS.sm} />
-        </View>
-        <Skeleton width={32} height={32} variant="circular" />
+        <Skeleton width={120} height={20} borderRadius={RADIUS.chip} />
+        <Skeleton width={64} height={14} borderRadius={7} />
       </View>
-      <Skeleton width="95%" height={20} style={{ marginTop: SPACING.lg }} />
-      <Skeleton width="80%" height={20} style={{ marginTop: SPACING.xs }} />
-      <Skeleton width="100%" height={14} variant="text" style={{ marginTop: SPACING.md }} />
-      <Skeleton width="70%" height={14} variant="text" style={{ marginTop: SPACING.xs }} />
+      <Skeleton width="88%" height={17} borderRadius={8} />
+      <Skeleton width="64%" height={17} borderRadius={8} />
+      <Skeleton width="100%" height={6} borderRadius={3} />
       <View style={styles.proposalFooter}>
-        <View style={styles.proposalStats}>
-          <Skeleton width={60} height={16} />
-          <Skeleton width={60} height={16} />
-        </View>
-        <Skeleton width={120} height={40} borderRadius={RADIUS.md} />
+        <Skeleton width={80} height={11} borderRadius={5} />
+        <Skeleton width={120} height={11} borderRadius={5} />
       </View>
     </View>
   );
@@ -392,30 +391,24 @@ const styles = StyleSheet.create({
     gap: SPACING.sm,
     marginTop: SPACING.lg,
   },
-  // Proposal
+  // Proposal — 22a: padding 17/18, 13px internal gap, radius 18
   proposalCard: {
-    padding: SPACING.xl,
+    paddingVertical: 17,
+    paddingHorizontal: 18,
     borderRadius: RADIUS.card,
     borderWidth: 1,
     marginBottom: SPACING.lg,
+    gap: 13,
   },
   proposalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
-  },
-  proposalHeaderLeft: {
-    gap: SPACING.sm,
+    alignItems: 'center',
   },
   proposalFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: SPACING.xl,
-  },
-  proposalStats: {
-    flexDirection: 'row',
-    gap: SPACING.lg,
   },
   // Welcome
   welcomeContainer: {

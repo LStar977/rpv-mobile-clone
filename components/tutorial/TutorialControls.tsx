@@ -34,7 +34,7 @@ export function TutorialControls() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     await skipTutorial();
     // Navigate to home screen after skipping
-    router.replace('/(tabs)/dashboard');
+    router.replace('/(tabs)/proposals');
   };
 
   const handleButtonPress = () => {
@@ -44,7 +44,7 @@ export function TutorialControls() {
     // Navigate to home screen after completing tutorial
     if (isComplete) {
       setTimeout(() => {
-        router.replace('/(tabs)/dashboard');
+        router.replace('/(tabs)/proposals');
       }, 100);
     }
   };
@@ -206,7 +206,6 @@ const styles = StyleSheet.create({
   },
   skipText: {
     ...TYPOGRAPHY.bodyMedium,
-    fontWeight: '500',
   },
   bottomContainer: {
     paddingHorizontal: SPACING.xl,
@@ -252,7 +251,6 @@ const styles = StyleSheet.create({
   },
   primaryButtonText: {
     ...TYPOGRAPHY.bodyLarge,
-    fontWeight: '700',
     color: '#000',
   },
   hintContainer: {
@@ -268,7 +266,6 @@ const styles = StyleSheet.create({
   },
   hintText: {
     ...TYPOGRAPHY.bodyMedium,
-    fontWeight: '600',
   },
 });
 

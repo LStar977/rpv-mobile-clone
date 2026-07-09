@@ -1,7 +1,7 @@
 import { View, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, { FadeIn } from 'react-native-reanimated';
-import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY } from '../../lib/theme';
+import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, FONTS } from '../../lib/theme';
 
 interface MultipleChoiceResultsProps {
   options: string[];
@@ -62,7 +62,7 @@ export function MultipleChoiceResults({ options, counts }: MultipleChoiceResults
                     styles.optionLabel,
                     {
                       color: isLeader ? colors.gold : colors.text,
-                      fontWeight: isLeader ? '700' : '500',
+                      fontFamily: isLeader ? FONTS.sansBold : FONTS.sansMedium,
                     },
                   ]}
                   numberOfLines={2}
@@ -119,16 +119,16 @@ const styles = StyleSheet.create({
   },
   leaderLabel: {
     ...TYPOGRAPHY.labelSmall,
-    fontWeight: '800',
     letterSpacing: 2,
   },
   leaderName: {
     ...TYPOGRAPHY.headlineMedium,
-    fontWeight: '700',
     marginBottom: 4,
   },
   leaderSub: {
     ...TYPOGRAPHY.bodySmall,
+    fontFamily: FONTS.mono,
+    fontVariant: ['tabular-nums'],
   },
   resultsCard: {
     borderRadius: BORDER_RADIUS.xl,
@@ -151,6 +151,7 @@ const styles = StyleSheet.create({
   },
   optionCount: {
     ...TYPOGRAPHY.bodySmall,
+    fontFamily: FONTS.mono,
     fontVariant: ['tabular-nums'],
   },
   barTrack: {

@@ -17,7 +17,7 @@ import Animated, {
   SlideOutDown,
 } from 'react-native-reanimated';
 import { router } from 'expo-router';
-import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS } from '../../lib/theme';
+import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS, FONTS } from '../../lib/theme';
 
 interface UpgradeModalProps {
   visible: boolean;
@@ -250,7 +250,6 @@ const styles = StyleSheet.create({
   },
   title: {
     ...TYPOGRAPHY.headlineMedium,
-    fontWeight: '700',
     textAlign: 'center',
     marginBottom: SPACING.sm,
   },
@@ -273,7 +272,8 @@ const styles = StyleSheet.create({
   },
   priceText: {
     ...TYPOGRAPHY.labelMedium,
-    fontWeight: '600',
+    fontFamily: FONTS.monoSemiBold,
+    fontVariant: ['tabular-nums'],
   },
   actionButton: {
     width: '100%',
@@ -290,7 +290,6 @@ const styles = StyleSheet.create({
   buttonText: {
     ...TYPOGRAPHY.labelLarge,
     color: '#000',
-    fontWeight: '700',
   },
   cancelButton: {
     paddingVertical: SPACING.sm,

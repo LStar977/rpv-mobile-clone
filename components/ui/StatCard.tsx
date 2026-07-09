@@ -10,7 +10,7 @@ import Animated, {
   withTiming,
   interpolate,
 } from 'react-native-reanimated';
-import { useTheme, SPACING, RADIUS, TYPOGRAPHY, SHADOWS } from '../../lib/theme';
+import { useTheme, SPACING, RADIUS, TYPOGRAPHY, SHADOWS, FONTS } from '../../lib/theme';
 
 interface StatCardProps {
   value: string | number;
@@ -381,7 +381,8 @@ const styles = StyleSheet.create({
   },
   value: {
     ...TYPOGRAPHY.h3,
-    fontWeight: '700',
+    fontFamily: FONTS.monoSemiBold,
+    fontVariant: ['tabular-nums'],
   },
   label: {
     ...TYPOGRAPHY.caption,
@@ -399,7 +400,8 @@ const styles = StyleSheet.create({
   },
   trendValue: {
     ...TYPOGRAPHY.captionSmall,
-    fontWeight: '600',
+    fontFamily: FONTS.monoSemiBold,
+    fontVariant: ['tabular-nums'],
   },
   // Compact
   compactContainer: {
@@ -422,7 +424,8 @@ const styles = StyleSheet.create({
   },
   compactValue: {
     ...TYPOGRAPHY.h5,
-    fontWeight: '700',
+    fontFamily: FONTS.monoSemiBold,
+    fontVariant: ['tabular-nums'],
   },
   compactLabel: {
     ...TYPOGRAPHY.caption,
@@ -439,7 +442,8 @@ const styles = StyleSheet.create({
   },
   compactTrendText: {
     fontSize: 10,
-    fontWeight: '600',
+    fontFamily: FONTS.monoSemiBold,
+    fontVariant: ['tabular-nums'],
   },
   // Grid
   grid: {
@@ -474,7 +478,8 @@ const styles = StyleSheet.create({
   },
   featuredValue: {
     fontSize: 40,
-    fontWeight: '700',
+    fontFamily: FONTS.monoSemiBold,
+    fontVariant: ['tabular-nums'],
     letterSpacing: -1,
   },
   featuredDescription: {
@@ -491,10 +496,11 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.sm,
   },
   progressLabel: {
-    fontWeight: '500',
+    fontFamily: FONTS.sansMedium,
   },
   progressValue: {
-    fontWeight: '600',
+    fontFamily: FONTS.monoSemiBold,
+    fontVariant: ['tabular-nums'],
   },
   progressBar: {
     borderRadius: RADIUS.full,

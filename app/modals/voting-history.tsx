@@ -6,7 +6,7 @@ import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuthStore } from '../../lib/auth';
-import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS } from '../../lib/theme';
+import { useTheme, SPACING, RADIUS, FONTS } from '../../lib/theme';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://representportal.com';
 
@@ -22,17 +22,17 @@ interface VotedProposal {
 type TimeFilter = 'all' | 'week' | 'month';
 type VoteFilter = 'all' | 'support' | 'oppose';
 
+const TALLY_THRESHOLD = 25;
+
 // Filter Chip Component
 function FilterChip({
   label,
   selected,
   onPress,
-  icon,
 }: {
   label: string;
   selected: boolean;
   onPress: () => void;
-  icon?: string;
 }) {
   const { colors } = useTheme();
 
@@ -41,8 +41,8 @@ function FilterChip({
       style={[
         styles.filterChip,
         {
-          backgroundColor: selected ? colors.gold : colors.surface,
-          borderColor: selected ? colors.gold : colors.border,
+          backgroundColor: selected ? colors.surfaceHighlight : colors.transparent,
+          borderColor: selected ? colors.borderStrong : colors.border,
         },
       ]}
       onPress={() => {
@@ -51,10 +51,7 @@ function FilterChip({
       }}
       activeOpacity={0.7}
     >
-      {icon && (
-        <Ionicons name={icon as any} size={14} color={selected ? '#000' : colors.textSecondary} />
-      )}
-      <Text style={[styles.filterChipText, { color: selected ? '#000' : colors.text }]}>
+      <Text style={[styles.filterChipText, { color: selected ? colors.text : colors.textSecondary }]}>
         {label}
       </Text>
     </TouchableOpacity>
@@ -161,11 +158,14 @@ export default function VotingHistoryScreen() {
   );
 
   const formatDate = (dateStr: string) =>
-    new Date(dateStr).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    });
+    new Date(dateStr)
+      .toLocaleDateString('en-US', {
+        month: 'short',
+        day: '2-digit',
+        year: 'numeric',
+      })
+      .replace(',', '')
+      .toUpperCase();
 
   if (loading) {
     return (
@@ -177,22 +177,18 @@ export default function VotingHistoryScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingTop: insets.top + 8,
-        paddingHorizontal: 16,
-        paddingBottom: 12,
-        borderBottomWidth: 1,
-        borderBottomColor: colors.border,
-      }}>
-        <TouchableOpacity onPress={() => router.back()} style={{ width: 40, height: 40, alignItems: 'center', justifyContent: 'center' }}>
-          <Ionicons name="chevron-back" size={24} color={colors.text} />
+      {/* Header */}
+      <View style={[styles.header, { paddingTop: insets.top + SPACING.sm }]}>
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={[styles.backButton, { backgroundColor: colors.surface, borderColor: colors.borderSubtle }]}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="chevron-back" size={20} color={colors.textSecondary} />
         </TouchableOpacity>
-        <Text style={{ fontFamily: 'Georgia', fontSize: 20, fontWeight: '600', color: colors.text }}>Voting History</Text>
-        <View style={{ width: 40 }} />
+        <Text style={[styles.headerTitle, { color: colors.text }]}>Your Record</Text>
       </View>
+
       <ScrollView
         style={styles.content}
         contentContainerStyle={styles.contentContainer}
@@ -208,186 +204,180 @@ export default function VotingHistoryScreen() {
           />
         }
       >
-        {/* Stats Card */}
-        <Animated.View
-          entering={FadeInDown.delay(100).duration(400)}
-          style={[styles.statsCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
-        >
-          <View style={styles.statsRow}>
-            <View style={styles.statItem}>
-              <Text style={[styles.statsNumber, { color: colors.gold }]}>{filteredProposals.length}</Text>
-              <Text style={[styles.statsLabel, { color: colors.textSecondary }]}>Total Votes</Text>
-            </View>
-            <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
-            <View style={styles.statItem}>
-              <Text style={[styles.statsNumber, { color: colors.success }]}>{supportCount}</Text>
-              <Text style={[styles.statsLabel, { color: colors.textSecondary }]}>Supported</Text>
-            </View>
-            <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
-            <View style={styles.statItem}>
-              <Text style={[styles.statsNumber, { color: colors.error }]}>{opposeCount}</Text>
-              <Text style={[styles.statsLabel, { color: colors.textSecondary }]}>Opposed</Text>
-            </View>
-          </View>
+        {/* Ledger line — counts, always mono */}
+        <Animated.View entering={FadeInDown.delay(100).duration(400)}>
+          <Text style={[styles.ledgerLine, { color: colors.textTertiary }]}>
+            {filteredProposals.length} {filteredProposals.length === 1 ? 'BALLOT' : 'BALLOTS'} · {supportCount} SUPPORT · {opposeCount} OPPOSE
+          </Text>
+          <Text style={[styles.ledgerSubline, { color: colors.textTertiary }]}>
+            ALL ON THE PUBLIC LEDGER
+          </Text>
         </Animated.View>
 
         {/* Filters */}
         <Animated.View entering={FadeInDown.delay(200).duration(400)} style={styles.filtersSection}>
-          <View style={styles.filterRow}>
-            <Text style={[styles.filterLabel, { color: colors.textTertiary }]}>Time Period</Text>
-            <View style={styles.filterChips}>
-              <FilterChip
-                label="All Time"
-                selected={timeFilter === 'all'}
-                onPress={() => setTimeFilter('all')}
-              />
-              <FilterChip
-                label="This Week"
-                selected={timeFilter === 'week'}
-                onPress={() => setTimeFilter('week')}
-              />
-              <FilterChip
-                label="This Month"
-                selected={timeFilter === 'month'}
-                onPress={() => setTimeFilter('month')}
-              />
-            </View>
+          <View style={styles.filterChips}>
+            <FilterChip
+              label="ALL TIME"
+              selected={timeFilter === 'all'}
+              onPress={() => setTimeFilter('all')}
+            />
+            <FilterChip
+              label="THIS WEEK"
+              selected={timeFilter === 'week'}
+              onPress={() => setTimeFilter('week')}
+            />
+            <FilterChip
+              label="THIS MONTH"
+              selected={timeFilter === 'month'}
+              onPress={() => setTimeFilter('month')}
+            />
           </View>
-
-          <View style={styles.filterRow}>
-            <Text style={[styles.filterLabel, { color: colors.textTertiary }]}>Vote Type</Text>
-            <View style={styles.filterChips}>
-              <FilterChip
-                label="All"
-                selected={voteFilter === 'all'}
-                onPress={() => setVoteFilter('all')}
-              />
-              <FilterChip
-                label="Supported"
-                icon="thumbs-up"
-                selected={voteFilter === 'support'}
-                onPress={() => setVoteFilter('support')}
-              />
-              <FilterChip
-                label="Opposed"
-                icon="thumbs-down"
-                selected={voteFilter === 'oppose'}
-                onPress={() => setVoteFilter('oppose')}
-              />
-            </View>
+          <View style={styles.filterChips}>
+            <FilterChip
+              label="ALL"
+              selected={voteFilter === 'all'}
+              onPress={() => setVoteFilter('all')}
+            />
+            <FilterChip
+              label="SUPPORTED"
+              selected={voteFilter === 'support'}
+              onPress={() => setVoteFilter('support')}
+            />
+            <FilterChip
+              label="OPPOSED"
+              selected={voteFilter === 'oppose'}
+              onPress={() => setVoteFilter('oppose')}
+            />
           </View>
         </Animated.View>
 
-        {/* Votes List */}
+        {/* Record ledger */}
         {filteredProposals.length > 0 ? (
-          filteredProposals.map((proposal, index) => {
-            const totalVotes = (proposal.supportVotes || 0) + (proposal.opposeVotes || 0);
-            const supportPercent = totalVotes > 0 ? ((proposal.supportVotes || 0) / totalVotes) * 100 : 0;
-            const isSupport = proposal.position === 'support';
+          <Animated.View
+            entering={FadeInUp.delay(300).duration(400)}
+            style={[styles.recordCard, { backgroundColor: colors.surface, borderColor: colors.borderSubtle }]}
+          >
+            {filteredProposals.map((proposal, index) => {
+              const totalVotes = (proposal.supportVotes || 0) + (proposal.opposeVotes || 0);
+              const supportPercent = totalVotes > 0 ? ((proposal.supportVotes || 0) / totalVotes) * 100 : 0;
+              const isSupport = proposal.position === 'support';
+              const sidePercent = isSupport ? supportPercent : 100 - supportPercent;
+              const tallyVisible = totalVotes >= TALLY_THRESHOLD;
+              const withMajority = tallyVisible && sidePercent > 50;
+              const inMinority = tallyVisible && sidePercent <= 50;
+              const positionLabel = isSupport ? 'SUPPORT' : 'OPPOSE';
+              const isLast = index === filteredProposals.length - 1;
 
-            return (
-              <TouchableOpacity
-                key={proposal.id}
-                activeOpacity={0.7}
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  router.push({ pathname: '/(tabs)/proposals', params: { proposalId: String(proposal.id) } });
-                }}
-              >
-              <Animated.View
-                entering={FadeInUp.delay(300 + index * 50).duration(400)}
-                style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}
-              >
-                <View style={styles.cardHeader}>
-                  <Text style={[styles.proposalTitle, { color: colors.text }]} numberOfLines={2}>
-                    {proposal.title}
-                  </Text>
-                  <View
-                    style={[
-                      styles.voteBadge,
-                      { backgroundColor: isSupport ? `${colors.success}15` : `${colors.error}15` },
-                    ]}
-                  >
-                    <Ionicons
-                      name={isSupport ? 'thumbs-up' : 'thumbs-down'}
-                      size={12}
-                      color={isSupport ? colors.success : colors.error}
-                    />
-                    <Text
-                      style={[styles.voteBadgeText, { color: isSupport ? colors.success : colors.error }]}
-                    >
-                      {isSupport ? 'SUPPORTED' : 'OPPOSED'}
-                    </Text>
-                  </View>
-                </View>
-
-                <View style={styles.progressContainer}>
-                  <View style={[styles.progressBar, { backgroundColor: colors.error }]}>
+              return (
+                <TouchableOpacity
+                  key={proposal.id}
+                  activeOpacity={0.7}
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    router.push({ pathname: '/(tabs)/proposals', params: { proposalId: String(proposal.id) } });
+                  }}
+                  style={[
+                    styles.recordRow,
+                    { borderBottomColor: colors.borderSubtle },
+                    isLast && { borderBottomWidth: 0 },
+                  ]}
+                >
+                  {/* Top row — side chip + mono date */}
+                  <View style={styles.recordTopRow}>
                     <View
                       style={[
-                        styles.progressFill,
-                        { width: `${supportPercent}%`, backgroundColor: colors.success },
+                        styles.sideChip,
+                        { backgroundColor: isSupport ? colors.supportSurface : colors.opposeSurface },
                       ]}
-                    />
+                    >
+                      <Text
+                        style={[
+                          styles.sideChipText,
+                          { color: isSupport ? colors.support : colors.oppose },
+                        ]}
+                      >
+                        {positionLabel}
+                      </Text>
+                    </View>
+                    {proposal.votedAt ? (
+                      <Text style={[styles.recordDate, { color: colors.textTertiary }]}>
+                        {formatDate(proposal.votedAt)}
+                      </Text>
+                    ) : null}
                   </View>
-                  <Text style={[styles.progressText, { color: colors.textSecondary }]}>
-                    {supportPercent.toFixed(0)}% support
-                  </Text>
-                </View>
 
-                <View style={styles.cardFooter}>
-                  <View style={styles.stat}>
-                    <Ionicons name="thumbs-up-outline" size={14} color={colors.success} />
-                    <Text style={[styles.statText, { color: colors.success }]}>
-                      {proposal.supportVotes || 0}
+                  {/* Serif proposal title */}
+                  <Text style={[styles.recordTitle, { color: colors.text }]} numberOfLines={2}>
+                    {proposal.title}
+                  </Text>
+
+                  {/* Bottom mono row — your side + outcome tally */}
+                  <View style={styles.recordBottomRow}>
+                    <Text
+                      style={[
+                        styles.recordSideLine,
+                        { color: withMajority ? colors.gold : colors.textSecondary },
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {withMajority
+                        ? `YOU · ${positionLabel} ✓ WITH MAJORITY`
+                        : inMinority
+                          ? `YOU · ${positionLabel} · IN MINORITY`
+                          : `YOU · ${positionLabel} · ON THE PUBLIC LEDGER`}
+                    </Text>
+                    <Text style={[styles.recordTally, { color: colors.textTertiary }]}>
+                      {tallyVisible
+                        ? `${supportPercent.toFixed(0)}% SUPPORT · ${totalVotes.toLocaleString()}`
+                        : `TALLY AT ${TALLY_THRESHOLD}`}
                     </Text>
                   </View>
-                  <View style={styles.stat}>
-                    <Ionicons name="thumbs-down-outline" size={14} color={colors.error} />
-                    <Text style={[styles.statText, { color: colors.error }]}>
-                      {proposal.opposeVotes || 0}
-                    </Text>
-                  </View>
-                  {proposal.votedAt && (
-                    <Text style={[styles.dateText, { color: colors.textTertiary }]}>
-                      {formatDate(proposal.votedAt)}
-                    </Text>
-                  )}
-                  <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} style={{ marginLeft: 'auto' }} />
-                </View>
-              </Animated.View>
-              </TouchableOpacity>
-            );
-          })
+                </TouchableOpacity>
+              );
+            })}
+          </Animated.View>
         ) : (
           <Animated.View
             entering={FadeInUp.delay(300).duration(400)}
-            style={[styles.emptyState, { backgroundColor: colors.surface, borderColor: colors.border }]}
+            style={[styles.emptyState, { backgroundColor: colors.surface, borderColor: colors.borderSubtle }]}
           >
-            <View style={[styles.emptyIcon, { backgroundColor: `${colors.gold}15` }]}>
-              <Ionicons name="document-text-outline" size={40} color={colors.gold} />
+            <View style={[styles.emptyIcon, { backgroundColor: colors.goldSurface }]}>
+              <Ionicons name="document-text-outline" size={36} color={colors.gold} />
             </View>
             <Text style={[styles.emptyText, { color: colors.text }]}>
-              {votedProposals.length > 0 ? 'No votes match filters' : 'No votes cast yet'}
+              {votedProposals.length > 0 ? 'No ballots match filters' : 'No ballots cast yet'}
             </Text>
             <Text style={[styles.emptySubtext, { color: colors.textSecondary }]}>
               {votedProposals.length > 0
-                ? 'Try adjusting your filters to see more votes'
-                : 'Vote on proposals to see your history here'}
+                ? 'Try adjusting your filters to see more of your record'
+                : 'Cast a ballot on a proposal and it will appear here'}
             </Text>
             {votedProposals.length === 0 && (
               <TouchableOpacity
-                style={[styles.emptyCtaButton, { backgroundColor: colors.gold }]}
+                style={[styles.emptyCtaButton, { backgroundColor: colors.goldFill }]}
                 onPress={() => {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                   router.back();
                   setTimeout(() => router.push('/(tabs)/proposals'), 100);
                 }}
               >
-                <Ionicons name="hand-right-outline" size={18} color="#000" />
-                <Text style={styles.emptyCtaText}>Start Voting</Text>
+                <Text style={[styles.emptyCtaText, { color: colors.black }]}>Start Voting</Text>
               </TouchableOpacity>
             )}
+          </Animated.View>
+        )}
+
+        {/* Ledger trust note */}
+        {filteredProposals.length > 0 && (
+          <Animated.View
+            entering={FadeInUp.delay(400).duration(400)}
+            style={[styles.trustCard, { backgroundColor: colors.backgroundSecondary, borderColor: colors.borderSubtle }]}
+          >
+            <Ionicons name="shield-checkmark-outline" size={18} color={colors.gold} style={{ flexShrink: 0 }} />
+            <Text style={[styles.trustText, { color: colors.textSecondary }]}>
+              Every ballot here is independently checkable on the public ledger — your record is yours to prove.
+            </Text>
           </Animated.View>
         )}
 
@@ -400,50 +390,54 @@ export default function VotingHistoryScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   content: { flex: 1 },
-  contentContainer: { padding: SPACING.lg },
-
-  // Stats Card
-  statsCard: {
-    borderRadius: BORDER_RADIUS['2xl'],
-    borderWidth: 1,
-    padding: SPACING.xl,
-    marginBottom: SPACING.lg,
-    ...SHADOWS.sm,
+  contentContainer: {
+    paddingHorizontal: SPACING.screenPadding,
+    paddingTop: SPACING.lg,
   },
-  statsRow: {
+
+  // Header
+  header: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 14,
+    paddingHorizontal: SPACING.screenPadding,
+    paddingBottom: SPACING.xs,
   },
-  statItem: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  statDivider: {
-    width: 1,
+  backButton: {
+    width: 40,
     height: 40,
+    borderRadius: 20,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  statsNumber: {
-    fontFamily: 'Georgia',
+  headerTitle: {
+    fontFamily: FONTS.serif,
     fontSize: 28,
-    fontWeight: '500',
+    lineHeight: 32,
+    letterSpacing: -0.34,
   },
-  statsLabel: {
-    ...TYPOGRAPHY.labelSmall,
-    marginTop: SPACING.xxs,
+
+  // Ledger count line
+  ledgerLine: {
+    fontFamily: FONTS.mono,
+    fontSize: 11,
+    letterSpacing: 0.88,
+    fontVariant: ['tabular-nums'],
+  },
+  ledgerSubline: {
+    fontFamily: FONTS.mono,
+    fontSize: 11,
+    letterSpacing: 0.88,
+    fontVariant: ['tabular-nums'],
+    marginTop: 4,
   },
 
   // Filters
   filtersSection: {
+    marginTop: SPACING.lg,
     marginBottom: SPACING.lg,
-  },
-  filterRow: {
-    marginBottom: SPACING.md,
-  },
-  filterLabel: {
-    ...TYPOGRAPHY.labelSmall,
-    letterSpacing: 0.5,
-    textTransform: 'uppercase',
-    marginBottom: SPACING.sm,
+    gap: SPACING.sm,
   },
   filterChips: {
     flexDirection: 'row',
@@ -451,124 +445,126 @@ const styles = StyleSheet.create({
     gap: SPACING.sm,
   },
   filterChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
-    borderRadius: BORDER_RADIUS.full,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: RADIUS.chip,
     borderWidth: 1,
-    gap: SPACING.xs,
   },
   filterChipText: {
-    ...TYPOGRAPHY.labelSmall,
-    fontWeight: '500',
+    fontFamily: FONTS.sansSemiBold,
+    fontSize: 9.5,
+    letterSpacing: 0.95,
   },
 
-  // Card
-  card: {
-    borderRadius: BORDER_RADIUS.xl,
+  // Record ledger card
+  recordCard: {
+    borderRadius: RADIUS.card,
     borderWidth: 1,
-    padding: SPACING.lg,
-    marginBottom: SPACING.md,
-    ...SHADOWS.sm,
+    paddingHorizontal: 18,
+    paddingVertical: 4,
   },
-  cardHeader: {
+  recordRow: {
+    paddingVertical: 14,
+    gap: 7,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  recordTopRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: SPACING.md,
-  },
-  proposalTitle: {
-    fontFamily: 'Georgia',
-    fontSize: 16,
-    fontWeight: '500',
-    flex: 1,
-    marginRight: SPACING.md,
-  },
-  voteBadge: {
-    flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: SPACING.sm,
-    paddingVertical: SPACING.xs,
-    borderRadius: BORDER_RADIUS.full,
-    gap: SPACING.xxs,
   },
-  voteBadgeText: {
-    ...TYPOGRAPHY.labelSmall,
+  sideChip: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: RADIUS.chip,
+  },
+  sideChipText: {
+    fontFamily: FONTS.sansSemiBold,
+    fontSize: 9,
+    letterSpacing: 1.08,
+  },
+  recordDate: {
+    fontFamily: FONTS.mono,
     fontSize: 10,
-    fontWeight: '700',
+    fontVariant: ['tabular-nums'],
   },
-  progressContainer: {
-    marginBottom: SPACING.md,
+  recordTitle: {
+    fontFamily: FONTS.serif,
+    fontSize: 15,
+    lineHeight: 20,
   },
-  progressBar: {
-    height: 6,
-    borderRadius: 3,
-    overflow: 'hidden',
+  recordBottomRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: SPACING.sm,
   },
-  progressFill: {
-    height: '100%',
-    borderRadius: 3,
+  recordSideLine: {
+    fontFamily: FONTS.mono,
+    fontSize: 10,
+    fontVariant: ['tabular-nums'],
+    flexShrink: 1,
   },
-  progressText: {
-    ...TYPOGRAPHY.bodySmall,
-    marginTop: SPACING.xs,
+  recordTally: {
+    fontFamily: FONTS.mono,
+    fontSize: 10,
+    fontVariant: ['tabular-nums'],
   },
-  cardFooter: {
+
+  // Trust note
+  trustCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: SPACING.lg,
+    gap: 12,
+    borderRadius: RADIUS.lg,
+    borderWidth: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    marginTop: SPACING.lg,
   },
-  stat: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.xs,
-  },
-  statText: {
-    ...TYPOGRAPHY.labelMedium,
-    fontWeight: '600',
-  },
-  dateText: {
-    ...TYPOGRAPHY.bodySmall,
-    marginLeft: 'auto',
+  trustText: {
+    fontFamily: FONTS.sans,
+    fontSize: 12,
+    lineHeight: 18,
+    flex: 1,
   },
 
   // Empty State
   emptyState: {
     alignItems: 'center',
-    padding: SPACING.xxxl,
-    borderRadius: BORDER_RADIUS['2xl'],
+    padding: SPACING['3xl'],
+    borderRadius: RADIUS.card,
     borderWidth: 1,
   },
   emptyIcon: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 72,
+    height: 72,
+    borderRadius: 36,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: SPACING.lg,
   },
   emptyText: {
-    ...TYPOGRAPHY.headlineSmall,
+    fontFamily: FONTS.serif,
+    fontSize: 19,
+    lineHeight: 25,
     marginBottom: SPACING.xs,
   },
   emptySubtext: {
-    ...TYPOGRAPHY.bodyMedium,
+    fontFamily: FONTS.sans,
+    fontSize: 13,
+    lineHeight: 20,
     textAlign: 'center',
     marginBottom: SPACING.md,
   },
   emptyCtaButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.xs,
     paddingVertical: SPACING.md,
     paddingHorizontal: SPACING.xl,
-    borderRadius: BORDER_RADIUS.full,
+    borderRadius: RADIUS.chip,
     marginTop: SPACING.sm,
   },
   emptyCtaText: {
-    ...TYPOGRAPHY.labelLarge,
-    color: '#000',
-    fontWeight: '600',
+    fontFamily: FONTS.sansSemiBold,
+    fontSize: 15,
   },
 });

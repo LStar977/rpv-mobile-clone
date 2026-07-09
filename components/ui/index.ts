@@ -32,6 +32,10 @@ export {
   VerificationBadge,
 } from './Badge';
 
+// Redesign signature components
+export { TallyBar, TALLY_THRESHOLD } from './TallyBar';
+export { TrustChip } from './TrustChip';
+
 // Skeletons (Loading States)
 export {
   Skeleton,
@@ -62,9 +66,10 @@ export {
 
 // Overlays & Feedback
 export { VoteConfirmationOverlay } from './VoteConfirmationOverlay';
+export { HowVotingWorksSheet } from './HowVotingWorksSheet';
 export { ConfettiParticles } from './ConfettiParticles';
 export { MilestoneCelebration } from './MilestoneCelebration';
-export { EmptyState } from './EmptyState';
+export { EmptyState, ErrorState } from './EmptyState';
 
 // Tier Badges
 export { TierBadge, TierCard } from './TierBadge';

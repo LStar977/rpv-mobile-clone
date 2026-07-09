@@ -1,6 +1,6 @@
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY } from '../../lib/theme';
+import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, FONTS } from '../../lib/theme';
 import type { OrgTier, OrgTierMeta } from '../../lib/org-tiers';
 
 interface TierCardProps {
@@ -99,9 +99,8 @@ const styles = StyleSheet.create({
   popularText: {
     ...TYPOGRAPHY.labelSmall,
     color: '#000',
-    fontWeight: '700',
     fontSize: 10,
-    letterSpacing: 0.5,
+    letterSpacing: 1,
   },
   tierHeader: {
     flexDirection: 'row',
@@ -121,7 +120,6 @@ const styles = StyleSheet.create({
   },
   tierName: {
     ...TYPOGRAPHY.headlineSmall,
-    fontWeight: '700',
     marginBottom: 2,
   },
   tierPriceRow: {
@@ -131,7 +129,8 @@ const styles = StyleSheet.create({
   },
   tierPrice: {
     ...TYPOGRAPHY.headlineMedium,
-    fontWeight: '700',
+    fontFamily: FONTS.monoSemiBold,
+    fontVariant: ['tabular-nums'],
   },
   tierPeriod: {
     ...TYPOGRAPHY.bodySmall,
