@@ -34,7 +34,7 @@ export function TutorialControls() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     await skipTutorial();
     // Navigate to home screen after skipping
-    router.replace('/(tabs)/dashboard');
+    router.replace('/(tabs)/proposals');
   };
 
   const handleButtonPress = () => {
@@ -44,7 +44,7 @@ export function TutorialControls() {
     // Navigate to home screen after completing tutorial
     if (isComplete) {
       setTimeout(() => {
-        router.replace('/(tabs)/dashboard');
+        router.replace('/(tabs)/proposals');
       }, 100);
     }
   };

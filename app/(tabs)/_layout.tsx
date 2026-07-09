@@ -168,15 +168,8 @@ export default function TabLayout() {
         },
       }}
     >
-      <Tabs.Screen
-        name="dashboard"
-        options={{
-          title: 'Home',
-          tabBarIcon: ({ color, focused }) => (
-            <TabIcon name="home-outline" color={color} focused={focused} />
-          ),
-        }}
-      />
+      {/* 4-tab IA per the 1b redesign: Vote is home. The dashboard route
+          stays alive (href: null) for deep links and legacy navigation. */}
       <Tabs.Screen
         name="proposals"
         options={{
@@ -184,6 +177,12 @@ export default function TabLayout() {
           tabBarIcon: ({ color, focused }) => (
             <TabIcon name="document-text-outline" color={color} focused={focused} />
           ),
+        }}
+      />
+      <Tabs.Screen
+        name="dashboard"
+        options={{
+          href: null,
         }}
       />
       <Tabs.Screen

@@ -707,6 +707,7 @@ export default function ProfileScreen() {
                 onPress={() => navigateTo('/modals/admin')}
               />
             )}
+            <SettingsRow label="Notifications" onPress={() => navigateTo('/modals/notifications')} />
             <SettingsRow label="Settings & privacy" onPress={() => navigateTo('/modals/privacy')} />
             {/* Dev builds only: exposes the session token for local tooling
                 (e.g. scripts/publish-test-proposals.mjs). Never ships. */}
