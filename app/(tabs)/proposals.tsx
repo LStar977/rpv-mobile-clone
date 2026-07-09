@@ -744,6 +744,9 @@ export default function ProposalsScreen() {
   const [usageLimits, setUsageLimits] = useState<UsageLimits | null>(null);
   // Create form: which field is focused (drives the gold active-field border).
   const [createFocusField, setCreateFocusField] = useState<'question' | 'details' | null>(null);
+  // CP1/CP2 · create flow step — 1 = composer, 2 = preview & publish.
+  // Reset to 1 every time the modal opens.
+  const [createStep, setCreateStep] = useState<1 | 2>(1);
   // P3 · How voting works rules sheet (opened from the vote queue).
   const [showHowVoting, setShowHowVoting] = useState(false);
 
@@ -1617,6 +1620,55 @@ export default function ProposalsScreen() {
     }
   };
 
+  // CP1 → CP2 · "Preview Ballot" — the required-field validation runs BEFORE
+  // the preview step; every limit/verification gate stays on final publish
+  // (handleCreateProposal, unchanged).
+  const handlePreviewBallot = () => {
+    if (!newProposal.title.trim()) {
+      Alert.alert('Error', 'Please enter a proposal title.');
+      return;
+    }
+    if (!newProposal.description.trim()) {
+      Alert.alert('Error', 'Please enter a proposal description.');
+      return;
+    }
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setCreateStep(2);
+  };
+
+  // CP2 preview derivations — built from the SAME inputs handleCreateProposal
+  // publishes (geoRestrictions construction mirrors it exactly), so the
+  // preview card is honest. No voter counts are invented: the app has no
+  // eligible-voter data, so the facts strip states the scope instead.
+  const previewGeo: string[] =
+    newProposal.geoScope === 'global' || !userCountry
+      ? []
+      : newProposal.geoScope === 'national'
+      ? [userCountry]
+      : newProposal.geoScope === 'state'
+      ? [userCountry, userState].filter(Boolean)
+      : [userCountry, userState, userCity].filter(Boolean);
+  const previewScopeLabel = (
+    getTierLabel(previewGeo) === 'GLOBAL'
+      ? 'GLOBAL'
+      : `${getLocationLabel(previewGeo)} · ${getTierLabel(previewGeo)}`
+  ).toUpperCase();
+  const previewScopeName =
+    newProposal.geoScope === 'city' && userCity
+      ? userCity
+      : newProposal.geoScope === 'state' && userState
+      ? userState
+      : newProposal.geoScope === 'national' && userCountry
+      ? userCountry
+      : '';
+  const previewOptionCount = newProposal.options.map((o) => o.trim()).filter(Boolean).length;
+  // Live neutrality coaching for the composer — purely client-side checks
+  // (ends in "?", no loaded words). Never blocks publishing.
+  const loadedWordHit = ['finally', 'wasteful', 'obviously', 'corrupt', 'disgraceful', 'ridiculous', 'insane'].find(
+    (w) => newProposal.title.toLowerCase().includes(w)
+  );
+  const questionNeutral = newProposal.title.trim().endsWith('?') && !loadedWordHit;
+
   const clearFilters = () => {
     setSearchQuery('');
     setSelectedCategory('All');
@@ -1759,6 +1811,7 @@ export default function ProposalsScreen() {
               <TouchableOpacity
                 onPress={() => {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                  setCreateStep(1);
                   setShowCreateModal(true);
                 }}
                 style={[feedStyles.newBtn, { backgroundColor: colors.goldFill }]}
@@ -2396,18 +2449,49 @@ export default function ProposalsScreen() {
           style={[createStyles.container, { backgroundColor: colors.background }]}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
-          {/* Top bar — circular close, proposal allowance in mono on the right */}
+          {/* Step chrome — 40px circular close/back, STEP X OF 2 mono label,
+              2-segment progress bar (same pattern as onboarding). */}
           <View style={createStyles.topBar}>
-            <TouchableOpacity
-              onPress={() => setShowCreateModal(false)}
-              style={[createStyles.closeBtn, { backgroundColor: colors.surface, borderColor: colors.borderSubtle }]}
-              accessibilityRole="button"
-              accessibilityLabel="Close"
-            >
-              <Ionicons name="close" size={18} color={colors.textSecondary} />
-            </TouchableOpacity>
-            {usageLimits &&
-              (usageLimits.proposals.limit === 'unlimited' ? (
+            {createStep === 1 ? (
+              <TouchableOpacity
+                onPress={() => setShowCreateModal(false)}
+                style={[createStyles.closeBtn, { backgroundColor: colors.surface, borderColor: colors.borderSubtle }]}
+                accessibilityRole="button"
+                accessibilityLabel="Close"
+              >
+                <Ionicons name="close" size={18} color={colors.textSecondary} />
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  setCreateStep(1);
+                }}
+                style={[createStyles.closeBtn, { backgroundColor: colors.surface, borderColor: colors.borderSubtle }]}
+                accessibilityRole="button"
+                accessibilityLabel="Back to editing"
+              >
+                <Ionicons name="chevron-back" size={20} color={colors.textSecondary} />
+              </TouchableOpacity>
+            )}
+            <Text style={[createStyles.stepLabel, { color: colors.textTertiary }]}>
+              STEP {createStep} OF 2
+            </Text>
+          </View>
+          <View style={createStyles.progressRow}>
+            <View style={[createStyles.progressSeg, { backgroundColor: colors.goldFill }]} />
+            <View
+              style={[
+                createStyles.progressSeg,
+                { backgroundColor: createStep === 2 ? colors.goldFill : colors.surfaceHighlight },
+              ]}
+            />
+          </View>
+
+          {/* Proposal allowance — mono meta, kept from the old top bar. */}
+          {createStep === 1 && usageLimits && (
+            <View style={createStyles.allowanceRow}>
+              {usageLimits.proposals.limit === 'unlimited' ? (
                 <Text style={[createStyles.topMeta, { color: colors.textTertiary }]}>
                   UNLIMITED · PREMIUM
                 </Text>
@@ -2427,9 +2511,12 @@ export default function ProposalsScreen() {
                   </Text>
                   <Text style={[createStyles.topMetaUpgrade, { color: colors.gold }]}>UPGRADE</Text>
                 </TouchableOpacity>
-              ))}
-          </View>
+              )}
+            </View>
+          )}
 
+          {createStep === 1 ? (
+            <>
           <ScrollView
             style={createStyles.scroll}
             contentContainerStyle={createStyles.scrollContent}
@@ -2438,9 +2525,15 @@ export default function ProposalsScreen() {
           >
             <Text style={[createStyles.pageTitle, { color: colors.text }]}>New Proposal</Text>
 
-            {/* THE QUESTION — serif input, gold border while focused */}
+            {/* THE QUESTION — serif input, gold border while focused, live
+                neutrality coaching (client-side only; never blocks). */}
             <View style={createStyles.section}>
-              <Text style={[createStyles.sectionLabel, { color: colors.textTertiary }]}>THE QUESTION</Text>
+              <View style={createStyles.sectionHeadRow}>
+                <Text style={[createStyles.sectionLabel, { color: colors.textTertiary }]}>THE QUESTION</Text>
+                <Text style={[createStyles.questionMeta, { color: colors.textTertiary }]}>
+                  {newProposal.title.length} / 140
+                </Text>
+              </View>
               <View
                 style={[
                   createStyles.questionCard,
@@ -2464,10 +2557,38 @@ export default function ProposalsScreen() {
                   multiline
                   maxLength={140}
                 />
-                <Text style={[createStyles.questionMeta, { color: colors.textTertiary }]}>
-                  {newProposal.title.length} / 140 · PHRASED AS A NEUTRAL QUESTION
-                </Text>
+                {newProposal.title.trim().length > 0 && (
+                  <View style={createStyles.neutralRow}>
+                    <Ionicons
+                      name={questionNeutral ? 'checkmark' : loadedWordHit ? 'alert-circle-outline' : 'ellipse-outline'}
+                      size={12}
+                      color={questionNeutral ? colors.support : loadedWordHit ? colors.oppose : colors.textTertiary}
+                    />
+                    <Text
+                      style={[
+                        createStyles.questionMeta,
+                        {
+                          color: questionNeutral
+                            ? colors.support
+                            : loadedWordHit
+                            ? colors.oppose
+                            : colors.textTertiary,
+                        },
+                      ]}
+                    >
+                      {questionNeutral
+                        ? 'READS AS A NEUTRAL QUESTION'
+                        : loadedWordHit
+                        ? `LOADED WORD: "${loadedWordHit.toUpperCase()}"`
+                        : 'END WITH A QUESTION MARK'}
+                    </Text>
+                  </View>
+                )}
               </View>
+              <Text style={[createStyles.scopeHint, { color: colors.textTertiary }]}>
+                Ends in a question mark, no loaded words ("finally", "wasteful"), one decision only.
+                Voters see it verbatim, forever.
+              </Text>
             </View>
 
             {/* THE DETAILS — description, unchanged wiring */}
@@ -2767,7 +2888,185 @@ export default function ProposalsScreen() {
             </View>
           </ScrollView>
 
-          {/* Pinned gold CTA — the one gold moment on this screen */}
+          {/* CP1 pinned gold CTA — validation runs here, gates stay on publish */}
+          <View
+            style={[
+              createStyles.footer,
+              {
+                backgroundColor: colors.background,
+                borderTopColor: colors.borderSubtle,
+                paddingBottom: Math.max(insets.bottom, 16),
+              },
+            ]}
+          >
+            <TouchableOpacity
+              style={[createStyles.submitBtn, { backgroundColor: colors.goldFill }]}
+              onPress={handlePreviewBallot}
+              activeOpacity={0.85}
+              accessibilityRole="button"
+              accessibilityLabel="Preview ballot"
+            >
+              <Text style={createStyles.submitText}>Preview Ballot</Text>
+            </TouchableOpacity>
+            <Text style={[createStyles.footerNote, { color: colors.textTertiary }]}>
+              Published proposals cannot be edited — only withdrawn
+            </Text>
+          </View>
+            </>
+          ) : (
+            <>
+          {/* ═══════════ CP2 · PREVIEW & PUBLISH ═══════════ */}
+          <ScrollView
+            style={createStyles.scroll}
+            contentContainerStyle={createStyles.scrollContent}
+            showsVerticalScrollIndicator={false}
+          >
+            <View style={createStyles.previewHead}>
+              <Text style={[createStyles.pageTitle, { color: colors.text }]}>This is your ballot.</Text>
+              <Text style={[createStyles.previewSub, { color: colors.textSecondary }]}>
+                {previewScopeName
+                  ? `Exactly what every eligible voter in ${previewScopeName} will see.`
+                  : 'Exactly what every eligible voter worldwide will see.'}
+              </Text>
+            </View>
+
+            {/* The preview IS the real 1b ballot card (ballotStyles), rendered
+                from the draft — visually real, non-interactive. */}
+            <View
+              style={[
+                ballotStyles.card,
+                { backgroundColor: colors.surface, borderColor: 'rgba(234, 186, 88, 0.35)' },
+              ]}
+            >
+              <View style={ballotStyles.topRow}>
+                <View style={ballotStyles.topLeft}>
+                  <Text
+                    style={[
+                      ballotStyles.scopeChip,
+                      { color: colors.textTertiary, backgroundColor: colors.surfaceHighlight },
+                    ]}
+                  >
+                    {previewScopeLabel}
+                  </Text>
+                  {newProposal.requiresCitizenship && (
+                    <Text
+                      style={[
+                        ballotStyles.scopeChip,
+                        { color: colors.textTertiary, backgroundColor: colors.surfaceHighlight },
+                      ]}
+                    >
+                      CITIZENS ONLY
+                    </Text>
+                  )}
+                </View>
+                {/* The deadline is assigned server-side at publish — stated
+                    honestly instead of inventing a date. */}
+                <Text style={[ballotStyles.deadlineText, { color: colors.textTertiary }]}>
+                  CLOSES · SET ON PUBLISH
+                </Text>
+              </View>
+
+              <Text style={[ballotStyles.question, { color: colors.text }]}>
+                {newProposal.title.trim()}
+              </Text>
+
+              <View style={createStyles.proposedByRow}>
+                <Text style={[createStyles.proposedByLabel, { color: colors.textTertiary }]}>
+                  PROPOSED BY
+                </Text>
+                <Text style={[createStyles.proposedByName, { color: colors.textSecondary }]} numberOfLines={1}>
+                  {user?.name?.trim() || 'You'}
+                </Text>
+                {(isVerified || !!user?.verified) && (
+                  <Ionicons name="shield-checkmark" size={12} color={colors.gold} />
+                )}
+              </View>
+
+              {newProposal.voteType === 'yes-no' ? (
+                <View style={ballotStyles.actionRow}>
+                  <View
+                    style={[
+                      ballotStyles.voteBtn,
+                      { backgroundColor: colors.supportSurface, borderColor: colors.support },
+                    ]}
+                  >
+                    <Text style={[ballotStyles.voteBtnText, { color: colors.support }]}>Support</Text>
+                  </View>
+                  <View
+                    style={[
+                      ballotStyles.voteBtn,
+                      { backgroundColor: colors.opposeSurface, borderColor: colors.oppose },
+                    ]}
+                  >
+                    <Text style={[ballotStyles.voteBtnText, { color: colors.oppose }]}>Oppose</Text>
+                  </View>
+                </View>
+              ) : (
+                <>
+                  <View style={ballotStyles.optionsRow}>
+                    <Text style={[ballotStyles.optionsText, { color: colors.textSecondary }]}>
+                      {previewOptionCount} OPTIONS ·{' '}
+                      {newProposal.voteType === 'ranked-choice' ? 'RANK YOUR CHOICES' : 'PICK ONE'}
+                    </Text>
+                  </View>
+                  {/* Dimmed so the pinned Publish CTA stays the screen's one
+                      live gold moment. */}
+                  <View style={[ballotStyles.openBallotBtn, { backgroundColor: colors.goldFill, opacity: 0.55 }]}>
+                    <Text style={ballotStyles.openBallotText} numberOfLines={1}>
+                      Open Ballot — {newProposal.voteType === 'ranked-choice' ? 'Rank Your Choices' : 'Pick One'}
+                    </Text>
+                  </View>
+                </>
+              )}
+            </View>
+
+            {/* Mono facts strip — no eligible-voter data exists, so the strip
+                states the scope instead of inventing a count. */}
+            <View
+              style={[
+                createStyles.factsCard,
+                { backgroundColor: colors.backgroundSecondary, borderColor: colors.borderSubtle },
+              ]}
+            >
+              <View style={[createStyles.factsRow, { borderBottomWidth: 1, borderBottomColor: colors.borderSubtle }]}>
+                <Text style={[createStyles.factsLabel, { color: colors.textTertiary }]}>OPEN TO</Text>
+                <Text style={[createStyles.factsValue, { color: colors.text }]} numberOfLines={1}>
+                  {previewScopeLabel}
+                </Text>
+              </View>
+              {newProposal.requiresCitizenship && (
+                <View style={[createStyles.factsRow, { borderBottomWidth: 1, borderBottomColor: colors.borderSubtle }]}>
+                  <Text style={[createStyles.factsLabel, { color: colors.textTertiary }]}>ELIGIBILITY</Text>
+                  <Text style={[createStyles.factsValue, { color: colors.text }]}>CITIZENS ONLY</Text>
+                </View>
+              )}
+              <View style={[createStyles.factsRow, { borderBottomWidth: 1, borderBottomColor: colors.borderSubtle }]}>
+                <Text style={[createStyles.factsLabel, { color: colors.textTertiary }]}>TALLY VISIBLE AT</Text>
+                <Text style={[createStyles.factsValue, { color: colors.text }]}>25 BALLOTS</Text>
+              </View>
+              <View style={createStyles.factsRow}>
+                <Text style={[createStyles.factsLabel, { color: colors.textTertiary }]}>RECORDED ON</Text>
+                <Text style={[createStyles.factsValue, { color: colors.text }]}>PUBLIC LEDGER · PERMANENT</Text>
+              </View>
+            </View>
+
+            {/* Permanence note — verbatim trust copy */}
+            <View
+              style={[
+                createStyles.noteCard,
+                { backgroundColor: colors.goldSurface, borderColor: 'rgba(234, 186, 88, 0.18)' },
+              ]}
+            >
+              <Ionicons name="shield-outline" size={16} color={colors.gold} style={createStyles.noteIcon} />
+              <Text style={[createStyles.noteText, { color: colors.textSecondary }]}>
+                Publishing is permanent and carries your verified name. You can withdraw a proposal,
+                but the record that it existed stays on the ledger.
+              </Text>
+            </View>
+          </ScrollView>
+
+          {/* CP2 pinned actions — gold publish (existing handleCreateProposal,
+              unchanged) + ghost back to editing. */}
           <View
             style={[
               createStyles.footer,
@@ -2784,18 +3083,31 @@ export default function ProposalsScreen() {
               disabled={creating}
               activeOpacity={0.85}
               accessibilityRole="button"
-              accessibilityLabel="Create proposal"
+              accessibilityLabel={previewScopeName ? `Publish to ${previewScopeName}` : 'Publish worldwide'}
             >
               {creating ? (
                 <ActivityIndicator size="small" color="#040707" />
               ) : (
-                <Text style={createStyles.submitText}>Create Proposal</Text>
+                <Text style={createStyles.submitText} numberOfLines={1}>
+                  {previewScopeName ? `Publish to ${previewScopeName}` : 'Publish Worldwide'}
+                </Text>
               )}
             </TouchableOpacity>
-            <Text style={[createStyles.footerNote, { color: colors.textTertiary }]}>
-              Published proposals cannot be edited — only withdrawn
-            </Text>
+            <TouchableOpacity
+              style={createStyles.ghostBtn}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                setCreateStep(1);
+              }}
+              disabled={creating}
+              accessibilityRole="button"
+              accessibilityLabel="Back to editing"
+            >
+              <Text style={[createStyles.ghostText, { color: colors.textSecondary }]}>Back to Editing</Text>
+            </TouchableOpacity>
           </View>
+            </>
+          )}
         </KeyboardAvoidingView>
       </Modal>
 
@@ -3691,6 +4003,119 @@ const createStyles = StyleSheet.create({
     fontFamily: FONTS.sans,
     fontSize: 11.5,
     textAlign: 'center',
+  },
+  // ── CP1/CP2 step chrome (mirrors the onboarding pattern) ──
+  stepLabel: {
+    fontFamily: FONTS.mono,
+    fontSize: 10.5,
+    letterSpacing: 1.68, // .16em
+    fontVariant: ['tabular-nums'],
+  },
+  progressRow: {
+    flexDirection: 'row',
+    gap: 6,
+    paddingHorizontal: SPACING.screenPadding,
+    paddingTop: 12,
+  },
+  progressSeg: {
+    flex: 1,
+    height: 4,
+    borderRadius: 2,
+  },
+  allowanceRow: {
+    paddingHorizontal: SPACING.screenPadding,
+    paddingTop: 10,
+    alignItems: 'flex-end',
+  },
+  // ── CP1 question coaching ──
+  sectionHeadRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+  },
+  neutralRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  // ── CP2 preview & publish ──
+  previewHead: {
+    gap: 5,
+  },
+  previewSub: {
+    fontFamily: FONTS.sans,
+    fontSize: 13.5,
+    lineHeight: 20,
+  },
+  proposedByRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+  },
+  proposedByLabel: {
+    fontFamily: FONTS.mono,
+    fontSize: 10,
+    letterSpacing: 0.4,
+    fontVariant: ['tabular-nums'],
+  },
+  proposedByName: {
+    fontFamily: FONTS.sansSemiBold,
+    fontSize: 11,
+    flexShrink: 1,
+  },
+  factsCard: {
+    borderWidth: 1,
+    borderRadius: 16,
+    paddingHorizontal: 17,
+    paddingVertical: 4,
+  },
+  factsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    paddingVertical: 11,
+  },
+  factsLabel: {
+    fontFamily: FONTS.mono,
+    fontSize: 11,
+    letterSpacing: 0.4,
+    fontVariant: ['tabular-nums'],
+  },
+  factsValue: {
+    fontFamily: FONTS.mono,
+    fontSize: 11,
+    letterSpacing: 0.4,
+    fontVariant: ['tabular-nums'],
+    flexShrink: 1,
+    textAlign: 'right',
+  },
+  noteCard: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 11,
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingVertical: 13,
+    paddingHorizontal: 15,
+  },
+  noteIcon: {
+    marginTop: 1,
+  },
+  noteText: {
+    flex: 1,
+    fontFamily: FONTS.sans,
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  ghostBtn: {
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  ghostText: {
+    fontFamily: FONTS.sansMedium,
+    fontSize: 14,
   },
 });
 
