@@ -9,12 +9,16 @@ export interface ShareProposalData { id: number | string; title: string; descrip
 const PROPOSAL_URL_BASE = 'https://representportal.com/p';
 const APP_STORE_URL = 'https://apps.apple.com/ca/app/id6756912022';
 
+// NOTE: never pass `message` and `url` as separate fields on iOS — the
+// share sheet's Copy action serializes the pair as a binary plist and the
+// clipboard fills with "bplist00…" garbage. One message string with the
+// URL inline copies (and pastes into Messages/Mail) cleanly everywhere.
 export async function shareProposal(proposal: ShareProposalData): Promise<boolean> {
   try {
     const proposalUrl = `${PROPOSAL_URL_BASE}/${proposal.id}`;
-    const message = `Vote on this: "${proposal.title}" — verified voting on Represent`;
+    const message = `Vote on this: "${proposal.title}" — verified voting on Represent\n\n${proposalUrl}`;
     const result = await Share.share(
-      Platform.OS === 'ios' ? { message, url: proposalUrl } : { message: `${message}\n\n${proposalUrl}` },
+      { message },
       { dialogTitle: 'Share Proposal', subject: `Represent: ${proposal.title}` }
     );
     return result.action === Share.sharedAction;
@@ -24,9 +28,9 @@ export async function shareProposal(proposal: ShareProposalData): Promise<boolea
 export async function shareVoteAchievement(proposalTitle: string, choice: 'support' | 'oppose', proposalId?: number | string): Promise<boolean> {
   try {
     const url = proposalId != null ? `${PROPOSAL_URL_BASE}/${proposalId}` : APP_STORE_URL;
-    const message = `I just cast a verified ${choice} vote on "${proposalTitle}". Add your voice:`;
+    const message = `I just cast a verified ${choice} vote on "${proposalTitle}". Add your voice:\n\n${url}`;
     const result = await Share.share(
-      Platform.OS === 'ios' ? { message, url } : { message: `${message}\n\n${url}` },
+      { message },
       { dialogTitle: 'Share Your Vote' }
     );
     return result.action === Share.sharedAction;
