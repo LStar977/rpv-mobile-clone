@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, AccessibilityInfo } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, AccessibilityInfo, Modal } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -289,6 +289,10 @@ export function VoteConfirmationOverlay({
       : 'RECORDED ON THE PUBLIC LEDGER · COUNTED EXACTLY ONCE';
 
   return (
+    // Modal so the sheet renders above the floating tab bar — as a plain
+    // absolute-positioned view it slides up BEHIND the tab bar, clipping the
+    // seal's share pill and leaving the tabs tappable mid-cast.
+    <Modal visible transparent statusBarTranslucent animationType="none" onRequestClose={phase === 'confirm' ? handleGoBack : undefined}>
     <View style={styles.root} pointerEvents="auto">
       {/* 75% scrim — the queue stays dimly visible behind the decision */}
       <Animated.View style={[styles.scrim, { backgroundColor: colors.overlay }, scrimStyle]}>
@@ -465,6 +469,7 @@ export function VoteConfirmationOverlay({
         )}
       </Animated.View>
     </View>
+    </Modal>
   );
 }
 

@@ -1668,13 +1668,19 @@ export default function ProposalsScreen() {
     setTimeout(() => setSelectedProposal(null), 150);
   };
 
-  // Auto-open a proposal when navigated with proposalId param (e.g. from voting history)
+  // Auto-open a proposal when navigated with proposalId param (e.g. from
+  // voting history). Consumed exactly once — tab params persist across tab
+  // switches, so without clearing it the detail modal would reopen on every
+  // return to the Vote tab.
+  const consumedDeepLinkRef = useRef<string | null>(null);
   useEffect(() => {
-    if (deepLinkProposalId && proposals.length > 0 && !loading) {
-      const match = proposals.find((p) => String(p.id) === String(deepLinkProposalId));
-      if (match && !showDetailModal) {
-        openProposal(match);
-      }
+    if (!deepLinkProposalId || proposals.length === 0 || loading) return;
+    if (consumedDeepLinkRef.current === String(deepLinkProposalId)) return;
+    const match = proposals.find((p) => String(p.id) === String(deepLinkProposalId));
+    if (match && !showDetailModal) {
+      consumedDeepLinkRef.current = String(deepLinkProposalId);
+      openProposal(match);
+      router.setParams({ proposalId: undefined });
     }
   }, [deepLinkProposalId, proposals, loading]);
 

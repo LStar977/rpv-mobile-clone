@@ -529,7 +529,15 @@ async function apiRequest<T>(
     });
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      console.error(`API Error: ${response.status}`, errorData);
+      // Endpoints that don't exist on the backend yet and have client-side
+      // fallbacks log quietly — console.error triggers the red dev-mode
+      // LogBox toast on every screen that touches them.
+      const expectedFailure = endpoint === '/api/user/limits';
+      if (expectedFailure) {
+        console.log(`API (expected, using fallback): ${response.status} ${endpoint}`);
+      } else {
+        console.error(`API Error: ${response.status}`, errorData);
+      }
 
       // Handle auth expiration - trigger re-auth flow.
       // TODO: implement transparent refresh+retry. Requires backend changes:
