@@ -793,6 +793,13 @@ export default function ProposalsScreen() {
   const [observerRegion, setObserverRegion] = useState<ObserverRegion | null>(null);
   const [showRegionPicker, setShowRegionPicker] = useState(false);
 
+  // D1 · verified-residence mismatch sheet. Once a user is verified their
+  // declared (onboarding-picked) region is consumed exactly once: deleted
+  // from storage either way, and surfaced as a calm, factual sheet only
+  // when it named a different city/state than the verified residence.
+  const [mismatchDeclared, setMismatchDeclared] = useState<ObserverRegion | null>(null);
+  const observerRegionConsumedRef = useRef(false);
+
   const [newProposal, setNewProposal] = useState({
     title: '',
     description: '',
@@ -853,6 +860,22 @@ export default function ProposalsScreen() {
       .catch(() => { /* display-only preference */ });
     return () => { alive = false; };
   }, []);
+
+  // D1 trigger — runs on feed mount/focus once both the profile (isVerified,
+  // verified city/state) and the stored declared region have loaded. Verified
+  // users never use the observer region again, so it's deleted either way;
+  // the sheet only shows when the declared region named a DIFFERENT
+  // city/state than the verified residence. Matches are consumed silently.
+  useEffect(() => {
+    if (!isVerified || !observerRegion || observerRegionConsumedRef.current) return;
+    observerRegionConsumedRef.current = true;
+    const same = (a?: string, b?: string) => (a ?? '').trim().toLowerCase() === (b ?? '').trim().toLowerCase();
+    const cityDiffers = !!observerRegion.city && !!userCity && !same(observerRegion.city, userCity);
+    const stateDiffers = !!observerRegion.state && !!userState && !same(observerRegion.state, userState);
+    if (cityDiffers || stateDiffers) setMismatchDeclared(observerRegion);
+    setObserverRegion(null);
+    AsyncStorage.removeItem(OBSERVER_REGION_KEY).catch(() => { /* display-only */ });
+  }, [isVerified, observerRegion, userCity, userState]);
 
   const pickObserverRegion = useCallback((region: ObserverRegion) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -2847,6 +2870,90 @@ export default function ProposalsScreen() {
         </View>
       </Modal>
 
+      {/* D1 · Verified-residence mismatch — calm and factual, never an error.
+          The trust system working: the verified ID's residence wins over the
+          declared observer region, stated once, then dismissed. */}
+      <Modal
+        visible={!!mismatchDeclared}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setMismatchDeclared(null)}
+      >
+        <View style={[mismatchStyles.backdrop, { backgroundColor: colors.overlay }]}>
+          <View
+            style={[
+              mismatchStyles.sheet,
+              {
+                backgroundColor: colors.backgroundElevated,
+                borderColor: colors.border,
+                paddingBottom: Math.max(insets.bottom, 16) + 24,
+              },
+            ]}
+          >
+            <View style={[mismatchStyles.grabber, { backgroundColor: colors.surfaceHighlight }]} />
+
+            <View style={mismatchStyles.headRow}>
+              <View style={[mismatchStyles.shieldTile, { backgroundColor: colors.goldSurface, borderColor: 'rgba(234, 186, 88, 0.3)' }]}>
+                <Ionicons name="shield-checkmark-outline" size={24} color={colors.gold} />
+              </View>
+              <View style={mismatchStyles.headCol}>
+                <Text style={[mismatchStyles.headline, { color: colors.text }]}>
+                  Your verified residence is {userCity || userState || userCountry}.
+                </Text>
+                <Text style={[mismatchStyles.headMeta, { color: colors.textTertiary }]}>
+                  FROM YOUR VERIFIED ID
+                </Text>
+              </View>
+            </View>
+
+            <Text style={[mismatchStyles.sub, { color: colors.textSecondary }]}>
+              {[userCity, userState, userCountry].filter(Boolean).length > 0
+                ? `Your feed now shows your real scope — ${[userCity, userState, userCountry]
+                    .filter(Boolean)
+                    .join(', ')}. That's where your ballot counts.`
+                : "Your feed now shows your real scope — where your ballot actually counts."}
+            </Text>
+
+            {/* Declared vs verified, mono and factual */}
+            <View style={[mismatchStyles.scopeCard, { backgroundColor: colors.surface, borderColor: colors.borderSubtle }]}>
+              <View style={mismatchStyles.scopeCol}>
+                <Text style={[mismatchStyles.scopeLabel, { color: colors.textTertiary }]}>YOUR SCOPE</Text>
+                <Text style={[mismatchStyles.scopeValue, { color: colors.text }]} numberOfLines={1}>
+                  {[userCity, userState, userCountry].filter(Boolean).join(' · ')}
+                </Text>
+                {!!mismatchDeclared && (
+                  <Text style={[mismatchStyles.scopeWas, { color: colors.textTertiary }]} numberOfLines={1}>
+                    WAS WATCHING ·{' '}
+                    {[mismatchDeclared.city, mismatchDeclared.state, mismatchDeclared.country]
+                      .filter(Boolean)
+                      .join(' · ')
+                      .toUpperCase()}
+                  </Text>
+                )}
+              </View>
+              <Text style={[mismatchStyles.scopeCount, { color: colors.gold }]}>{heroCount} OPEN</Text>
+            </View>
+
+            <TouchableOpacity
+              style={[mismatchStyles.cta, { backgroundColor: colors.goldFill }]}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                setMismatchDeclared(null);
+              }}
+              activeOpacity={0.85}
+              accessibilityRole="button"
+              accessibilityLabel="Got it"
+            >
+              <Text style={mismatchStyles.ctaText}>Got It</Text>
+            </TouchableOpacity>
+
+            <Text style={[mismatchStyles.footer, { color: colors.textTertiary }]}>
+              Moved? Update your ID with your province, then re-verify — takes two minutes.
+            </Text>
+          </View>
+        </View>
+      </Modal>
+
       {/* Verification/Upgrade Modal */}
       <UpgradeModal
         visible={showVerificationModal}
@@ -3881,5 +3988,121 @@ const feedStyles = StyleSheet.create({
     fontSize: 10.5,
     letterSpacing: 0.63,
     fontVariant: ['tabular-nums'],
+  },
+});
+
+// D1 · verified-residence mismatch sheet — matches the X1 confirm sheet's
+// bottom-sheet treatment (VoteConfirmationOverlay): 28px top radius,
+// hairline border, grabber, deep upward shadow.
+const mismatchStyles = StyleSheet.create({
+  backdrop: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  sheet: {
+    borderWidth: 1,
+    borderBottomWidth: 0,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingTop: 12,
+    paddingHorizontal: 28,
+    gap: 18,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -20 },
+    shadowOpacity: 0.6,
+    shadowRadius: 60,
+    elevation: 24,
+  },
+  grabber: {
+    width: 42,
+    height: 5,
+    borderRadius: 3,
+    alignSelf: 'center',
+  },
+  headRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+  },
+  shieldTile: {
+    width: 52,
+    height: 52,
+    borderRadius: 16,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headCol: {
+    flex: 1,
+    gap: 2,
+  },
+  headline: {
+    fontFamily: FONTS.serif,
+    fontSize: 23,
+    lineHeight: 26.5, // 1.15
+  },
+  headMeta: {
+    fontFamily: FONTS.mono,
+    fontSize: 10.5,
+    letterSpacing: 1.05, // .1em
+    fontVariant: ['tabular-nums'],
+  },
+  sub: {
+    fontFamily: FONTS.sans,
+    fontSize: 14.5,
+    lineHeight: 22, // 1.55
+  },
+  scopeCard: {
+    borderWidth: 1,
+    borderRadius: 16,
+    paddingVertical: 15,
+    paddingHorizontal: 18,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  scopeCol: {
+    flex: 1,
+    gap: 2,
+  },
+  scopeLabel: {
+    fontFamily: FONTS.mono,
+    fontSize: 10,
+    letterSpacing: 1.4, // .14em
+    fontVariant: ['tabular-nums'],
+  },
+  scopeValue: {
+    fontFamily: FONTS.sansSemiBold,
+    fontSize: 15,
+  },
+  scopeWas: {
+    fontFamily: FONTS.mono,
+    fontSize: 9.5,
+    letterSpacing: 0.95,
+    fontVariant: ['tabular-nums'],
+    marginTop: 2,
+  },
+  scopeCount: {
+    fontFamily: FONTS.monoSemiBold,
+    fontSize: 18,
+    fontVariant: ['tabular-nums'],
+  },
+  cta: {
+    height: 54,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  ctaText: {
+    fontFamily: FONTS.sansSemiBold,
+    fontSize: 16,
+    color: '#040707',
+  },
+  footer: {
+    fontFamily: FONTS.sans,
+    fontSize: 11,
+    lineHeight: 16.5, // 1.5
+    textAlign: 'center',
   },
 });
