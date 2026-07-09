@@ -1450,10 +1450,7 @@ export default function ProposalsScreen() {
       Alert.alert('Error', 'Please enter a proposal title.');
       return;
     }
-    if (!newProposal.description.trim()) {
-      Alert.alert('Error', 'Please enter a proposal description.');
-      return;
-    }
+    // Description is optional — a well-phrased question can stand alone.
 
     // Demo account bypasses all limits (for App Store review)
     const isDemoAccount = user?.email === 'demo@represent.app';
@@ -1628,10 +1625,7 @@ export default function ProposalsScreen() {
       Alert.alert('Error', 'Please enter a proposal title.');
       return;
     }
-    if (!newProposal.description.trim()) {
-      Alert.alert('Error', 'Please enter a proposal description.');
-      return;
-    }
+    // Description is optional — the question can stand alone.
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setCreateStep(2);
   };
@@ -1662,12 +1656,26 @@ export default function ProposalsScreen() {
       ? userCountry
       : '';
   const previewOptionCount = newProposal.options.map((o) => o.trim()).filter(Boolean).length;
-  // Live neutrality coaching for the composer — purely client-side checks
-  // (ends in "?", no loaded words). Never blocks publishing.
-  const loadedWordHit = ['finally', 'wasteful', 'obviously', 'corrupt', 'disgraceful', 'ridiculous', 'insane'].find(
-    (w) => newProposal.title.toLowerCase().includes(w)
-  );
-  const questionNeutral = newProposal.title.trim().endsWith('?') && !loadedWordHit;
+  // Live neutrality coaching for the composer — purely client-side checks;
+  // never blocks publishing. Deliberately conservative: the green "reads as
+  // neutral" claim only appears for a single interrogative sentence with no
+  // loaded/opinion/profane language. When unsure, we coach instead of endorse.
+  const titleTrimmed = newProposal.title.trim();
+  const titleLower = titleTrimmed.toLowerCase();
+  const loadedWordHit = [
+    // charged framing
+    'finally', 'wasteful', 'obviously', 'corrupt', 'disgraceful', 'ridiculous',
+    'insane', 'stupid', 'idiotic', 'terrible', 'awful', 'disaster', 'scam',
+    'greedy', 'lazy', 'pathetic', 'suck', 'sucks', 'garbage', 'trash', 'evil',
+    // profanity — a neutral civic question contains none
+    'fuck', 'shit', 'damn', 'hell', 'ass', 'bitch', 'crap',
+    // first-person opinion markers — the question should ask, not argue
+    'i think', 'i believe', 'we all know', 'everyone knows', 'let’s be honest', "let's be honest",
+  ].find((w) => titleLower.includes(w));
+  // Multiple sentences = statement smuggled in beside the question.
+  const sentenceCount = (titleTrimmed.match(/[.!?](\s|$)/g) || []).length;
+  const singleQuestion = titleTrimmed.endsWith('?') && sentenceCount <= 1;
+  const questionNeutral = singleQuestion && !loadedWordHit && titleTrimmed.length >= 12;
 
   const clearFilters = () => {
     setSearchQuery('');
@@ -2579,8 +2587,12 @@ export default function ProposalsScreen() {
                       {questionNeutral
                         ? 'READS AS A NEUTRAL QUESTION'
                         : loadedWordHit
-                        ? `LOADED WORD: "${loadedWordHit.toUpperCase()}"`
-                        : 'END WITH A QUESTION MARK'}
+                        ? `LOADED LANGUAGE: "${loadedWordHit.toUpperCase()}"`
+                        : !titleTrimmed.endsWith('?')
+                        ? 'END WITH A QUESTION MARK'
+                        : sentenceCount > 1
+                        ? 'ONE QUESTION ONLY — DROP THE EXTRA SENTENCE'
+                        : 'KEEP IT SHORT AND ASKABLE'}
                     </Text>
                   </View>
                 )}
@@ -2593,7 +2605,7 @@ export default function ProposalsScreen() {
 
             {/* THE DETAILS — description, unchanged wiring */}
             <View style={createStyles.section}>
-              <Text style={[createStyles.sectionLabel, { color: colors.textTertiary }]}>THE DETAILS</Text>
+              <Text style={[createStyles.sectionLabel, { color: colors.textTertiary }]}>THE DETAILS · OPTIONAL</Text>
               <View
                 style={[
                   createStyles.detailsCard,
@@ -3123,8 +3135,10 @@ export default function ProposalsScreen() {
         onConfirm={confirmPendingVote}
         onDismiss={() => setPendingVote(null)}
         onShare={() => {
+          // Return the Share promise so the seal sheet stays mounted while
+          // the native share dialog is presenting.
           const last = lastVotedRef.current;
-          if (last) shareVoteAchievement(last.title, lastVoteType, last.id);
+          return last ? shareVoteAchievement(last.title, lastVoteType, last.id) : undefined;
         }}
       />
 

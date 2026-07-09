@@ -606,35 +606,8 @@ export default function ProfileScreen() {
           </Text>
         </Animated.View>
 
-        {/* Civic badges */}
-        <Animated.View entering={FadeInUp.delay(300).duration(400)} style={styles.section}>
-          <View style={styles.badgesHeader}>
-            <SectionLabel>CIVIC BADGES</SectionLabel>
-            <TouchableOpacity
-              style={styles.badgesLink}
-              onPress={() => navigateTo('/modals/badges')}
-              activeOpacity={0.7}
-            >
-              {badgesEarned !== null && (
-                <Text style={[styles.badgesCount, { color: colors.textTertiary }]}>
-                  {badgesEarned} / {BADGES_TOTAL}
-                </Text>
-              )}
-              <Text style={[styles.rowArrow, { color: colors.textTertiary }]}>→</Text>
-            </TouchableOpacity>
-          </View>
-          <View style={styles.badgesGrid}>
-            {badgeTiles.map((b) => (
-              <BadgeTile
-                key={b.id}
-                name={b.name}
-                icon={b.icon}
-                earned={b.earned}
-                onPress={() => navigateTo('/modals/badges')}
-              />
-            ))}
-          </View>
-        </Animated.View>
+        {/* Civic badges section removed for launch — the badges modal and
+            its data plumbing stay intact for when it returns. */}
 
         {/* Civic record */}
         <Animated.View entering={FadeInUp.delay(350).duration(400)} style={styles.section}>

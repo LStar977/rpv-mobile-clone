@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, AccessibilityInfo, Modal } from 'react-native';
 import Animated, {
   useSharedValue,
@@ -69,7 +69,9 @@ interface VoteConfirmationOverlayProps {
   // auto-dismiss window stretches to give it a beat. This is the single
   // cheapest viral moment in the app — the user just acted and is at peak
   // motivation to tell someone.
-  onShare?: () => void;
+  // May return a promise (e.g. the native Share dialog) — the sheet stays
+  // open until it settles so the share presentation isn't torn down.
+  onShare?: () => void | Promise<unknown>;
   /**
    * OPTIONAL truthfulness channel. When the parent reports actual submission
    * status here, the seal reflects it instead of pretending:
@@ -104,6 +106,8 @@ export function VoteConfirmationOverlay({
   const insets = useSafeAreaInsets();
 
   const [phase, setPhase] = useState<'confirm' | 'cast'>(onConfirm ? 'confirm' : 'cast');
+  // True while the native share dialog is up — blocks auto-dismiss.
+  const sharingRef = useRef(false);
   const [reduceMotion, setReduceMotion] = useState(false);
 
   const scrimOpacity = useSharedValue(0);
@@ -156,19 +160,22 @@ export function VoteConfirmationOverlay({
   };
 
   // Cast state: the Momentous ballot seal. Auto-dismiss only once the seal is
-  // truthfully complete (legacy mode, or castState === 'confirmed') — timing
-  // unchanged: longer when the share pill is showing so there's time to tap it.
+  // truthfully complete (legacy mode, or castState === 'confirmed') — with a
+  // long enough window to actually read it and tap the share pill. Tapping
+  // share cancels the timer (sharingRef) so the sheet never dismisses out
+  // from under the native share dialog.
   useEffect(() => {
     if (!visible || phase !== 'cast') return;
 
     let dismissTimer: ReturnType<typeof setTimeout> | undefined;
     const startAutoDismiss = () => {
       dismissTimer = setTimeout(() => {
+        if (sharingRef.current) return;
         scrimOpacity.value = withTiming(0, { duration: ANIMATION.motion.quick });
         sheetTranslate.value = withTiming(480, { duration: ANIMATION.motion.quick }, () => {
           runOnJS(onDismiss)();
         });
-      }, onShare ? 2800 : 1600);
+      }, onShare ? 6000 : 2400);
     };
 
     if (reduceMotion) {
@@ -452,9 +459,17 @@ export function VoteConfirmationOverlay({
               onShare && (
                 <TouchableOpacity
                   style={[styles.shareBtn, { borderColor: colors.gold }]}
-                  onPress={() => {
-                    onShare();
-                    onDismiss();
+                  onPress={async () => {
+                    // Keep the sheet (and its Modal) alive while the native
+                    // share dialog presents — dismissing first cancels the
+                    // share presentation on iOS.
+                    sharingRef.current = true;
+                    try {
+                      await Promise.resolve(onShare());
+                    } finally {
+                      sharingRef.current = false;
+                      onDismiss();
+                    }
                   }}
                   activeOpacity={0.8}
                   accessibilityRole="button"
