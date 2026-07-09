@@ -811,7 +811,10 @@ export default function ProposalsScreen() {
     state: '',
     city: '',
     geoScope: 'global' as 'global' | 'national' | 'state' | 'city',
-    ageGroup: 'All Ages',
+    // Age range as numbers — the server only enforces ageMin/ageMax; the
+    // old 'ageGroup' bucket string was silently ignored at vote time.
+    ageMin: '',
+    ageMax: '',
     gender: 'All Genders',
     imageUri: '' as string,
     voteType: 'yes-no' as 'yes-no' | 'multiple-choice' | 'ranked-choice',
@@ -1524,7 +1527,10 @@ export default function ProposalsScreen() {
       }
 
       const demographicRestrictions: any = {};
-      if (newProposal.ageGroup !== 'All Ages') demographicRestrictions.ageGroup = newProposal.ageGroup;
+      const ageMinNum = parseInt(newProposal.ageMin, 10);
+      const ageMaxNum = parseInt(newProposal.ageMax, 10);
+      if (!Number.isNaN(ageMinNum) && ageMinNum > 0) demographicRestrictions.ageMin = ageMinNum;
+      if (!Number.isNaN(ageMaxNum) && ageMaxNum > 0) demographicRestrictions.ageMax = ageMaxNum;
       if (newProposal.gender !== 'All Genders') demographicRestrictions.gender = newProposal.gender;
 
       let imageUrl: string | undefined;
@@ -1599,7 +1605,8 @@ export default function ProposalsScreen() {
         state: userState,
         city: userCity,
         geoScope: 'global',
-        ageGroup: 'All Ages',
+        ageMin: '',
+        ageMax: '',
         gender: 'All Genders',
         imageUri: '',
         voteType: 'yes-no',
@@ -1626,6 +1633,12 @@ export default function ProposalsScreen() {
       return;
     }
     // Description is optional — the question can stand alone.
+    const min = parseInt(newProposal.ageMin, 10);
+    const max = parseInt(newProposal.ageMax, 10);
+    if (!Number.isNaN(min) && !Number.isNaN(max) && min > max) {
+      Alert.alert('Check the age range', 'Minimum age is higher than maximum age.');
+      return;
+    }
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setCreateStep(2);
   };
@@ -2871,19 +2884,39 @@ export default function ProposalsScreen() {
             {/* WHO CAN VOTE — demographics, optional (unchanged wiring) */}
             <View style={createStyles.section}>
               <Text style={[createStyles.sectionLabel, { color: colors.textTertiary }]}>WHO CAN VOTE · OPTIONAL</Text>
-              <Text style={[createStyles.subLabel, { color: colors.textSecondary }]}>Age group</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                <View style={styles.filterRow}>
-                  {AGE_GROUPS.map((age) => (
-                    <FilterChip
-                      key={age}
-                      label={age}
-                      selected={newProposal.ageGroup === age}
-                      onPress={() => setNewProposal((p) => ({ ...p, ageGroup: age }))}
-                    />
-                  ))}
+              <Text style={[createStyles.subLabel, { color: colors.textSecondary }]}>Age range</Text>
+              <View style={createStyles.ageRangeRow}>
+                <View style={[createStyles.ageInputWrap, { backgroundColor: colors.surface, borderColor: colors.borderSubtle }]}>
+                  <TextInput
+                    style={[createStyles.ageInput, { color: colors.text }]}
+                    value={newProposal.ageMin}
+                    onChangeText={(t) => setNewProposal((p) => ({ ...p, ageMin: t.replace(/[^0-9]/g, '').slice(0, 3) }))}
+                    placeholder="18"
+                    placeholderTextColor={colors.textTertiary}
+                    keyboardType="number-pad"
+                    maxLength={3}
+                    accessibilityLabel="Minimum age"
+                  />
+                  <Text style={[createStyles.ageInputLabel, { color: colors.textTertiary }]}>MIN</Text>
                 </View>
-              </ScrollView>
+                <Text style={[createStyles.ageRangeDash, { color: colors.textTertiary }]}>–</Text>
+                <View style={[createStyles.ageInputWrap, { backgroundColor: colors.surface, borderColor: colors.borderSubtle }]}>
+                  <TextInput
+                    style={[createStyles.ageInput, { color: colors.text }]}
+                    value={newProposal.ageMax}
+                    onChangeText={(t) => setNewProposal((p) => ({ ...p, ageMax: t.replace(/[^0-9]/g, '').slice(0, 3) }))}
+                    placeholder="No limit"
+                    placeholderTextColor={colors.textTertiary}
+                    keyboardType="number-pad"
+                    maxLength={3}
+                    accessibilityLabel="Maximum age"
+                  />
+                  <Text style={[createStyles.ageInputLabel, { color: colors.textTertiary }]}>MAX</Text>
+                </View>
+              </View>
+              <Text style={[createStyles.scopeHint, { color: colors.textTertiary }]}>
+                Leave blank for all ages. Enforced against the voter's verified date of birth.
+              </Text>
               <Text style={[createStyles.subLabel, { color: colors.textSecondary, marginTop: 8 }]}>Gender</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                 <View style={styles.filterRow}>
@@ -4046,6 +4079,36 @@ const createStyles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'baseline',
     justifyContent: 'space-between',
+  },
+  ageRangeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  ageInputWrap: {
+    flex: 1,
+    height: 50,
+    borderRadius: 14,
+    borderWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    gap: 8,
+  },
+  ageInput: {
+    flex: 1,
+    fontFamily: FONTS.mono,
+    fontSize: 15,
+    fontVariant: ['tabular-nums'],
+  },
+  ageInputLabel: {
+    fontFamily: FONTS.mono,
+    fontSize: 9,
+    letterSpacing: 1.2,
+  },
+  ageRangeDash: {
+    fontFamily: FONTS.mono,
+    fontSize: 15,
   },
   neutralRow: {
     flexDirection: 'row',
