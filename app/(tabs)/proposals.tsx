@@ -15,7 +15,6 @@ import {
   Platform,
   Image,
   Switch,
-  Dimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image as ExpoImage } from 'expo-image';
@@ -26,29 +25,20 @@ import Animated, {
   FadeIn,
   FadeInDown,
   FadeInUp,
-  FadeInRight,
-  FadeOut,
-  SlideInRight,
-  SlideOutLeft,
-  SlideOutRight,
   useAnimatedStyle,
   useSharedValue,
   withSpring,
   withTiming,
-  withDelay,
   withRepeat,
   withSequence,
   interpolate,
-  runOnJS,
-  Extrapolation,
 } from 'react-native-reanimated';
-import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import { router, useLocalSearchParams } from 'expo-router';
 import { proposalsApi, userApi, uploadsApi, limitsApi, Proposal, UsageLimits } from '../../lib/api';
 import { useAuthStore } from '../../lib/auth';
 import { useBallotStore } from '../../lib/ballots';
 import { shareProposal, shareVoteAchievement } from '../../lib/share';
-import { useTheme, FONTS, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS, ANIMATION, responsive } from '../../lib/theme';
+import { useTheme, FONTS, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS, ANIMATION } from '../../lib/theme';
 import { getTierLabel, getLocationLabel, canUserVoteOnProposal, meetsCitizenshipRequirement } from '../../lib/proposalGeo';
 import { useModerationStore, useSyncMutes } from '../../lib/moderation';
 import { ProposalModerationMenu } from '../../components/moderation/ProposalModerationMenu';
@@ -98,14 +88,11 @@ function useProposalColors() {
   };
 }
 import { showVoteConfirmation } from '../../lib/notifications';
-import { VoteConfirmationOverlay, UpgradeModal, BallotDisplay, TallyBar, TrustChip, HowVotingWorksSheet } from '../../components/ui';
+import { VoteConfirmationOverlay, UpgradeModal, TallyBar, HowVotingWorksSheet } from '../../components/ui';
 import { checkForNewBadges } from '../../lib/badgeNotification';
 import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const SWIPE_HINT_KEY = '@represent_swipe_hint_shown';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
 const CATEGORIES = [
@@ -126,241 +113,71 @@ const COUNTRIES = ['Canada', 'United States', 'United Kingdom', 'Australia'];
 const AGE_GROUPS = ['All Ages', '18-25', '26-35', '36-45', '46-55', '56-65', '65+'];
 const GENDERS = ['All Genders', 'Male', 'Female'];
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// 1b · INLINE BALLOT FEED helpers — deadline chips, observer display region
+// ═══════════════════════════════════════════════════════════════════════════════
 
-const SWIPE_THRESHOLD = 120;
+// Observer-picked display region (2a). NEVER affects voting eligibility —
+// only what the unverified feed/hero is scoped to. Persisted in AsyncStorage.
+type ObserverRegion = { country?: string; state?: string; city?: string };
+type VoteReceipt = { side?: 'support' | 'oppose'; at?: number };
+type FeedFilter = 'main' | 'city' | 'province' | 'country' | 'voted';
 
+const OBSERVER_REGION_KEY = '@represent_observer_region';
 
-
-// Generate dossier ref code from proposal
-function getDossierRef(proposal: Proposal): string {
-  const tier = getTierLabel(proposal.geoRestrictions);
-  const prefix = tier === 'FEDERAL' ? 'FED' : tier === 'PROVINCIAL' ? 'PROV' : 'MUN';
-  const idNum = String(proposal.id).match(/\d+/g)?.join('') || '0000';
-  return `${prefix}-${idNum.slice(-4).padStart(4, '0')}`;
+// Hierarchical display-region match: a proposal "belongs" to the region when
+// its geoRestrictions prefix-match [country, state, city]. Global proposals
+// (no restrictions) always count. An empty region ({} = "Everywhere") or a
+// missing region (null = unknown) matches everything.
+function proposalMatchesRegion(p: Proposal, region: ObserverRegion | null): boolean {
+  const geo = p.geoRestrictions || [];
+  if (geo.length === 0) return true;
+  if (!region || (!region.country && !region.state && !region.city)) return true;
+  const levels = [region.country, region.state, region.city];
+  return geo.every((restriction, i) => {
+    const level = levels[i];
+    return !!level && level.toLowerCase() === restriction.toLowerCase();
+  });
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// M2 · VOTE QUEUE HEADER — filter rail, mono queue counter, 4px gold progress
-// ═══════════════════════════════════════════════════════════════════════════════
-function VoteHeader({
-  index,
-  total,
-  activeCount,
-  closingSoon,
-  selectedFilter,
-  onFilterChange,
-  insetTop,
-  onCreate,
-  onToggleView,
-  onHowVotingWorks,
-}: {
-  index: number;
-  total: number;
-  activeCount: number;
-  closingSoon: number;
-  selectedFilter: string;
-  onFilterChange: (filter: string) => void;
-  insetTop: number;
-  onCreate: () => void;
-  onToggleView: () => void;
-  onHowVotingWorks?: () => void;
-}) {
-  const { colors } = useTheme();
-  const filters = ['All', 'Federal', 'Provincial', 'Municipal', 'Closing'];
-  const reviewed = total > 0 ? Math.round(((index + 1) / total) * 100) : 0;
-
-  return (
-    <View style={{ paddingTop: insetTop + 8, backgroundColor: colors.background }}>
-      {/* Filter rail + queue actions (list toggle / create kept from the old header) */}
-      <View style={voteHeaderStyles.railRow}>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={voteHeaderStyles.filterRail}
-          style={{ flex: 1 }}
-        >
-          {filters.map((label) => {
-            const isActive = selectedFilter === label;
-            return (
-              <TouchableOpacity
-                key={label}
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  onFilterChange(label);
-                }}
-                style={[
-                  voteHeaderStyles.filterChip,
-                  isActive
-                    ? { backgroundColor: colors.goldFill }
-                    : { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1 },
-                ]}
-                accessibilityRole="button"
-                accessibilityState={{ selected: isActive }}
-              >
-                <Text
-                  style={[
-                    isActive ? voteHeaderStyles.filterChipTextActive : voteHeaderStyles.filterChipText,
-                    { color: isActive ? '#040707' : colors.textSecondary },
-                  ]}
-                >
-                  {label}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
-        <View style={voteHeaderStyles.actionsRow}>
-          <TouchableOpacity
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              onToggleView();
-            }}
-            style={[voteHeaderStyles.actionBtn, { backgroundColor: colors.surface, borderColor: colors.borderSubtle }]}
-            accessibilityLabel="Switch to list view"
-          >
-            <Ionicons name="list-outline" size={17} color={colors.textSecondary} />
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-              onCreate();
-            }}
-            style={[voteHeaderStyles.actionBtn, { backgroundColor: colors.goldFill, borderColor: 'transparent' }]}
-            accessibilityLabel="Create proposal"
-          >
-            <Ionicons name="add" size={20} color="#040707" />
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* Queue progress — everything counted is mono + tabular. Hidden when
-          the queue is empty (E1 queue-clear state owns that layout). */}
-      {total > 0 && (
-        <View style={voteHeaderStyles.progressSection}>
-          <View style={voteHeaderStyles.progressRow}>
-            <Text style={[voteHeaderStyles.counterNum, { color: colors.text }]}>
-              {String(Math.min(index + 1, total)).padStart(2, '0')} / {String(total).padStart(2, '0')} IN QUEUE
-            </Text>
-            <View style={voteHeaderStyles.progressRight}>
-              <Text style={[voteHeaderStyles.percentText, { color: colors.textTertiary }]}>
-                {reviewed}% REVIEWED
-              </Text>
-              {onHowVotingWorks && (
-                <TouchableOpacity
-                  onPress={() => {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    onHowVotingWorks();
-                  }}
-                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                  accessibilityRole="button"
-                  accessibilityLabel="How voting works"
-                >
-                  <Ionicons name="information-circle-outline" size={15} color={colors.textTertiary} />
-                </TouchableOpacity>
-              )}
-            </View>
-          </View>
-          <View style={[voteHeaderStyles.progressBar, { backgroundColor: colors.surfaceHighlight }]}>
-            <View
-              style={[
-                voteHeaderStyles.progressFill,
-                { backgroundColor: colors.goldFill, width: `${reviewed}%` },
-              ]}
-            />
-          </View>
-          {(activeCount > 0 || closingSoon > 0) && (
-            <Text style={[voteHeaderStyles.metaText, { color: colors.textTertiary }]}>
-              {activeCount} OPEN{closingSoon > 0 ? ` · ${closingSoon} CLOSING SOON` : ''}
-            </Text>
-          )}
-        </View>
-      )}
-    </View>
-  );
+// Deadline falls before the end of today (local time) and hasn't passed yet.
+function isClosingTonight(p: Proposal): boolean {
+  if (!p.deadline) return false;
+  const t = new Date(p.deadline).getTime();
+  if (Number.isNaN(t) || t <= Date.now()) return false;
+  const endOfToday = new Date();
+  endOfToday.setHours(23, 59, 59, 999);
+  return t <= endOfToday.getTime();
 }
 
-const voteHeaderStyles = StyleSheet.create({
-  railRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingLeft: 24,
-    paddingRight: 24,
-    paddingTop: 6,
-    paddingBottom: 14,
-    gap: 8,
-  },
-  filterRail: {
-    gap: 8,
-    paddingRight: 8,
-  },
-  filterChip: {
-    paddingHorizontal: 15,
-    paddingVertical: 8,
-    borderRadius: 100,
-  },
-  filterChipText: {
-    fontFamily: FONTS.sansMedium,
-    fontSize: 12.5,
-  },
-  filterChipTextActive: {
-    fontFamily: FONTS.sansSemiBold,
-    fontSize: 12.5,
-  },
-  actionsRow: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  actionBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  progressSection: {
-    paddingHorizontal: 24,
-    paddingBottom: 14,
-    gap: 7,
-  },
-  progressRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'baseline',
-  },
-  counterNum: {
-    fontFamily: FONTS.mono,
-    fontSize: 12,
-    letterSpacing: 1.2,
-    fontVariant: ['tabular-nums'],
-  },
-  progressRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 7,
-  },
-  percentText: {
-    fontFamily: FONTS.mono,
-    fontSize: 10.5,
-    letterSpacing: 0.84,
-    fontVariant: ['tabular-nums'],
-  },
-  progressBar: {
-    height: 4,
-    borderRadius: 2,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    borderRadius: 2,
-  },
-  metaText: {
-    fontFamily: FONTS.mono,
-    fontSize: 9.5,
-    letterSpacing: 1,
-    fontVariant: ['tabular-nums'],
-  },
-});
+function formatClockTime(ts: number): string {
+  const d = new Date(ts);
+  let h = d.getHours();
+  const m = d.getMinutes();
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  h = h % 12 || 12;
+  return `${h}:${String(m).padStart(2, '0')} ${ampm}`;
+}
+
+// Mono deadline chip: "CLOSES 10:00 PM" tonight, else "21D LEFT" / "5H LEFT".
+function deadlineChipLabel(p: Proposal): string {
+  if (!p.deadline) return '';
+  const t = new Date(p.deadline).getTime();
+  if (Number.isNaN(t)) return '';
+  const diff = t - Date.now();
+  if (diff <= 0) return 'ENDED';
+  if (isClosingTonight(p)) return `CLOSES ${formatClockTime(t)}`;
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+  if (days > 0) return `${days}D LEFT`;
+  return `${Math.max(1, Math.floor(diff / (1000 * 60 * 60)))}H LEFT`;
+}
+
+// Deadline-ascending sort key; undated proposals sink to the bottom.
+function deadlineMs(p: Proposal): number {
+  if (!p.deadline) return Number.MAX_SAFE_INTEGER;
+  const t = new Date(p.deadline).getTime();
+  return Number.isNaN(t) ? Number.MAX_SAFE_INTEGER : t;
+}
 
 // Helper to check if a proposal is a seed proposal (for local-only voting)
 const isSeedProposal = (id: number | string): boolean =>
@@ -426,536 +243,96 @@ function FilterChip({
   );
 }
 
-// ── M2 · QUEUE PROPOSAL CARD ────────────────────────────────────────────────
-// Scope chips · serif question · description · captioned attachment ·
-// proposer · TallyBar with ledger line. M2 is button-driven: the tinted
-// Support/Oppose buttons below the stack are the only way to cast, and
-// tapping the card opens the full proposal detail.
-interface SwipeCardProps {
+// ── 1b · BALLOT FEED CARD ───────────────────────────────────────────────────
+// Scope chip · serif question · compact tally · inline Support / Oppose / "…"
+// (verified) or one locked "Verify to cast your ballot" row (observer, 2a).
+interface BallotCardProps {
   proposal: Proposal;
-  onTap: () => void;
-  isTopCard: boolean;
-  cardIndex: number;
-  cardHeight: number;
-}
-
-const { height: SCREEN_HEIGHT } = Dimensions.get('window');
-// Space reserved for the header, vote buttons, skip control and tab bar.
-const BASE_CARD_HEIGHT_OFFSET = 420;
-
-function SwipeCard({ proposal, onTap, isTopCard, cardIndex, cardHeight }: SwipeCardProps) {
-  const { colors } = useTheme();
-  const translateX = useSharedValue(0);
-  const translateY = useSharedValue(0);
-  const rotation = useSharedValue(0);
-  const scale = useSharedValue(isTopCard ? 1 : 0.95 - cardIndex * 0.02);
-
-  // Ref avoids stale callback issues in the gesture worklet
-  const onTapRef = useRef(onTap);
-
-  useEffect(() => {
-    onTapRef.current = onTap;
-  }, [onTap]);
-
-  const category = proposal.category || 'General';
-  const timeRemaining = getTimeRemaining(proposal.deadline);
-  const isEnded = timeRemaining === 'Ended';
-
-  useEffect(() => {
-    scale.value = withSpring(isTopCard ? 1 : 0.95 - cardIndex * 0.02, { damping: 15 });
-  }, [isTopCard, cardIndex]);
-
-  // Wrapper uses the ref — prevents stale closure in the worklet
-  const handleTap = useCallback(() => {
-    onTapRef.current();
-  }, []);
-
-  // M2 is button-driven: the tinted Support/Oppose buttons and Skip below
-  // the card are the only way to act. Swipe-to-vote is gone — tapping the
-  // card opens the full proposal detail.
-  const composedGesture = Gesture.Tap()
-    .enabled(isTopCard)
-    .onEnd(() => {
-      runOnJS(Haptics.impactAsync)(Haptics.ImpactFeedbackStyle.Light);
-      runOnJS(handleTap)();
-    });
-
-  const cardStyle = useAnimatedStyle(() => ({
-    transform: [
-      { translateX: translateX.value },
-      { translateY: translateY.value + cardIndex * 12 },
-      { rotate: `${rotation.value}deg` },
-      { scale: scale.value },
-    ],
-    zIndex: 100 - cardIndex,
-    opacity: isTopCard ? 1 : 0.85 - cardIndex * 0.15,
-  }));
-
-  const tierLabel = getTierLabel(proposal.geoRestrictions);
-  const location = getLocationLabel(proposal.geoRestrictions);
-  const scopeLabel = tierLabel === 'GLOBAL' ? 'GLOBAL' : `${location} · ${tierLabel}`;
-  const voteType = (proposal as any).voteType || 'yes-no';
-  const optionCount = ((proposal as any).options || []).length;
-  const totalBallots = (proposal.supportVotes || 0) + (proposal.opposeVotes || 0);
-  const creatorName = proposal.creatorName || 'Community Member';
-
-  return (
-    <GestureDetector gesture={composedGesture}>
-      <Animated.View
-        style={[
-          premiumCardStyles.card,
-          { height: cardHeight, backgroundColor: colors.surface, borderColor: colors.border },
-          cardStyle,
-        ]}
-      >
-        {/* Scope chips + time left */}
-        <View style={premiumCardStyles.chipRow}>
-          <View style={premiumCardStyles.chipGroup}>
-            {proposal.source === 'civic-desk' ? (
-              <TrustChip label="CIVIC DESK" variant="gold" />
-            ) : null}
-            <TrustChip label={scopeLabel} variant="neutral" />
-            <TrustChip label={category} variant="outline" />
-            {proposal.requiresCitizenship && (
-              <TrustChip label="CITIZENS ONLY" variant="outline" icon="shield-outline" />
-            )}
-          </View>
-          {timeRemaining ? (
-            <Text style={[premiumCardStyles.timeText, { color: isEnded ? colors.oppose : colors.textTertiary }]}>
-              {timeRemaining.toUpperCase()}
-            </Text>
-          ) : null}
-        </View>
-
-        {/* Serif ballot question */}
-        <Text style={[premiumCardStyles.serifTitle, { color: colors.text }]} numberOfLines={3}>
-          {proposal.title}
-        </Text>
-
-        {/* Description */}
-        <Text style={[premiumCardStyles.description, { color: colors.textSecondary }]} numberOfLines={4}>
-          {proposal.description}
-        </Text>
-
-        {/* Attachment — captioned document, not decoration */}
-        {proposal.imageUrl ? (
-          <View style={premiumCardStyles.attachmentBlock}>
-            <ExpoImage
-              source={{ uri: proposal.imageUrl }}
-              style={[premiumCardStyles.attachmentImage, { borderColor: colors.borderSubtle }]}
-              contentFit="cover"
-              cachePolicy="memory-disk"
-              transition={150}
-            />
-            <View style={premiumCardStyles.attachmentCaptionRow}>
-              <Ionicons name="document-attach-outline" size={11} color={colors.textTertiary} />
-              <Text style={[premiumCardStyles.attachmentCaption, { color: colors.textTertiary }]}>
-                ATTACHMENT · FILED WITH THIS PROPOSAL
-              </Text>
-            </View>
-          </View>
-        ) : null}
-
-        {/* Proposer */}
-        <View style={premiumCardStyles.proposerRow}>
-          <View
-            style={[
-              premiumCardStyles.proposerAvatar,
-              { backgroundColor: colors.goldSurface, borderColor: 'rgba(234, 186, 88, 0.25)' },
-            ]}
-          >
-            <Text style={[premiumCardStyles.proposerInitial, { color: colors.gold }]}>
-              {creatorName.charAt(0).toUpperCase()}
-            </Text>
-          </View>
-          <Text style={[premiumCardStyles.proposerText, { color: colors.textTertiary }]}>
-            Proposed by <Text style={{ color: colors.textSecondary }}>{creatorName}</Text>
-          </Text>
-        </View>
-
-        {/* Tally — compact treatment per the 25-ballot threshold rules */}
-        <View style={premiumCardStyles.tallySection}>
-          {voteType !== 'yes-no' ? (
-            <View style={premiumCardStyles.optionsRow}>
-              <Text style={[premiumCardStyles.optionsText, { color: colors.textSecondary }]}>
-                {optionCount || 2} OPTIONS · {voteType === 'ranked-choice' ? 'RANK YOUR CHOICES' : 'PICK ONE'}
-              </Text>
-              <Text style={[premiumCardStyles.optionsText, { color: colors.textTertiary }]}>
-                {totalBallots.toLocaleString('en-CA')} VERIFIED BALLOTS
-              </Text>
-            </View>
-          ) : (
-            <TallyBar
-              supportCount={proposal.supportVotes || 0}
-              opposeCount={proposal.opposeVotes || 0}
-              variant="full"
-              applyThreshold={!isEnded}
-            />
-          )}
-          <Text style={[premiumCardStyles.ledgerLine, { color: colors.textTertiary }]}>
-            ON THE PUBLIC LEDGER · ONE PERSON, ONE BALLOT
-          </Text>
-        </View>
-
-        {/* Ended Banner — failure/closure must look like what it is */}
-        {isEnded && (
-          <View style={[premiumCardStyles.endedBanner, { backgroundColor: colors.opposeSurface }]}>
-            <Ionicons name="flag-outline" size={13} color={colors.oppose} />
-            <Text style={[premiumCardStyles.endedText, { color: colors.oppose }]}>VOTING CLOSED</Text>
-          </View>
-        )}
-      </Animated.View>
-    </GestureDetector>
-  );
-}
-
-// M2 queue card styles
-const premiumCardStyles = StyleSheet.create({
-  card: {
-    position: 'absolute',
-    left: 24,
-    right: 24,
-    top: 0,
-    borderRadius: 22,
-    borderWidth: 1,
-    overflow: 'hidden',
-    padding: 20,
-    gap: 13,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 24 },
-    shadowOpacity: 0.5,
-    shadowRadius: 48,
-    elevation: 20,
-  },
-  chipRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: 8,
-  },
-  chipGroup: {
-    flex: 1,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-  },
-  timeText: {
-    fontFamily: FONTS.mono,
-    fontSize: 10,
-    fontVariant: ['tabular-nums'],
-  },
-  serifTitle: {
-    fontFamily: FONTS.serif,
-    fontSize: 23,
-    lineHeight: 29,
-    letterSpacing: -0.18,
-  },
-  description: {
-    fontFamily: FONTS.sans,
-    fontSize: 13,
-    lineHeight: 20,
-  },
-  attachmentBlock: {
-    gap: 6,
-  },
-  attachmentImage: {
-    width: '100%',
-    height: 110,
-    borderRadius: 12,
-    borderWidth: 1,
-  },
-  attachmentCaptionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-  },
-  attachmentCaption: {
-    fontFamily: FONTS.mono,
-    fontSize: 8.5,
-    letterSpacing: 0.85,
-    fontVariant: ['tabular-nums'],
-  },
-  proposerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  proposerAvatar: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  proposerInitial: {
-    fontFamily: FONTS.serif,
-    fontSize: 10,
-  },
-  proposerText: {
-    fontFamily: FONTS.sans,
-    fontSize: 11.5,
-  },
-  tallySection: {
-    marginTop: 'auto',
-    gap: 8,
-  },
-  optionsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'baseline',
-  },
-  optionsText: {
-    fontFamily: FONTS.mono,
-    fontSize: 10,
-    letterSpacing: 0.6,
-    fontVariant: ['tabular-nums'],
-  },
-  ledgerLine: {
-    fontFamily: FONTS.mono,
-    fontSize: 9.5,
-    letterSpacing: 0.95,
-    textAlign: 'center',
-    fontVariant: ['tabular-nums'],
-  },
-  swipeVeil: {
-    ...StyleSheet.absoluteFillObject,
-    zIndex: 5,
-  },
-  swipeVeilTop: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 100,
-    zIndex: 5,
-  },
-  swipeStamp: {
-    position: 'absolute',
-    top: 32,
-    left: 24,
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: 6,
-    borderWidth: 2,
-    backgroundColor: 'rgba(0,0,0,0.3)',
-    transform: [{ rotate: '-8deg' }],
-  },
-  swipeStampText: {
-    fontFamily: FONTS.sansBold,
-    fontSize: 14,
-    letterSpacing: 3,
-  },
-  endedBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 10,
-    borderRadius: 10,
-  },
-  endedText: {
-    fontFamily: FONTS.sansSemiBold,
-    fontSize: 11,
-    letterSpacing: 1.32,
-  },
-});
-
-// --- View Mode Toggle ---
-function ViewModeToggle({ mode, onToggle }: { mode: 'swipe' | 'list'; onToggle: () => void }) {
-  const { colors } = useTheme();
-
-  return (
-    <TouchableOpacity
-      style={[styles.viewModeBtn, { backgroundColor: colors.surface, borderColor: colors.border }]}
-      onPress={() => {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        onToggle();
-      }}
-    >
-      <Ionicons
-        name={mode === 'swipe' ? 'list-outline' : 'layers-outline'}
-        size={18}
-        color={colors.text}
-      />
-    </TouchableOpacity>
-  );
-}
-
-// 05 · FEED PROPOSAL CARD — scope chips, serif question, compact tally
-interface ProposalCardProps {
-  proposal: Proposal;
-  hasVoted: boolean;
-  onVote: (id: number, vote: 'support' | 'oppose') => Promise<void>;
+  observer: boolean;
   isVoting: boolean;
-  onPress: () => void;
+  onSupport: () => void;
+  onOppose: () => void;
+  onOpen: () => void;
+  onVerify: () => void;
   index: number;
-  isUserVerified: boolean;
-  isUserCitizen: boolean;
-  userCountry: string;
-  userState: string;
-  userCity: string;
 }
 
-function ProposalCard({
+function BallotCard({
   proposal,
-  hasVoted,
-  onVote,
+  observer,
   isVoting,
-  onPress,
+  onSupport,
+  onOppose,
+  onOpen,
+  onVerify,
   index,
-  isUserVerified,
-  isUserCitizen,
-  userCountry,
-  userState,
-  userCity,
-}: ProposalCardProps) {
+}: BallotCardProps) {
   const { colors } = useTheme();
-  const scale = useSharedValue(1);
 
-  // Check if user's location matches for voting on geo-restricted proposals
-  const userLocation = [userCountry, userState, userCity].filter(Boolean);
-  const proposalGeo = proposal.geoRestrictions || [];
-  const canVoteByLocation = proposalGeo.length === 0 ||
-    proposalGeo.every((restriction, i) =>
-      userLocation[i]?.toLowerCase() === restriction.toLowerCase()
-    );
-
-  const timeRemaining = getTimeRemaining(proposal.deadline);
-  const isEnded = timeRemaining === 'Ended';
-  const geoTags = proposal.geoRestrictions || [];
+  const closingTonight = isClosingTonight(proposal);
   const tierLabel = getTierLabel(proposal.geoRestrictions);
   const location = getLocationLabel(proposal.geoRestrictions);
-  const scopeLabel = tierLabel === 'GLOBAL' ? 'GLOBAL' : `${location} · ${tierLabel}`;
-  const isCivicDesk = proposal.source === 'civic-desk';
+  const scopeLabel = (tierLabel === 'GLOBAL' ? 'GLOBAL' : `${location} · ${tierLabel}`).toUpperCase();
   const voteType = (proposal as any).voteType || 'yes-no';
   const optionCount = ((proposal as any).options || []).length;
   const totalBallots = (proposal.supportVotes || 0) + (proposal.opposeVotes || 0);
-
-  const handlePressIn = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    scale.value = withSpring(0.98, ANIMATION.spring.snappy);
-  };
-
-  const handlePressOut = () => {
-    scale.value = withSpring(1, ANIMATION.spring.snappy);
-  };
-
-  const animatedCardStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-  }));
-
-  const handleShare = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    shareProposal({
-      id: proposal.id as number,
-      title: proposal.title,
-      description: proposal.description,
-    });
-  };
+  const ended = isProposalEnded(proposal);
+  const deadlineLabel = deadlineChipLabel(proposal);
 
   return (
     <AnimatedTouchable
-      entering={FadeInUp.delay(index * 60).duration(400).springify()}
+      entering={FadeInUp.delay(Math.min(index, 8) * 50).duration(350)}
       style={[
-        feedCardStyles.card,
+        ballotStyles.card,
         {
           backgroundColor: colors.surface,
-          // The civic-desk (referendum) card carries a gold-tinted border, per 05.
-          borderColor: isCivicDesk ? 'rgba(234, 186, 88, 0.24)' : colors.borderSubtle,
+          // Gold-tinted border for ballots that close tonight, per 1b.
+          borderColor: closingTonight ? 'rgba(234, 186, 88, 0.3)' : colors.borderSubtle,
         },
-        animatedCardStyle,
       ]}
-      onPress={onPress}
-      onPressIn={handlePressIn}
-      onPressOut={handlePressOut}
-      activeOpacity={1}
+      onPress={onOpen}
+      activeOpacity={0.94}
+      accessibilityRole="button"
+      accessibilityLabel={`Open ${proposal.title}`}
     >
-      {/* Chip row + deadline */}
-      <View style={feedCardStyles.chipRow}>
-        <View style={feedCardStyles.chipGroup}>
-          {isCivicDesk && <TrustChip label="CIVIC DESK" variant="gold" />}
-          <TrustChip label={scopeLabel} variant="neutral" />
-          {voteType === 'ranked-choice' && <TrustChip label="RANKED" variant="outline" />}
-          {voteType === 'multiple-choice' && <TrustChip label="PICK ONE" variant="outline" />}
+      {/* Scope chip + deadline (mono, gold when closing tonight) */}
+      <View style={ballotStyles.topRow}>
+        <View style={ballotStyles.topLeft}>
+          <Text style={[ballotStyles.scopeChip, { color: colors.textTertiary, backgroundColor: colors.surfaceHighlight }]}>
+            {scopeLabel}
+          </Text>
           {proposal.requiresCitizenship && (
-            <TrustChip label="CITIZENS ONLY" variant="outline" icon="shield-outline" />
+            <Text style={[ballotStyles.scopeChip, { color: colors.textTertiary, backgroundColor: colors.surfaceHighlight }]}>
+              CITIZENS ONLY
+            </Text>
           )}
         </View>
-        <View style={feedCardStyles.chipRight}>
-          {timeRemaining ? (
-            <Text style={[feedCardStyles.timeText, { color: isEnded ? colors.oppose : colors.textTertiary }]}>
-              {timeRemaining.toUpperCase()}
+        {deadlineLabel ? (
+          closingTonight ? (
+            <View style={ballotStyles.deadlineRow}>
+              <View style={[ballotStyles.deadlineDot, { backgroundColor: colors.gold }]} />
+              <Text style={[ballotStyles.deadlineTextUrgent, { color: colors.gold }]}>{deadlineLabel}</Text>
+            </View>
+          ) : (
+            <Text style={[ballotStyles.deadlineText, { color: deadlineLabel === 'ENDED' ? colors.oppose : colors.textTertiary }]}>
+              {deadlineLabel}
             </Text>
-          ) : null}
-          <TouchableOpacity
-            onPress={(e) => {
-              e.stopPropagation();
-              handleShare();
-            }}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            accessibilityLabel={`Share ${proposal.title}`}
-          >
-            <Ionicons name="share-outline" size={15} color={colors.textTertiary} />
-          </TouchableOpacity>
-        </View>
+          )
+        ) : null}
       </View>
 
-      {/* Eligibility notices — restyled, all conditions preserved */}
-      {geoTags.length > 0 && !isUserVerified && (
-        <View style={[feedCardStyles.noticeChip, { backgroundColor: colors.warningSurface }]}>
-          <Ionicons name="lock-closed" size={11} color={colors.warning} />
-          <Text style={[feedCardStyles.noticeText, { color: colors.warning }]}>
-            Verification required to vote
-          </Text>
-        </View>
-      )}
-      {geoTags.length > 0 && isUserVerified && !canVoteByLocation && (
-        <View style={[feedCardStyles.noticeChip, { backgroundColor: colors.errorSurface }]}>
-          <Ionicons name="location-outline" size={11} color={colors.error} />
-          <Text style={[feedCardStyles.noticeText, { color: colors.error }]}>Not in your region</Text>
-        </View>
-      )}
-      {proposal.requiresCitizenship && !isUserCitizen && (
-        <View style={[feedCardStyles.noticeChip, { backgroundColor: colors.warningSurface }]}>
-          <Ionicons name="shield-checkmark" size={11} color={colors.warning} />
-          <Text style={[feedCardStyles.noticeText, { color: colors.warning }]}>
-            Citizens only — verify to vote
-          </Text>
-        </View>
-      )}
-
       {/* Serif ballot question */}
-      <Text style={[feedCardStyles.title, { color: colors.text }]} numberOfLines={3}>
+      <Text style={[ballotStyles.question, { color: colors.text }]} numberOfLines={3}>
         {proposal.title}
       </Text>
 
-      {/* Attachment — captioned document */}
-      {proposal.imageUrl && (
-        <View style={feedCardStyles.attachmentBlock}>
-          <ExpoImage
-            source={{ uri: proposal.imageUrl }}
-            style={[feedCardStyles.attachmentImage, { borderColor: colors.borderSubtle }]}
-            contentFit="cover"
-            cachePolicy="memory-disk"
-            transition={150}
-          />
-          <View style={feedCardStyles.attachmentCaptionRow}>
-            <Ionicons name="document-attach-outline" size={11} color={colors.textTertiary} />
-            <Text style={[feedCardStyles.attachmentCaption, { color: colors.textTertiary }]}>
-              ATTACHMENT · FILED WITH THIS PROPOSAL
-            </Text>
-          </View>
-        </View>
-      )}
-
-      {/* Tally — TallyBar enforces the 25-ballot threshold */}
+      {/* Tally — TallyBar enforces the 25-ballot threshold (dots below it) */}
       {voteType !== 'yes-no' ? (
-        <View style={feedCardStyles.optionsRow}>
-          <Text style={[feedCardStyles.optionsText, { color: colors.textSecondary }]}>
+        <View style={ballotStyles.optionsRow}>
+          <Text style={[ballotStyles.optionsText, { color: colors.textSecondary }]}>
             {optionCount || 2} OPTIONS · {voteType === 'ranked-choice' ? 'RANK YOUR CHOICES' : 'PICK ONE'}
           </Text>
-          <Text style={[feedCardStyles.optionsText, { color: colors.textTertiary }]}>
+          <Text style={[ballotStyles.optionsText, { color: colors.textTertiary }]}>
             {totalBallots.toLocaleString('en-CA')} VERIFIED BALLOTS
           </Text>
         </View>
@@ -964,73 +341,74 @@ function ProposalCard({
           supportCount={proposal.supportVotes || 0}
           opposeCount={proposal.opposeVotes || 0}
           variant="compact"
-          applyThreshold={!isEnded}
+          applyThreshold={!ended}
         />
       )}
 
-      {/* Status / actions */}
-      {isEnded ? (
-        <View style={[feedCardStyles.statusBanner, { backgroundColor: colors.opposeSurface }]}>
-          <Ionicons name="flag-outline" size={13} color={colors.oppose} />
-          <Text style={[feedCardStyles.statusText, { color: colors.oppose }]}>VOTING CLOSED</Text>
-        </View>
-      ) : hasVoted ? (
-        // Committed ballot state is GOLD — never green/red
-        <View
-          style={[
-            feedCardStyles.votedBanner,
-            { backgroundColor: colors.goldSurface, borderColor: 'rgba(234, 186, 88, 0.3)' },
-          ]}
-        >
-          <View style={[feedCardStyles.votedCheck, { backgroundColor: colors.goldSurfaceStrong }]}>
-            <Ionicons name="checkmark" size={13} color={colors.gold} />
-          </View>
-          <View>
-            <Text style={[feedCardStyles.votedTitle, { color: colors.text }]}>Your ballot is recorded</Text>
-            <Text style={[feedCardStyles.votedSub, { color: colors.textTertiary }]}>ON THE PUBLIC LEDGER</Text>
-          </View>
-        </View>
-      ) : !canVoteByLocation && proposalGeo.length > 0 && isUserVerified ? (
-        <View style={[feedCardStyles.statusBanner, { backgroundColor: colors.errorSurface }]}>
-          <Ionicons name="lock-closed" size={13} color={colors.error} />
-          <Text style={[feedCardStyles.statusText, { color: colors.error }]}>
-            OPEN TO {String(proposalGeo[proposalGeo.length - 1] ?? 'REGION').toUpperCase()} RESIDENTS ONLY
-          </Text>
-        </View>
-      ) : !isUserVerified && proposalGeo.length > 0 ? (
-        <View style={[feedCardStyles.statusBanner, { backgroundColor: colors.warningSurface }]}>
-          <Ionicons name="lock-closed" size={13} color={colors.warning} />
-          <Text style={[feedCardStyles.statusText, { color: colors.warning }]}>
-            VERIFY YOUR IDENTITY TO VOTE
-          </Text>
-        </View>
-      ) : voteType !== 'yes-no' ? (
-        // Non-binary ballots open the dedicated ballot screen (X2 / ranked)
+      {/* Action row — 2a observers get one locked verification row instead */}
+      {observer ? (
         <TouchableOpacity
-          style={[feedCardStyles.openBallotBtn, { backgroundColor: colors.goldFill }]}
+          style={[ballotStyles.lockedRow, { backgroundColor: colors.background, borderColor: colors.border }]}
           onPress={(e) => {
             e.stopPropagation();
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-            onPress();
+            onVerify();
           }}
-          activeOpacity={0.85}
+          activeOpacity={0.8}
           accessibilityRole="button"
-          accessibilityLabel={`Open ballot for ${proposal.title}`}
+          accessibilityLabel="Verify to cast your ballot"
         >
-          <Text style={feedCardStyles.openBallotText}>Open Ballot</Text>
+          <Ionicons name="lock-closed-outline" size={14} color={colors.textTertiary} />
+          <Text style={[ballotStyles.lockedText, { color: colors.textSecondary }]}>Verify to cast your ballot</Text>
         </TouchableOpacity>
+      ) : ended ? (
+        <View style={[ballotStyles.endedBanner, { backgroundColor: colors.opposeSurface }]}>
+          <Ionicons name="flag-outline" size={13} color={colors.oppose} />
+          <Text style={[ballotStyles.endedText, { color: colors.oppose }]}>VOTING CLOSED</Text>
+        </View>
+      ) : voteType !== 'yes-no' ? (
+        // Non-binary ballots: one full-width gold entry into the ballot screen
+        <View style={ballotStyles.actionRow}>
+          <TouchableOpacity
+            style={[ballotStyles.openBallotBtn, { backgroundColor: colors.goldFill }]}
+            onPress={(e) => {
+              e.stopPropagation();
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              onOpen();
+            }}
+            activeOpacity={0.85}
+            accessibilityRole="button"
+            accessibilityLabel={`Open ballot for ${proposal.title}`}
+          >
+            <Text style={ballotStyles.openBallotText} numberOfLines={1}>
+              Open Ballot — {voteType === 'ranked-choice' ? 'Rank Your Choices' : 'Pick One'}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[ballotStyles.moreBtn, { backgroundColor: colors.surfaceHighlight }]}
+            onPress={(e) => {
+              e.stopPropagation();
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              onOpen();
+            }}
+            accessibilityRole="button"
+            accessibilityLabel={`More about ${proposal.title}`}
+          >
+            <Text style={[ballotStyles.moreText, { color: colors.textSecondary }]}>…</Text>
+          </TouchableOpacity>
+        </View>
       ) : (
-        <View style={feedCardStyles.voteActions}>
+        <View style={ballotStyles.actionRow}>
           <TouchableOpacity
             style={[
-              feedCardStyles.voteBtn,
+              ballotStyles.voteBtn,
               { backgroundColor: colors.supportSurface, borderColor: colors.support },
-              isVoting && feedCardStyles.btnDisabled,
+              isVoting && ballotStyles.btnDisabled,
             ]}
             onPress={(e) => {
               e.stopPropagation();
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-              onVote(proposal.id as number, 'support');
+              onSupport();
             }}
             disabled={isVoting}
             activeOpacity={0.85}
@@ -1041,20 +419,19 @@ function ProposalCard({
             {isVoting ? (
               <ActivityIndicator size="small" color={colors.support} />
             ) : (
-              <Text style={[feedCardStyles.voteBtnText, { color: colors.support }]}>Support</Text>
+              <Text style={[ballotStyles.voteBtnText, { color: colors.support }]}>Support</Text>
             )}
           </TouchableOpacity>
-
           <TouchableOpacity
             style={[
-              feedCardStyles.voteBtn,
+              ballotStyles.voteBtn,
               { backgroundColor: colors.opposeSurface, borderColor: colors.oppose },
-              isVoting && feedCardStyles.btnDisabled,
+              isVoting && ballotStyles.btnDisabled,
             ]}
             onPress={(e) => {
               e.stopPropagation();
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-              onVote(proposal.id as number, 'oppose');
+              onOppose();
             }}
             disabled={isVoting}
             activeOpacity={0.85}
@@ -1065,8 +442,20 @@ function ProposalCard({
             {isVoting ? (
               <ActivityIndicator size="small" color={colors.oppose} />
             ) : (
-              <Text style={[feedCardStyles.voteBtnText, { color: colors.oppose }]}>Oppose</Text>
+              <Text style={[ballotStyles.voteBtnText, { color: colors.oppose }]}>Oppose</Text>
             )}
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[ballotStyles.moreBtn, { backgroundColor: colors.surfaceHighlight }]}
+            onPress={(e) => {
+              e.stopPropagation();
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              onOpen();
+            }}
+            accessibilityRole="button"
+            accessibilityLabel={`More about ${proposal.title}`}
+          >
+            <Text style={[ballotStyles.moreText, { color: colors.textSecondary }]}>…</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -1074,79 +463,107 @@ function ProposalCard({
   );
 }
 
-const feedCardStyles = StyleSheet.create({
+// Voted cards collapse into a compact gold receipt row (1b). The side/time
+// only render when the user's actual ballot data is available — never guessed.
+function VotedReceiptRow({
+  proposal,
+  receipt,
+  onOpen,
+}: {
+  proposal: Proposal;
+  receipt?: VoteReceipt;
+  onOpen: () => void;
+}) {
+  const { colors } = useTheme();
+  const parts = ['YOUR BALLOT'];
+  if (receipt?.side) parts.push(receipt.side.toUpperCase());
+  parts.push(receipt?.at ? `RECORDED ${formatClockTime(receipt.at)}` : 'RECORDED');
+
+  return (
+    <Animated.View entering={FadeIn.duration(300)}>
+      <TouchableOpacity
+        style={[ballotStyles.receiptCard, { backgroundColor: colors.surface, borderColor: colors.borderSubtle }]}
+        onPress={onOpen}
+        activeOpacity={0.8}
+        accessibilityRole="button"
+        accessibilityLabel={`Receipt for ${proposal.title}`}
+      >
+        <View style={[ballotStyles.receiptCheck, { backgroundColor: colors.goldSurface, borderColor: 'rgba(234, 186, 88, 0.25)' }]}>
+          <Ionicons name="checkmark" size={17} color={colors.gold} />
+        </View>
+        <View style={ballotStyles.receiptBody}>
+          <Text style={[ballotStyles.receiptTitle, { color: colors.textSecondary }]} numberOfLines={1}>
+            {proposal.title}
+          </Text>
+          <Text style={[ballotStyles.receiptMeta, { color: colors.gold }]} numberOfLines={1}>
+            {parts.join(' · ')}
+          </Text>
+        </View>
+        <Text style={[ballotStyles.receiptLink, { color: colors.textTertiary }]}>Receipt →</Text>
+      </TouchableOpacity>
+    </Animated.View>
+  );
+}
+
+const ballotStyles = StyleSheet.create({
   card: {
-    borderRadius: 18,
+    borderRadius: 20,
     borderWidth: 1,
     paddingVertical: 17,
     paddingHorizontal: 18,
     gap: 12,
   },
-  chipRow: {
+  topRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     gap: 8,
   },
-  chipGroup: {
+  topLeft: {
     flex: 1,
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 6,
   },
-  chipRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  timeText: {
-    fontFamily: FONTS.mono,
-    fontSize: 10.5,
-    fontVariant: ['tabular-nums'],
-  },
-  noticeChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    gap: 6,
-    paddingHorizontal: 10,
+  scopeChip: {
+    fontFamily: FONTS.sansSemiBold,
+    fontSize: 9.5,
+    letterSpacing: 1.14,
+    paddingHorizontal: 9,
     paddingVertical: 5,
     borderRadius: 100,
+    overflow: 'hidden',
   },
-  noticeText: {
-    fontFamily: FONTS.sansSemiBold,
-    fontSize: 10.5,
-    letterSpacing: 0.2,
-  },
-  title: {
-    fontFamily: FONTS.serif,
-    fontSize: 18,
-    lineHeight: 24,
-  },
-  attachmentBlock: {
-    gap: 6,
-  },
-  attachmentImage: {
-    width: '100%',
-    height: 140,
-    borderRadius: 12,
-    borderWidth: 1,
-  },
-  attachmentCaptionRow: {
+  deadlineRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
   },
-  attachmentCaption: {
-    fontFamily: FONTS.mono,
-    fontSize: 8.5,
-    letterSpacing: 0.85,
+  deadlineDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  deadlineTextUrgent: {
+    fontFamily: FONTS.monoSemiBold,
+    fontSize: 10.5,
     fontVariant: ['tabular-nums'],
+  },
+  deadlineText: {
+    fontFamily: FONTS.mono,
+    fontSize: 10.5,
+    fontVariant: ['tabular-nums'],
+  },
+  question: {
+    fontFamily: FONTS.serif,
+    fontSize: 18.5,
+    lineHeight: 24,
   },
   optionsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'baseline',
+    gap: 8,
   },
   optionsText: {
     fontFamily: FONTS.mono,
@@ -1154,88 +571,121 @@ const feedCardStyles = StyleSheet.create({
     letterSpacing: 0.6,
     fontVariant: ['tabular-nums'],
   },
-  statusBanner: {
+  actionRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 7,
-    paddingVertical: 10,
-    borderRadius: 10,
-  },
-  statusText: {
-    fontFamily: FONTS.sansSemiBold,
-    fontSize: 10.5,
-    letterSpacing: 1.1,
-  },
-  votedBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 11,
-    borderWidth: 1,
-    borderRadius: 14,
-    paddingVertical: 11,
-    paddingHorizontal: 14,
-  },
-  votedCheck: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  votedTitle: {
-    fontFamily: FONTS.sansSemiBold,
-    fontSize: 13,
-  },
-  votedSub: {
-    fontFamily: FONTS.mono,
-    fontSize: 8.5,
-    letterSpacing: 0.85,
-    marginTop: 1,
-    fontVariant: ['tabular-nums'],
-  },
-  openBallotBtn: {
-    height: 48,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  openBallotText: {
-    fontFamily: FONTS.sansSemiBold,
-    fontSize: 15,
-    color: '#040707',
-  },
-  voteActions: {
-    flexDirection: 'row',
-    gap: 10,
+    gap: 9,
   },
   voteBtn: {
     flex: 1,
-    height: 50,
-    borderRadius: 14,
+    height: 46,
+    borderRadius: 13,
     borderWidth: 1.5,
     alignItems: 'center',
     justifyContent: 'center',
   },
   voteBtnText: {
     fontFamily: FONTS.sansSemiBold,
-    fontSize: 15,
+    fontSize: 14.5,
+  },
+  moreBtn: {
+    width: 46,
+    height: 46,
+    borderRadius: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  moreText: {
+    fontFamily: FONTS.sansMedium,
+    fontSize: 16,
+    marginTop: -6,
+  },
+  openBallotBtn: {
+    flex: 1,
+    height: 46,
+    borderRadius: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 14,
+  },
+  openBallotText: {
+    fontFamily: FONTS.sansSemiBold,
+    fontSize: 14.5,
+    color: '#040707',
+  },
+  lockedRow: {
+    height: 46,
+    borderRadius: 13,
+    borderWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 9,
+  },
+  lockedText: {
+    fontFamily: FONTS.sansSemiBold,
+    fontSize: 13.5,
+  },
+  endedBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+    height: 46,
+    borderRadius: 13,
+  },
+  endedText: {
+    fontFamily: FONTS.sansSemiBold,
+    fontSize: 10.5,
+    letterSpacing: 1.1,
   },
   btnDisabled: { opacity: 0.6 },
+  // Receipt row (voted)
+  receiptCard: {
+    borderRadius: 20,
+    borderWidth: 1,
+    paddingVertical: 15,
+    paddingHorizontal: 18,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 13,
+    opacity: 0.85,
+  },
+  receiptCheck: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  receiptBody: {
+    flex: 1,
+    gap: 1,
+  },
+  receiptTitle: {
+    fontFamily: FONTS.serif,
+    fontSize: 14.5,
+    lineHeight: 19,
+  },
+  receiptMeta: {
+    fontFamily: FONTS.mono,
+    fontSize: 9.5,
+    letterSpacing: 0.57,
+    fontVariant: ['tabular-nums'],
+  },
+  receiptLink: {
+    fontFamily: FONTS.sansMedium,
+    fontSize: 12,
+  },
 });
 
-// Memoized list-item wrapper: without this, every parent re-render (vote
-// counts, filters, swipe index) re-renders every visible card. Re-render
-// only when the card's own proposal data / vote state changes.
-const MemoProposalCard = React.memo(ProposalCard, (prev, next) => (
+// Memoized feed card: without this, every parent re-render (vote counts,
+// filters) re-renders every visible card. Callback props are intentionally
+// ignored — they close over the item and are stable per data identity.
+const MemoBallotCard = React.memo(BallotCard, (prev, next) => (
   prev.proposal === next.proposal &&
-  prev.hasVoted === next.hasVoted &&
-  prev.isVoting === next.isVoting &&
-  prev.isUserVerified === next.isUserVerified &&
-  prev.isUserCitizen === next.isUserCitizen &&
-  prev.userCountry === next.userCountry &&
-  prev.userState === next.userState &&
-  prev.userCity === next.userCity
+  prev.observer === next.observer &&
+  prev.isVoting === next.isVoting
 ));
 
 // Skeleton Card
@@ -1273,13 +723,10 @@ function ProposalSkeleton({ index }: { index: number }) {
 }
 
 export default function ProposalsScreen() {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const { isAuthenticated, user } = useAuthStore();
   const { proposalId: deepLinkProposalId } = useLocalSearchParams<{ proposalId?: string }>();
   const insets = useSafeAreaInsets();
-
-  // Calculate card height dynamically based on safe area insets
-  const cardHeight = SCREEN_HEIGHT - insets.top - insets.bottom - BASE_CARD_HEIGHT_OFFSET;
 
   const [proposals, setProposals] = useState<Proposal[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1287,6 +734,9 @@ export default function ProposalsScreen() {
 
   const [claimedTokens, setClaimedTokens] = useState<Set<number | string>>(new Set());
   const [votedProposals, setVotedProposals] = useState<Set<number | string>>(new Set());
+  // Receipt metadata (side / recorded-at) for the collapsed voted rows. Only
+  // populated from the user's actual ballots — never guessed.
+  const [voteReceipts, setVoteReceipts] = useState<Map<string, VoteReceipt>>(new Map());
   const [votingProposalId, setVotingProposalId] = useState<number | null>(null);
 
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -1314,13 +764,13 @@ export default function ProposalsScreen() {
   const mutedUserIds = useModerationStore((s) => s.mutedUserIds);
   useSyncMutes();
 
-  // X1 confirm-before-cast sheet state. EVERY cast — swipe, queue buttons,
-  // list card, detail modal — must pass through this pending state; nothing
-  // is submitted until the user confirms on the sheet.
+  // X1 confirm-before-cast sheet state. EVERY cast — feed card, detail
+  // modal — must pass through this pending state; nothing is submitted
+  // until the user confirms on the sheet.
   const [pendingVote, setPendingVote] = useState<{
     proposal: Proposal;
     vote: 'support' | 'oppose';
-    source: 'swipe' | 'list' | 'detail';
+    source: 'list' | 'detail';
   } | null>(null);
   const [lastVoteType, setLastVoteType] = useState<'support' | 'oppose'>('support');
   // Context for the post-vote "Share your vote" pill on the confirmation
@@ -1332,13 +782,16 @@ export default function ProposalsScreen() {
   const voteQueueRef = useRef<Array<{ proposalId: number | string; vote: 'support' | 'oppose'; title: string }>>([]);
   const isProcessingQueueRef = useRef(false);
 
-  // Swipe mode state
-  const [viewMode, setViewMode] = useState<'swipe' | 'list'>('swipe');
-  const [swipeIndex, setSwipeIndex] = useState(0);
+  // 1b feed state — active filter chip, header search toggle, receipts that
+  // just collapsed in place this session (so a fresh vote stays visible in
+  // the To Vote feed as a receipt instead of vanishing).
+  const [feedFilter, setFeedFilter] = useState<FeedFilter>('main');
+  const [showSearch, setShowSearch] = useState(false);
+  const [sessionVotedIds, setSessionVotedIds] = useState<Set<string>>(new Set());
 
-  // Swipe hint overlay (shows once for new users)
-  const [showSwipeHint, setShowSwipeHint] = useState(false);
-  const swipeCardRef = useRef<View>(null);
+  // 2a observer display region (picked, persisted). Display scoping only.
+  const [observerRegion, setObserverRegion] = useState<ObserverRegion | null>(null);
+  const [showRegionPicker, setShowRegionPicker] = useState(false);
 
   const [newProposal, setNewProposal] = useState({
     title: '',
@@ -1385,29 +838,45 @@ export default function ProposalsScreen() {
     setNewProposal((p) => ({ ...p, country: userCountry, state: userState, city: userCity }));
   }, [userCountry, userState, userCity]);
 
-  // Check if swipe hint should be shown (first time in swipe mode).
-  // Read from disk at most once per screen lifetime, and guard the async
-  // setState against unmount (toggling view modes used to re-hit disk every
-  // time and could setState after the screen was gone).
-  const swipeHintCheckedRef = useRef(false);
+  // Hydrate the observer-picked display region (2a). Guard the async
+  // setState against unmount; a missing/corrupt value just means "unset".
   useEffect(() => {
-    if (viewMode !== 'swipe' || swipeHintCheckedRef.current) return;
-    swipeHintCheckedRef.current = true;
     let alive = true;
-    AsyncStorage.getItem(SWIPE_HINT_KEY)
+    AsyncStorage.getItem(OBSERVER_REGION_KEY)
       .then((value) => {
-        if (alive && !value) setShowSwipeHint(true);
+        if (!alive || !value) return;
+        try {
+          const parsed = JSON.parse(value);
+          if (parsed && typeof parsed === 'object') setObserverRegion(parsed as ObserverRegion);
+        } catch { /* display-only preference — never block on bad data */ }
       })
-      .catch(() => { /* hint is cosmetic — never block on storage errors */ });
+      .catch(() => { /* display-only preference */ });
     return () => { alive = false; };
-  }, [viewMode]);
-
-  const dismissSwipeHint = useCallback(async () => {
-    setShowSwipeHint(false);
-    try {
-      await AsyncStorage.setItem(SWIPE_HINT_KEY, 'shown');
-    } catch { /* cosmetic */ }
   }, []);
+
+  const pickObserverRegion = useCallback((region: ObserverRegion) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setObserverRegion(region);
+    setShowRegionPicker(false);
+    AsyncStorage.setItem(OBSERVER_REGION_KEY, JSON.stringify(region)).catch(() => { /* display-only */ });
+  }, []);
+
+  // LOCATION LOGIC for the observer hero + feed scoping.
+  // Tier 1: the user's own city/state/country from their profile, if set.
+  // Tier 2: the observer-picked region persisted under OBSERVER_REGION_KEY.
+  // Tier 3 (device locale via expo-localization) is skipped — the package
+  // isn't installed and timezone heuristics aren't reliable enough to name
+  // a region. Tier 4: null → unscoped totals, no region ever named.
+  const displayRegion = useMemo<ObserverRegion | null>(() => {
+    if (userCountry || userState || userCity) {
+      return {
+        country: userCountry || undefined,
+        state: userState || undefined,
+        city: userCity || undefined,
+      };
+    }
+    return observerRegion;
+  }, [userCountry, userState, userCity, observerRegion]);
 
   const filteredProposals = useMemo(() => {
     const mutedSet = new Set(mutedUserIds);
@@ -1418,11 +887,11 @@ export default function ProposalsScreen() {
       const creatorId = (proposal as any).creatorId || (proposal as any).userId;
       if (creatorId && mutedSet.has(String(creatorId))) return false;
 
-      // Unverified users can only act on global proposals (geoRestrictions
-      // empty), so hide geo-restricted ones from the list to keep the view
-      // honest. canUserVoteOnProposal still gates the vote button as a
-      // belt-and-suspenders measure.
-      if (!isVerified && (proposal.geoRestrictions || []).length > 0) return false;
+      // Observer mode (2a): counts are public, so unverified users see the
+      // real feed scoped to their display region (global ballots always
+      // show). The region NEVER affects eligibility — canUserVoteOnProposal
+      // and the locked action row still gate every cast.
+      if (!isVerified && !proposalMatchesRegion(proposal, displayRegion)) return false;
 
       const matchesSearch =
         searchQuery === '' ||
@@ -1472,58 +941,135 @@ export default function ProposalsScreen() {
     user?.id,
     isVerified,
     mutedUserIds,
+    displayRegion,
   ]);
 
-  const activeCount = useMemo(() => filteredProposals.filter((p) => !isProposalEnded(p)).length, [filteredProposals]);
+  const hasVotedOn = useCallback(
+    (p: Proposal) => votedProposals.has(p.id as number) || votedProposals.has(p.id as any),
+    [votedProposals],
+  );
 
-  // Proposals available for swiping (not voted, not ended, user can vote)
-  const swipeableProposals = useMemo(() => {
-    const eligible = filteredProposals.filter((p) => {
-      // Handle both string and number IDs for seed proposals
-      const hasVoted = votedProposals.has(p.id as number) || votedProposals.has(p.id as any);
-      const isEnded = isProposalEnded(p);
-      // Filter out proposals user can't vote on (geo-restricted)
-      const canVote = canUserVoteOnProposal(p, userCountry, userState, userCity, isVerified);
-      return !hasVoted && !isEnded && canVote;
+  // Open, unmuted proposals — the raw pool behind the observer hero count,
+  // the region picker counts, and the "To Vote" chip badge.
+  const openBallots = useMemo(() => {
+    const mutedSet = new Set(mutedUserIds);
+    return proposals.filter((p) => {
+      const creatorId = (p as any).creatorId || (p as any).userId;
+      if (creatorId && mutedSet.has(String(creatorId))) return false;
+      return !isProposalEnded(p);
     });
-    // Bring the deep-linked proposal to the front of the swipe stack so when
-    // the user backs out of the detail modal it's the next card to vote on.
+  }, [proposals, mutedUserIds]);
+
+  // Hero count (2a): open ballots matching the display region hierarchically
+  // (global ones always count).
+  const heroCount = useMemo(
+    () => openBallots.filter((p) => proposalMatchesRegion(p, displayRegion)).length,
+    [openBallots, displayRegion],
+  );
+
+  // "To Vote" chip badge — unvoted, open, eligible (the queue-clear truth).
+  const toVoteCount = useMemo(() => {
+    if (!isVerified) return heroCount;
+    return openBallots.filter(
+      (p) => !hasVotedOn(p) && canUserVoteOnProposal(p, userCountry, userState, userCity, isVerified),
+    ).length;
+  }, [openBallots, hasVotedOn, userCountry, userState, userCity, isVerified, heroCount]);
+
+  // ── The 1b feed ────────────────────────────────────────────────────────────
+  // To Vote (default): unvoted + open + eligible (the old queue logic) —
+  // plus any ballot cast this session, which collapses in place to a receipt.
+  // City/Province/Country chips narrow the same feed by geo level (via
+  // selectedGeoLevel inside filteredProposals). Voted: the user's ballots.
+  // Observer: every open ballot in the display region, votable or not.
+  const feedData = useMemo(() => {
+    let base: Proposal[];
+    if (isVerified && feedFilter === 'voted') {
+      base = filteredProposals.filter((p) => hasVotedOn(p));
+    } else if (!isVerified) {
+      base = filteredProposals.filter((p) => !isProposalEnded(p));
+    } else {
+      base = filteredProposals.filter((p) => {
+        if (hasVotedOn(p)) return sessionVotedIds.has(String(p.id));
+        return (
+          !isProposalEnded(p) &&
+          canUserVoteOnProposal(p, userCountry, userState, userCity, isVerified)
+        );
+      });
+    }
+    // Sorted by deadline — closing soonest first; undated ballots last.
+    const sorted = [...base].sort((a, b) => deadlineMs(a) - deadlineMs(b));
+    // Bring the deep-linked proposal to the top of the feed so it's the
+    // first card when the user backs out of the detail modal.
     if (deepLinkProposalId) {
-      const idx = eligible.findIndex((p) => String(p.id) === String(deepLinkProposalId));
+      const idx = sorted.findIndex((p) => String(p.id) === String(deepLinkProposalId));
       if (idx > 0) {
-        const [target] = eligible.splice(idx, 1);
-        eligible.unshift(target);
+        const [target] = sorted.splice(idx, 1);
+        sorted.unshift(target);
       }
     }
-    return eligible;
-  }, [filteredProposals, votedProposals, userCountry, userState, userCity, isVerified, deepLinkProposalId]);
+    return sorted;
+  }, [
+    filteredProposals,
+    feedFilter,
+    isVerified,
+    hasVotedOn,
+    sessionVotedIds,
+    userCountry,
+    userState,
+    userCity,
+    deepLinkProposalId,
+  ]);
 
-  // Reset swipe index when filters change or proposals update
-  useEffect(() => {
-    setSwipeIndex(0);
-  }, [selectedCategory, selectedStatus, selectedGeoLevel, searchQuery]);
+  // Gold meta count: unvoted feed ballots whose deadline lands before the
+  // end of today.
+  const closeTonightCount = useMemo(
+    () => feedData.filter((p) => !hasVotedOn(p) && isClosingTonight(p)).length,
+    [feedData, hasVotedOn],
+  );
 
-  // Infinite rotation for seed proposals - when all proposals swiped, reset
-  useEffect(() => {
-    const hasSeedProposals = proposals.some((p) => isSeedProposal(p.id));
-    if (hasSeedProposals && swipeIndex > 0 && swipeableProposals.length === 0) {
-      // All proposals have been voted on, reset for infinite loop
-      const timer = setTimeout(() => {
-        // Clear seed proposal IDs from voted set, keep real votes
-        setVotedProposals((prev) => {
-          const newSet = new Set<number | string>();
-          prev.forEach((id) => {
-            if (!isSeedProposal(id)) {
-              newSet.add(id);
-            }
-          });
-          return newSet;
-        });
-        setSwipeIndex(0);
-      }, 500); // Small delay for smooth transition
-      return () => clearTimeout(timer);
+  // Region rows for the observer picker — derived ONLY from the open
+  // proposals' actual geoRestrictions (distinct cities, provinces, then
+  // "All of {country}" and "Everywhere"), each with its open-ballot count.
+  const regionOptions = useMemo(() => {
+    if (isVerified) return [];
+    const cities: { key: string; label: string; region: ObserverRegion }[] = [];
+    const states: { key: string; label: string; region: ObserverRegion }[] = [];
+    const countries: { key: string; label: string; region: ObserverRegion }[] = [];
+    const seen = new Set<string>();
+    for (const p of openBallots) {
+      const geo = p.geoRestrictions || [];
+      if (geo.length >= 3) {
+        const key = `city:${geo[0]}|${geo[1]}|${geo[2]}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          cities.push({ key, label: geo[2], region: { country: geo[0], state: geo[1], city: geo[2] } });
+        }
+      }
+      if (geo.length >= 2) {
+        const key = `state:${geo[0]}|${geo[1]}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          states.push({ key, label: geo[1], region: { country: geo[0], state: geo[1] } });
+        }
+      }
+      if (geo.length >= 1) {
+        const key = `country:${geo[0]}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          countries.push({ key, label: `All of ${geo[0]}`, region: { country: geo[0] } });
+        }
+      }
     }
-  }, [swipeIndex, swipeableProposals.length, proposals]);
+    const byLabel = (a: { label: string }, b: { label: string }) => a.label.localeCompare(b.label);
+    cities.sort(byLabel);
+    states.sort(byLabel);
+    countries.sort(byLabel);
+    const rows = [...cities, ...states, ...countries, { key: 'everywhere', label: 'Everywhere', region: {} as ObserverRegion }];
+    return rows.map((row) => ({
+      ...row,
+      count: openBallots.filter((p) => proposalMatchesRegion(p, row.region)).length,
+    }));
+  }, [isVerified, openBallots]);
 
   const fetchData = useCallback(
     async (isRefresh = false) => {
@@ -1546,6 +1092,28 @@ export default function ProposalsScreen() {
 
         if (votedRes.data) {
           setVotedProposals(new Set(votedRes.data.map((v: any) => (typeof v === 'object' ? v.proposalId : v))));
+          // Capture receipt metadata (side / recorded-at) when the API
+          // provides it — the receipt row only claims what we actually know.
+          const receipts = new Map<string, VoteReceipt>();
+          for (const v of votedRes.data as any[]) {
+            if (!v || typeof v !== 'object') continue;
+            const id = v.proposalId ?? v.id;
+            if (id == null) continue;
+            const rawSide = v.vote ?? v.side ?? v.voteChoice;
+            const side = rawSide === 'support' || rawSide === 'oppose' ? rawSide : undefined;
+            const rawAt = v.votedAt ?? v.createdAt ?? v.timestamp;
+            const at = rawAt ? Date.parse(String(rawAt)) : NaN;
+            receipts.set(String(id), { side, at: Number.isFinite(at) ? at : undefined });
+          }
+          setVoteReceipts((prev) => {
+            const next = new Map(receipts);
+            // Keep richer session-local receipts (we always know side + time).
+            prev.forEach((val, key) => {
+              const server = next.get(key);
+              if (!server || (!server.side && val.side)) next.set(key, val);
+            });
+            return next;
+          });
         }
 
         // Demo account should use hardcoded location and be verified (for App Store review)
@@ -1629,6 +1197,7 @@ export default function ProposalsScreen() {
     const isDemoAccount = user?.email === 'demo@represent.app';
     if (isSeedProposal(proposalId) || isDemoAccount) {
       setVotedProposals((prev) => new Set([...prev, proposalId as any]));
+      setVoteReceipts((prev) => new Map(prev).set(String(proposalId), { side: vote, at: Date.now() }));
       setProposals((prev) =>
         prev.map((p) =>
           p.id === proposalId
@@ -1738,6 +1307,7 @@ export default function ProposalsScreen() {
       }
 
       setVotedProposals((prev) => new Set([...prev, proposalId]));
+      setVoteReceipts((prev) => new Map(prev).set(String(proposalId), { side: vote, at: Date.now() }));
 
       setProposals((prev) =>
         prev.map((p) =>
@@ -1808,14 +1378,14 @@ export default function ProposalsScreen() {
   }, [handleVote]);
 
   // ── X1 confirm-before-cast flow ────────────────────────────────────────────
-  // Step 1: any vote intent (swipe, queue button, list card, detail modal)
-  // lands here and opens the mandatory confirm sheet. Non-binary ballots are
+  // Step 1: any vote intent (feed card, detail modal) lands here and opens
+  // the mandatory confirm sheet. Non-binary ballots are
   // routed to their dedicated ballot screen instead — a support/oppose sheet
   // would misrepresent a ranked or multiple-choice ballot.
   const requestVote = (
     proposal: Proposal,
     vote: 'support' | 'oppose',
-    source: 'swipe' | 'list' | 'detail',
+    source: 'list' | 'detail',
   ) => {
     const voteType = (proposal as any).voteType;
     if (voteType && voteType !== 'yes-no') {
@@ -1828,35 +1398,26 @@ export default function ProposalsScreen() {
   };
 
   // Step 2: the user pressed "Cast Ballot" on the X1 sheet — only now does
-  // anything get submitted. Swipe-sourced casts advance the queue and go
-  // through the sequential vote queue (blockchain nonce collisions).
+  // anything get submitted. Real (non-seed) casts go through the sequential
+  // vote queue (blockchain nonce collisions) — inline feed voting makes
+  // rapid back-to-back casts the normal case.
   const confirmPendingVote = () => {
     const pending = pendingVote;
     if (!pending) return;
-    const { proposal, vote, source } = pending;
+    const { proposal, vote } = pending;
 
-    if (source === 'swipe') {
-      setSwipeIndex((prev) => prev + 1);
-      if (!isSeedProposal(proposal.id)) {
-        voteQueueRef.current.push({ proposalId: proposal.id, vote, title: proposal.title || 'Untitled' });
-        processVoteQueue();
-      } else {
-        handleVote(proposal.id, vote);
-      }
+    // Keep the just-voted card in place in the To Vote feed, collapsed to a
+    // receipt row. (The receipt itself only renders once votedProposals
+    // confirms the ballot landed — a failed cast leaves the card actionable.)
+    setSessionVotedIds((prev) => new Set([...prev, String(proposal.id)]));
+
+    if (!isSeedProposal(proposal.id)) {
+      voteQueueRef.current.push({ proposalId: proposal.id, vote, title: proposal.title || 'Untitled' });
+      processVoteQueue();
     } else {
       handleVote(proposal.id, vote);
     }
   };
-
-  // Skip handler - move to next card without voting
-  const handleSkip = useCallback(() => {
-    setSwipeIndex((prev) => prev + 1);
-  }, []);
-
-  // Get current cards to display in stack (max 3)
-  const visibleSwipeCards = useMemo(() => {
-    return swipeableProposals.slice(swipeIndex, swipeIndex + 3);
-  }, [swipeableProposals, swipeIndex]);
 
   const handleCreateProposal = async () => {
     if (!newProposal.title.trim()) {
@@ -2094,95 +1655,142 @@ export default function ProposalsScreen() {
     }
   }, [deepLinkProposalId, proposals, loading]);
 
+  // 2a: every locked affordance (hero CTA, locked card rows) routes into the
+  // existing verification flow.
+  const goToVerification = useCallback(() => {
+    router.push('/modals/verification-payment');
+  }, []);
+
+  // Filter chips: To Vote/Open · the user's levels · Voted (verified only).
+  // Only levels that actually exist for the user (or observer region) render.
+  const filterChips = useMemo(() => {
+    const chips: { key: FeedFilter; label: string }[] = [
+      { key: 'main', label: isVerified ? 'To Vote' : 'Open' },
+    ];
+    const chipRegion: ObserverRegion = isVerified
+      ? { country: userCountry || undefined, state: userState || undefined, city: userCity || undefined }
+      : displayRegion ?? {};
+    if (chipRegion.city) chips.push({ key: 'city', label: chipRegion.city });
+    if (chipRegion.state) chips.push({ key: 'province', label: chipRegion.state });
+    if (chipRegion.country) chips.push({ key: 'country', label: chipRegion.country });
+    if (isVerified) chips.push({ key: 'voted', label: 'Voted' });
+    return chips;
+  }, [isVerified, userCountry, userState, userCity, displayRegion]);
+
+  // Geo chips reuse the existing selectedGeoLevel machinery.
+  const selectFeedFilter = useCallback((key: FeedFilter) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setFeedFilter(key);
+    setSelectedGeoLevel(
+      key === 'city' ? 'City/Local' : key === 'province' ? 'State/Province' : key === 'country' ? 'National' : 'All',
+    );
+  }, []);
+
+  // 2a hero copy — a region is only ever named when tiers 1–2 supplied one.
+  const heroPlace = displayRegion?.city || displayRegion?.state || displayRegion?.country || null;
+  const heroHeadline = heroPlace
+    ? `${heroCount} ${heroCount === 1 ? 'ballot is' : 'ballots are'} open in ${heroPlace}`
+    : `${heroCount} ${heroCount === 1 ? 'ballot is' : 'ballots are'} open right now`;
+  const heroSub = heroPlace
+    ? 'Verify once with your ID to cast every one of them.'
+    : 'Verify once with your ID to cast yours.';
+  const profileHasRegion = !!(userCountry || userState || userCity);
+
   const detail = selectedProposal;
   const detailHasVoted = detail ? votedProposals.has(detail.id as number) : false;
   const detailIsVoting = detail ? votingProposalId === (detail.id as number) : false;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Header - only show in list mode */}
-      {viewMode !== 'swipe' && (
-        <Animated.View entering={FadeInDown.duration(400)} style={[styles.header, { borderBottomColor: colors.border, paddingTop: insets.top + 16 }]}>
-          <View style={styles.headerRow}>
-            <View>
-              <Text style={[styles.headerTitle, { color: colors.text }]}>Proposals</Text>
-              <Text style={[styles.headerSubtitle, { color: colors.textTertiary }]}>
-                {activeCount} active proposal{activeCount !== 1 ? 's' : ''}
-              </Text>
-            </View>
-
-            <View style={styles.headerActions}>
-              <BallotDisplay size="sm" />
-
+      {/* 1b · Feed header — serif "Vote" + search / gold New pill; observers
+          (2a) get the OBSERVING pill instead (creation requires verification) */}
+      <Animated.View
+        entering={FadeInDown.duration(400)}
+        style={[feedStyles.headerWrap, { paddingTop: insets.top + 14, backgroundColor: colors.background }]}
+      >
+        <View style={feedStyles.headerRow}>
+          <Text style={[feedStyles.headerTitle, { color: colors.text }]}>Vote</Text>
+          {isVerified ? (
+            <View style={feedStyles.headerActions}>
               <TouchableOpacity
-                style={[
-                  styles.filterBtn,
-                  { backgroundColor: colors.surface, borderColor: colors.border },
-                ]}
                 onPress={() => {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  setViewMode('swipe');
+                  if (showSearch) {
+                    setSearchQuery('');
+                    setShowFilters(false);
+                  }
+                  setShowSearch(!showSearch);
                 }}
-                accessibilityLabel="Switch to swipe view"
+                style={[feedStyles.roundBtn, { backgroundColor: colors.surface, borderColor: colors.borderSubtle }]}
+                accessibilityRole="button"
+                accessibilityLabel={showSearch ? 'Close search' : 'Search proposals'}
               >
-                <Ionicons name="layers-outline" size={18} color={colors.text} />
+                <Ionicons name={showSearch ? 'close' : 'search-outline'} size={17} color={colors.textSecondary} />
               </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[
-                  styles.filterBtn,
-                  {
-                    backgroundColor: hasActiveFilters ? colors.gold : colors.surface,
-                    borderColor: hasActiveFilters ? colors.gold : colors.border,
-                  },
-                ]}
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  setShowFilters(!showFilters);
-                }}
-              >
-                <Ionicons name="options-outline" size={18} color={hasActiveFilters ? '#000' : colors.text} />
-              </TouchableOpacity>
-
               <TouchableOpacity
                 onPress={() => {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                   setShowCreateModal(true);
                 }}
+                style={[feedStyles.newBtn, { backgroundColor: colors.goldFill }]}
+                accessibilityRole="button"
+                accessibilityLabel="Create proposal"
               >
-                <LinearGradient
-                  colors={[colors.gold, colors.goldDark || '#A68523']}
-                  style={styles.createBtn}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                >
-                  <Ionicons name="add" size={22} color="#000" />
-                </LinearGradient>
+                <Ionicons name="add" size={15} color="#040707" />
+                <Text style={feedStyles.newBtnText}>New</Text>
               </TouchableOpacity>
             </View>
-          </View>
+          ) : (
+            <View style={[feedStyles.observingPill, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <Ionicons name="eye-outline" size={11} color={colors.textTertiary} />
+              <Text style={[feedStyles.observingText, { color: colors.textTertiary }]}>OBSERVING</Text>
+            </View>
+          )}
+        </View>
 
-          {/* Search */}
-          <View style={[styles.searchBar, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <Ionicons name="search-outline" size={18} color={colors.textTertiary} />
-            <TextInput
-              style={[styles.searchInput, { color: colors.text }]}
-              placeholder="Search proposals..."
-              placeholderTextColor={colors.textTertiary}
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-            />
-            {searchQuery ? (
-              <TouchableOpacity onPress={() => setSearchQuery('')}>
-                <Ionicons name="close-circle" size={18} color={colors.textTertiary} />
-              </TouchableOpacity>
-            ) : null}
-          </View>
-        </Animated.View>
-      )}
+        {/* Search — toggled from the header. The options glyph opens the
+            existing category/status/geo filter panel, wiring unchanged. */}
+        {isVerified && showSearch && (
+          <Animated.View entering={FadeInDown.duration(220)} style={feedStyles.searchRow}>
+            <View style={[feedStyles.searchBar, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <Ionicons name="search-outline" size={16} color={colors.textTertiary} />
+              <TextInput
+                style={[feedStyles.searchInput, { color: colors.text }]}
+                placeholder="Search proposals..."
+                placeholderTextColor={colors.textTertiary}
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                autoFocus
+              />
+              {searchQuery ? (
+                <TouchableOpacity onPress={() => setSearchQuery('')} accessibilityLabel="Clear search">
+                  <Ionicons name="close-circle" size={16} color={colors.textTertiary} />
+                </TouchableOpacity>
+              ) : null}
+            </View>
+            <TouchableOpacity
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                setShowFilters((v) => !v);
+              }}
+              style={[
+                feedStyles.roundBtn,
+                {
+                  backgroundColor: hasActiveFilters ? colors.goldSurface : colors.surface,
+                  borderColor: hasActiveFilters ? 'rgba(234, 186, 88, 0.4)' : colors.borderSubtle,
+                },
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel="More filters"
+            >
+              <Ionicons name="options-outline" size={17} color={hasActiveFilters ? colors.gold : colors.textSecondary} />
+            </TouchableOpacity>
+          </Animated.View>
+        )}
+      </Animated.View>
 
-      {/* Filter Panel */}
-      {showFilters && viewMode !== 'swipe' && (
+      {/* Filter Panel — category/status/geo level, unchanged wiring */}
+      {isVerified && showSearch && showFilters && (
         <Animated.View
           entering={FadeInDown.duration(250)}
           style={[styles.filterPanel, { backgroundColor: colors.surface, borderColor: colors.border }]}
@@ -2234,85 +1842,197 @@ export default function ProposalsScreen() {
         </Animated.View>
       )}
 
-      {/* Content */}
+      {/* Feed — one virtualized list for every mode. The hero (2a), filter
+          chips, and the SORTED BY DEADLINE meta line scroll with the feed. */}
       {loading ? (
         <ScrollView style={styles.list} contentContainerStyle={styles.listContent}>
           {[0, 1, 2].map((i) => (
             <ProposalSkeleton key={i} index={i} />
           ))}
         </ScrollView>
-      ) : filteredProposals.length === 0 ? (
-        <Animated.View entering={FadeIn.duration(400)} style={styles.emptyState}>
-          <View style={[styles.emptyIcon, { backgroundColor: `${colors.gold}15` }]}>
-            <Ionicons name={!isVerified && !hasActiveFilters ? 'shield-checkmark-outline' : 'document-text-outline'} size={48} color={colors.gold} />
-          </View>
-          <Text style={[styles.emptyTitle, { color: colors.text }]}>
-            {!isVerified && !hasActiveFilters ? 'No global proposals open' : 'No proposals found'}
-          </Text>
-          <Text style={[styles.emptyDesc, { color: colors.textSecondary }]}>
-            {hasActiveFilters
-              ? 'Try adjusting your filters'
-              : !isVerified
-                ? 'There are no global proposals open right now. Verify your identity to vote on proposals in your country, province, and city.'
-                : 'Be the first to create one!'}
-          </Text>
-          {!hasActiveFilters && (
-            <TouchableOpacity
-              onPress={() => {
-                if (!isVerified) {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                  setVerificationModalType('vote');
-                  setShowVerificationModal(true);
-                } else {
-                  setShowCreateModal(true);
-                }
-              }}
-              style={styles.emptyBtn}
-            >
-              <LinearGradient
-                colors={[colors.gold, colors.goldDark || '#A68523']}
-                style={styles.emptyBtnGradient}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
+      ) : (
+        <FlatList
+          style={styles.list}
+          contentContainerStyle={feedStyles.feedContent}
+          showsVerticalScrollIndicator={false}
+          data={feedData}
+          keyExtractor={(p) => String(p.id)}
+          ListHeaderComponent={
+            <View style={feedStyles.feedHeader}>
+              {/* 2a · Verification hero — the one gold moment for observers */}
+              {!isVerified && (
+                <LinearGradient
+                  colors={isDark ? ['#141818', '#0A0D0D', '#040707'] : [colors.surface, colors.backgroundSecondary, colors.background]}
+                  locations={[0, 0.6, 1]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 0.7, y: 1 }}
+                  style={[feedStyles.hero, { borderColor: 'rgba(234, 186, 88, 0.4)' }]}
+                >
+                  <View style={feedStyles.heroTop}>
+                    <View style={[feedStyles.heroShield, { backgroundColor: colors.goldSurface, borderColor: 'rgba(234, 186, 88, 0.3)' }]}>
+                      <Ionicons name="shield-checkmark-outline" size={22} color={colors.gold} />
+                    </View>
+                    <View style={feedStyles.heroTextCol}>
+                      <Text style={[feedStyles.heroHeadline, { color: colors.text }]}>{heroHeadline}</Text>
+                      <Text style={[feedStyles.heroSub, { color: colors.textSecondary }]}>{heroSub}</Text>
+                      {!profileHasRegion && (
+                        <TouchableOpacity
+                          onPress={() => {
+                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                            setShowRegionPicker(true);
+                          }}
+                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                          accessibilityRole="button"
+                          accessibilityLabel="Change region"
+                        >
+                          <Text style={[feedStyles.heroRegionLink, { color: colors.textTertiary }]}>
+                            {heroPlace ? `Not in ${heroPlace}? Change region →` : 'Choose your region →'}
+                          </Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  </View>
+                  <TouchableOpacity
+                    style={[feedStyles.heroCta, { backgroundColor: colors.goldFill }]}
+                    onPress={() => {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                      goToVerification();
+                    }}
+                    activeOpacity={0.85}
+                    accessibilityRole="button"
+                    accessibilityLabel="Verify my identity"
+                  >
+                    <Text style={feedStyles.heroCtaText}>Verify My Identity</Text>
+                    <Text style={feedStyles.heroCtaSuffix}>~2 MIN</Text>
+                  </TouchableOpacity>
+                  <Text style={[feedStyles.heroTrust, { color: colors.textTertiary }]}>
+                    CHECKED, NEVER KEPT · ONE PERSON, ONE BALLOT
+                  </Text>
+                </LinearGradient>
+              )}
+
+              {/* Filter chips */}
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={feedStyles.chipsScroll}
+                contentContainerStyle={feedStyles.chipsRow}
               >
-                <Ionicons name={!isVerified ? 'shield-checkmark' : 'add-circle-outline'} size={20} color="#000" />
-                <Text style={styles.emptyBtnText}>{!isVerified ? 'Get Verified' : 'Create Proposal'}</Text>
-              </LinearGradient>
-            </TouchableOpacity>
-          )}
-        </Animated.View>
-      ) : viewMode === 'swipe' ? (
-        /* M2 · Vote Queue — review session */
-        <GestureHandlerRootView style={[styles.swipeContainer, { backgroundColor: colors.background }]}>
-          {visibleSwipeCards.length === 0 ? (
-            /* E1 · Queue Complete — the header stays so filters, list view,
-               and the create button remain reachable from the empty queue. */
-            <View style={{ flex: 1 }}>
-              <VoteHeader
-                index={0}
-                total={0}
-                activeCount={activeCount}
-                closingSoon={0}
-                selectedFilter={selectedGeoLevel === 'All' ? 'All' :
-                  selectedGeoLevel === 'National' ? 'Federal' :
-                  selectedGeoLevel === 'State/Province' ? 'Provincial' :
-                  selectedGeoLevel === 'City/Local' ? 'Municipal' : 'All'}
-                onFilterChange={(filter) => {
-                  const geoMap: Record<string, string> = {
-                    'All': 'All',
-                    'Federal': 'National',
-                    'Provincial': 'State/Province',
-                    'Municipal': 'City/Local',
-                    'Closing': 'All',
-                  };
-                  setSelectedGeoLevel(geoMap[filter] || 'All');
-                  if (filter === 'Closing') setSelectedStatus('Active');
-                }}
-                insetTop={insets.top}
-                onCreate={() => setShowCreateModal(true)}
-                onToggleView={() => setViewMode('list')}
+                {filterChips.map((chip) => {
+                  const active = feedFilter === chip.key;
+                  return (
+                    <TouchableOpacity
+                      key={chip.key}
+                      onPress={() => selectFeedFilter(chip.key)}
+                      style={[
+                        feedStyles.chip,
+                        active
+                          ? { backgroundColor: colors.text }
+                          : { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1 },
+                      ]}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: active }}
+                    >
+                      <Text
+                        style={[
+                          active ? feedStyles.chipTextActive : feedStyles.chipText,
+                          { color: active ? colors.background : colors.textSecondary },
+                        ]}
+                      >
+                        {chip.label}
+                      </Text>
+                      {chip.key === 'main' && (
+                        <Text
+                          style={[
+                            feedStyles.chipCount,
+                            active
+                              ? { color: colors.background, backgroundColor: `${colors.background}26` }
+                              : { color: colors.textTertiary, backgroundColor: colors.surfaceHighlight },
+                          ]}
+                        >
+                          {toVoteCount}
+                        </Text>
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+
+              {/* Meta line — sort order, rules glyph, tonight's closings */}
+              <View style={feedStyles.metaRow}>
+                <View style={feedStyles.metaLeft}>
+                  <Text style={[feedStyles.metaText, { color: colors.textTertiary }]}>SORTED BY DEADLINE</Text>
+                  <TouchableOpacity
+                    onPress={() => {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      setShowHowVoting(true);
+                    }}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    accessibilityRole="button"
+                    accessibilityLabel="How voting works"
+                  >
+                    <Ionicons name="information-circle-outline" size={14} color={colors.textTertiary} />
+                  </TouchableOpacity>
+                </View>
+                {closeTonightCount > 0 && (
+                  <Text style={[feedStyles.metaTonight, { color: colors.gold }]}>
+                    {closeTonightCount} CLOSE TONIGHT
+                  </Text>
+                )}
+              </View>
+            </View>
+          }
+          renderItem={({ item, index }) =>
+            hasVotedOn(item) ? (
+              <VotedReceiptRow
+                proposal={item}
+                receipt={voteReceipts.get(String(item.id))}
+                onOpen={() => openProposal(item)}
               />
-              <Animated.View entering={FadeIn.duration(400)} style={styles.queueClearBody}>
+            ) : (
+              <MemoBallotCard
+                proposal={item}
+                observer={!isVerified}
+                isVoting={votingProposalId === item.id}
+                onSupport={() => requestVote(item, 'support', 'list')}
+                onOppose={() => requestVote(item, 'oppose', 'list')}
+                onOpen={() => openProposal(item)}
+                onVerify={goToVerification}
+                index={index}
+              />
+            )
+          }
+          ListEmptyComponent={
+            feedFilter === 'voted' && isVerified ? (
+              <Animated.View entering={FadeIn.duration(300)} style={feedStyles.simpleEmpty}>
+                <Text style={[feedStyles.simpleEmptyTitle, { color: colors.text }]}>No ballots yet.</Text>
+                <Text style={[feedStyles.simpleEmptyDesc, { color: colors.textSecondary }]}>
+                  Ballots you cast collapse into gold receipts here — each one recorded on the public ledger.
+                </Text>
+              </Animated.View>
+            ) : hasActiveFilters ? (
+              <Animated.View entering={FadeIn.duration(300)} style={feedStyles.simpleEmpty}>
+                <Text style={[feedStyles.simpleEmptyTitle, { color: colors.text }]}>No proposals found</Text>
+                <Text style={[feedStyles.simpleEmptyDesc, { color: colors.textSecondary }]}>
+                  Nothing matches your search and filters.
+                </Text>
+                <TouchableOpacity style={styles.clearBtn} onPress={clearFilters}>
+                  <Ionicons name="close-circle" size={16} color={colors.error} />
+                  <Text style={[styles.clearBtnText, { color: colors.error }]}>Clear all filters</Text>
+                </TouchableOpacity>
+              </Animated.View>
+            ) : !isVerified ? (
+              <Animated.View entering={FadeIn.duration(300)} style={feedStyles.simpleEmpty}>
+                <Text style={[feedStyles.simpleEmptyTitle, { color: colors.text }]}>No open ballots here.</Text>
+                <Text style={[feedStyles.simpleEmptyDesc, { color: colors.textSecondary }]}>
+                  {regionOptions.length > 1
+                    ? 'Try a different region — or check back soon.'
+                    : 'Check back soon.'}
+                </Text>
+              </Animated.View>
+            ) : (
+              /* E1 · Queue clear — reused inside the feed area */
+              <Animated.View entering={FadeIn.duration(400)} style={feedStyles.queueClearWrap}>
                 <View style={styles.queueClearCenter}>
                   <View style={[styles.queueClearSeal, { backgroundColor: colors.goldSurface, borderColor: 'rgba(234, 186, 88, 0.35)' }]}>
                     <Ionicons name="checkmark-done-outline" size={44} color={colors.gold} />
@@ -2347,7 +2067,7 @@ export default function ProposalsScreen() {
                     style={[styles.queueClearCta, { backgroundColor: colors.goldFill }]}
                     onPress={() => {
                       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                      setViewMode('list');
+                      router.push('/(tabs)/results');
                     }}
                     accessibilityRole="button"
                     accessibilityLabel="See live results"
@@ -2370,7 +2090,6 @@ export default function ProposalsScreen() {
                     style={styles.queueClearGhost}
                     onPress={() => {
                       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                      setSwipeIndex(0);
                       fetchData(true);
                     }}
                     accessibilityRole="button"
@@ -2381,158 +2100,18 @@ export default function ProposalsScreen() {
                   </TouchableOpacity>
                 </View>
               </Animated.View>
+            )
+          }
+          ListFooterComponent={
+            <View>
+              {!isVerified && feedData.length > 0 && (
+                <Text style={[feedStyles.observerFootnote, { color: colors.textTertiary }]}>
+                  Counts are public — anyone can watch. Only verified citizens are counted.
+                </Text>
+              )}
+              <View style={styles.listSpacer} />
             </View>
-          ) : (
-            <View style={{ flex: 1 }}>
-              {/* Premium Vote Header */}
-              <VoteHeader
-                index={swipeIndex}
-                total={swipeableProposals.length}
-                activeCount={activeCount}
-                closingSoon={filteredProposals.filter(p => {
-                  const tr = getTimeRemaining(p.deadline);
-                  return tr && tr.includes('d') && parseInt(tr) <= 3;
-                }).length}
-                selectedFilter={selectedGeoLevel === 'All' ? 'All' :
-                  selectedGeoLevel === 'National' ? 'Federal' :
-                  selectedGeoLevel === 'State/Province' ? 'Provincial' :
-                  selectedGeoLevel === 'City/Local' ? 'Municipal' : 'All'}
-                onFilterChange={(filter) => {
-                  const geoMap: Record<string, string> = {
-                    'All': 'All',
-                    'Federal': 'National',
-                    'Provincial': 'State/Province',
-                    'Municipal': 'City/Local',
-                    'Closing': 'All',
-                  };
-                  setSelectedGeoLevel(geoMap[filter] || 'All');
-                  if (filter === 'Closing') setSelectedStatus('Active');
-                }}
-                insetTop={insets.top}
-                onCreate={() => setShowCreateModal(true)}
-                onToggleView={() => setViewMode('list')}
-                onHowVotingWorks={() => setShowHowVoting(true)}
-              />
-
-              {/* Card stack — tap opens the full detail; the buttons below cast */}
-              <View ref={swipeCardRef} style={[styles.cardStack, { marginTop: 8 }]} collapsable={false}>
-                {visibleSwipeCards.map((proposal, idx) => (
-                  <SwipeCard
-                    key={proposal.id}
-                    proposal={proposal}
-                    onTap={() => openProposal(proposal)}
-                    isTopCard={idx === 0}
-                    cardIndex={idx}
-                    cardHeight={cardHeight}
-                  />
-                )).reverse()}
-              </View>
-
-              {/* M2 vote controls — big tinted Support / Oppose + skip.
-                  Bottom padding clears the floating tab bar. */}
-              {(() => {
-                const topCard = visibleSwipeCards[0];
-                const topVoteType = topCard ? ((topCard as any).voteType || 'yes-no') : 'yes-no';
-                return (
-                  <View style={[styles.voteControls, { paddingBottom: insets.bottom + 74 }]}>
-                    {topVoteType !== 'yes-no' ? (
-                      <TouchableOpacity
-                        style={[styles.openBallotBtn, { backgroundColor: colors.goldFill }]}
-                        onPress={() => {
-                          if (!topCard) return;
-                          dismissSwipeHint();
-                          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                          openProposal(topCard);
-                        }}
-                        activeOpacity={0.85}
-                        accessibilityRole="button"
-                        accessibilityLabel="Open ballot"
-                      >
-                        <Text style={styles.openBallotText}>
-                          Open Ballot — {topVoteType === 'ranked-choice' ? 'Rank Your Choices' : 'Pick One'}
-                        </Text>
-                      </TouchableOpacity>
-                    ) : (
-                      <View style={styles.voteButtonRow}>
-                        <TouchableOpacity
-                          style={[
-                            styles.queueVoteBtn,
-                            { backgroundColor: colors.supportSurface, borderColor: colors.support },
-                          ]}
-                          onPress={() => {
-                            if (!topCard) return;
-                            dismissSwipeHint();
-                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                            requestVote(topCard, 'support', 'swipe');
-                          }}
-                          activeOpacity={0.85}
-                          accessibilityRole="button"
-                          accessibilityLabel="Support this proposal"
-                        >
-                          <Text style={[styles.queueVoteText, { color: colors.support }]}>Support</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          style={[
-                            styles.queueVoteBtn,
-                            { backgroundColor: colors.opposeSurface, borderColor: colors.oppose },
-                          ]}
-                          onPress={() => {
-                            if (!topCard) return;
-                            dismissSwipeHint();
-                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                            requestVote(topCard, 'oppose', 'swipe');
-                          }}
-                          activeOpacity={0.85}
-                          accessibilityRole="button"
-                          accessibilityLabel="Oppose this proposal"
-                        >
-                          <Text style={[styles.queueVoteText, { color: colors.oppose }]}>Oppose</Text>
-                        </TouchableOpacity>
-                      </View>
-                    )}
-                    <TouchableOpacity
-                      style={styles.skipBtn}
-                      onPress={() => {
-                        dismissSwipeHint();
-                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                        handleSkip();
-                      }}
-                      activeOpacity={0.7}
-                      accessibilityRole="button"
-                      accessibilityLabel="Skip, decide later"
-                    >
-                      <Text style={[styles.skipText, { color: colors.textTertiary }]}>Skip — decide later</Text>
-                    </TouchableOpacity>
-                  </View>
-                );
-              })()}
-            </View>
-          )}
-        </GestureHandlerRootView>
-      ) : (
-        /* List Mode — virtualized so memory + first-paint scale to thousands of proposals */
-        <FlatList
-          style={styles.list}
-          contentContainerStyle={styles.listContent}
-          showsVerticalScrollIndicator={false}
-          data={filteredProposals}
-          keyExtractor={(p) => String(p.id)}
-          renderItem={({ item, index }) => (
-            <MemoProposalCard
-              proposal={item}
-              hasVoted={votedProposals.has(item.id as number)}
-              onVote={handleVote}
-              isVoting={votingProposalId === item.id}
-              onPress={() => openProposal(item)}
-              index={index}
-              isUserVerified={isVerified}
-              isUserCitizen={citizenshipVerified}
-              userCountry={userCountry}
-              userState={userState}
-              userCity={userCity}
-            />
-          )}
-          ListFooterComponent={<View style={styles.listSpacer} />}
+          }
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -3211,6 +2790,63 @@ export default function ProposalsScreen() {
       {/* P3 · How voting works — rules sheet, opened from the queue's info glyph */}
       <HowVotingWorksSheet visible={showHowVoting} onClose={() => setShowHowVoting(false)} />
 
+      {/* 2a · Observer region picker — regions derived from the open
+          proposals' actual geoRestrictions. Display scoping ONLY; it never
+          touches voting eligibility. */}
+      <Modal
+        visible={showRegionPicker}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowRegionPicker(false)}
+      >
+        <View style={feedStyles.sheetBackdrop}>
+          <TouchableOpacity
+            style={{ flex: 1 }}
+            onPress={() => setShowRegionPicker(false)}
+            accessibilityRole="button"
+            accessibilityLabel="Close region picker"
+          />
+          <View style={[feedStyles.sheet, { backgroundColor: colors.surfaceElevated, paddingBottom: insets.bottom + 20 }]}>
+            <View style={[feedStyles.sheetHandle, { backgroundColor: colors.surfaceHighlight }]} />
+            <Text style={[feedStyles.sheetTitle, { color: colors.text }]}>Choose your region</Text>
+            <Text style={[feedStyles.sheetSub, { color: colors.textTertiary }]}>
+              Scopes what you see while observing. It never changes who can vote.
+            </Text>
+            <ScrollView style={feedStyles.sheetList} showsVerticalScrollIndicator={false}>
+              {regionOptions.map((opt) => {
+                const selected =
+                  !!observerRegion &&
+                  (observerRegion.country ?? '') === (opt.region.country ?? '') &&
+                  (observerRegion.state ?? '') === (opt.region.state ?? '') &&
+                  (observerRegion.city ?? '') === (opt.region.city ?? '');
+                return (
+                  <TouchableOpacity
+                    key={opt.key}
+                    style={[feedStyles.sheetRow, { borderBottomColor: colors.borderSubtle }]}
+                    onPress={() => pickObserverRegion(opt.region)}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected }}
+                  >
+                    <Text style={[feedStyles.sheetRowLabel, { color: selected ? colors.gold : colors.text }]}>
+                      {opt.label}
+                    </Text>
+                    <View style={feedStyles.sheetRowRight}>
+                      <Text style={[feedStyles.sheetRowCount, { color: colors.textTertiary }]}>{opt.count} OPEN</Text>
+                      {selected && <Ionicons name="checkmark" size={15} color={colors.gold} />}
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+              {regionOptions.length === 1 && (
+                <Text style={[feedStyles.sheetSub, { color: colors.textTertiary, paddingTop: 10 }]}>
+                  Every open ballot is global right now — no regional ballots to scope to.
+                </Text>
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
       {/* Verification/Upgrade Modal */}
       <UpgradeModal
         visible={showVerificationModal}
@@ -3535,98 +3171,6 @@ const detailStyles = StyleSheet.create({
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-
-  // Swipe Hint Overlay
-  swipeHintOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.85)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 1000,
-  },
-  swipeHintCard: {
-    borderRadius: BORDER_RADIUS.xl,
-    borderWidth: 1,
-    padding: SPACING.xl,
-    width: '85%',
-    maxWidth: 320,
-  },
-  swipeHintTitle: {
-    fontFamily: SERIF_FONT,
-    fontSize: 24,
-    textAlign: 'center',
-    marginBottom: SPACING.lg,
-  },
-  swipeHintRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: SPACING.md,
-  },
-  swipeHintIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    borderWidth: 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: SPACING.md,
-  },
-  swipeHintText: {
-    fontSize: 16,
-    fontFamily: FONTS.sansMedium,
-  },
-  swipeHintDismiss: {
-    textAlign: 'center',
-    marginTop: SPACING.lg,
-    fontSize: 14,
-  },
-
-  // Header
-  header: {
-    paddingHorizontal: SPACING.lg,
-    // paddingTop is set dynamically via insets
-    paddingBottom: SPACING.md,
-    borderBottomWidth: 1,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: SPACING.md,
-  },
-  headerTitle: { ...TYPOGRAPHY.displaySmall, fontSize: responsive(28, 32, 36) },
-  headerSubtitle: { ...TYPOGRAPHY.labelMedium, marginTop: 2 },
-  headerActions: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm },
-
-  filterBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-  },
-  createBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-    ...SHADOWS.md,
-  },
-
-  // Search
-  searchBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
-    borderRadius: BORDER_RADIUS.xl,
-    borderWidth: 1,
-    gap: SPACING.sm,
-  },
-  searchInput: { flex: 1, ...TYPOGRAPHY.bodyMedium, paddingVertical: SPACING.xs },
-
   // Filter Panel
   filterPanel: {
     marginHorizontal: SPACING.lg,
@@ -3654,12 +3198,10 @@ const styles = StyleSheet.create({
     paddingTop: SPACING.sm,
   },
   clearBtnText: { ...TYPOGRAPHY.labelMedium },
-
   // List
   list: { flex: 1 },
   listContent: { padding: SPACING.lg, gap: SPACING.md },
   listSpacer: { height: 100 },
-
   // Card
   card: {
     borderRadius: BORDER_RADIUS['2xl'],
@@ -3668,437 +3210,18 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     ...SHADOWS.md,
   },
-  shimmerContainer: {
-    ...StyleSheet.absoluteFillObject,
-    overflow: 'hidden',
-  },
-  shimmerBar: {
-    width: SCREEN_WIDTH,
-    height: '100%',
-  },
   cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: SPACING.md,
   },
-  headerRight: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm },
-  categoryBadge: {
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.xs,
-    borderRadius: BORDER_RADIUS.full,
-  },
-  categoryText: { ...TYPOGRAPHY.labelSmall, textTransform: 'uppercase', letterSpacing: 0.5 },
-  headerBadges: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.sm,
-    flexWrap: 'wrap',
-  },
-  civicDeskBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: SPACING.sm,
-    paddingVertical: SPACING.xs,
-    borderRadius: BORDER_RADIUS.full,
-  },
-  civicDeskText: { ...TYPOGRAPHY.labelSmall, fontSize: 10 },
-  timeBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: SPACING.sm,
-    paddingVertical: SPACING.xs,
-    borderRadius: BORDER_RADIUS.full,
-  },
-  timeText: { ...TYPOGRAPHY.labelSmall,},
-  shareBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  geoTags: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: SPACING.xs,
-    marginBottom: SPACING.sm,
-  },
-  geoTag: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    paddingHorizontal: SPACING.sm,
-    paddingVertical: 3,
-    borderRadius: BORDER_RADIUS.full,
-  },
-  geoTagText: { ...TYPOGRAPHY.labelSmall, fontSize: 10 },
-  restrictionBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.xs,
-    paddingHorizontal: SPACING.sm,
-    paddingVertical: SPACING.xs,
-    borderRadius: BORDER_RADIUS.full,
-    marginBottom: SPACING.sm,
-    alignSelf: 'flex-start',
-  },
-  restrictionText: { ...TYPOGRAPHY.labelSmall, fontSize: 11 },
-  cardTitle: { ...TYPOGRAPHY.headlineSmall, marginBottom: SPACING.sm },
-  cardDesc: { ...TYPOGRAPHY.bodyMedium, lineHeight: 22, marginBottom: SPACING.lg },
-
-  imageWrapper: {
-    marginBottom: SPACING.lg,
-    borderRadius: BORDER_RADIUS.xl,
-    overflow: 'hidden',
-  },
-  proposalImage: { width: '100%', height: 180 },
-  imageOverlay: {
-    ...StyleSheet.absoluteFillObject,
-  },
-
-  // Vote Section
-  voteSection: { marginBottom: SPACING.lg },
-  voteBarBg: {
-    height: 8,
-    borderRadius: BORDER_RADIUS.full,
-    overflow: 'hidden',
-    marginBottom: SPACING.sm,
-  },
-  voteBarFill: { height: '100%', borderRadius: BORDER_RADIUS.full },
-  voteStats: { flexDirection: 'row', justifyContent: 'space-between' },
-  voteStat: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm },
-  voteIconBg: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  voteCount: { ...TYPOGRAPHY.labelMedium },
-
-  // Actions
-  statusBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: SPACING.md,
-    borderRadius: BORDER_RADIUS.xl,
-    gap: SPACING.sm,
-  },
-  statusText: { ...TYPOGRAPHY.labelMedium,},
-  voteActions: { flexDirection: 'row', gap: SPACING.md },
-  voteBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 14,
-    borderRadius: BORDER_RADIUS.xl,
-    gap: SPACING.xs,
-  },
-  voteBtnText: { color: '#fff', ...TYPOGRAPHY.labelMedium,},
-  btnDisabled: { opacity: 0.6 },
-
   // Skeleton
   skeletonBadge: { width: 80, height: 24, borderRadius: BORDER_RADIUS.full },
   skeletonSmall: { width: 60, height: 24, borderRadius: BORDER_RADIUS.full },
   skeletonTitle: { height: 24, borderRadius: BORDER_RADIUS.sm, marginBottom: SPACING.sm },
   skeletonLine: { height: 16, borderRadius: BORDER_RADIUS.sm, marginBottom: SPACING.xs },
   skeletonBtn: { height: 48, borderRadius: BORDER_RADIUS.xl, marginTop: SPACING.md },
-
-  // Empty State
-  emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: SPACING.xxxl },
-  emptyIcon: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: SPACING.xl,
-  },
-  emptyTitle: { ...TYPOGRAPHY.headlineSmall, marginBottom: SPACING.xs },
-  emptyDesc: { ...TYPOGRAPHY.bodyMedium, textAlign: 'center', marginBottom: SPACING.xl },
-  emptyBtn: { overflow: 'hidden', borderRadius: BORDER_RADIUS.full },
-  emptyBtnGradient: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: SPACING.xl,
-    paddingVertical: SPACING.md,
-    gap: SPACING.sm,
-  },
-  emptyBtnText: { color: '#000', ...TYPOGRAPHY.labelLarge,},
-
-  // View Mode Toggle
-  viewModeBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-  },
-
-  // Swipe Container
-  swipeContainer: {
-    flex: 1,
-    paddingTop: SPACING.md,
-  },
-  swipeProgress: {
-    paddingHorizontal: SPACING.lg,
-    marginBottom: SPACING.md,
-  },
-  swipeProgressText: {
-    ...TYPOGRAPHY.labelSmall,
-    textAlign: 'center',
-    marginBottom: SPACING.xs,
-  },
-  swipeProgressBar: {
-    height: 3,
-    borderRadius: 2,
-    overflow: 'hidden',
-  },
-  swipeProgressFill: {
-    height: '100%',
-    borderRadius: 2,
-  },
-
-  // Card Stack
-  cardStack: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'flex-start',
-    paddingHorizontal: SPACING.lg,
-  },
-
-  // M2 vote controls — big tinted Support / Oppose buttons + skip.
-  voteControls: {
-    paddingHorizontal: SPACING.lg,
-    paddingTop: 14,
-    gap: 12,
-  },
-  voteButtonRow: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  queueVoteBtn: {
-    flex: 1,
-    height: 58,
-    borderRadius: 16,
-    borderWidth: 1.5,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  queueVoteText: {
-    fontFamily: FONTS.sansSemiBold,
-    fontSize: 16,
-    letterSpacing: 0.1,
-  },
-  // Non-binary ballots (ranked / multiple-choice) open their dedicated
-  // ballot screen instead of a support/oppose pair.
-  openBallotBtn: {
-    height: 58,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 20,
-  },
-  openBallotText: {
-    fontFamily: FONTS.sansSemiBold,
-    fontSize: 16,
-    color: '#040707',
-  },
-  skipBtn: {
-    height: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  skipText: {
-    fontFamily: FONTS.sansMedium,
-    fontSize: 13.5,
-    letterSpacing: 0.2,
-  },
-
-  // Swipe Card
-  swipeCard: {
-    position: 'absolute',
-    width: SCREEN_WIDTH - SPACING.lg * 2,
-    borderRadius: BORDER_RADIUS['2xl'],
-    borderWidth: 1,
-    overflow: 'hidden',
-    ...SHADOWS.lg,
-  },
-  swipeCardContent: {
-    padding: SPACING.xl,
-  },
-  swipeCardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: SPACING.md,
-  },
-  swipeCategoryBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
-    borderRadius: BORDER_RADIUS.full,
-  },
-  swipeCategoryText: {
-    ...TYPOGRAPHY.labelSmall,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  swipeTimeBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: SPACING.sm,
-    paddingVertical: SPACING.xs,
-    borderRadius: BORDER_RADIUS.full,
-  },
-  swipeTimeText: {
-    ...TYPOGRAPHY.labelSmall,
-  },
-  swipeGeoTags: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: SPACING.xs,
-    marginBottom: SPACING.sm,
-  },
-  swipeGeoTag: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    paddingHorizontal: SPACING.sm,
-    paddingVertical: 3,
-    borderRadius: BORDER_RADIUS.full,
-  },
-  swipeGeoTagText: {
-    ...TYPOGRAPHY.labelSmall,
-    fontSize: 10,
-  },
-  swipeCardTitle: {
-    ...TYPOGRAPHY.headlineMedium,
-    marginBottom: SPACING.sm,
-  },
-  swipeCardDesc: {
-    ...TYPOGRAPHY.bodyMedium,
-    lineHeight: 22,
-    marginBottom: SPACING.lg,
-  },
-  swipeImageWrapper: {
-    borderRadius: BORDER_RADIUS.xl,
-    overflow: 'hidden',
-    marginBottom: SPACING.lg,
-  },
-  swipeImage: {
-    width: '100%',
-    height: 160,
-  },
-  swipeVoteSection: {
-    marginBottom: SPACING.lg,
-  },
-  swipeVoteBarBg: {
-    height: 10,
-    borderRadius: BORDER_RADIUS.full,
-    overflow: 'hidden',
-    marginBottom: SPACING.sm,
-  },
-  swipeVoteBarFill: {
-    height: '100%',
-    borderRadius: BORDER_RADIUS.full,
-  },
-  swipeVoteStats: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  swipeVoteStat: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.xs,
-  },
-  swipeVoteCount: {
-    ...TYPOGRAPHY.labelMedium,
-  },
-  swipeVotePercent: {
-    ...TYPOGRAPHY.labelSmall,
-  },
-  swipeEndedBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: SPACING.md,
-    borderRadius: BORDER_RADIUS.xl,
-    gap: SPACING.sm,
-  },
-  swipeEndedText: {
-    ...TYPOGRAPHY.labelMedium,
-  },
-  swipeInstructions: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingTop: SPACING.sm,
-  },
-  swipeInstruction: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.xs,
-  },
-  swipeInstructionText: {
-    ...TYPOGRAPHY.labelSmall,
-  },
-  swipeTapHint: {
-    ...TYPOGRAPHY.labelSmall,
-    fontStyle: 'italic',
-  },
-
-  // Swipe Indicators
-  swipeIndicator: {
-    position: 'absolute',
-    top: SPACING.xl,
-    zIndex: 10,
-    borderRadius: BORDER_RADIUS.xl,
-    overflow: 'hidden',
-  },
-  swipeIndicatorLeft: {
-    right: SPACING.xl,
-  },
-  swipeIndicatorRight: {
-    left: SPACING.xl,
-  },
-  swipeIndicatorTop: {
-    top: SPACING.xl,
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-  },
-  swipeIndicatorGradient: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.md,
-    gap: SPACING.sm,
-  },
-  swipeIndicatorText: {
-    color: '#fff',
-    ...TYPOGRAPHY.labelLarge,
-    letterSpacing: 1,
-  },
-
-  // Swipe Empty State
-  // E1 · Queue Complete
-  queueClearBody: {
-    flex: 1,
-    paddingHorizontal: 28,
-    paddingBottom: 24,
-    gap: 18,
-  },
   queueClearCenter: {
     flex: 1,
     alignItems: 'center',
@@ -4185,257 +3308,6 @@ const styles = StyleSheet.create({
   queueClearGhostText: {
     fontFamily: FONTS.sansMedium,
     fontSize: 14,
-  },
-
-  swipeEmptyState: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: SPACING.xxxl,
-  },
-  swipeEmptyIcon: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: SPACING.xl,
-  },
-  swipeEmptyTitle: {
-    ...TYPOGRAPHY.headlineMedium,
-    marginBottom: SPACING.sm,
-  },
-  swipeEmptyDesc: {
-    ...TYPOGRAPHY.bodyMedium,
-    textAlign: 'center',
-    marginBottom: SPACING.xl,
-  },
-  swipeRefreshBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: SPACING.xl,
-    paddingVertical: SPACING.md,
-    borderRadius: BORDER_RADIUS.full,
-    borderWidth: 1,
-    gap: SPACING.sm,
-  },
-  swipeRefreshText: {
-    ...TYPOGRAPHY.labelMedium,
-  },
-
-  // Full-Screen Swipe Card Styles
-  swipeCardImageContainer: {
-    width: '100%',
-    height: '55%',
-    position: 'relative',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  swipeCardImage: {
-    width: '100%',
-    height: '100%',
-  },
-  swipeCardImageOverlayTop: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: '40%',
-  },
-  swipeCardImageOverlay: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: '70%',
-  },
-  swipeCardContentOverlay: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    padding: SPACING.xl,
-    paddingBottom: SPACING.lg,
-  },
-  swipeCardBadgeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.sm,
-    marginBottom: SPACING.md,
-  },
-  swipeCategoryBadgeLarge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
-    borderRadius: BORDER_RADIUS.full,
-  },
-  swipeCategoryTextLight: {
-    color: '#fff',
-    ...TYPOGRAPHY.labelSmall,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  swipeTimeBadgeLarge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
-    borderRadius: BORDER_RADIUS.full,
-  },
-  swipeTimeTextLight: {
-    color: '#fff',
-    ...TYPOGRAPHY.labelSmall,
-  },
-  swipeGeoBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
-    borderRadius: BORDER_RADIUS.full,
-  },
-  swipeGeoText: {
-    color: '#fff',
-    ...TYPOGRAPHY.labelSmall,
-  },
-  swipeGeoBadgeTopLeft: {
-    position: 'absolute',
-    top: SPACING.md,
-    left: SPACING.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
-    borderRadius: BORDER_RADIUS.full,
-    zIndex: 5,
-  },
-  swipeCardTitleLarge: {
-    color: '#fff',
-    ...TYPOGRAPHY.headlineMedium,
-    fontSize: responsive(20, 22, 24),
-    marginBottom: SPACING.sm,
-    textShadowColor: 'rgba(0,0,0,0.5)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 4,
-  },
-  swipeCardDescLarge: {
-    color: 'rgba(255,255,255,0.9)',
-    ...TYPOGRAPHY.bodyMedium,
-    lineHeight: 22,
-    marginBottom: SPACING.lg,
-    textShadowColor: 'rgba(0,0,0,0.3)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
-  },
-  swipeVoteSectionLarge: {
-    marginBottom: SPACING.md,
-  },
-  swipeVoteBarBgLarge: {
-    height: 8,
-    borderRadius: BORDER_RADIUS.full,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    overflow: 'hidden',
-    marginBottom: SPACING.sm,
-    flexDirection: 'row',
-  },
-  swipeVoteBarFillLarge: {
-    height: '100%',
-    borderRadius: BORDER_RADIUS.full,
-  },
-  swipeVoteBarOpposeSection: {
-    height: '100%',
-    borderRadius: BORDER_RADIUS.full,
-  },
-  swipeVoteStatsLarge: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  swipeVoteStatLarge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.xs,
-  },
-  swipeVoteCountLarge: {
-    ...TYPOGRAPHY.labelMedium,
-  },
-  swipeVotePercentLarge: {
-    color: '#fff',
-    ...TYPOGRAPHY.labelSmall,
-  },
-  swipeEndedBannerLarge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: SPACING.md,
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    borderRadius: BORDER_RADIUS.xl,
-    gap: SPACING.sm,
-  },
-  swipeEndedTextLarge: {
-    color: '#fff',
-    ...TYPOGRAPHY.labelMedium,
-  },
-  swipeInstructionsLarge: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingTop: SPACING.sm,
-  },
-  swipeInstructionLarge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.xs,
-  },
-  swipeInstructionTextLarge: {
-    color: 'rgba(255,255,255,0.8)',
-    ...TYPOGRAPHY.labelSmall,
-  },
-  swipeTapHintLarge: {
-    color: 'rgba(255,255,255,0.6)',
-    ...TYPOGRAPHY.labelSmall,
-    fontStyle: 'italic',
-  },
-
-  // Creator Info
-  swipeCreatorRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.xs,
-    marginBottom: SPACING.sm,
-  },
-  swipeCreatorText: {
-    color: 'rgba(255,255,255,0.6)',
-    ...TYPOGRAPHY.labelSmall,
-  },
-
-  // Full-Screen Swipe Indicators
-  swipeIndicatorFullScreen: {
-    position: 'absolute',
-    top: '25%',
-    zIndex: 10,
-    alignItems: 'center',
-    gap: SPACING.sm,
-  },
-  swipeIndicatorCircle: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 4,
-    borderColor: '#fff',
-  },
-  swipeIndicatorTextLarge: {
-    ...TYPOGRAPHY.labelLarge,
-    letterSpacing: 2,
-    textShadowColor: 'rgba(0,0,0,0.5)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 4,
   },
 });
 
@@ -4706,5 +3578,308 @@ const createStyles = StyleSheet.create({
     fontFamily: FONTS.sans,
     fontSize: 11.5,
     textAlign: 'center',
+  },
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 1b / 2a · FEED CHROME — header, chips, meta line, observer hero, region sheet
+// ═══════════════════════════════════════════════════════════════════════════════
+const feedStyles = StyleSheet.create({
+  headerWrap: {
+    paddingHorizontal: SPACING.screenPadding,
+    paddingBottom: 14,
+    gap: 12,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  headerTitle: {
+    fontFamily: FONTS.serif,
+    fontSize: 32,
+    lineHeight: 35,
+    letterSpacing: -0.38,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  roundBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  newBtn: {
+    height: 40,
+    borderRadius: 20,
+    paddingHorizontal: 15,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  newBtnText: {
+    fontFamily: FONTS.sansSemiBold,
+    fontSize: 13.5,
+    color: '#040707',
+  },
+  observingPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 100,
+    borderWidth: 1,
+  },
+  observingText: {
+    fontFamily: FONTS.sansSemiBold,
+    fontSize: 10.5,
+    letterSpacing: 1,
+  },
+  searchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  searchBar: {
+    flex: 1,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    gap: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontFamily: FONTS.sans,
+    fontSize: 13.5,
+    paddingVertical: 0,
+  },
+  feedContent: {
+    paddingHorizontal: SPACING.screenPadding,
+    gap: 14,
+  },
+  feedHeader: {
+    gap: 14,
+  },
+  chipsScroll: {
+    marginHorizontal: -SPACING.screenPadding,
+  },
+  chipsRow: {
+    paddingHorizontal: SPACING.screenPadding,
+    gap: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 100,
+  },
+  chipText: {
+    fontFamily: FONTS.sansMedium,
+    fontSize: 12.5,
+  },
+  chipTextActive: {
+    fontFamily: FONTS.sansSemiBold,
+    fontSize: 12.5,
+  },
+  chipCount: {
+    fontFamily: FONTS.monoSemiBold,
+    fontSize: 11,
+    paddingHorizontal: 7,
+    paddingVertical: 1,
+    borderRadius: 100,
+    overflow: 'hidden',
+    fontVariant: ['tabular-nums'],
+  },
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  metaLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+  },
+  metaText: {
+    fontFamily: FONTS.mono,
+    fontSize: 10.5,
+    letterSpacing: 1.05,
+    fontVariant: ['tabular-nums'],
+  },
+  metaTonight: {
+    fontFamily: FONTS.mono,
+    fontSize: 10.5,
+    letterSpacing: 0.63,
+    fontVariant: ['tabular-nums'],
+  },
+  // 2a · Verification hero
+  hero: {
+    borderRadius: 22,
+    borderWidth: 1,
+    padding: 22,
+    gap: 14,
+  },
+  heroTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 13,
+  },
+  heroShield: {
+    width: 46,
+    height: 46,
+    borderRadius: 15,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  heroTextCol: {
+    flex: 1,
+    gap: 2,
+  },
+  heroHeadline: {
+    fontFamily: FONTS.serif,
+    fontSize: 20,
+    lineHeight: 24,
+  },
+  heroSub: {
+    fontFamily: FONTS.sans,
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  heroRegionLink: {
+    fontFamily: FONTS.sansMedium,
+    fontSize: 11.5,
+    marginTop: 4,
+  },
+  heroCta: {
+    height: 52,
+    borderRadius: 15,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 9,
+  },
+  heroCtaText: {
+    fontFamily: FONTS.sansSemiBold,
+    fontSize: 16,
+    color: '#040707',
+  },
+  heroCtaSuffix: {
+    fontFamily: FONTS.mono,
+    fontSize: 12.5,
+    color: '#040707',
+    opacity: 0.75,
+    fontVariant: ['tabular-nums'],
+  },
+  heroTrust: {
+    fontFamily: FONTS.mono,
+    fontSize: 9.5,
+    letterSpacing: 0.95,
+    textAlign: 'center',
+    fontVariant: ['tabular-nums'],
+  },
+  observerFootnote: {
+    fontFamily: FONTS.sans,
+    fontSize: 11.5,
+    lineHeight: 17,
+    textAlign: 'center',
+    paddingTop: 14,
+    paddingHorizontal: 10,
+  },
+  // Empty states
+  simpleEmpty: {
+    alignItems: 'center',
+    paddingVertical: 48,
+    paddingHorizontal: 20,
+    gap: 8,
+  },
+  simpleEmptyTitle: {
+    fontFamily: FONTS.serif,
+    fontSize: 22,
+    textAlign: 'center',
+  },
+  simpleEmptyDesc: {
+    fontFamily: FONTS.sans,
+    fontSize: 13,
+    lineHeight: 19,
+    textAlign: 'center',
+    maxWidth: 280,
+  },
+  queueClearWrap: {
+    paddingTop: 20,
+    paddingHorizontal: 4,
+    gap: 18,
+  },
+  // Region picker sheet
+  sheetBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.55)',
+    justifyContent: 'flex-end',
+  },
+  sheet: {
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: SPACING.screenPadding,
+    paddingTop: 10,
+    gap: 6,
+  },
+  sheetHandle: {
+    alignSelf: 'center',
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    marginBottom: 8,
+  },
+  sheetTitle: {
+    fontFamily: FONTS.serif,
+    fontSize: 22,
+    lineHeight: 26,
+  },
+  sheetSub: {
+    fontFamily: FONTS.sans,
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  sheetList: {
+    maxHeight: 380,
+    marginTop: 8,
+  },
+  sheetRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+  },
+  sheetRowLabel: {
+    fontFamily: FONTS.sansMedium,
+    fontSize: 14,
+    flex: 1,
+  },
+  sheetRowRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  sheetRowCount: {
+    fontFamily: FONTS.mono,
+    fontSize: 10.5,
+    letterSpacing: 0.63,
+    fontVariant: ['tabular-nums'],
   },
 });
