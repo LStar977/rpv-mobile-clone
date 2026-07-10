@@ -2642,39 +2642,12 @@ export default function ProposalsScreen() {
               </View>
             </View>
 
-            {/* IMAGE — optional, same picker logic */}
-            <View style={createStyles.section}>
-              <Text style={[createStyles.sectionLabel, { color: colors.textTertiary }]}>IMAGE · OPTIONAL</Text>
-              <TouchableOpacity
-                style={[createStyles.imageCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
-                onPress={pickImage}
-                activeOpacity={0.8}
-                accessibilityRole="button"
-                accessibilityLabel="Add an image"
-              >
-                {newProposal.imageUri ? (
-                  <Image source={{ uri: newProposal.imageUri }} style={createStyles.imagePreview} />
-                ) : (
-                  <View style={createStyles.imageEmpty}>
-                    <Ionicons name="image-outline" size={26} color={colors.textTertiary} />
-                    <Text style={[createStyles.imageEmptyText, { color: colors.textTertiary }]}>
-                      Tap to add image
-                    </Text>
-                  </View>
-                )}
-              </TouchableOpacity>
-              {!!newProposal.imageUri && (
-                <TouchableOpacity
-                  style={createStyles.imageRemoveBtn}
-                  onPress={() => setNewProposal((p) => ({ ...p, imageUri: '' }))}
-                  accessibilityRole="button"
-                  accessibilityLabel="Remove image"
-                >
-                  <Ionicons name="trash-outline" size={14} color={colors.error} />
-                  <Text style={[createStyles.imageRemoveText, { color: colors.error }]}>Remove</Text>
-                </TouchableOpacity>
-              )}
-            </View>
+            {/* Image picker removed per the design's "no mood photography on
+                ballots" rule — the feed never renders images and the ballot
+                should win on the question alone. Existing proposals with
+                images still display them in the detail view, and the upload
+                plumbing (pickImage, imageUri) stays for a future captioned
+                functional-attachments feature. */}
 
             {/* SCOPE — geo reach chips; non-global scopes still gate on verification */}
             <View style={createStyles.section}>
