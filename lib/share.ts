@@ -9,18 +9,19 @@ export interface ShareProposalData { id: number | string; title: string; descrip
 const PROPOSAL_URL_BASE = 'https://representportal.com/p';
 const APP_STORE_URL = 'https://apps.apple.com/ca/app/id6756912022';
 
-// iOS NOTE: passing `message` and `url` together breaks the share sheet's
-// Copy action (the pair serializes as "bplist00…" clipboard garbage), while
-// URL-only shares give both the rich iMessage preview card (the backend
-// serves og: tags with the live tally) AND a clean URL on Copy. So on iOS
-// we share ONLY the URL and let the preview card do the talking; Android
-// has no url field, so it gets the text with the link inline.
+// iOS NOTE (hard-won): the share sheet's Copy action mangles anything passed
+// via the `url` field into "bplist00…" clipboard garbage (long-standing RN
+// bug — the NSURL activity item gets plist-serialized). The only payload
+// that survives every share target is a PLAIN STRING. On iOS we send the
+// bare URL as the message: iMessage still unfurls a URL-only text into the
+// rich og-card, and Copy yields clean text. Never reintroduce the `url`
+// field here. Android keeps the context line + link (no unfurl either way).
 export async function shareProposal(proposal: ShareProposalData): Promise<boolean> {
   try {
     const proposalUrl = `${PROPOSAL_URL_BASE}/${proposal.id}`;
     const message = `Vote on this: "${proposal.title}" — verified voting on Represent`;
     const result = await Share.share(
-      Platform.OS === 'ios' ? { url: proposalUrl } : { message: `${message}\n\n${proposalUrl}` },
+      Platform.OS === 'ios' ? { message: proposalUrl } : { message: `${message}\n\n${proposalUrl}` },
       { dialogTitle: 'Share Proposal', subject: `Represent: ${proposal.title}` }
     );
     return result.action === Share.sharedAction;
@@ -32,7 +33,7 @@ export async function shareVoteAchievement(proposalTitle: string, choice: 'suppo
     const url = proposalId != null ? `${PROPOSAL_URL_BASE}/${proposalId}` : APP_STORE_URL;
     const message = `I just cast a verified ${choice} vote on "${proposalTitle}". Add your voice:`;
     const result = await Share.share(
-      Platform.OS === 'ios' ? { url } : { message: `${message}\n\n${url}` },
+      Platform.OS === 'ios' ? { message: url } : { message: `${message}\n\n${url}` },
       { dialogTitle: 'Share Your Vote' }
     );
     return result.action === Share.sharedAction;
