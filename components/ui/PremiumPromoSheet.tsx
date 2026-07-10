@@ -9,7 +9,7 @@ import Animated, {
   FadeIn,
   FadeInDown,
 } from 'react-native-reanimated';
-import Svg, { Circle } from 'react-native-svg';
+import Svg, { Circle, Line } from 'react-native-svg';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -327,7 +327,16 @@ export function AppOpenInterstitial({ visible, onClose, onSeePremium }: AppOpenI
               />
             </Svg>
             <View style={inter.ringIcon}>
-              <Ionicons name="scan-outline" size={38} color={colors.gold} />
+              {/* The Sentinel lens per the S3a mock: crosshair circle with
+                  four tick marks and a center dot — not scan brackets. */}
+              <Svg width={38} height={38} viewBox="0 0 24 24">
+                <Line x1={12} y1={3} x2={12} y2={5} stroke={colors.gold} strokeWidth={1.7} strokeLinecap="round" />
+                <Line x1={12} y1={19} x2={12} y2={21} stroke={colors.gold} strokeWidth={1.7} strokeLinecap="round" />
+                <Line x1={3} y1={12} x2={5} y2={12} stroke={colors.gold} strokeWidth={1.7} strokeLinecap="round" />
+                <Line x1={19} y1={12} x2={21} y2={12} stroke={colors.gold} strokeWidth={1.7} strokeLinecap="round" />
+                <Circle cx={12} cy={12} r={5} fill="none" stroke={colors.gold} strokeWidth={1.7} />
+                <Circle cx={12} cy={12} r={1.6} fill={colors.gold} />
+              </Svg>
             </View>
           </View>
 

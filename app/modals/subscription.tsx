@@ -549,24 +549,8 @@ export default function SubscriptionScreen() {
           </View>
         </Animated.View>
 
-        {/* Organizations pointer — org plans are never sold on the personal paywall */}
-        <Animated.View entering={FadeInUp.delay(300).duration(400)}>
-          <TouchableOpacity
-            style={[styles.orgCard, { backgroundColor: colors.surface, borderColor: colors.borderSubtle }]}
-            onPress={handleContactOrganizations}
-            activeOpacity={0.8}
-            accessibilityRole="button"
-            accessibilityLabel="Organization governance plans"
-          >
-            <View style={{ flex: 1, gap: 2 }}>
-              <Text style={[styles.orgTitle, { color: colors.text }]}>Running an organization?</Text>
-              <Text style={[styles.orgSub, { color: colors.textTertiary }]}>
-                Org governance plans · $29–299/mo
-              </Text>
-            </View>
-            <Text style={[styles.orgArrow, { color: colors.textSecondary }]}>→</Text>
-          </TouchableOpacity>
-        </Animated.View>
+        {/* Org plans are sold in the Orgs tab flow, not on the personal
+            paywall — pointer removed to keep this screen to one decision. */}
 
         {/* CTA + referral alternative + footer links */}
         <Animated.View entering={FadeInUp.delay(350).duration(400)} style={styles.ctaCol}>
@@ -638,55 +622,9 @@ export default function SubscriptionScreen() {
           />
         </Animated.View>
 
-        {/* FAQ */}
-        <Animated.View
-          entering={FadeInUp.delay(450).duration(400)}
-          style={[styles.faqSection, { backgroundColor: colors.surface, borderColor: colors.borderSubtle }]}
-        >
-          <Text style={[styles.faqTitle, { color: colors.text }]}>Frequently Asked Questions</Text>
-
-          <View style={styles.faqItem}>
-            <Text style={[styles.faqQuestion, { color: colors.text }]}>
-              Is verification part of Premium?
-            </Text>
-            <Text style={[styles.faqAnswer, { color: colors.textSecondary }]}>
-              No — verification is an identity status and it's free forever. Premium adds tools on
-              top: Sentinel analysis, full analytics, unlimited proposal creation, alerts, and
-              export.
-            </Text>
-          </View>
-
-          <View style={styles.faqItem}>
-            <Text style={[styles.faqQuestion, { color: colors.text }]}>
-              Can I cancel Premium anytime?
-            </Text>
-            <Text style={[styles.faqAnswer, { color: colors.textSecondary }]}>
-              Yes, cancel anytime with no questions asked. Your votes, record, and verification are
-              never affected.
-            </Text>
-          </View>
-
-          <View style={styles.faqItem}>
-            <Text style={[styles.faqQuestion, { color: colors.text }]}>
-              What payment methods do you accept?
-            </Text>
-            <Text style={[styles.faqAnswer, { color: colors.textSecondary }]}>
-              On iOS, subscriptions are processed through Apple In-App Purchase. On Android, through
-              Stripe (cards, Apple Pay, Google Pay). All transactions complete inside the app — no
-              redirects to external websites.
-            </Text>
-          </View>
-
-          <View style={styles.faqItem}>
-            <Text style={[styles.faqQuestion, { color: colors.text }]}>
-              How does organization verification work?
-            </Text>
-            <Text style={[styles.faqAnswer, { color: colors.textSecondary }]}>
-              Organization members verify via invite codes - no individual KYC needed for internal
-              proposals.
-            </Text>
-          </View>
-        </Animated.View>
+        {/* FAQ removed — the paywall makes one clean pitch; cancellation and
+            billing terms live in SubscriptionLegal above and the App Store
+            manages the rest. */}
       </ScrollView>
     </View>
   );
