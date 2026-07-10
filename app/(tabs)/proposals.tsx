@@ -775,15 +775,14 @@ export default function ProposalsScreen() {
     vote: 'support' | 'oppose';
     source: 'list' | 'detail';
   } | null>(null);
+  // Truthful seal state for the X1 sheet: 'pending' while the ledger write
+  // is in flight, 'confirmed' only when it landed, 'failed' otherwise.
+  const [pendingCastState, setPendingCastState] = useState<'pending' | 'confirmed' | 'failed' | undefined>(undefined);
   const [lastVoteType, setLastVoteType] = useState<'support' | 'oppose'>('support');
   // Context for the post-vote "Share your vote" pill on the confirmation
   // overlay — the user's just-cast vote is the highest-motivation share
   // moment in the app.
   const lastVotedRef = useRef<{ id: number | string; title: string } | null>(null);
-
-  // Vote queue for sequential processing of real (non-seed) votes
-  const voteQueueRef = useRef<Array<{ proposalId: number | string; vote: 'support' | 'oppose'; title: string }>>([]);
-  const isProcessingQueueRef = useRef(false);
 
   // 1b feed state — active filter chip, header search toggle, receipts that
   // just collapsed in place this session (so a fresh vote stays visible in
@@ -1181,7 +1180,9 @@ export default function ProposalsScreen() {
   }, [fetchData]);
 
 
-  const handleVote = async (proposalId: number | string, vote: 'support' | 'oppose') => {
+  // Returns true only when the ballot actually landed — the X1 seal uses
+  // this to decide whether the gold ring completes or reverses red.
+  const handleVote = async (proposalId: number | string, vote: 'support' | 'oppose'): Promise<boolean> => {
     // Geo / verification gate. Apply BEFORE the demo + seed bypass so the
     // demo account (used by App Store reviewers) can't register votes on
     // proposals that show the "Not in your region" badge — the gate badge
@@ -1200,7 +1201,7 @@ export default function ProposalsScreen() {
           : `This proposal is restricted to ${geo[geo.length - 1] ?? 'a specific region'}. Voting is only open to residents.`,
         [{ text: 'OK', style: 'cancel' }],
       );
-      return;
+      return false;
     }
 
     // Citizens-only gate. Runs before the demo/seed bypass so the eligibility
@@ -1218,7 +1219,7 @@ export default function ProposalsScreen() {
           },
         ],
       );
-      return;
+      return false;
     }
 
     // Seed proposals + demo account votes: local-only, never hit the API.
@@ -1242,13 +1243,13 @@ export default function ProposalsScreen() {
       setLastVoteType(vote);
       lastVotedRef.current = { id: proposalId, title: target?.title || 'Proposal' };
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      return;
+      return false;
     }
 
     // Real proposals: require authentication
     if (!isAuthenticated) {
       Alert.alert('Sign In Required', 'Please sign in to vote.');
-      return;
+      return false;
     }
 
     // Daily ballot cap check (premium users have unlimited).
@@ -1270,7 +1271,7 @@ export default function ProposalsScreen() {
             { text: 'Go unlimited', onPress: () => router.push('/modals/subscription') },
           ],
         );
-        return;
+        return false;
       }
     }
 
@@ -1284,7 +1285,7 @@ export default function ProposalsScreen() {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       setVerificationModalType('vote');
       setShowVerificationModal(true);
-      return;
+      return false;
     }
 
     // For verified users: check if their location matches proposal restrictions
@@ -1307,7 +1308,7 @@ export default function ProposalsScreen() {
           `This proposal is only for voters in ${locationDescription}. Your verified location does not match.`,
           [{ text: 'OK' }]
         );
-        return;
+        return false;
       }
     }
 
@@ -1322,7 +1323,7 @@ export default function ProposalsScreen() {
           if (currentTier !== 'premium') restoreBallot();
           Alert.alert('Error', claimResult.error);
           setVotingProposalId(null);
-          return;
+          return false;
         }
         setClaimedTokens((prev) => new Set([...prev, proposalId]));
       }
@@ -1331,8 +1332,20 @@ export default function ProposalsScreen() {
       const result = await proposalsApi.submitVote(proposalId, vote);
       if (result.error) {
         if (currentTier !== 'premium') restoreBallot();
-        Alert.alert('Error', result.error);
-        return;
+        // Self-heal: the server is the source of truth for "already voted" —
+        // mark it voted locally so the card collapses to a receipt and the
+        // buttons can never be pressed again (side unknown, so not claimed).
+        if (/already voted/i.test(result.error)) {
+          setVotedProposals((prev) => new Set([...prev, proposalId]));
+          setVoteReceipts((prev) => {
+            if (prev.has(String(proposalId))) return prev;
+            return new Map(prev).set(String(proposalId), {});
+          });
+          Alert.alert('Already on the ledger', 'You had already voted on this proposal — your original ballot stands. Nothing new was recorded.');
+        } else {
+          Alert.alert('Error', result.error);
+        }
+        return false;
       }
 
       setVotedProposals((prev) => new Set([...prev, proposalId]));
@@ -1380,31 +1393,19 @@ export default function ProposalsScreen() {
       // Daily counter was already incremented by spendBallot() before the vote.
       // No on-chain balance sync needed — the daily counter is the source of
       // truth for the UI; the user's on-chain RPV balance is just "ammo".
+      return true;
     } catch {
       if (currentTier !== 'premium') restoreBallot();
       Alert.alert('Error', 'Failed to submit vote. Please try again.');
+      return false;
     } finally {
       setVotingProposalId(null);
     }
   };
 
-  // Process vote queue sequentially to avoid blockchain nonce collisions
-  const processVoteQueue = useCallback(async () => {
-    if (isProcessingQueueRef.current) return;
-    isProcessingQueueRef.current = true;
-
-    while (voteQueueRef.current.length > 0) {
-      const { proposalId, vote, title } = voteQueueRef.current[0];
-      try {
-        await handleVote(proposalId, vote);
-      } catch {
-        Alert.alert('Vote Failed', `Your vote on "${title}" couldn't be submitted. Please find it and try again.`);
-      }
-      voteQueueRef.current.shift();
-    }
-
-    isProcessingQueueRef.current = false;
-  }, [handleVote]);
+  // (The old sequential vote queue is gone: the X1 sheet awaits each cast
+  // and blocks the next until the seal resolves, so nonce collisions can't
+  // happen and the seal can report the real outcome.)
 
   // ── X1 confirm-before-cast flow ────────────────────────────────────────────
   // Step 1: any vote intent (feed card, detail modal) lands here and opens
@@ -1423,6 +1424,7 @@ export default function ProposalsScreen() {
     }
     setLastVoteType(vote);
     lastVotedRef.current = { id: proposal.id, title: proposal.title || 'Proposal' };
+    setPendingCastState(undefined);
     setPendingVote({ proposal, vote, source });
   };
 
@@ -1430,7 +1432,7 @@ export default function ProposalsScreen() {
   // anything get submitted. Real (non-seed) casts go through the sequential
   // vote queue (blockchain nonce collisions) — inline feed voting makes
   // rapid back-to-back casts the normal case.
-  const confirmPendingVote = () => {
+  const confirmPendingVote = async () => {
     const pending = pendingVote;
     if (!pending) return;
     const { proposal, vote } = pending;
@@ -1440,11 +1442,22 @@ export default function ProposalsScreen() {
     // confirms the ballot landed — a failed cast leaves the card actionable.)
     setSessionVotedIds((prev) => new Set([...prev, String(proposal.id)]));
 
-    if (!isSeedProposal(proposal.id)) {
-      voteQueueRef.current.push({ proposalId: proposal.id, vote, title: proposal.title || 'Untitled' });
-      processVoteQueue();
-    } else {
-      handleVote(proposal.id, vote);
+    // The X1 sheet serializes casts (one at a time), so we await the vote
+    // directly and let the seal tell the truth: the gold ring holds at 85%
+    // while the ledger write is in flight, completes only on success, and
+    // reverses red on failure. Never fake completion.
+    setPendingCastState('pending');
+    const ok = await handleVote(proposal.id, vote);
+    setPendingCastState(ok ? 'confirmed' : 'failed');
+    if (!ok) {
+      // Failed cast: the card goes back to being actionable (unless the
+      // failure was "already voted", in which case handleVote marked it
+      // voted and the card collapses to a receipt).
+      setSessionVotedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(String(proposal.id));
+        return next;
+      });
     }
   };
 
@@ -3139,7 +3152,12 @@ export default function ProposalsScreen() {
         voteType={pendingVote?.vote ?? lastVoteType}
         question={pendingVote?.proposal.title}
         onConfirm={confirmPendingVote}
-        onDismiss={() => setPendingVote(null)}
+        castState={pendingCastState}
+        onRetry={confirmPendingVote}
+        onDismiss={() => {
+          setPendingVote(null);
+          setPendingCastState(undefined);
+        }}
         onShare={() => {
           // Return the Share promise so the seal sheet stays mounted while
           // the native share dialog is presenting.

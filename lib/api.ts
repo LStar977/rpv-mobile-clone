@@ -634,7 +634,16 @@ export const userApi = {
         const orgProposalIds = Object.keys(votes)
           .map((k) => k.split(':')[1])
           .filter(Boolean);
-        backendIds = Array.from(new Set([...backendIds.map(String), ...orgProposalIds]));
+        // The backend returns vote OBJECTS ({proposalId, position, …}), not
+        // bare ids — never String() them (that yields "[object Object]" and
+        // destroys every backend vote id, so voted proposals reappear in the
+        // To Vote feed). Merge org ids alongside, preserving the objects.
+        const known = new Set(
+          backendIds.map((v: any) => String(typeof v === 'object' && v !== null ? v.proposalId ?? v.id : v)),
+        );
+        for (const id of orgProposalIds) {
+          if (!known.has(String(id))) backendIds.push(id);
+        }
       }
     } catch {}
 
