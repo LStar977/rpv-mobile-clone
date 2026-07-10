@@ -34,6 +34,7 @@ import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuthStore } from '../../lib/auth';
 import { restorePurchases } from '../../lib/iap';
+import { PremiumPromoSheet, markPromoShown } from '../../components/ui';
 import { useTheme, SPACING, RADIUS, FONTS } from '../../lib/theme';
 import { useTutorialTarget } from '../../components/tutorial';
 import Svg, { Circle, Path } from 'react-native-svg';
@@ -903,7 +904,7 @@ function PaywallView({
           <PaywallFeature
             icon="megaphone-outline"
             title="Turn analyses into proposals"
-            body="Unlimited proposals with priority visibility"
+            body="Run as many active proposals as you can champion"
           />
         </View>
 
@@ -975,6 +976,10 @@ export default function SentinelScreen() {
   const [proposalCreated, setProposalCreated] = useState(false);
   const [showPaywall, setShowPaywall] = useState(false);
   const [restoring, setRestoring] = useState(false);
+  // S2b · Sentinel gate sheet — shown instead of the full-screen paywall when
+  // a non-premium user hits the analysis limit. Gate-triggered, so it bypasses
+  // the weekly promo cap (contextual explanation, not an ad).
+  const [showGateSheet, setShowGateSheet] = useState(false);
 
   // AI consent state
   const [aiConsented, setAiConsented] = useState(false);
@@ -1143,10 +1148,14 @@ export default function SentinelScreen() {
 
   // ── Analyze ────────────────────────────────────────────────────────
   const handleAnalyze = async () => {
-    // For non-premium users, show the Sentinel paywall
+    // Non-premium analysis gate → S2b Sentinel-gate sheet (replaces the old
+    // full-screen PaywallView takeover; "See Premium" routes to the paywall
+    // modal, which carries purchase + restore). Gate-triggered, so it may
+    // bypass the weekly promo cap — but it still records the showing.
     if (!isPremium) {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      setShowPaywall(true);
+      markPromoShown('sentinel-gate');
+      setShowGateSheet(true);
       return;
     }
 
@@ -1613,6 +1622,19 @@ export default function SentinelScreen() {
 
         <View style={st.bottomPadding} />
       </ScrollView>
+
+      {/* S2b · Sentinel gate — the honest alternative first ("unlocks at
+          midnight"), the real free→premium daily comparison in mono, one gold
+          CTA to the paywall modal. */}
+      <PremiumPromoSheet
+        visible={showGateSheet}
+        variant="sentinel-gate"
+        onClose={() => setShowGateSheet(false)}
+        onSeePremium={() => {
+          setShowGateSheet(false);
+          router.push('/modals/subscription');
+        }}
+      />
     </View>
   );
 }

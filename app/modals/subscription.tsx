@@ -1,18 +1,45 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Linking, Alert, Platform } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  ActivityIndicator,
+  Linking,
+  Alert,
+  Platform,
+} from 'react-native';
 import { useState, useEffect } from 'react';
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuthStore } from '../../lib/auth';
-import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS, responsive, FONTS } from '../../lib/theme';
+import { useTheme, SPACING, FONTS } from '../../lib/theme';
 import { showPaymentError, showPaymentSuccess } from '../../lib/stripe';
 import { processPremiumPayment } from '../../lib/payment';
 import { restorePurchases } from '../../lib/iap';
+import { referralsApi } from '../../lib/api';
+import { shareReferralInvite } from '../../lib/share';
+import { SubscriptionLegal } from '../../components/ui/SubscriptionLegal';
+import { SENTINEL_FREE_PER_DAY, SENTINEL_PREMIUM_PER_DAY } from '../../components/ui';
 
 const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://representportal.com';
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// S1 · THE PREMIUM PAYWALL — one product, honest numbers, one gold moment.
+//
+// ANNUAL PLAN: no annual IAP product exists in App Store Connect yet, so the
+// paywall is monthly-only for now. The monthly/annual toggle UI is built and
+// gated behind this flag — once the annual SKU is registered in App Store
+// Connect (and added to lib/iap.ts IAP_PRODUCTS), flipping this to true
+// re-enables the s1b two-card toggle. Do NOT enable before the product exists:
+// StoreKit throws "Invalid product ID" for unregistered SKUs.
+// ═══════════════════════════════════════════════════════════════════════════════
+const ANNUAL_PLAN_ENABLED = false;
+const MONTHLY_PRICE = '$7.99';
+const ANNUAL_PRICE = '$79';
 
 interface SubscriptionData {
   subscription: string | null;
@@ -21,68 +48,23 @@ interface SubscriptionData {
   endDate: string | null;
 }
 
-const TIERS = {
-  free: {
-    name: 'Free',
-    price: '$0',
-    period: 'forever',
-    description: 'Get started with global proposals',
-    icon: 'person-outline' as const,
-    features: [
-      { text: 'Unlimited voting on global proposals', included: true },
-      { text: 'Create 1 proposal/month', included: true },
-      { text: 'Basic analytics on your proposals', included: true },
-      { text: 'Geo-restricted proposals', included: false },
-      { text: 'Sentinel AI analyzer', included: false },
-    ],
+// Feature ledger — every line carries a real mono number against its free
+// counterpart. Sentinel numbers come from backend/server/routes.ts
+// (SENTINEL_FREE_DAILY / SENTINEL_PREMIUM_DAILY) via the shared constants.
+const FEATURE_ROWS: { label: string; value?: string; valueDim?: string; check?: boolean }[] = [
+  {
+    label: 'Sentinel governance analysis',
+    value: `${SENTINEL_PREMIUM_PER_DAY}/DAY`,
+    valueDim: ` · FREE ${SENTINEL_FREE_PER_DAY}`,
   },
-  verified: {
-    name: 'Verified',
-    price: 'Free',
-    period: '',
-    description: 'Verify your identity to unlock all proposals',
-    icon: 'shield-checkmark' as const,
-    features: [
-      { text: 'Unlimited voting on every proposal you can act on', included: true },
-      { text: 'Create 3 proposals/month', included: true },
-      { text: 'Access geo-restricted proposals', included: true },
-      { text: 'Verified badge on profile', included: true },
-      { text: 'Basic analytics on your proposals', included: true },
-      { text: 'Sentinel AI analyzer', included: false },
-    ],
-  },
-  premium: {
-    name: 'Premium',
-    price: '$7.99',
-    period: '/month',
-    description: 'Full access + Sentinel AI',
-    icon: 'star' as const,
-    features: [
-      { text: 'Everything in Verified', included: true },
-      { text: 'Unlimited proposal creation', included: true },
-      { text: 'Sentinel AI governance analyzer', included: true },
-      { text: 'Advanced analytics (geo + demographic breakdowns)', included: true },
-      { text: 'Custom proposal alerts', included: true },
-      { text: 'Voting history export', included: true },
-      { text: 'Patron badge on profile', included: true },
-    ],
-  },
-  organization: {
-    name: 'Organizations',
-    price: '$29-299',
-    period: '/month',
-    description: 'For unions, nonprofits & groups',
-    icon: 'business' as const,
-    features: [
-      { text: 'Verified organization badge', included: true },
-      { text: 'Member verification via invite codes', included: true },
-      { text: 'Unlimited official proposals', included: true },
-      { text: 'Full analytics & reporting', included: true },
-      { text: 'Team management', included: true },
-      { text: 'API access (Professional tier)', included: true },
-    ],
-  },
-};
+  { label: 'Proposal creation', value: 'UNLIMITED', valueDim: ' · FREE 1 ACTIVE' },
+  { label: 'Analytics — geo + demographic', value: 'FULL' },
+  { label: 'Custom proposal alerts', value: 'UNLIMITED' },
+  { label: 'Voting history export', value: 'CSV + PDF' },
+  { label: 'Patron badge on your credential', check: true },
+];
+
+const FREE_FOREVER_CHIPS = ["Voting on everything you're eligible for", 'Verification', 'Results'];
 
 export default function SubscriptionScreen() {
   const { colors } = useTheme();
@@ -91,10 +73,12 @@ export default function SubscriptionScreen() {
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [subscription, setSubscription] = useState<SubscriptionData | null>(null);
+  // Monthly/annual toggle — annual is only selectable once the App Store
+  // Connect product exists (ANNUAL_PLAN_ENABLED).
+  const [plan, setPlan] = useState<'monthly' | 'annual'>('monthly');
 
   // Demo account should appear as premium (for App Store review)
   const isDemoAccount = user?.email === 'demo@represent.app';
-  const isVerified = isDemoAccount ? true : (user?.verified ?? false);
   // Premium is source-agnostic: the auth user's subscriptionStatus is
   // updated by BOTH the Stripe webhook and the Apple IAP receipt path.
   // The /api/stripe/subscription fetch below only knows about Stripe and
@@ -123,10 +107,6 @@ export default function SubscriptionScreen() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleGetVerified = async () => {
-    router.push('/modals/verification-payment');
   };
 
   const handleSubscribePremium = async () => {
@@ -179,188 +159,68 @@ export default function SubscriptionScreen() {
     router.push('/modals/create-organization');
   };
 
-  const getCurrentTier = (): 'free' | 'verified' | 'premium' => {
-    if (isPremium) return 'premium';
-    if (isVerified) return 'verified';
-    return 'free';
+  // "Or earn a free month — invite a friend" → the existing referral program.
+  // Shares the user's real code directly when one exists; otherwise generates
+  // one (backend only regenerates when none exists — same rule as
+  // InviteFriendsCard). Falls back to the Identity tab's referral card.
+  const handleReferralInvite = async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setActionLoading('referral');
+    try {
+      const stats = await referralsApi.stats();
+      let code = stats.data?.code;
+      if (!code || code === 'NO_CODE') {
+        const generated = await referralsApi.generate();
+        code = generated.data?.code;
+      }
+      if (code && code !== 'NO_CODE') {
+        await shareReferralInvite(code);
+      } else {
+        router.push('/(tabs)/profile');
+      }
+    } catch {
+      router.push('/(tabs)/profile');
+    } finally {
+      setActionLoading(null);
+    }
   };
 
-  const currentTier = getCurrentTier();
-
-  const renderTierCard = (
-    tierKey: 'free' | 'verified' | 'premium' | 'organization',
-    delay: number,
-    isHighlighted: boolean = false
-  ) => {
-    const tier = TIERS[tierKey];
-    const isCurrent = tierKey === currentTier;
-    const isOrgTier = tierKey === 'organization';
-
-    return (
-      <Animated.View
-        key={tierKey}
-        entering={FadeInUp.delay(delay).duration(400)}
-        style={[
-          styles.tierCard,
-          {
-            backgroundColor: colors.surface,
-            borderColor: isHighlighted ? colors.gold : colors.border,
-            borderWidth: isHighlighted ? 2 : 1,
-          },
-        ]}
-      >
-        {isHighlighted && (
-          <View style={[styles.bestValueBadge, { backgroundColor: colors.gold }]}>
-            <Text style={styles.bestValueText}>BEST VALUE</Text>
-          </View>
-        )}
-
-        <View style={styles.tierHeader}>
-          <View style={[
-            styles.tierIconContainer,
-            { backgroundColor: isHighlighted ? `${colors.gold}20` : `${colors.textSecondary}15` }
-          ]}>
-            <Ionicons
-              name={tier.icon}
-              size={24}
-              color={isHighlighted ? colors.gold : colors.textSecondary}
-            />
-          </View>
-          <View style={styles.tierInfo}>
-            <Text style={[styles.tierName, { color: isHighlighted ? colors.gold : colors.text }]}>
-              {tier.name}
-            </Text>
-            <Text style={[styles.tierDescription, { color: colors.textSecondary }]}>
-              {tier.description}
-            </Text>
-          </View>
-        </View>
-
-        <View style={styles.priceContainer}>
-          <Text style={[styles.tierPrice, { color: isHighlighted ? colors.gold : colors.text }]}>
-            {tier.price}
-          </Text>
-          <Text style={[styles.tierPeriod, { color: colors.textSecondary }]}>
-            {tier.period}
-          </Text>
-        </View>
-
-        <View style={styles.featuresList}>
-          {tier.features.map((feature, index) => (
-            <View key={index} style={styles.featureRow}>
-              <Ionicons
-                name={feature.included ? 'checkmark-circle' : 'close-circle'}
-                size={18}
-                color={feature.included ? colors.success : colors.textTertiary}
-              />
-              <Text
-                style={[
-                  styles.featureText,
-                  { color: feature.included ? colors.text : colors.textTertiary },
-                ]}
-              >
-                {feature.text}
-              </Text>
-            </View>
-          ))}
-        </View>
-
-        {isCurrent && !isOrgTier && (
-          <View style={[styles.currentBadge, { backgroundColor: `${colors.success}15` }]}>
-            <Ionicons name="checkmark-circle" size={16} color={colors.success} />
-            <Text style={[styles.currentText, { color: colors.success }]}>Current Plan</Text>
-          </View>
-        )}
-
-        {!isCurrent && !isOrgTier && tierKey !== 'free' && (
-          <TouchableOpacity
-            onPress={
-              tierKey === 'verified'
-                ? handleGetVerified
-                : tierKey === 'premium'
-                ? isPremium
-                  ? handleManageBilling
-                  : handleSubscribePremium
-                : undefined
-            }
-            disabled={actionLoading !== null}
-            style={[
-              styles.tierButton,
-              isHighlighted && styles.highlightedButton,
-            ]}
-          >
-            {isHighlighted ? (
-              <LinearGradient
-                colors={[colors.gold, colors.goldDark || '#A68523']}
-                style={styles.gradientButton}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-              >
-                {actionLoading === 'premium' ? (
-                  <ActivityIndicator size="small" color="#000" />
-                ) : (
-                  <>
-                    <Ionicons name="star" size={18} color="#000" />
-                    <Text style={styles.gradientButtonText}>
-                      {isPremium ? 'Manage Billing' : 'Subscribe Now'}
-                    </Text>
-                  </>
-                )}
-              </LinearGradient>
-            ) : (
-              <View
-                style={[
-                  styles.outlineButton,
-                  { borderColor: tierKey === 'verified' ? colors.success : colors.border },
-                ]}
-              >
-                {actionLoading === tierKey ? (
-                  <ActivityIndicator size="small" color={colors.success} />
-                ) : (
-                  <>
-                    <Ionicons
-                      name={tierKey === 'verified' ? 'shield-checkmark' : 'card-outline'}
-                      size={18}
-                      color={tierKey === 'verified' ? colors.success : colors.text}
-                    />
-                    <Text
-                      style={[
-                        styles.outlineButtonText,
-                        { color: tierKey === 'verified' ? colors.success : colors.text },
-                      ]}
-                    >
-                      {tierKey === 'verified' ? 'Get Verified' : 'Subscribe'}
-                    </Text>
-                  </>
-                )}
-              </View>
-            )}
-          </TouchableOpacity>
-        )}
-
-        {isOrgTier && (
-          <TouchableOpacity onPress={handleContactOrganizations} style={styles.tierButton}>
-            <View style={[styles.outlineButton, { borderColor: colors.gold }]}>
-              <Ionicons name="arrow-forward" size={18} color={colors.gold} />
-              <Text style={[styles.outlineButtonText, { color: colors.gold }]}>
-                Get Started
-              </Text>
-            </View>
-          </TouchableOpacity>
-        )}
-      </Animated.View>
-    );
+  const selectPlan = (next: 'monthly' | 'annual') => {
+    if (next === 'annual' && !ANNUAL_PLAN_ENABLED) return;
+    Haptics.selectionAsync();
+    setPlan(next);
   };
 
+  const renewsLabel = subscription?.endDate
+    ? new Date(subscription.endDate)
+        .toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' })
+        .toUpperCase()
+    : null;
+  const renewsSentence = subscription?.endDate
+    ? new Date(subscription.endDate).toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+      })
+    : null;
+
+  const goldBorderStrong = 'rgba(234, 186, 88, 0.5)';
+  const goldBorderMid = 'rgba(234, 186, 88, 0.25)';
+
+  // ── Loading ────────────────────────────────────────────────────────────────
   if (loading) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <View style={[styles.header, { borderBottomColor: colors.border, paddingTop: insets.top + 8 }]}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-            <Ionicons name="close" size={24} color={colors.text} />
+        <View style={[styles.topRow, { paddingTop: insets.top + 8 }]}>
+          <View style={{ width: 36 }} />
+          <TouchableOpacity
+            onPress={() => router.back()}
+            style={[styles.closeBtn, { backgroundColor: colors.surface, borderColor: colors.borderSubtle }]}
+            accessibilityRole="button"
+            accessibilityLabel="Close"
+          >
+            <Ionicons name="close" size={16} color={colors.textSecondary} />
           </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: colors.text }]}>Choose Your Plan</Text>
-          <View style={{ width: 40 }} />
         </View>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.gold} />
@@ -369,85 +229,430 @@ export default function SubscriptionScreen() {
     );
   }
 
+  // ── S1c · Already premium — manage state, no re-sell ──────────────────────
+  if (isPremium) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <ScrollView
+          style={styles.content}
+          contentContainerStyle={{ paddingBottom: insets.bottom + 34 }}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={[styles.topRow, { paddingTop: insets.top + 8 }]}>
+            <TouchableOpacity
+              onPress={() => router.back()}
+              style={[styles.closeBtn, { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.surface, borderColor: colors.borderSubtle }]}
+              accessibilityRole="button"
+              accessibilityLabel="Back"
+            >
+              <Ionicons name="chevron-back" size={20} color={colors.textSecondary} />
+            </TouchableOpacity>
+            <View style={[styles.premiumChip, { backgroundColor: colors.goldSurface, borderColor: goldBorderMid }]}>
+              <Ionicons name="checkmark" size={11} color={colors.gold} />
+              <Text style={[styles.premiumChipText, { color: colors.gold }]}>PREMIUM</Text>
+            </View>
+          </View>
+
+          <Animated.View entering={FadeInDown.duration(400)} style={styles.heroCol}>
+            <Text style={[styles.manageTitle, { color: colors.text }]}>Your Premium</Text>
+            <Text style={[styles.manageSub, { color: colors.textSecondary }]}>
+              Thank you for keeping the count independent.
+            </Text>
+          </Animated.View>
+
+          {/* Membership card — the credential's visual language, mono facts */}
+          <Animated.View
+            entering={FadeInUp.delay(100).duration(400)}
+            style={[styles.membershipCard, { backgroundColor: colors.surface, borderColor: 'rgba(234, 186, 88, 0.4)' }]}
+          >
+            <View style={styles.membershipHead}>
+              <Text style={[styles.membershipEyebrow, { color: colors.gold }]}>MEMBERSHIP</Text>
+              {isDemoAccount && (
+                <Text style={[styles.membershipMeta, { color: colors.textTertiary }]}>DEMO ACCOUNT</Text>
+              )}
+            </View>
+            <View style={styles.membershipRows}>
+              <View style={styles.membershipRow}>
+                <Text style={[styles.membershipKey, { color: colors.textTertiary }]}>PLAN</Text>
+                <Text style={[styles.membershipVal, { color: colors.text }]}>
+                  MONTHLY · {MONTHLY_PRICE}/MO
+                </Text>
+              </View>
+              {renewsLabel ? (
+                <View style={styles.membershipRow}>
+                  <Text style={[styles.membershipKey, { color: colors.textTertiary }]}>RENEWS</Text>
+                  <Text style={[styles.membershipVal, { color: colors.text }]}>{renewsLabel}</Text>
+                </View>
+              ) : (
+                <View style={styles.membershipRow}>
+                  <Text style={[styles.membershipKey, { color: colors.textTertiary }]}>STATUS</Text>
+                  <Text style={[styles.membershipVal, { color: colors.text }]}>ACTIVE</Text>
+                </View>
+              )}
+              <View style={styles.membershipRow}>
+                <Text style={[styles.membershipKey, { color: colors.textTertiary }]}>SENTINEL</Text>
+                <Text style={[styles.membershipVal, { color: colors.text }]}>
+                  {SENTINEL_PREMIUM_PER_DAY}/DAY
+                </Text>
+              </View>
+              <View style={styles.membershipRow}>
+                <Text style={[styles.membershipKey, { color: colors.textTertiary }]}>ACTIVE PROPOSALS</Text>
+                <Text style={[styles.membershipVal, { color: colors.text }]}>UNLIMITED</Text>
+              </View>
+            </View>
+          </Animated.View>
+
+          {/* Patron badge */}
+          <Animated.View
+            entering={FadeInUp.delay(160).duration(400)}
+            style={[styles.patronCard, { backgroundColor: colors.surface, borderColor: colors.borderSubtle }]}
+          >
+            <View style={[styles.patronTile, { backgroundColor: colors.goldSurface }]}>
+              <Ionicons name="shield-checkmark-outline" size={19} color={colors.gold} />
+            </View>
+            <View style={{ flex: 1, gap: 1 }}>
+              <Text style={[styles.patronTitle, { color: colors.text }]}>Patron badge active</Text>
+              <Text style={[styles.patronSub, { color: colors.textTertiary }]}>
+                Shown on your civic credential
+              </Text>
+            </View>
+          </Animated.View>
+
+          {/* Management rows — plain, no sell */}
+          <Animated.View
+            entering={FadeInUp.delay(220).duration(400)}
+            style={[styles.manageList, { backgroundColor: colors.surface, borderColor: colors.borderSubtle }]}
+          >
+            <TouchableOpacity
+              style={[styles.manageRow, { borderBottomColor: colors.borderSubtle }]}
+              onPress={handleManageBilling}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel="Manage in App Store"
+            >
+              <Text style={[styles.manageRowText, { color: colors.text }]}>
+                Manage in {Platform.OS === 'ios' ? 'App Store' : 'Google Play'}
+              </Text>
+              <Text style={[styles.manageRowArrow, { color: colors.textTertiary }]}>→</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.manageRow,
+                Platform.OS === 'ios'
+                  ? { borderBottomColor: colors.borderSubtle }
+                  : { borderBottomWidth: 0 },
+              ]}
+              onPress={handleReferralInvite}
+              disabled={actionLoading !== null}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel="Invite a friend"
+            >
+              <Text style={[styles.manageRowText, { color: colors.text }]}>
+                Invite a friend — you both earn a month
+              </Text>
+              {actionLoading === 'referral' ? (
+                <ActivityIndicator size="small" color={colors.textTertiary} />
+              ) : (
+                <Text style={[styles.manageRowArrow, { color: colors.textTertiary }]}>→</Text>
+              )}
+            </TouchableOpacity>
+            {Platform.OS === 'ios' && (
+              <TouchableOpacity
+                style={[styles.manageRow, { borderBottomWidth: 0 }]}
+                onPress={handleRestorePurchases}
+                disabled={actionLoading !== null}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel="Restore purchases"
+              >
+                <Text style={[styles.manageRowText, { color: colors.text }]}>Restore Purchases</Text>
+                {actionLoading === 'restore' ? (
+                  <ActivityIndicator size="small" color={colors.textTertiary} />
+                ) : (
+                  <Text style={[styles.manageRowArrow, { color: colors.textTertiary }]}>→</Text>
+                )}
+              </TouchableOpacity>
+            )}
+          </Animated.View>
+
+          <Animated.Text
+            entering={FadeInUp.delay(280).duration(400)}
+            style={[styles.cancelNote, { color: colors.textTertiary }]}
+          >
+            {renewsSentence
+              ? `Cancelling keeps Premium until ${renewsSentence}. Your votes, record, and verification are never affected.`
+              : 'Cancelling keeps Premium until the end of your billing period. Your votes, record, and verification are never affected.'}
+          </Animated.Text>
+        </ScrollView>
+      </View>
+    );
+  }
+
+  // ── S1a · Free user — the sell ─────────────────────────────────────────────
+  const ctaLabel =
+    ANNUAL_PLAN_ENABLED && plan === 'annual'
+      ? `Start Premium — ${ANNUAL_PRICE}/yr`
+      : `Start Premium — ${MONTHLY_PRICE}/mo`;
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={[styles.header, { borderBottomColor: colors.border, paddingTop: insets.top + 8 }]}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="close" size={24} color={colors.text} />
-        </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>Choose Your Plan</Text>
-        <View style={{ width: 40 }} />
-      </View>
+      <ScrollView
+        style={styles.content}
+        contentContainerStyle={{ paddingBottom: insets.bottom + 34 }}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={[styles.topRow, { paddingTop: insets.top + 8 }]}>
+          <View style={{ width: 36 }} />
+          <TouchableOpacity
+            onPress={() => router.back()}
+            style={[styles.closeBtn, { backgroundColor: colors.surface, borderColor: colors.borderSubtle }]}
+            accessibilityRole="button"
+            accessibilityLabel="Close"
+          >
+            <Ionicons name="close" size={16} color={colors.textSecondary} />
+          </TouchableOpacity>
+        </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        <Animated.View entering={FadeInDown.duration(400)} style={styles.heroSection}>
+        {/* Eyebrow + serif statement */}
+        <Animated.View entering={FadeInDown.duration(400)} style={styles.heroCol}>
+          <Text style={[styles.eyebrow, { color: colors.gold }]}>REPRESENT PREMIUM</Text>
           <Text style={[styles.heroTitle, { color: colors.text }]}>
-            Unlock Your Full Voice
-          </Text>
-          <Text style={[styles.heroSubtitle, { color: colors.textSecondary }]}>
-            Choose the plan that fits your civic engagement needs
+            Sharpen your voice. Keep the count independent.
           </Text>
         </Animated.View>
 
-        {renderTierCard('free', 100)}
-        {renderTierCard('verified', 200)}
-        {renderTierCard('premium', 300, true)}
-        {renderTierCard('organization', 400)}
+        {/* Plan cards. Monthly-only until the annual App Store Connect product
+            exists (ANNUAL_PLAN_ENABLED) — then this renders the s1b two-card
+            toggle with the gold "2 MONTHS FREE" chip. */}
+        <Animated.View entering={FadeInUp.delay(80).duration(400)} style={styles.planRow}>
+          <TouchableOpacity
+            style={[
+              styles.planCard,
+              {
+                backgroundColor: colors.surface,
+                borderColor: plan === 'monthly' ? goldBorderStrong : colors.border,
+                borderWidth: plan === 'monthly' ? 1.5 : 1,
+              },
+            ]}
+            onPress={() => selectPlan('monthly')}
+            activeOpacity={0.85}
+            accessibilityRole="button"
+            accessibilityLabel="Monthly plan, $7.99 per month"
+            accessibilityState={{ selected: plan === 'monthly' }}
+          >
+            {ANNUAL_PLAN_ENABLED && plan === 'monthly' && (
+              <View style={[styles.selectedChip, { backgroundColor: colors.goldFill }]}>
+                <Text style={styles.selectedChipText}>SELECTED</Text>
+              </View>
+            )}
+            <Text style={[styles.planLabel, { color: colors.textTertiary }]}>MONTHLY</Text>
+            <Text style={[styles.planPrice, { color: colors.text }]}>
+              {MONTHLY_PRICE}
+              <Text style={[styles.planPeriod, { color: colors.textTertiary }]}>/mo</Text>
+            </Text>
+          </TouchableOpacity>
 
-        {/* Restore Purchases (iOS only) */}
-        {Platform.OS === 'ios' && (
-          <Animated.View entering={FadeInUp.delay(450).duration(400)}>
+          {ANNUAL_PLAN_ENABLED && (
             <TouchableOpacity
-              onPress={handleRestorePurchases}
-              disabled={actionLoading !== null}
-              style={styles.restoreButton}
+              style={[
+                styles.planCard,
+                {
+                  backgroundColor: colors.surface,
+                  borderColor: plan === 'annual' ? goldBorderStrong : colors.border,
+                  borderWidth: plan === 'annual' ? 1.5 : 1,
+                },
+              ]}
+              onPress={() => selectPlan('annual')}
+              activeOpacity={0.85}
+              accessibilityRole="button"
+              accessibilityLabel="Annual plan, $79 per year, two months free"
+              accessibilityState={{ selected: plan === 'annual' }}
             >
-              {actionLoading === 'restore' ? (
-                <ActivityIndicator size="small" color={colors.textSecondary} />
+              {plan === 'annual' ? (
+                <View style={[styles.selectedChip, { backgroundColor: colors.goldFill }]}>
+                  <Text style={styles.selectedChipText}>SELECTED</Text>
+                </View>
               ) : (
-                <Text style={[styles.restoreText, { color: colors.textSecondary }]}>
-                  Restore Purchases
+                <View style={[styles.freeMonthsChip, { backgroundColor: colors.goldSurface, borderColor: goldBorderMid }]}>
+                  <Text style={[styles.freeMonthsChipText, { color: colors.gold }]}>2 MONTHS FREE</Text>
+                </View>
+              )}
+              <Text style={[styles.planLabel, { color: colors.textTertiary }]}>ANNUAL</Text>
+              <Text style={[styles.planPrice, { color: colors.text }]}>
+                {ANNUAL_PRICE}
+                <Text style={[styles.planPeriod, { color: colors.textTertiary }]}>/yr</Text>
+              </Text>
+              {plan === 'annual' && (
+                <Text style={[styles.planEffective, { color: colors.gold }]}>
+                  = $6.58/MO · 2 MONTHS FREE
                 </Text>
               )}
             </TouchableOpacity>
-          </Animated.View>
-        )}
+          )}
+        </Animated.View>
 
-        {/* Legal disclosure — required on the purchase screen by Apple
-            (Guideline 3.1.2) and good practice on Android. */}
-        <Animated.View entering={FadeInUp.delay(475).duration(400)} style={styles.legalFooter}>
-          <Text style={[styles.legalFooterText, { color: colors.textTertiary }]}>
-            Subscriptions auto-renew until canceled in {Platform.OS === 'ios' ? 'App Store settings' : 'Google Play settings'}. By subscribing you agree to our{' '}
-            <Text
-              style={[styles.legalLink, { color: colors.text }]}
-              onPress={() => Linking.openURL('https://representportal.com/terms')}
+        {/* Feature ledger — real mono numbers against the free counterpart */}
+        <Animated.View
+          entering={FadeInUp.delay(140).duration(400)}
+          style={[styles.featureList, { backgroundColor: colors.surface, borderColor: colors.borderSubtle }]}
+        >
+          {FEATURE_ROWS.map((row, i) => (
+            <View
+              key={row.label}
+              style={[
+                styles.featureRow,
+                i < FEATURE_ROWS.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.borderSubtle },
+              ]}
             >
-              Terms
-            </Text>
-            {' and '}
-            <Text
-              style={[styles.legalLink, { color: colors.text }]}
-              onPress={() => Linking.openURL('https://representportal.com/privacy')}
-            >
-              Privacy Policy
-            </Text>
-            .
+              <Text style={[styles.featureLabel, { color: colors.text }]}>{row.label}</Text>
+              {row.check ? (
+                <Ionicons name="checkmark" size={14} color={colors.gold} />
+              ) : (
+                <Text style={[styles.featureValue, { color: colors.gold }]}>
+                  {row.value}
+                  {row.valueDim ? (
+                    <Text style={{ color: colors.textTertiary }}>{row.valueDim}</Text>
+                  ) : null}
+                </Text>
+              )}
+            </View>
+          ))}
+        </Animated.View>
+
+        {/* Mission card — the emotional core */}
+        <Animated.View
+          entering={FadeInUp.delay(200).duration(400)}
+          style={[styles.missionCard, { backgroundColor: colors.goldSurface, borderColor: goldBorderMid }]}
+        >
+          <Ionicons name="shield-outline" size={17} color={colors.gold} style={{ marginTop: 2 }} />
+          <Text style={[styles.missionText, { color: colors.textSecondary }]}>
+            <Text style={[styles.missionLead, { color: colors.text }]}>
+              Premium keeps Represent independent.
+            </Text>{' '}
+            No ads. No data sales. One person, one ballot — forever.
           </Text>
         </Animated.View>
 
-        {/* FAQ Section */}
+        {/* What stays free forever — voting is never paid */}
+        <Animated.View entering={FadeInUp.delay(250).duration(400)} style={styles.freeForeverCol}>
+          <Text style={[styles.freeForeverLabel, { color: colors.textTertiary }]}>FREE FOREVER</Text>
+          <View style={styles.freeForeverChips}>
+            {FREE_FOREVER_CHIPS.map((chip) => (
+              <View
+                key={chip}
+                style={[styles.freeChip, { backgroundColor: colors.surface, borderColor: colors.borderSubtle }]}
+              >
+                <Text style={[styles.freeChipText, { color: colors.textSecondary }]}>{chip}</Text>
+              </View>
+            ))}
+          </View>
+        </Animated.View>
+
+        {/* Organizations pointer — org plans are never sold on the personal paywall */}
+        <Animated.View entering={FadeInUp.delay(300).duration(400)}>
+          <TouchableOpacity
+            style={[styles.orgCard, { backgroundColor: colors.surface, borderColor: colors.borderSubtle }]}
+            onPress={handleContactOrganizations}
+            activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel="Organization governance plans"
+          >
+            <View style={{ flex: 1, gap: 2 }}>
+              <Text style={[styles.orgTitle, { color: colors.text }]}>Running an organization?</Text>
+              <Text style={[styles.orgSub, { color: colors.textTertiary }]}>
+                Org governance plans · $29–299/mo
+              </Text>
+            </View>
+            <Text style={[styles.orgArrow, { color: colors.textSecondary }]}>→</Text>
+          </TouchableOpacity>
+        </Animated.View>
+
+        {/* CTA + referral alternative + footer links */}
+        <Animated.View entering={FadeInUp.delay(350).duration(400)} style={styles.ctaCol}>
+          <TouchableOpacity
+            style={[styles.cta, { backgroundColor: colors.goldFill }]}
+            onPress={handleSubscribePremium}
+            disabled={actionLoading !== null}
+            activeOpacity={0.85}
+            accessibilityRole="button"
+            accessibilityLabel={ctaLabel}
+          >
+            {actionLoading === 'premium' ? (
+              <ActivityIndicator size="small" color="#040707" />
+            ) : (
+              <Text style={styles.ctaText}>{ctaLabel}</Text>
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={handleReferralInvite}
+            disabled={actionLoading !== null}
+            style={styles.referralRow}
+            activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel="Earn a free month by inviting a friend"
+          >
+            {actionLoading === 'referral' ? (
+              <ActivityIndicator size="small" color={colors.textSecondary} />
+            ) : (
+              <Text style={[styles.referralText, { color: colors.textSecondary }]}>
+                Or earn a free month — invite a friend →
+              </Text>
+            )}
+          </TouchableOpacity>
+
+          <View style={styles.footerLinks}>
+            {Platform.OS === 'ios' && (
+              <>
+                <TouchableOpacity
+                  onPress={handleRestorePurchases}
+                  disabled={actionLoading !== null}
+                  accessibilityRole="button"
+                  accessibilityLabel="Restore purchases"
+                >
+                  {actionLoading === 'restore' ? (
+                    <ActivityIndicator size="small" color={colors.textTertiary} />
+                  ) : (
+                    <Text style={[styles.footerLinkText, { color: colors.textTertiary }]}>
+                      Restore Purchases
+                    </Text>
+                  )}
+                </TouchableOpacity>
+                <Text style={[styles.footerLinkText, { color: colors.textTertiary }]}>·</Text>
+              </>
+            )}
+            <Text style={[styles.footerLinkText, { color: colors.textTertiary }]}>
+              Billed via {Platform.OS === 'ios' ? 'App Store' : 'Google Play'} · cancel anytime
+            </Text>
+          </View>
+        </Animated.View>
+
+        {/* Apple Guideline 3.1.2 disclosure — required on the purchase screen */}
+        <Animated.View entering={FadeInUp.delay(400).duration(400)}>
+          <SubscriptionLegal
+            mode="subscription"
+            productTitle="Premium"
+            productLength={ANNUAL_PLAN_ENABLED && plan === 'annual' ? '1 year' : '1 month'}
+            productPrice={ANNUAL_PLAN_ENABLED && plan === 'annual' ? ANNUAL_PRICE : MONTHLY_PRICE}
+          />
+        </Animated.View>
+
+        {/* FAQ */}
         <Animated.View
-          entering={FadeInUp.delay(500).duration(400)}
-          style={[styles.faqSection, { backgroundColor: colors.surface, borderColor: colors.border }]}
+          entering={FadeInUp.delay(450).duration(400)}
+          style={[styles.faqSection, { backgroundColor: colors.surface, borderColor: colors.borderSubtle }]}
         >
           <Text style={[styles.faqTitle, { color: colors.text }]}>Frequently Asked Questions</Text>
 
           <View style={styles.faqItem}>
             <Text style={[styles.faqQuestion, { color: colors.text }]}>
-              What's the difference between Verified and Premium?
+              Is verification part of Premium?
             </Text>
             <Text style={[styles.faqAnswer, { color: colors.textSecondary }]}>
-              Verified (free) unlocks geo-restricted voting and proposals. Premium ($7.99/mo) includes verification plus analytics, unlimited proposals, and priority visibility.
+              No — verification is an identity status and it's free forever. Premium adds tools on
+              top: Sentinel analysis, full analytics, unlimited proposal creation, alerts, and
+              export.
             </Text>
           </View>
 
@@ -456,7 +661,8 @@ export default function SubscriptionScreen() {
               Can I cancel Premium anytime?
             </Text>
             <Text style={[styles.faqAnswer, { color: colors.textSecondary }]}>
-              Yes, cancel anytime with no questions asked. You'll keep Verified status after canceling.
+              Yes, cancel anytime with no questions asked. Your votes, record, and verification are
+              never affected.
             </Text>
           </View>
 
@@ -465,7 +671,9 @@ export default function SubscriptionScreen() {
               What payment methods do you accept?
             </Text>
             <Text style={[styles.faqAnswer, { color: colors.textSecondary }]}>
-              On iOS, subscriptions are processed through Apple In-App Purchase. On Android, through Stripe (cards, Apple Pay, Google Pay). All transactions complete inside the app — no redirects to external websites.
+              On iOS, subscriptions are processed through Apple In-App Purchase. On Android, through
+              Stripe (cards, Apple Pay, Google Pay). All transactions complete inside the app — no
+              redirects to external websites.
             </Text>
           </View>
 
@@ -474,12 +682,11 @@ export default function SubscriptionScreen() {
               How does organization verification work?
             </Text>
             <Text style={[styles.faqAnswer, { color: colors.textSecondary }]}>
-              Organization members verify via invite codes - no individual KYC needed for internal proposals.
+              Organization members verify via invite codes - no individual KYC needed for internal
+              proposals.
             </Text>
           </View>
         </Animated.View>
-
-        <View style={{ height: 40 }} />
       </ScrollView>
     </View>
   );
@@ -489,188 +696,239 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: SPACING.lg,
-    paddingTop: SPACING.xl,
-    paddingBottom: SPACING.md,
-    borderBottomWidth: 1,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    fontFamily: FONTS.serif,
-    fontSize: 20,
-  },
   content: {
     flex: 1,
-    padding: SPACING.lg,
+    paddingHorizontal: 26,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  heroSection: {
+  topRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: SPACING.xl,
-    paddingTop: SPACING.md,
+    paddingBottom: 12,
+  },
+  closeBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  heroCol: {
+    gap: 5,
+    marginBottom: 14,
+  },
+  eyebrow: {
+    fontFamily: FONTS.sansSemiBold,
+    fontSize: 10.5,
+    letterSpacing: 2.1,
   },
   heroTitle: {
     fontFamily: FONTS.serif,
-    fontSize: responsive(24, 26, 28),
-    textAlign: 'center',
-    marginBottom: SPACING.xs,
+    fontSize: 31,
+    lineHeight: 35,
+    letterSpacing: -0.37,
   },
-  heroSubtitle: {
-    ...TYPOGRAPHY.bodyMedium,
-    textAlign: 'center',
-  },
-  tierCard: {
-    borderRadius: BORDER_RADIUS['2xl'],
-    padding: SPACING.lg,
-    marginBottom: SPACING.lg,
-    ...SHADOWS.md,
-  },
-  bestValueBadge: {
-    position: 'absolute',
-    top: -12,
-    alignSelf: 'center',
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.xxs,
-    borderRadius: BORDER_RADIUS.full,
-  },
-  bestValueText: {
-    ...TYPOGRAPHY.labelSmall,
-    color: '#000',
-    fontFamily: FONTS.sansSemiBold,
-    letterSpacing: 1,
-  },
-  tierHeader: {
+  // Plan cards
+  planRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: SPACING.md,
+    gap: 9,
+    marginBottom: 14,
   },
-  tierIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: SPACING.md,
-  },
-  tierInfo: {
+  planCard: {
     flex: 1,
+    borderRadius: 16,
+    paddingVertical: 13,
+    paddingHorizontal: 15,
+    gap: 2,
   },
-  tierName: {
-    fontFamily: FONTS.serif,
-    fontSize: 18,
-    marginBottom: 2,
+  selectedChip: {
+    position: 'absolute',
+    top: -9,
+    left: 13,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 100,
   },
-  tierDescription: {
-    ...TYPOGRAPHY.bodySmall,
+  selectedChipText: {
+    fontFamily: FONTS.sansSemiBold,
+    fontSize: 8.5,
+    letterSpacing: 1.02,
+    color: '#040707',
   },
-  priceContainer: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    marginBottom: SPACING.lg,
+  freeMonthsChip: {
+    position: 'absolute',
+    top: -9,
+    right: 13,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 100,
+    borderWidth: 1,
   },
-  tierPrice: {
-    fontFamily: FONTS.mono,
-    fontSize: responsive(28, 32, 36),
+  freeMonthsChipText: {
+    fontFamily: FONTS.monoSemiBold,
+    fontSize: 8.5,
+    letterSpacing: 0.85,
     fontVariant: ['tabular-nums'],
   },
-  tierPeriod: {
-    ...TYPOGRAPHY.bodyMedium,
-    marginLeft: SPACING.xs,
+  planLabel: {
+    fontFamily: FONTS.sansSemiBold,
+    fontSize: 9.5,
+    letterSpacing: 1.33,
   },
-  featuresList: {
-    gap: SPACING.sm,
-    marginBottom: SPACING.lg,
+  planPrice: {
+    fontFamily: FONTS.monoSemiBold,
+    fontSize: 20,
+    fontVariant: ['tabular-nums'],
+  },
+  planPeriod: {
+    fontFamily: FONTS.sans,
+    fontSize: 11,
+  },
+  planEffective: {
+    fontFamily: FONTS.mono,
+    fontSize: 9.5,
+    fontVariant: ['tabular-nums'],
+  },
+  // Feature ledger
+  featureList: {
+    borderWidth: 1,
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 3,
+    marginBottom: 12,
   },
   featureRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: SPACING.sm,
+    justifyContent: 'space-between',
+    paddingVertical: 10,
+    gap: 10,
   },
-  featureText: {
-    ...TYPOGRAPHY.bodySmall,
-    flex: 1,
-  },
-  currentBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: SPACING.xs,
-    paddingVertical: SPACING.md,
-    borderRadius: BORDER_RADIUS.lg,
-  },
-  currentText: {
-    ...TYPOGRAPHY.labelMedium,
-  },
-  tierButton: {
-    marginTop: SPACING.xs,
-  },
-  highlightedButton: {},
-  gradientButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: SPACING.md,
-    borderRadius: BORDER_RADIUS.lg,
-    gap: SPACING.sm,
-  },
-  gradientButtonText: {
-    ...TYPOGRAPHY.labelLarge,
-    color: '#000',
-  },
-  outlineButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: SPACING.md,
-    borderRadius: BORDER_RADIUS.lg,
-    borderWidth: 1.5,
-    gap: SPACING.sm,
-  },
-  outlineButtonText: {
-    ...TYPOGRAPHY.labelMedium,
-  },
-  restoreButton: {
-    alignItems: 'center',
-    paddingVertical: SPACING.md,
-    marginBottom: SPACING.md,
-  },
-  restoreText: {
-    ...TYPOGRAPHY.labelMedium,
+  featureLabel: {
     fontFamily: FONTS.sansMedium,
+    fontSize: 12.5,
+    flexShrink: 1,
   },
-  legalFooter: {
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
-    marginBottom: SPACING.md,
+  featureValue: {
+    fontFamily: FONTS.mono,
+    fontSize: 11,
+    fontVariant: ['tabular-nums'],
   },
-  legalFooterText: {
+  // Mission card
+  missionCard: {
+    borderWidth: 1,
+    borderRadius: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+    marginBottom: 14,
+  },
+  missionText: {
+    flex: 1,
+    fontFamily: FONTS.sans,
+    fontSize: 12.5,
+    lineHeight: 19.5,
+  },
+  missionLead: {
+    fontFamily: FONTS.sansSemiBold,
+  },
+  // Free forever
+  freeForeverCol: {
+    gap: 6,
+    marginBottom: 14,
+  },
+  freeForeverLabel: {
+    fontFamily: FONTS.sansSemiBold,
+    fontSize: 9.5,
+    letterSpacing: 1.33,
+  },
+  freeForeverChips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 7,
+  },
+  freeChip: {
+    borderWidth: 1,
+    borderRadius: 100,
+    paddingVertical: 6,
+    paddingHorizontal: 11,
+  },
+  freeChipText: {
+    fontFamily: FONTS.sansMedium,
+    fontSize: 10.5,
+  },
+  // Organizations pointer
+  orgCard: {
+    borderWidth: 1,
+    borderRadius: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 16,
+  },
+  orgTitle: {
+    fontFamily: FONTS.sansSemiBold,
+    fontSize: 13,
+  },
+  orgSub: {
     fontFamily: FONTS.sans,
     fontSize: 11.5,
-    lineHeight: 17,
-    textAlign: 'center',
   },
-  legalLink: {
-    textDecorationLine: 'underline',
+  orgArrow: {
     fontFamily: FONTS.sansMedium,
+    fontSize: 13,
   },
+  // CTA block
+  ctaCol: {
+    gap: 8,
+  },
+  cta: {
+    height: 54,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  ctaText: {
+    fontFamily: FONTS.sansSemiBold,
+    fontSize: 16.5,
+    color: '#040707',
+  },
+  referralRow: {
+    alignItems: 'center',
+    paddingVertical: 2,
+    minHeight: 20,
+    justifyContent: 'center',
+  },
+  referralText: {
+    fontFamily: FONTS.sans,
+    fontSize: 11,
+  },
+  footerLinks: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 8,
+  },
+  footerLinkText: {
+    fontFamily: FONTS.sans,
+    fontSize: 10.5,
+  },
+  // FAQ
   faqSection: {
-    borderRadius: BORDER_RADIUS['2xl'],
+    borderRadius: 18,
     borderWidth: 1,
     padding: SPACING.lg,
-    marginTop: SPACING.md,
+    marginTop: SPACING.lg,
   },
   faqTitle: {
     fontFamily: FONTS.serif,
@@ -681,11 +939,139 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.lg,
   },
   faqQuestion: {
-    ...TYPOGRAPHY.labelMedium,
-    marginBottom: SPACING.xs,
+    fontFamily: FONTS.sansSemiBold,
+    fontSize: 13.5,
+    marginBottom: 4,
   },
   faqAnswer: {
-    ...TYPOGRAPHY.bodySmall,
+    fontFamily: FONTS.sans,
+    fontSize: 12.5,
     lineHeight: 20,
+  },
+  // S1c manage state
+  premiumChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 6,
+    paddingHorizontal: 11,
+    borderRadius: 100,
+    borderWidth: 1,
+  },
+  premiumChipText: {
+    fontFamily: FONTS.sansSemiBold,
+    fontSize: 9.5,
+    letterSpacing: 1.33,
+  },
+  manageTitle: {
+    fontFamily: FONTS.serif,
+    fontSize: 30,
+    lineHeight: 34,
+    letterSpacing: -0.36,
+  },
+  manageSub: {
+    fontFamily: FONTS.sans,
+    fontSize: 13.5,
+    lineHeight: 20,
+  },
+  membershipCard: {
+    borderWidth: 1,
+    borderRadius: 20,
+    padding: 20,
+    gap: 13,
+    marginBottom: 14,
+  },
+  membershipHead: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  membershipEyebrow: {
+    fontFamily: FONTS.monoSemiBold,
+    fontSize: 9.5,
+    letterSpacing: 1.9,
+    fontVariant: ['tabular-nums'],
+  },
+  membershipMeta: {
+    fontFamily: FONTS.mono,
+    fontSize: 10.5,
+    fontVariant: ['tabular-nums'],
+  },
+  membershipRows: {
+    gap: 8,
+  },
+  membershipRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 10,
+  },
+  membershipKey: {
+    fontFamily: FONTS.mono,
+    fontSize: 11,
+    fontVariant: ['tabular-nums'],
+  },
+  membershipVal: {
+    fontFamily: FONTS.mono,
+    fontSize: 11,
+    fontVariant: ['tabular-nums'],
+    flexShrink: 1,
+    textAlign: 'right',
+  },
+  patronCard: {
+    borderWidth: 1,
+    borderRadius: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 13,
+    marginBottom: 14,
+  },
+  patronTile: {
+    width: 40,
+    height: 40,
+    borderRadius: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  patronTitle: {
+    fontFamily: FONTS.sansSemiBold,
+    fontSize: 13.5,
+  },
+  patronSub: {
+    fontFamily: FONTS.sans,
+    fontSize: 11.5,
+  },
+  manageList: {
+    borderWidth: 1,
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 4,
+    marginBottom: 16,
+  },
+  manageRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 13,
+    borderBottomWidth: 1,
+    gap: 10,
+  },
+  manageRowText: {
+    fontFamily: FONTS.sansMedium,
+    fontSize: 13.5,
+    flexShrink: 1,
+  },
+  manageRowArrow: {
+    fontFamily: FONTS.sansMedium,
+    fontSize: 13,
+  },
+  cancelNote: {
+    fontFamily: FONTS.sans,
+    fontSize: 11.5,
+    lineHeight: 17,
+    textAlign: 'center',
+    paddingHorizontal: 8,
   },
 });

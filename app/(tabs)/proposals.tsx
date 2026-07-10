@@ -88,7 +88,16 @@ function useProposalColors() {
   };
 }
 import { showVoteConfirmation } from '../../lib/notifications';
-import { VoteConfirmationOverlay, UpgradeModal, TallyBar, HowVotingWorksSheet } from '../../components/ui';
+import {
+  VoteConfirmationOverlay,
+  UpgradeModal,
+  TallyBar,
+  HowVotingWorksSheet,
+  PremiumPromoSheet,
+  shouldShowPromo,
+  markPromoShown,
+} from '../../components/ui';
+import type { PremiumPromoContext } from '../../components/ui';
 import { checkForNewBadges } from '../../lib/badgeNotification';
 import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -749,6 +758,13 @@ export default function ProposalsScreen() {
   const [createStep, setCreateStep] = useState<1 | 2>(1);
   // P3 · How voting works rules sheet (opened from the vote queue).
   const [showHowVoting, setShowHowVoting] = useState(false);
+
+  // S2 · Premium promo sheet (momentum after a confirmed cast, creation gate
+  // when the one-active-proposal limit is hit). Never shown to premium users.
+  const [promoSheet, setPromoSheet] = useState<{
+    variant: 'momentum' | 'creation-gate';
+    context?: PremiumPromoContext;
+  } | null>(null);
 
   const [userCountry, setUserCountry] = useState('');
   const [userState, setUserState] = useState('');
@@ -1461,6 +1477,53 @@ export default function ProposalsScreen() {
     }
   };
 
+  // ── S2 promo triggers ──────────────────────────────────────────────────────
+  const isPremiumMember = !!user?.isPremium || user?.subscriptionStatus === 'active';
+
+  // Mono close-date label for the creation-gate sheet ("AUG 15"). Undefined
+  // when the proposal has no (future) deadline — the sheet then falls back
+  // to a plain "Not now" dismiss instead of inventing a date.
+  const promoCloseLabel = (p?: Proposal): string | undefined => {
+    if (!p?.deadline) return undefined;
+    const t = new Date(p.deadline).getTime();
+    if (Number.isNaN(t) || t <= Date.now()) return undefined;
+    return new Date(t)
+      .toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+      .toUpperCase();
+  };
+
+  // Creation gate (S2c) — contextual explanation of the one-active-proposal
+  // limit, allowed to bypass the weekly promo cap because the user directly
+  // hit the gate. Only ever called on the non-premium path.
+  const openCreationGateSheet = (active?: Proposal) => {
+    markPromoShown('creation-gate');
+    setPromoSheet({
+      variant: 'creation-gate',
+      context: {
+        activeProposalTitle: active?.title,
+        activeProposalCloses: promoCloseLabel(active),
+      },
+    });
+  };
+
+  // Momentum promo (S2a) — fires only AFTER the X1 seal sheet fully dismisses
+  // from a confirmed cast (never stacked on the seal), only for non-premium
+  // users, only when the real recorded-ballot count hits a multiple of 5,
+  // and at most once a week across all promos (shouldShowPromo).
+  const maybeShowMomentumPromo = (wasConfirmed: boolean) => {
+    if (!wasConfirmed) return;
+    if (isPremiumMember || user?.email === 'demo@represent.app') return;
+    const ballotCount = votedProposals.size;
+    if (ballotCount <= 0 || ballotCount % 5 !== 0) return;
+    shouldShowPromo('momentum')
+      .then((ok) => {
+        if (!ok) return;
+        markPromoShown('momentum');
+        setPromoSheet({ variant: 'momentum', context: { ballotCount } });
+      })
+      .catch(() => { /* promo is best-effort — never block the feed */ });
+  };
+
   const handleCreateProposal = async () => {
     if (!newProposal.title.trim()) {
       Alert.alert('Error', 'Please enter a proposal title.');
@@ -1483,23 +1546,14 @@ export default function ProposalsScreen() {
         String(p.creatorId) === String(user?.id ?? '') &&
         !String(p.id).startsWith('seed-') &&
         (!p.deadline || new Date(p.deadline).getTime() > now)
-      ).length;
-      if (myActiveProposals >= 1) {
+      );
+      if (myActiveProposals.length >= 1) {
+        // S2c creation gate — names the user's actual open proposal (and its
+        // close date) instead of a bare Alert. Same routing options: the
+        // sheet's "See Premium" goes to /modals/subscription, dismiss waits.
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-        Alert.alert(
-          'One active proposal at a time',
-          'Free accounts can run one active proposal at a time. Upgrade to Premium for unlimited proposals, or wait for your current one to close.',
-          [
-            { text: 'Not now', style: 'cancel' },
-            {
-              text: 'Upgrade',
-              onPress: () => {
-                setShowCreateModal(false);
-                router.push('/modals/subscription');
-              },
-            },
-          ],
-        );
+        setShowCreateModal(false);
+        openCreationGateSheet(myActiveProposals[0]);
         return;
       }
     }
@@ -1587,20 +1641,16 @@ export default function ProposalsScreen() {
 
       if (result.error) {
         if (result.errorCode === 'PROPOSAL_LIMIT') {
-          Alert.alert(
-            'One active proposal at a time',
-            'Free accounts can run one active proposal at a time. Upgrade to Premium for unlimited proposals.',
-            [
-              { text: 'Not now', style: 'cancel' },
-              {
-                text: 'Upgrade',
-                onPress: () => {
-                  setShowCreateModal(false);
-                  router.push('/modals/subscription');
-                },
-              },
-            ],
+          // Server-enforced one-active-proposal limit → same S2c creation-gate
+          // sheet as the pre-check (the local list may have been stale).
+          const now = Date.now();
+          const activeMine = proposals.find((p) =>
+            String(p.creatorId) === String(user?.id ?? '') &&
+            !String(p.id).startsWith('seed-') &&
+            (!p.deadline || new Date(p.deadline).getTime() > now)
           );
+          setShowCreateModal(false);
+          openCreationGateSheet(activeMine);
           return;
         }
         Alert.alert('Error', result.error);
@@ -3155,8 +3205,13 @@ export default function ProposalsScreen() {
         castState={pendingCastState}
         onRetry={confirmPendingVote}
         onDismiss={() => {
+          // Capture the seal outcome BEFORE clearing it — the S2a momentum
+          // promo may only fire after a confirmed cast, and only once the
+          // seal sheet has fully dismissed (never stacked on the seal).
+          const wasConfirmed = pendingCastState === 'confirmed';
           setPendingVote(null);
           setPendingCastState(undefined);
+          maybeShowMomentumPromo(wasConfirmed);
         }}
         onShare={() => {
           // Return the Share promise so the seal sheet stays mounted while
@@ -3168,6 +3223,19 @@ export default function ProposalsScreen() {
 
       {/* P3 · How voting works — rules sheet, opened from the queue's info glyph */}
       <HowVotingWorksSheet visible={showHowVoting} onClose={() => setShowHowVoting(false)} />
+
+      {/* S2 · Premium promo sheet — momentum (post-ballot) and creation gate.
+          One gold CTA to the paywall, equal-weight dismiss, capped frequency. */}
+      <PremiumPromoSheet
+        visible={!!promoSheet}
+        variant={promoSheet?.variant ?? 'momentum'}
+        context={promoSheet?.context}
+        onClose={() => setPromoSheet(null)}
+        onSeePremium={() => {
+          setPromoSheet(null);
+          router.push('/modals/subscription');
+        }}
+      />
 
       {/* 2a · Observer region picker — regions derived from the open
           proposals' actual geoRestrictions. Display scoping ONLY; it never
