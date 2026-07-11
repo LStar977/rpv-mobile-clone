@@ -1256,10 +1256,13 @@ export default function ProposalsScreen() {
         )
       );
       // The X1 sheet (already open in its cast state) is the confirmation UI.
+      // This local-only cast IS the success path for demo/seed — returning
+      // false here would play the red failure reversal on a vote we just
+      // recorded, so the seal must complete gold.
       setLastVoteType(vote);
       lastVotedRef.current = { id: proposalId, title: target?.title || 'Proposal' };
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      return false;
+      return true;
     }
 
     // Real proposals: require authentication
