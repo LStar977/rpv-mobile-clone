@@ -41,51 +41,31 @@ GoogleSignin.configure({
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// Welcome page dots — active is a 22×6 gold pill, inactive 6×6 surface dots.
+// W3 ambient glow — the mock's radial-gradient behind the mark, approximated
+// with concentric circles (RN has no radial gradients). Sits behind content.
 // ═══════════════════════════════════════════════════════════════════════════════
-function PageDots({ count, index }: { count: number; index: number }) {
-  const { colors } = useTheme();
+function GoldGlow() {
+  const { isDark } = useTheme();
+  // Light theme uses the deeper #C99A38 at slightly higher alpha per the mock.
+  const rgb = isDark ? '234, 186, 88' : '201, 154, 56';
+  const rings: Array<[number, number]> = isDark
+    ? [[480, 0.03], [340, 0.035], [220, 0.04], [140, 0.05]]
+    : [[480, 0.035], [340, 0.04], [220, 0.05], [140, 0.06]];
   return (
-    <View style={styles.dotsRow}>
-      {Array.from({ length: count }).map((_, i) => (
+    <View pointerEvents="none" style={styles.glowWrap}>
+      {rings.map(([size, alpha]) => (
         <View
-          key={i}
-          style={[
-            styles.dot,
-            {
-              width: i === index ? 22 : 6,
-              backgroundColor: i === index ? colors.goldFill : colors.surfaceHighlight,
-            },
-          ]}
+          key={size}
+          style={{
+            position: 'absolute',
+            width: size,
+            height: size,
+            borderRadius: size / 2,
+            backgroundColor: `rgba(${rgb}, ${alpha})`,
+          }}
         />
       ))}
     </View>
-  );
-}
-
-// Welcome page 2 — feature row: gold-surface icon tile + title + body.
-function FeatureRow({
-  icon,
-  title,
-  body,
-  delay,
-}: {
-  icon: keyof typeof Ionicons.glyphMap;
-  title: string;
-  body: string;
-  delay: number;
-}) {
-  const { colors } = useTheme();
-  return (
-    <Animated.View entering={FadeInDown.delay(delay).duration(400)} style={styles.featureRow}>
-      <View style={[styles.featureIconTile, { backgroundColor: colors.goldSurface }]}>
-        <Ionicons name={icon} size={20} color={colors.gold} />
-      </View>
-      <View style={styles.featureRowText}>
-        <Text style={[styles.featureRowTitle, { color: colors.text }]}>{title}</Text>
-        <Text style={[styles.featureRowBody, { color: colors.textSecondary }]}>{body}</Text>
-      </View>
-    </Animated.View>
   );
 }
 
@@ -166,7 +146,6 @@ export default function AuthScreen() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const [view, setView] = useState<'welcome' | 'login' | 'signup'>('welcome');
-  const [welcomePage, setWelcomePage] = useState<0 | 1>(0);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
@@ -414,7 +393,9 @@ export default function AuthScreen() {
   };
 
   // ─────────────────────────────────────────────────────────────────────────────
-  // WELCOME — mocks 01a / 01b
+  // WELCOME — W3 "simple cut": wordmark, big mark in a gold glow, one serif
+  // line, Create Account (the gold moment) / Sign In. Single screen — no
+  // carousel, no Skip. Static composition, so reduced motion needs nothing.
   // ─────────────────────────────────────────────────────────────────────────────
   if (view === 'welcome') {
     return (
@@ -422,172 +403,105 @@ export default function AuthScreen() {
         style={[
           styles.container,
           styles.welcomeScreen,
-          { backgroundColor: colors.background, paddingTop: insets.top, paddingBottom: Math.max(insets.bottom, 24) + 16 },
+          { backgroundColor: colors.background, paddingTop: insets.top + 24, paddingBottom: Math.max(insets.bottom, 24) + 16 },
         ]}
       >
-        {welcomePage === 0 ? (
-          <View key="w0" style={styles.welcomeBody}>
-            <View style={styles.welcomeHero}>
-              {/* Logo — 5 taps triggers the hidden demo account entry */}
-              <Animated.View entering={FadeInDown.duration(500)}>
-                <TouchableOpacity onPress={handleLogoTap} activeOpacity={1} disabled={demoLoading}>
-                  <View style={[styles.welcomeLogo, { backgroundColor: colors.surface }]}>
-                    {demoLoading ? (
-                      <ActivityIndicator size="large" color={colors.gold} />
-                    ) : (
-                      <Image
-                        source={require('../assets/logo.png')}
-                        style={styles.welcomeLogoImage}
-                        resizeMode="cover"
-                      />
-                    )}
-                  </View>
-                </TouchableOpacity>
-              </Animated.View>
+        <GoldGlow />
 
-              <Animated.Text
-                entering={FadeInDown.delay(80).duration(500)}
-                style={[styles.eyebrow, { color: colors.gold }]}
-              >
-                REPRESENT
-              </Animated.Text>
+        <Text style={[styles.wordmark, { color: colors.gold }]}>REPRESENT</Text>
 
-              <Animated.Text
-                entering={FadeInDown.delay(160).duration(500)}
-                style={[styles.welcomeDisplay, { color: colors.text }]}
-              >
-                Your verified voice, on the record.
-              </Animated.Text>
+        <View style={styles.welcomeCenter}>
+          {/* Mark — 5 taps triggers the hidden demo account entry */}
+          <Animated.View entering={FadeIn.duration(500)}>
+            <TouchableOpacity
+              onPress={handleLogoTap}
+              activeOpacity={1}
+              disabled={demoLoading}
+              accessibilityLabel="Represent"
+            >
+              <View style={[styles.welcomeLogo, { backgroundColor: colors.surface }]}>
+                {demoLoading ? (
+                  <ActivityIndicator size="large" color={colors.gold} />
+                ) : (
+                  <Image
+                    source={require('../assets/logo.png')}
+                    style={styles.welcomeLogoImage}
+                    resizeMode="cover"
+                  />
+                )}
+              </View>
+            </TouchableOpacity>
+          </Animated.View>
 
-              <Animated.Text
-                entering={FadeInDown.delay(240).duration(500)}
-                style={[styles.welcomeBodyText, { color: colors.textSecondary }]}
-              >
-                Verify once with your government ID. Vote on the issues that govern your street,
-                your city, your province — and watch the real count.
-              </Animated.Text>
+          <Animated.Text
+            entering={FadeInDown.delay(120).duration(500)}
+            style={[styles.welcomeDisplay, { color: colors.text }]}
+          >
+            Your voice beyond the ballot box.
+          </Animated.Text>
 
-              {/* Biometric quick sign-in (only when a stored session exists) */}
-              {biometricAvailable && (
-                <Animated.View entering={FadeInDown.delay(320).duration(500)}>
-                  <TouchableOpacity
-                    onPress={handleBiometricLogin}
-                    activeOpacity={0.8}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Sign in with ${biometricType}`}
-                    style={[styles.biometricRow, { backgroundColor: colors.surface, borderColor: colors.border }]}
-                  >
-                    <Ionicons
-                      name={biometricType === 'Face ID' ? 'scan-outline' : 'finger-print-outline'}
-                      size={18}
-                      color={colors.gold}
-                    />
-                    <Text style={[styles.biometricRowText, { color: colors.text }]}>
-                      Sign in with {biometricType}
-                    </Text>
-                  </TouchableOpacity>
-                </Animated.View>
-              )}
-            </View>
-
-            <PageDots count={2} index={0} />
-
-            <Animated.View entering={FadeInUp.delay(300).duration(500)} style={styles.welcomeActions}>
-              <Button
-                title="Get Started"
-                onPress={() => {
-                  haptics.light();
-                  setWelcomePage(1);
-                }}
-                variant="primary"
-                size="lg"
-                fullWidth
-              />
+          {/* Biometric quick sign-in (only when a stored session exists) */}
+          {biometricAvailable && (
+            <Animated.View entering={FadeInDown.delay(240).duration(500)}>
               <TouchableOpacity
-                onPress={() => {
-                  haptics.light();
-                  setView('login');
-                }}
-                activeOpacity={0.7}
-                style={styles.ghostAction}
+                onPress={handleBiometricLogin}
+                activeOpacity={0.8}
                 accessibilityRole="button"
+                accessibilityLabel={`Sign in with ${biometricType}`}
+                style={[styles.biometricRow, { backgroundColor: colors.surface, borderColor: colors.border }]}
               >
-                <Text style={[styles.ghostActionText, { color: colors.textSecondary }]}>
-                  I already have an account
+                <Ionicons
+                  name={biometricType === 'Face ID' ? 'scan-outline' : 'finger-print-outline'}
+                  size={18}
+                  color={colors.gold}
+                />
+                <Text style={[styles.biometricRowText, { color: colors.text }]}>
+                  Sign in with {biometricType}
                 </Text>
               </TouchableOpacity>
             </Animated.View>
+          )}
+        </View>
 
-            <Text style={[styles.ledgerFootnote, { color: colors.textTertiary }]}>
-              ONE PERSON · ONE BALLOT
+        <Animated.View entering={FadeInUp.delay(200).duration(500)} style={styles.welcomeActions}>
+          <TouchableOpacity
+            onPress={() => {
+              haptics.light();
+              setView('signup');
+            }}
+            activeOpacity={0.85}
+            accessibilityRole="button"
+            style={[styles.welcomeCta, { backgroundColor: colors.goldFill }]}
+          >
+            <Text style={styles.welcomeCtaText}>Create Account</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => {
+              haptics.light();
+              setView('login');
+            }}
+            activeOpacity={0.85}
+            accessibilityRole="button"
+            style={[styles.welcomeCta, { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1 }]}
+          >
+            <Text style={[styles.welcomeCtaText, { color: colors.text }]}>Sign In</Text>
+          </TouchableOpacity>
+          <Text style={[styles.welcomeFooter, { color: colors.textTertiary }]}>
+            <Text
+              style={[styles.welcomeFooterLink, { color: colors.textSecondary }]}
+              onPress={() => Linking.openURL('https://representportal.com/terms')}
+            >
+              Terms
             </Text>
-          </View>
-        ) : (
-          <View key="w1" style={styles.welcomeBody}>
-            <View style={styles.welcomeHero}>
-              <Animated.Text
-                entering={FadeInDown.duration(400)}
-                style={[styles.eyebrow, { color: colors.gold }]}
-              >
-                THE PUBLIC RECORD
-              </Animated.Text>
-
-              <Animated.Text
-                entering={FadeInDown.delay(80).duration(400)}
-                style={[styles.welcomeDisplaySmall, { color: colors.text }]}
-              >
-                Every ballot counted. Every count checkable.
-              </Animated.Text>
-
-              <View style={styles.featureList}>
-                <FeatureRow
-                  icon="shield-checkmark-outline"
-                  title="Verified identity"
-                  body="Government ID, verified once. No bots, no duplicates, no guessing."
-                  delay={160}
-                />
-                <FeatureRow
-                  icon="checkmark-circle-outline"
-                  title="One person, one ballot"
-                  body="Every number you see is one verified citizen. Counted, not estimated."
-                  delay={240}
-                />
-                <FeatureRow
-                  icon="library-outline"
-                  title="A public ledger"
-                  body="Ballots are recorded on a tamper-evident public record anyone can audit."
-                  delay={320}
-                />
-              </View>
-            </View>
-
-            <PageDots count={2} index={1} />
-
-            <Animated.View entering={FadeInUp.delay(240).duration(500)} style={styles.welcomeActions}>
-              <Button
-                title="Continue"
-                onPress={() => {
-                  haptics.light();
-                  setView('signup');
-                }}
-                variant="primary"
-                size="lg"
-                fullWidth
-              />
-              <TouchableOpacity
-                onPress={() => {
-                  haptics.light();
-                  setView('signup');
-                }}
-                activeOpacity={0.7}
-                style={styles.ghostAction}
-                accessibilityRole="button"
-              >
-                <Text style={[styles.ghostActionText, { color: colors.textSecondary }]}>Skip</Text>
-              </TouchableOpacity>
-            </Animated.View>
-          </View>
-        )}
+            {'  ·  '}
+            <Text
+              style={[styles.welcomeFooterLink, { color: colors.textSecondary }]}
+              onPress={() => Linking.openURL('https://representportal.com/privacy')}
+            >
+              Privacy
+            </Text>
+          </Text>
+        </Animated.View>
       </View>
     );
   }
@@ -849,58 +763,59 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 
-  // ── Welcome (01a / 01b) ──────────────────────────────────────────────────────
+  // ── Welcome (W3 · simple cut) ────────────────────────────────────────────────
   welcomeScreen: {
-    paddingHorizontal: SPACING.screenPadding + 6, // mock: 30px gutters
+    paddingHorizontal: 32, // mock: 32px gutters
   },
-  welcomeBody: {
-    flex: 1,
-  },
-  welcomeHero: {
-    flex: 1,
+  glowWrap: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
     justifyContent: 'center',
-    gap: 22,
+    // Mock centers the glow slightly above true center (translate -58%).
+    paddingBottom: 120,
+  },
+  wordmark: {
+    textAlign: 'center',
+    fontFamily: FONTS.sansSemiBold,
+    fontSize: 13,
+    letterSpacing: 3.9, // .3em
+  },
+  welcomeCenter: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 36,
   },
   welcomeLogo: {
-    width: 76,
-    height: 76,
-    borderRadius: 38,
+    width: 170,
+    height: 170,
+    borderRadius: 85,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
+    // Mock: 0 24px 70px black + a gold bloom (the bloom comes from GoldGlow).
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 24 },
+    shadowOpacity: 0.6,
+    shadowRadius: 35,
+    elevation: 16,
   },
   welcomeLogoImage: {
-    width: 76,
-    height: 76,
-    borderRadius: 38,
-  },
-  eyebrow: {
-    fontFamily: FONTS.sansSemiBold,
-    fontSize: 11,
-    letterSpacing: 1.98, // .18em
+    width: 170,
+    height: 170,
+    borderRadius: 85,
   },
   welcomeDisplay: {
     fontFamily: FONTS.serif,
-    fontSize: 45,
-    lineHeight: 49,
-    letterSpacing: -0.54,
-  },
-  welcomeDisplaySmall: {
-    fontFamily: FONTS.serif,
-    fontSize: 40,
-    lineHeight: 44,
-    letterSpacing: -0.48,
-  },
-  welcomeBodyText: {
-    fontFamily: FONTS.sans,
-    fontSize: 16,
-    lineHeight: 25,
-    maxWidth: 320,
+    fontSize: 34,
+    lineHeight: 41, // 1.2
+    letterSpacing: -0.41, // -.012em
+    textAlign: 'center',
+    maxWidth: 280,
   },
   biometricRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    alignSelf: 'flex-start',
     gap: 9,
     paddingHorizontal: 16,
     height: 44,
@@ -911,55 +826,29 @@ const styles = StyleSheet.create({
     fontFamily: FONTS.sansSemiBold,
     fontSize: 14,
   },
-  featureList: {
-    gap: 18,
-    marginTop: 6,
-  },
-  featureRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 14,
-  },
-  featureIconTile: {
-    width: 42,
-    height: 42,
-    borderRadius: 13,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  featureRowText: {
-    flex: 1,
-    gap: 3,
-  },
-  featureRowTitle: {
-    fontFamily: FONTS.sansSemiBold,
-    fontSize: 15,
-  },
-  featureRowBody: {
-    fontFamily: FONTS.sans,
-    fontSize: 13.5,
-    lineHeight: 20,
-  },
-  dotsRow: {
-    flexDirection: 'row',
-    gap: 7,
-    marginBottom: 26,
-  },
-  dot: {
-    height: 6,
-    borderRadius: 3,
-  },
   welcomeActions: {
     gap: 10,
   },
-  ghostAction: {
-    height: 48,
+  welcomeCta: {
+    height: 56,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  ghostActionText: {
-    fontFamily: FONTS.sansMedium,
-    fontSize: 15,
+  welcomeCtaText: {
+    fontFamily: FONTS.sansSemiBold,
+    fontSize: 16.5,
+    color: '#040707',
+  },
+  welcomeFooter: {
+    marginTop: 6,
+    textAlign: 'center',
+    fontFamily: FONTS.sans,
+    fontSize: 11.5,
+    lineHeight: 18,
+  },
+  welcomeFooterLink: {
+    textDecorationLine: 'underline',
   },
   ledgerFootnote: {
     fontFamily: FONTS.mono,
