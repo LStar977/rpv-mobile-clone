@@ -406,13 +406,13 @@ export default function AuthScreen() {
           { backgroundColor: colors.background, paddingTop: insets.top + 24, paddingBottom: Math.max(insets.bottom, 24) + 16 },
         ]}
       >
-        <GoldGlow />
-
         <Text style={[styles.wordmark, { color: colors.gold }]}>REPRESENT</Text>
 
         <View style={styles.welcomeCenter}>
-          {/* Mark — 5 taps triggers the hidden demo account entry */}
-          <Animated.View entering={FadeIn.duration(500)}>
+          {/* Mark — 5 taps triggers the hidden demo account entry. The glow
+              is anchored here so its rings stay centered on the mark. */}
+          <Animated.View entering={FadeIn.duration(500)} style={styles.logoAnchor}>
+            <GoldGlow />
             <TouchableOpacity
               onPress={handleLogoTap}
               activeOpacity={1}
@@ -771,8 +771,10 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     alignItems: 'center',
     justifyContent: 'center',
-    // Mock centers the glow slightly above true center (translate -58%).
-    paddingBottom: 120,
+  },
+  logoAnchor: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   wordmark: {
     textAlign: 'center',
