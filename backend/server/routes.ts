@@ -6,6 +6,7 @@ import { log } from "./app";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { setupBadgeRoutes } from "./badge-routes";
 import { renderShareCardPNG, shareCardsEnabled } from "./shareCard";
+import { registerPublicRecordRoutes } from "./publicRecord";
 import { passportNFTs, activatedRidings, electoralRidingQRCodes, proposals, votes, voteTokenClaims, organizations, transactions, proposalReports, userMutes, proposalComments, users as usersTable } from "@shared/schema";
 import { getMemberLimit, getTierLimits, isFeatureEnabled, tierDisplayName, type OrgTier } from "@shared/tier-limits";
 import {
@@ -430,98 +431,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/p/:proposalId", async (req: any, res: any) => {
-    try {
-      const proposal = await storage.getProposal(req.params.proposalId);
-      if (!proposal || (proposal as any).hiddenAt) {
-        return res.status(404).type("html").send(
-          `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Proposal not found — Represent</title></head><body style="margin:0;background:#0B0B0C;color:#F5EFE1;font-family:-apple-system,system-ui,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;text-align:center;padding:32px"><div><h1 style="font-family:Georgia,serif;font-weight:500">Proposal not found</h1><p style="color:rgba(245,239,225,.6)">It may have closed or been removed.</p><a href="${APP_STORE_URL}" style="color:#EABA58">Get Represent Vote →</a></div></body></html>`,
-        );
-      }
-
-      const title = escapeHtml(proposal.title);
-      const desc = escapeHtml((proposal.description || "").slice(0, 200));
-      const support = Number(proposal.supportVotes) || 0;
-      const oppose = Number(proposal.opposeVotes) || 0;
-      const total = support + oppose;
-      const pct = total > 0 ? Math.round((support / total) * 100) : 0;
-      const geo: string[] = Array.isArray(proposal.geoRestrictions) ? proposal.geoRestrictions : [];
-      const scope = geo.length === 0 ? "Global" : geo[geo.length - 1];
-      const ended = proposal.deadline && new Date(proposal.deadline).getTime() < Date.now();
-      const citizens = (proposal as any).requiresCitizenship
-        ? `<span style="display:inline-block;font-size:11px;font-weight:700;letter-spacing:.08em;color:#EABA58;background:rgba(234,186,88,.14);padding:5px 10px;border-radius:7px;margin-left:8px">CITIZENS ONLY</span>`
-        : "";
-      const pageUrl = `https://representportal.com/p/${escapeHtml(String(proposal.id))}`;
-
-      res.status(200).type("html").send(`<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${title} — Represent Vote</title>
-<meta name="description" content="${desc}">
-<meta property="og:title" content="${title}">
-<meta property="og:description" content="${total.toLocaleString()} verified votes · ${pct}% support — cast yours on Represent Vote.">
-<meta property="og:type" content="website">
-<meta property="og:url" content="${pageUrl}">
-<meta property="og:site_name" content="Represent Vote">
-${shareCardsEnabled() ? `<meta property="og:image" content="https://representportal.com/og/p/${escapeHtml(String(proposal.id))}">
-<meta property="og:image:width" content="1200">
-<meta property="og:image:height" content="630">
-<meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:image" content="https://representportal.com/og/p/${escapeHtml(String(proposal.id))}">` : `<meta name="twitter:card" content="summary">`}
-<meta name="twitter:title" content="${title}">
-<meta name="twitter:description" content="${total.toLocaleString()} verified votes · ${pct}% support. One person, one verified ballot.">
-<style>
-:root{color-scheme:dark}
-body{margin:0;background:#0B0B0C;color:#F5EFE1;font-family:-apple-system,system-ui,Segoe UI,Roboto,sans-serif;line-height:1.6}
-.wrap{max-width:680px;margin:0 auto;padding:48px 24px 64px}
-.brand{display:flex;align-items:center;gap:10px;color:#EABA58;font-weight:700;letter-spacing:.2em;font-size:13px;margin-bottom:40px}
-.brand svg{flex-shrink:0}
-.eyebrow{font-size:12px;font-weight:700;letter-spacing:.18em;color:#EABA58;text-transform:uppercase}
-h1{font-family:Georgia,serif;font-weight:500;font-size:clamp(28px,6vw,40px);line-height:1.15;margin:14px 0 16px}
-.desc{color:rgba(245,239,225,.65);font-size:16px}
-.card{background:#131419;border:1px solid rgba(245,239,225,.1);border-radius:18px;padding:26px;margin:32px 0}
-.bar{height:10px;border-radius:6px;background:rgba(245,239,225,.1);overflow:hidden;margin:14px 0 10px}
-.bar i{display:block;height:100%;width:${pct}%;background:linear-gradient(90deg,#EABA58,#C99838);border-radius:6px}
-.row{display:flex;justify-content:space-between;font-size:14px;color:rgba(245,239,225,.7)}
-.row b{color:#F5EFE1}
-.status{font-size:12.5px;font-weight:600;letter-spacing:.06em;color:${ended ? "rgba(245,239,225,.45)" : "#3F7A5C"};margin-top:14px}
-.cta{display:block;text-align:center;background:#EABA58;color:#0B0B0C;font-weight:700;font-size:16px;padding:16px;border-radius:13px;text-decoration:none;margin-top:8px}
-.note{text-align:center;font-size:12.5px;color:rgba(245,239,225,.4);margin-top:14px}
-.foot{margin-top:48px;border-top:1px solid rgba(245,239,225,.1);padding-top:20px;font-size:12.5px;color:rgba(245,239,225,.4);display:flex;gap:16px;flex-wrap:wrap}
-.foot a{color:rgba(245,239,225,.55);text-decoration:none}
-</style>
-</head>
-<body>
-<main class="wrap">
-  <div class="brand">
-    <svg width="26" height="26" viewBox="0 0 100 100" fill="none"><circle cx="50" cy="50" r="44" stroke="#EABA58" stroke-width="5"/><path d="M52 16c-3 0-5.5 2.4-5.5 5.5v22c0 1-1.5 1-1.5 0V31c0-3-2.4-5.5-5.5-5.5S34 28 34 31v25c-1-2-2.5-4-4.5-3.4-2 .6-2.4 2.8-1.3 4.8l7.2 13c2 3.5 5.5 6.4 11 6.4h2.5c7 0 12-5 12-12V27c0-3-2.5-5.5-5.5-5.5S50 24 50 27v15c0 1-1.5 1-1.5 0V21.5c0-3-2.5-5.5-5.5-5.5z" fill="#EABA58"/></svg>
-    REPRESENT
-  </div>
-  <span class="eyebrow">${escapeHtml(scope)} proposal</span>${citizens}
-  <h1>${title}</h1>
-  <p class="desc">${desc}</p>
-  <div class="card">
-    <div class="row"><b>${pct}% support</b><span><b>${total.toLocaleString()}</b> verified votes</span></div>
-    <div class="bar"><i></i></div>
-    <div class="row"><span>Support ${support.toLocaleString()}</span><span>Oppose ${oppose.toLocaleString()}</span></div>
-    <div class="status">${ended ? "● Voting closed" : "● Voting open now"}</div>
-  </div>
-  <a class="cta" href="${APP_STORE_URL}">Cast your verified vote — get the app</a>
-  <p class="note">One person, one ballot. Identity-verified. Free to verify.</p>
-  <div class="foot">
-    <span>© 2026 Represent Labs</span>
-    <a href="https://representportal.com/privacy">Privacy</a>
-    <a href="https://representportal.com/terms">Terms</a>
-  </div>
-</main>
-</body>
-</html>`);
-    } catch (e: any) {
-      log(`Public proposal page error: ${e?.message || e}`);
-      res.status(500).type("html").send("<!doctype html><title>Error</title>Something went wrong.");
-    }
-  });
+  // The Public Record — /record, /record/:region, and the redesigned /p/:id
+  // ballot permalink (R1/R2/R3 design). Registered before the SPA catch-all.
+  registerPublicRecordRoutes(app, storage);
 
   // Setup badge system routes
   setupBadgeRoutes(app);
