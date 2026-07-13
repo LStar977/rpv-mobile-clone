@@ -323,13 +323,15 @@ function BallotCard({
       {/* Scope chip + deadline (mono, gold when closing tonight) */}
       <View style={ballotStyles.topRow}>
         <View style={ballotStyles.topLeft}>
-          <Text style={[ballotStyles.scopeChip, { color: colors.textTertiary, backgroundColor: colors.surfaceHighlight }]}>
-            {scopeLabel}
-          </Text>
+          {/* Chip background lives on a View — background+radius directly on
+              Text renders broken lens-shaped pills on iOS. */}
+          <View style={[ballotStyles.scopeChipWrap, { backgroundColor: colors.surfaceHighlight }]}>
+            <Text style={[ballotStyles.scopeChip, { color: colors.textTertiary }]}>{scopeLabel}</Text>
+          </View>
           {proposal.requiresCitizenship && (
-            <Text style={[ballotStyles.scopeChip, { color: colors.textTertiary, backgroundColor: colors.surfaceHighlight }]}>
-              CITIZENS ONLY
-            </Text>
+            <View style={[ballotStyles.scopeChipWrap, { backgroundColor: colors.surfaceHighlight }]}>
+              <Text style={[ballotStyles.scopeChip, { color: colors.textTertiary }]}>CITIZENS ONLY</Text>
+            </View>
           )}
         </View>
         {deadlineLabel ? (
@@ -550,14 +552,15 @@ const ballotStyles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 6,
   },
+  scopeChipWrap: {
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: 100,
+  },
   scopeChip: {
     fontFamily: FONTS.sansSemiBold,
     fontSize: 9.5,
     letterSpacing: 1.14,
-    paddingHorizontal: 9,
-    paddingVertical: 5,
-    borderRadius: 100,
-    overflow: 'hidden',
   },
   deadlineRow: {
     flexDirection: 'row',
@@ -1147,7 +1150,16 @@ export default function ProposalsScreen() {
           isAuthenticated ? limitsApi.getUsageLimits() : Promise.resolve({ data: null, error: null }),
         ]);
 
-        if (proposalsRes.data) setProposals(proposalsRes.data);
+        if (proposalsRes.data) {
+          // The public Vote feed carries public ballots only. Organization
+          // proposals live inside their org — filter out anything the
+          // backend returns with an org attachment, whatever the field name.
+          setProposals(
+            proposalsRes.data.filter(
+              (p: any) => p.organizationId == null && p.orgId == null && p.organization_id == null,
+            ),
+          );
+        }
 
         if (claimedRes.data) {
           setClaimedTokens(new Set(claimedRes.data.map((c: any) => (typeof c === 'object' ? c.proposalId : c))));
@@ -4588,7 +4600,9 @@ const feedStyles = StyleSheet.create({
     fontSize: 11,
     paddingHorizontal: 7,
     paddingVertical: 1,
-    borderRadius: 100,
+    // Radius must stay below half the rendered height — larger values on a
+    // backgrounded Text render as broken lens shapes on iOS.
+    borderRadius: 8,
     overflow: 'hidden',
     fontVariant: ['tabular-nums'],
   },
