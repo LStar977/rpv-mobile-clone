@@ -12,13 +12,19 @@
 // without the key, and meaningless outside this database. This keeps the
 // product promise: "checked, never kept."
 //
-// Fingerprint derivation (first available wins):
-//   1. document number + issuing country  (strongest: unique per document)
-//   2. full name + date of birth          (fallback: catches doc renewals /
-//                                          providers that omit doc numbers)
-// If neither is available the claim is 'skipped' — we fail OPEN for the
+// TWO fingerprints are claimed per verification (both must be free):
+//   1. document fingerprint: number + issuing country — unique per document
+//   2. person fingerprint: full name + date of birth — the same human
+//      switching documents (driver's license on one account, passport on
+//      another) or renewing a document still collides here
+// If neither is derivable the claim is 'skipped' — we fail OPEN for the
 // legitimate user and log loudly, rather than locking real people out on a
 // provider payload quirk.
+//
+// Known trade-off: two different real people sharing an identical full name
+// AND exact date of birth would collide on the person fingerprint. That's
+// rare, and the product answer is the support path on the P2 screen —
+// integrity of the count wins the tie.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import crypto from "crypto";
@@ -49,21 +55,19 @@ function hmacKey(): string | null {
   return process.env.IDENTITY_HASH_KEY || process.env.VERIFF_MASTER_SIGNATURE_KEY || null;
 }
 
-export function identityHashFromParts(parts: IdentityParts): string | null {
+// All derivable fingerprints for this person — document AND person-level.
+export function identityHashesFromParts(parts: IdentityParts): string[] {
   const key = hmacKey();
-  if (!key) return null;
+  if (!key) return [];
+  const hashes: string[] = [];
+  const hmac = (material: string) => crypto.createHmac("sha256", key).update(material).digest("hex");
   const doc = norm(parts.docNumber);
-  let material: string | null = null;
-  if (doc) {
-    material = `doc|${norm(parts.docCountry)}|${doc}`;
-  } else {
-    const first = norm(parts.firstName);
-    const last = norm(parts.lastName);
-    const dob = norm(parts.dateOfBirth);
-    if (first && last && dob) material = `pii|${first}|${last}|${dob}`;
-  }
-  if (!material) return null;
-  return crypto.createHmac("sha256", key).update(material).digest("hex");
+  if (doc) hashes.push(hmac(`doc|${norm(parts.docCountry)}|${doc}`));
+  const first = norm(parts.firstName);
+  const last = norm(parts.lastName);
+  const dob = norm(parts.dateOfBirth);
+  if (first && last && dob) hashes.push(hmac(`pii|${first}|${last}|${dob}`));
+  return hashes;
 }
 
 // Veriff decision payloads: verification.person / verification.document.
@@ -135,42 +139,70 @@ function ensureTable(): Promise<void> {
 
 export type ClaimResult = "claimed" | "already-yours" | "taken" | "skipped";
 
-// Atomically claim an identity fingerprint for a user.
-//   'claimed'       → first claim, proceed with verification
+// Atomically claim every derivable fingerprint of this identity for a user.
+//   'claimed'       → all fingerprints free (or already this user's), proceed
 //   'already-yours' → same user re-verifying (retries, doc renewal), proceed
-//   'taken'         → ANOTHER account owns this identity — refuse verification
-//   'skipped'       → no fingerprint derivable (or no key) — proceed, logged
+//   'taken'         → ANOTHER account owns any fingerprint — refuse
+//   'skipped'       → nothing derivable (or no key) — proceed, logged loudly
 export async function claimIdentity(
-  hash: string | null,
+  parts: IdentityParts,
   userId: string,
   method: string,
   log?: (msg: string) => void,
 ): Promise<ClaimResult> {
   const say = log || (() => {});
   if (!userId) return "skipped";
-  if (!hash) {
-    say(`identity-claims: no fingerprint derivable for user=${userId} (${method}) — verification allowed, NOT deduped`);
+  const hashes = identityHashesFromParts(parts);
+  if (hashes.length === 0) {
+    say(`identity-claims: no fingerprint derivable for user=${userId} (${method}) — verification allowed, NOT deduped (is IDENTITY_HASH_KEY set?)`);
     return "skipped";
   }
   try {
     await ensureTable();
-    const inserted: any = await db.execute(sql`
-      INSERT INTO identity_claims (identity_hash, user_id, method)
-      VALUES (${hash}, ${userId}, ${method})
-      ON CONFLICT (identity_hash) DO NOTHING
-      RETURNING user_id
-    `);
-    const insertedRows = inserted?.rows ?? inserted ?? [];
-    if (Array.isArray(insertedRows) && insertedRows.length > 0) return "claimed";
 
-    const owner: any = await db.execute(sql`
-      SELECT user_id FROM identity_claims WHERE identity_hash = ${hash}
-    `);
-    const ownerRows = owner?.rows ?? owner ?? [];
-    const ownerId = ownerRows[0]?.user_id;
-    if (ownerId && String(ownerId) === String(userId)) return "already-yours";
-    say(`identity-claims: DUPLICATE IDENTITY BLOCKED — user=${userId} presented an identity already claimed by another account (${method})`);
-    return "taken";
+    // Check every fingerprint first — a single hit by another account
+    // refuses the whole verification (this is what stops "driver's license
+    // on account one, passport on account two": the person fingerprint
+    // collides even when the document numbers differ).
+    for (const hash of hashes) {
+      const owner: any = await db.execute(sql`
+        SELECT user_id FROM identity_claims WHERE identity_hash = ${hash}
+      `);
+      const ownerRows = owner?.rows ?? owner ?? [];
+      const ownerId = ownerRows[0]?.user_id;
+      if (ownerId && String(ownerId) !== String(userId)) {
+        say(`identity-claims: DUPLICATE IDENTITY BLOCKED — user=${userId} presented an identity already claimed by another account (${method})`);
+        return "taken";
+      }
+    }
+
+    // All free (or ours) — claim them all. If an insert conflicts, re-check
+    // the owner: a concurrent verification may have won the race, in which
+    // case this account is refused too.
+    let insertedAny = false;
+    for (const hash of hashes) {
+      const inserted: any = await db.execute(sql`
+        INSERT INTO identity_claims (identity_hash, user_id, method)
+        VALUES (${hash}, ${userId}, ${method})
+        ON CONFLICT (identity_hash) DO NOTHING
+        RETURNING user_id
+      `);
+      const insertedRows = inserted?.rows ?? inserted ?? [];
+      if (Array.isArray(insertedRows) && insertedRows.length > 0) {
+        insertedAny = true;
+        continue;
+      }
+      const owner: any = await db.execute(sql`
+        SELECT user_id FROM identity_claims WHERE identity_hash = ${hash}
+      `);
+      const ownerRows = owner?.rows ?? owner ?? [];
+      const ownerId = ownerRows[0]?.user_id;
+      if (ownerId && String(ownerId) !== String(userId)) {
+        say(`identity-claims: DUPLICATE IDENTITY BLOCKED (race) — user=${userId} lost the claim to another account (${method})`);
+        return "taken";
+      }
+    }
+    return insertedAny ? "claimed" : "already-yours";
   } catch (e: any) {
     // Fail open: a database hiccup must not lock real people out of
     // verification. The gap is logged so it can be audited.

@@ -8,7 +8,6 @@ import { setupBadgeRoutes } from "./badge-routes";
 import { renderShareCardPNG, shareCardsEnabled } from "./shareCard";
 import { registerPublicRecordRoutes } from "./publicRecord";
 import {
-  identityHashFromParts,
   identityPartsFromVeriff,
   identityPartsFromDidit,
   claimIdentity,
@@ -2115,7 +2114,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // One verified person, one account — refuse if this identity
           // already verified a different account.
           const dupe = await claimIdentity(
-            identityHashFromParts(identityPartsFromVeriff(decisionData.verification || {})),
+            identityPartsFromVeriff(decisionData.verification || {}),
             userId, 'veriff', log,
           );
           if (dupe === 'taken') {
@@ -2177,7 +2176,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
               // One verified person, one account.
               const dupe = await claimIdentity(
-                identityHashFromParts(identityPartsFromVeriff(approvedVerification)),
+                identityPartsFromVeriff(approvedVerification),
                 userId, 'veriff', log,
               );
               if (dupe === 'taken') {
@@ -2287,7 +2286,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // One verified person, one account — refuse if this identity
         // already verified a different account.
         const dupe = await claimIdentity(
-          identityHashFromParts(identityPartsFromVeriff(verification)),
+          identityPartsFromVeriff(verification),
           userId, 'veriff', log,
         );
         if (dupe === 'taken') {
@@ -2360,7 +2359,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         // One verified person, one account.
         const dupe = await claimIdentity(
-          identityHashFromParts(identityPartsFromVeriff(verification)),
+          identityPartsFromVeriff(verification),
           userId, 'veriff', log,
         );
         if (dupe === 'taken') {
@@ -2812,7 +2811,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         // One verified person, one account.
         const dupe = await claimIdentity(
-          identityHashFromParts(identityPartsFromDidit(decision || req.body, fields)),
+          identityPartsFromDidit(decision || req.body, fields),
           userId, 'didit', log,
         );
         if (dupe === 'taken') {
@@ -2870,7 +2869,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           // One verified person, one account.
           const dupe = await claimIdentity(
-            identityHashFromParts(identityPartsFromDidit(decision, fields)),
+            identityPartsFromDidit(decision, fields),
             userId, 'didit', log,
           );
           if (dupe === 'taken') {
@@ -3001,7 +3000,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         // One verified person, one account.
         const dupe = await claimIdentity(
-          identityHashFromParts(identityPartsFromVeriff(verification)),
+          identityPartsFromVeriff(verification),
           userId, 'veriff', log,
         );
         if (dupe === 'taken') {
