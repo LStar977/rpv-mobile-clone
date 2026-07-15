@@ -67,6 +67,15 @@ export {
 // Overlays & Feedback
 export { VoteConfirmationOverlay } from './VoteConfirmationOverlay';
 export { HowVotingWorksSheet } from './HowVotingWorksSheet';
+export {
+  PremiumPromoSheet,
+  AppOpenInterstitial,
+  shouldShowPromo,
+  markPromoShown,
+  SENTINEL_FREE_PER_DAY,
+  SENTINEL_PREMIUM_PER_DAY,
+} from './PremiumPromoSheet';
+export type { PremiumPromoVariant, PremiumPromoContext } from './PremiumPromoSheet';
 export { ConfettiParticles } from './ConfettiParticles';
 export { MilestoneCelebration } from './MilestoneCelebration';
 export { EmptyState, ErrorState } from './EmptyState';

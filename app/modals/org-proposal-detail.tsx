@@ -77,6 +77,9 @@ export default function OrgProposalDetailScreen() {
   const isOfficial = params.isOfficial === 'true';
   const creatorId = params.creatorId || null;
   const viewerId = useAuthStore((s) => s.user?.id ?? null);
+  // Demo account (App Store reviewers) is sandboxed: casts never hit the
+  // API, so they must succeed locally — same policy as the yes/no feed.
+  const isDemoAccount = useAuthStore((s) => s.user?.email === 'demo@represent.app');
   const isOwnProposal = !!(creatorId && viewerId && String(creatorId) === String(viewerId));
   const creatorName = params.creatorName || 'Community Member';
   const deadline = params.deadline || null;
@@ -168,6 +171,12 @@ export default function OrgProposalDetailScreen() {
 
   const handleRcvVote = useCallback(async (rankings: string[]) => {
     if (rcvSubmitted || isEnded || voting) return;
+    if (isDemoAccount) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setRcvSubmitted(true);
+      await fetchRichResults();
+      return;
+    }
     setVoting(true);
     try {
       const result = await proposalsApi.submitVote(proposalId, 'ranked-choice', { rankings });
@@ -183,10 +192,16 @@ export default function OrgProposalDetailScreen() {
     } finally {
       setVoting(false);
     }
-  }, [proposalId, rcvSubmitted, isEnded, voting, fetchRichResults, handleOrgVerificationError]);
+  }, [proposalId, rcvSubmitted, isEnded, voting, isDemoAccount, fetchRichResults, handleOrgVerificationError]);
 
   const handleMcVote = useCallback(async (selectedOption: string) => {
     if (mcSubmitted || isEnded || voting) return;
+    if (isDemoAccount) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setMcSubmitted(true);
+      await fetchRichResults();
+      return;
+    }
     setVoting(true);
     try {
       const result = await proposalsApi.submitVote(proposalId, 'multiple-choice', { selectedOption });
@@ -202,7 +217,7 @@ export default function OrgProposalDetailScreen() {
     } finally {
       setVoting(false);
     }
-  }, [proposalId, mcSubmitted, isEnded, voting, fetchRichResults, handleOrgVerificationError]);
+  }, [proposalId, mcSubmitted, isEnded, voting, isDemoAccount, fetchRichResults, handleOrgVerificationError]);
 
   const supportScale = useSharedValue(1);
   const opposeScale = useSharedValue(1);
@@ -233,6 +248,16 @@ export default function OrgProposalDetailScreen() {
     }
 
     try {
+      if (isDemoAccount) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        setUserVote(vote);
+        if (vote === 'support') {
+          setSupportVotes((v) => (v ?? 0) + 1);
+        } else {
+          setOpposeVotes((v) => (v ?? 0) + 1);
+        }
+        return;
+      }
       const result = await organizationsApi.voteOnProposal(orgId, proposalId, vote);
 
       if (result.error) {
@@ -261,7 +286,7 @@ export default function OrgProposalDetailScreen() {
     } finally {
       setVoting(false);
     }
-  }, [orgId, proposalId, userVote, isEnded, voting, supportScale, opposeScale, handleOrgVerificationError]);
+  }, [orgId, proposalId, userVote, isEnded, voting, isDemoAccount, supportScale, opposeScale, handleOrgVerificationError]);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>

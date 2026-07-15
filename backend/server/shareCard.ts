@@ -22,6 +22,11 @@
 import { writeFileSync, existsSync, mkdirSync } from "fs";
 import { tmpdir } from "os";
 import path from "path";
+import { createRequire } from "module";
+
+// tsx runs this file as ESM, where bare `require` is undefined — createRequire
+// gives us a CJS require for optionally loading the native resvg module.
+const cjsRequire = createRequire(import.meta.url);
 
 const W = 1200;
 const H = 630;
@@ -238,8 +243,7 @@ function getResvg(): any {
   if (!resvgTried) {
     resvgTried = true;
     try {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      resvgModule = require("@resvg/resvg-js");
+      resvgModule = cjsRequire("@resvg/resvg-js");
     } catch {
       console.warn("[shareCard] @resvg/resvg-js not installed — share cards disabled (npm i @resvg/resvg-js)");
     }

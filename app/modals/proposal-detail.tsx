@@ -58,6 +58,9 @@ export default function ProposalDetailScreen() {
   const deadline = params.deadline || null;
   const creatorId = params.creatorId || null;
   const viewerId = useAuthStore((s) => s.user?.id ?? null);
+  // Demo account (App Store reviewers) is sandboxed: casts never hit the
+  // API, so they must succeed locally — same policy as the yes/no feed.
+  const isDemoAccount = useAuthStore((s) => s.user?.email === 'demo@represent.app');
   const isOwnProposal = !!(creatorId && viewerId && String(creatorId) === String(viewerId));
   const creatorName = params.creatorName || 'Community Member';
   const requiresCitizenship = params.requiresCitizenship === '1';
@@ -141,6 +144,12 @@ export default function ProposalDetailScreen() {
 
   const handleRcvVote = useCallback(async (rankings: string[]) => {
     if (rcvSubmitted || isEnded || voting) return;
+    if (isDemoAccount) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setRcvSubmitted(true);
+      await fetchResults();
+      return;
+    }
     setVoting(true);
     try {
       const result = await proposalsApi.submitVote(proposalId, 'ranked-choice', { rankings });
@@ -156,10 +165,16 @@ export default function ProposalDetailScreen() {
     } finally {
       setVoting(false);
     }
-  }, [proposalId, rcvSubmitted, isEnded, voting, fetchResults, handleOrgVerificationError]);
+  }, [proposalId, rcvSubmitted, isEnded, voting, isDemoAccount, fetchResults, handleOrgVerificationError]);
 
   const handleMcVote = useCallback(async (selectedOption: string) => {
     if (mcSubmitted || isEnded || voting) return;
+    if (isDemoAccount) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setMcSubmitted(true);
+      await fetchResults();
+      return;
+    }
     setVoting(true);
     try {
       const result = await proposalsApi.submitVote(proposalId, 'multiple-choice', { selectedOption });
@@ -175,7 +190,7 @@ export default function ProposalDetailScreen() {
     } finally {
       setVoting(false);
     }
-  }, [proposalId, mcSubmitted, isEnded, voting, fetchResults, handleOrgVerificationError]);
+  }, [proposalId, mcSubmitted, isEnded, voting, isDemoAccount, fetchResults, handleOrgVerificationError]);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>

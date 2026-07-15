@@ -17,7 +17,6 @@ import {
   Switch,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Image as ExpoImage } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
@@ -64,6 +63,22 @@ const BLUE = '#5B8FF9';
 const SERIF_FONT = FONTS.serif;
 const MONO_FONT = FONTS.mono;
 
+// PD detail-sheet palette (Proposal Detail handoff, dark). The detail modal
+// is dark-committed like the rest of this screen's hardcoded tokens.
+const PD_SF = '#141818';
+const PD_SFH = '#202626';
+const PD_BD = 'rgba(244,245,246,0.08)';
+const PD_BDS = 'rgba(244,245,246,0.05)';
+const PD_TX2 = '#B8BABB';
+const PD_TX3 = '#7A7D7E';
+const PD_SUP = '#34D399';
+const PD_OPP = '#F87171';
+const PD_BLUE = '#60A5FA';
+const PD_AMBER = '#FBBF24';
+// Category tags use the info-blue/warning-amber family — never the
+// support-green / oppose-red pair, which is reserved for tally semantics.
+const PD_AMBER_CATEGORIES = new Set(['housing', 'economy', 'taxes', 'budget', 'finance', 'agriculture', 'other', 'general']);
+
 // Dynamic hook for components to get theme-aware colors
 function useProposalColors() {
   const { colors, isDark } = useTheme();
@@ -88,7 +103,17 @@ function useProposalColors() {
   };
 }
 import { showVoteConfirmation } from '../../lib/notifications';
-import { VoteConfirmationOverlay, UpgradeModal, TallyBar, HowVotingWorksSheet } from '../../components/ui';
+import {
+  VoteConfirmationOverlay,
+  UpgradeModal,
+  TallyBar,
+  TALLY_THRESHOLD,
+  HowVotingWorksSheet,
+  PremiumPromoSheet,
+  shouldShowPromo,
+  markPromoShown,
+} from '../../components/ui';
+import type { PremiumPromoContext } from '../../components/ui';
 import { checkForNewBadges } from '../../lib/badgeNotification';
 import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -298,13 +323,15 @@ function BallotCard({
       {/* Scope chip + deadline (mono, gold when closing tonight) */}
       <View style={ballotStyles.topRow}>
         <View style={ballotStyles.topLeft}>
-          <Text style={[ballotStyles.scopeChip, { color: colors.textTertiary, backgroundColor: colors.surfaceHighlight }]}>
-            {scopeLabel}
-          </Text>
+          {/* Chip background lives on a View — background+radius directly on
+              Text renders broken lens-shaped pills on iOS. */}
+          <View style={[ballotStyles.scopeChipWrap, { backgroundColor: colors.surfaceHighlight }]}>
+            <Text style={[ballotStyles.scopeChip, { color: colors.textTertiary }]}>{scopeLabel}</Text>
+          </View>
           {proposal.requiresCitizenship && (
-            <Text style={[ballotStyles.scopeChip, { color: colors.textTertiary, backgroundColor: colors.surfaceHighlight }]}>
-              CITIZENS ONLY
-            </Text>
+            <View style={[ballotStyles.scopeChipWrap, { backgroundColor: colors.surfaceHighlight }]}>
+              <Text style={[ballotStyles.scopeChip, { color: colors.textTertiary }]}>CITIZENS ONLY</Text>
+            </View>
           )}
         </View>
         {deadlineLabel ? (
@@ -525,14 +552,15 @@ const ballotStyles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 6,
   },
+  scopeChipWrap: {
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: 100,
+  },
   scopeChip: {
     fontFamily: FONTS.sansSemiBold,
     fontSize: 9.5,
     letterSpacing: 1.14,
-    paddingHorizontal: 9,
-    paddingVertical: 5,
-    borderRadius: 100,
-    overflow: 'hidden',
   },
   deadlineRow: {
     flexDirection: 'row',
@@ -750,6 +778,13 @@ export default function ProposalsScreen() {
   // P3 · How voting works rules sheet (opened from the vote queue).
   const [showHowVoting, setShowHowVoting] = useState(false);
 
+  // S2 · Premium promo sheet (momentum after a confirmed cast, creation gate
+  // when the one-active-proposal limit is hit). Never shown to premium users.
+  const [promoSheet, setPromoSheet] = useState<{
+    variant: 'momentum' | 'creation-gate';
+    context?: PremiumPromoContext;
+  } | null>(null);
+
   const [userCountry, setUserCountry] = useState('');
   const [userState, setUserState] = useState('');
   const [userCity, setUserCity] = useState('');
@@ -758,6 +793,9 @@ export default function ProposalsScreen() {
 
   const [selectedProposal, setSelectedProposal] = useState<Proposal | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
+  // PD2 anti-bandwagon disclosure: unvoted users see the count only, with an
+  // explicit "Show current split anyway" opt-in. Reset per proposal.
+  const [detailSplitRevealed, setDetailSplitRevealed] = useState(false);
   const [showVerificationModal, setShowVerificationModal] = useState(false);
   const [verificationModalType, setVerificationModalType] = useState<'vote' | 'proposal' | 'limit'>('vote');
   const [pendingLimitTier, setPendingLimitTier] = useState<'free' | 'verified'>('free');
@@ -775,15 +813,14 @@ export default function ProposalsScreen() {
     vote: 'support' | 'oppose';
     source: 'list' | 'detail';
   } | null>(null);
+  // Truthful seal state for the X1 sheet: 'pending' while the ledger write
+  // is in flight, 'confirmed' only when it landed, 'failed' otherwise.
+  const [pendingCastState, setPendingCastState] = useState<'pending' | 'confirmed' | 'failed' | undefined>(undefined);
   const [lastVoteType, setLastVoteType] = useState<'support' | 'oppose'>('support');
   // Context for the post-vote "Share your vote" pill on the confirmation
   // overlay — the user's just-cast vote is the highest-motivation share
   // moment in the app.
   const lastVotedRef = useRef<{ id: number | string; title: string } | null>(null);
-
-  // Vote queue for sequential processing of real (non-seed) votes
-  const voteQueueRef = useRef<Array<{ proposalId: number | string; vote: 'support' | 'oppose'; title: string }>>([]);
-  const isProcessingQueueRef = useRef(false);
 
   // 1b feed state — active filter chip, header search toggle, receipts that
   // just collapsed in place this session (so a fresh vote stays visible in
@@ -1113,7 +1150,16 @@ export default function ProposalsScreen() {
           isAuthenticated ? limitsApi.getUsageLimits() : Promise.resolve({ data: null, error: null }),
         ]);
 
-        if (proposalsRes.data) setProposals(proposalsRes.data);
+        if (proposalsRes.data) {
+          // The public Vote feed carries public ballots only. Organization
+          // proposals live inside their org — filter out anything the
+          // backend returns with an org attachment, whatever the field name.
+          setProposals(
+            proposalsRes.data.filter(
+              (p: any) => p.organizationId == null && p.orgId == null && p.organization_id == null,
+            ),
+          );
+        }
 
         if (claimedRes.data) {
           setClaimedTokens(new Set(claimedRes.data.map((c: any) => (typeof c === 'object' ? c.proposalId : c))));
@@ -1181,7 +1227,9 @@ export default function ProposalsScreen() {
   }, [fetchData]);
 
 
-  const handleVote = async (proposalId: number | string, vote: 'support' | 'oppose') => {
+  // Returns true only when the ballot actually landed — the X1 seal uses
+  // this to decide whether the gold ring completes or reverses red.
+  const handleVote = async (proposalId: number | string, vote: 'support' | 'oppose'): Promise<boolean> => {
     // Geo / verification gate. Apply BEFORE the demo + seed bypass so the
     // demo account (used by App Store reviewers) can't register votes on
     // proposals that show the "Not in your region" badge — the gate badge
@@ -1200,7 +1248,7 @@ export default function ProposalsScreen() {
           : `This proposal is restricted to ${geo[geo.length - 1] ?? 'a specific region'}. Voting is only open to residents.`,
         [{ text: 'OK', style: 'cancel' }],
       );
-      return;
+      return false;
     }
 
     // Citizens-only gate. Runs before the demo/seed bypass so the eligibility
@@ -1218,7 +1266,7 @@ export default function ProposalsScreen() {
           },
         ],
       );
-      return;
+      return false;
     }
 
     // Seed proposals + demo account votes: local-only, never hit the API.
@@ -1239,16 +1287,19 @@ export default function ProposalsScreen() {
         )
       );
       // The X1 sheet (already open in its cast state) is the confirmation UI.
+      // This local-only cast IS the success path for demo/seed — returning
+      // false here would play the red failure reversal on a vote we just
+      // recorded, so the seal must complete gold.
       setLastVoteType(vote);
       lastVotedRef.current = { id: proposalId, title: target?.title || 'Proposal' };
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      return;
+      return true;
     }
 
     // Real proposals: require authentication
     if (!isAuthenticated) {
       Alert.alert('Sign In Required', 'Please sign in to vote.');
-      return;
+      return false;
     }
 
     // Daily ballot cap check (premium users have unlimited).
@@ -1270,7 +1321,7 @@ export default function ProposalsScreen() {
             { text: 'Go unlimited', onPress: () => router.push('/modals/subscription') },
           ],
         );
-        return;
+        return false;
       }
     }
 
@@ -1284,7 +1335,7 @@ export default function ProposalsScreen() {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       setVerificationModalType('vote');
       setShowVerificationModal(true);
-      return;
+      return false;
     }
 
     // For verified users: check if their location matches proposal restrictions
@@ -1307,7 +1358,7 @@ export default function ProposalsScreen() {
           `This proposal is only for voters in ${locationDescription}. Your verified location does not match.`,
           [{ text: 'OK' }]
         );
-        return;
+        return false;
       }
     }
 
@@ -1322,7 +1373,7 @@ export default function ProposalsScreen() {
           if (currentTier !== 'premium') restoreBallot();
           Alert.alert('Error', claimResult.error);
           setVotingProposalId(null);
-          return;
+          return false;
         }
         setClaimedTokens((prev) => new Set([...prev, proposalId]));
       }
@@ -1331,8 +1382,20 @@ export default function ProposalsScreen() {
       const result = await proposalsApi.submitVote(proposalId, vote);
       if (result.error) {
         if (currentTier !== 'premium') restoreBallot();
-        Alert.alert('Error', result.error);
-        return;
+        // Self-heal: the server is the source of truth for "already voted" —
+        // mark it voted locally so the card collapses to a receipt and the
+        // buttons can never be pressed again (side unknown, so not claimed).
+        if (/already voted/i.test(result.error)) {
+          setVotedProposals((prev) => new Set([...prev, proposalId]));
+          setVoteReceipts((prev) => {
+            if (prev.has(String(proposalId))) return prev;
+            return new Map(prev).set(String(proposalId), {});
+          });
+          Alert.alert('Already on the ledger', 'You had already voted on this proposal — your original ballot stands. Nothing new was recorded.');
+        } else {
+          Alert.alert('Error', result.error);
+        }
+        return false;
       }
 
       setVotedProposals((prev) => new Set([...prev, proposalId]));
@@ -1380,31 +1443,19 @@ export default function ProposalsScreen() {
       // Daily counter was already incremented by spendBallot() before the vote.
       // No on-chain balance sync needed — the daily counter is the source of
       // truth for the UI; the user's on-chain RPV balance is just "ammo".
+      return true;
     } catch {
       if (currentTier !== 'premium') restoreBallot();
       Alert.alert('Error', 'Failed to submit vote. Please try again.');
+      return false;
     } finally {
       setVotingProposalId(null);
     }
   };
 
-  // Process vote queue sequentially to avoid blockchain nonce collisions
-  const processVoteQueue = useCallback(async () => {
-    if (isProcessingQueueRef.current) return;
-    isProcessingQueueRef.current = true;
-
-    while (voteQueueRef.current.length > 0) {
-      const { proposalId, vote, title } = voteQueueRef.current[0];
-      try {
-        await handleVote(proposalId, vote);
-      } catch {
-        Alert.alert('Vote Failed', `Your vote on "${title}" couldn't be submitted. Please find it and try again.`);
-      }
-      voteQueueRef.current.shift();
-    }
-
-    isProcessingQueueRef.current = false;
-  }, [handleVote]);
+  // (The old sequential vote queue is gone: the X1 sheet awaits each cast
+  // and blocks the next until the seal resolves, so nonce collisions can't
+  // happen and the seal can report the real outcome.)
 
   // ── X1 confirm-before-cast flow ────────────────────────────────────────────
   // Step 1: any vote intent (feed card, detail modal) lands here and opens
@@ -1423,6 +1474,7 @@ export default function ProposalsScreen() {
     }
     setLastVoteType(vote);
     lastVotedRef.current = { id: proposal.id, title: proposal.title || 'Proposal' };
+    setPendingCastState(undefined);
     setPendingVote({ proposal, vote, source });
   };
 
@@ -1430,7 +1482,7 @@ export default function ProposalsScreen() {
   // anything get submitted. Real (non-seed) casts go through the sequential
   // vote queue (blockchain nonce collisions) — inline feed voting makes
   // rapid back-to-back casts the normal case.
-  const confirmPendingVote = () => {
+  const confirmPendingVote = async () => {
     const pending = pendingVote;
     if (!pending) return;
     const { proposal, vote } = pending;
@@ -1440,12 +1492,70 @@ export default function ProposalsScreen() {
     // confirms the ballot landed — a failed cast leaves the card actionable.)
     setSessionVotedIds((prev) => new Set([...prev, String(proposal.id)]));
 
-    if (!isSeedProposal(proposal.id)) {
-      voteQueueRef.current.push({ proposalId: proposal.id, vote, title: proposal.title || 'Untitled' });
-      processVoteQueue();
-    } else {
-      handleVote(proposal.id, vote);
+    // The X1 sheet serializes casts (one at a time), so we await the vote
+    // directly and let the seal tell the truth: the gold ring holds at 85%
+    // while the ledger write is in flight, completes only on success, and
+    // reverses red on failure. Never fake completion.
+    setPendingCastState('pending');
+    const ok = await handleVote(proposal.id, vote);
+    setPendingCastState(ok ? 'confirmed' : 'failed');
+    if (!ok) {
+      // Failed cast: the card goes back to being actionable (unless the
+      // failure was "already voted", in which case handleVote marked it
+      // voted and the card collapses to a receipt).
+      setSessionVotedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(String(proposal.id));
+        return next;
+      });
     }
+  };
+
+  // ── S2 promo triggers ──────────────────────────────────────────────────────
+  const isPremiumMember = !!user?.isPremium || user?.subscriptionStatus === 'active';
+
+  // Mono close-date label for the creation-gate sheet ("AUG 15"). Undefined
+  // when the proposal has no (future) deadline — the sheet then falls back
+  // to a plain "Not now" dismiss instead of inventing a date.
+  const promoCloseLabel = (p?: Proposal): string | undefined => {
+    if (!p?.deadline) return undefined;
+    const t = new Date(p.deadline).getTime();
+    if (Number.isNaN(t) || t <= Date.now()) return undefined;
+    return new Date(t)
+      .toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+      .toUpperCase();
+  };
+
+  // Creation gate (S2c) — contextual explanation of the one-active-proposal
+  // limit, allowed to bypass the weekly promo cap because the user directly
+  // hit the gate. Only ever called on the non-premium path.
+  const openCreationGateSheet = (active?: Proposal) => {
+    markPromoShown('creation-gate');
+    setPromoSheet({
+      variant: 'creation-gate',
+      context: {
+        activeProposalTitle: active?.title,
+        activeProposalCloses: promoCloseLabel(active),
+      },
+    });
+  };
+
+  // Momentum promo (S2a) — fires only AFTER the X1 seal sheet fully dismisses
+  // from a confirmed cast (never stacked on the seal), only for non-premium
+  // users, only when the real recorded-ballot count hits a multiple of 5,
+  // and at most once a week across all promos (shouldShowPromo).
+  const maybeShowMomentumPromo = (wasConfirmed: boolean) => {
+    if (!wasConfirmed) return;
+    if (isPremiumMember || user?.email === 'demo@represent.app') return;
+    const ballotCount = votedProposals.size;
+    if (ballotCount <= 0 || ballotCount % 5 !== 0) return;
+    shouldShowPromo('momentum')
+      .then((ok) => {
+        if (!ok) return;
+        markPromoShown('momentum');
+        setPromoSheet({ variant: 'momentum', context: { ballotCount } });
+      })
+      .catch(() => { /* promo is best-effort — never block the feed */ });
   };
 
   const handleCreateProposal = async () => {
@@ -1470,23 +1580,14 @@ export default function ProposalsScreen() {
         String(p.creatorId) === String(user?.id ?? '') &&
         !String(p.id).startsWith('seed-') &&
         (!p.deadline || new Date(p.deadline).getTime() > now)
-      ).length;
-      if (myActiveProposals >= 1) {
+      );
+      if (myActiveProposals.length >= 1) {
+        // S2c creation gate — names the user's actual open proposal (and its
+        // close date) instead of a bare Alert. Same routing options: the
+        // sheet's "See Premium" goes to /modals/subscription, dismiss waits.
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-        Alert.alert(
-          'One active proposal at a time',
-          'Free accounts can run one active proposal at a time. Upgrade to Premium for unlimited proposals, or wait for your current one to close.',
-          [
-            { text: 'Not now', style: 'cancel' },
-            {
-              text: 'Upgrade',
-              onPress: () => {
-                setShowCreateModal(false);
-                router.push('/modals/subscription');
-              },
-            },
-          ],
-        );
+        setShowCreateModal(false);
+        openCreationGateSheet(myActiveProposals[0]);
         return;
       }
     }
@@ -1574,20 +1675,16 @@ export default function ProposalsScreen() {
 
       if (result.error) {
         if (result.errorCode === 'PROPOSAL_LIMIT') {
-          Alert.alert(
-            'One active proposal at a time',
-            'Free accounts can run one active proposal at a time. Upgrade to Premium for unlimited proposals.',
-            [
-              { text: 'Not now', style: 'cancel' },
-              {
-                text: 'Upgrade',
-                onPress: () => {
-                  setShowCreateModal(false);
-                  router.push('/modals/subscription');
-                },
-              },
-            ],
+          // Server-enforced one-active-proposal limit → same S2c creation-gate
+          // sheet as the pre-check (the local list may have been stale).
+          const now = Date.now();
+          const activeMine = proposals.find((p) =>
+            String(p.creatorId) === String(user?.id ?? '') &&
+            !String(p.id).startsWith('seed-') &&
+            (!p.deadline || new Date(p.deadline).getTime() > now)
           );
+          setShowCreateModal(false);
+          openCreationGateSheet(activeMine);
           return;
         }
         Alert.alert('Error', result.error);
@@ -1733,6 +1830,7 @@ export default function ProposalsScreen() {
       return;
     }
     setSelectedProposal(p);
+    setDetailSplitRevealed(false); // PD2 opt-in never carries between proposals
     setShowDetailModal(true);
   };
 
@@ -2230,10 +2328,10 @@ export default function ProposalsScreen() {
         />
       )}
 
-      {/* Detail Modal — premium institutional redesign */}
+      {/* Detail Modal — PD1–PD5 post-image layout. The question is the hero. */}
       <Modal visible={showDetailModal} animationType="slide" presentationStyle="pageSheet" onRequestClose={closeProposal}>
         <View style={[detailStyles.container, { backgroundColor: BG }]}>
-          {/* Minimal floating header */}
+          {/* In-flow header — nothing to float over now that the photo hero is gone */}
           <View style={detailStyles.header}>
             <TouchableOpacity onPress={closeProposal} style={detailStyles.headerBtn} activeOpacity={0.7}>
               <Ionicons name="chevron-down" size={20} color={FG} />
@@ -2266,115 +2364,274 @@ export default function ProposalsScreen() {
           </View>
 
           {detail && (() => {
-            const total = (detail.supportVotes || 0) + (detail.opposeVotes || 0);
-            const pct = total > 0 ? Math.round(((detail.supportVotes || 0) / total) * 100) : 0;
+            const support = detail.supportVotes || 0;
+            const oppose = detail.opposeVotes || 0;
+            const total = support + oppose;
+            const pct = total > 0 ? Math.round((support / total) * 100) : 0;
+            const aboveThreshold = total >= TALLY_THRESHOLD;
             const tierLabel = getTierLabel(detail.geoRestrictions);
-            const category = detail.category || 'General';
             const location = getLocationLabel(detail.geoRestrictions);
+            const scopeLabel = [tierLabel, location].filter(Boolean).join(' · ').toUpperCase();
+            const category = (detail.category || 'General').toUpperCase();
+            const catColor = PD_AMBER_CATEGORIES.has((detail.category || 'general').toLowerCase()) ? PD_AMBER : PD_BLUE;
             const timeRemaining = getTimeRemaining(detail.deadline);
             const ended = isProposalEnded(detail);
-            const cat = category.toLowerCase();
-            const categoryColor =
-              cat === 'economy' ? GREEN :
-              cat === 'housing' ? GOLD :
-              cat === 'transportation' || cat === 'infrastructure' ? BLUE :
-              cat === 'environment' ? '#22C55E' :
-              cat === 'healthcare' ? '#EF4444' : GOLD;
+            const closedLabel = detail.deadline
+              ? `CLOSED ${new Date(detail.deadline).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }).toUpperCase()}`
+              : 'CLOSED';
+            const createdLabel = detail.createdAt && !Number.isNaN(Date.parse(detail.createdAt))
+              ? new Date(detail.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+              : null;
+            const receipt = voteReceipts.get(String(detail.id));
+            const votedSideLabel = receipt?.side === 'support' ? 'Support' : receipt?.side === 'oppose' ? 'Oppose' : null;
+            const eligible = canUserVoteOnProposal(detail, userCountry, userState, userCity, isVerified);
+            const geo = detail.geoRestrictions ?? [];
+            const regionName = geo[geo.length - 1];
+            const isUnverifiedGeo = geo.length > 0 && !isVerified;
+            const residence = userCity || userState || userCountry;
+            const passed = support > oppose;
+
+            // The full two-tone tally, PD3/PD4/PD5 — only ever rendered at or
+            // above threshold. Below 25 the split is never shown, to anyone.
+            const tallySplit = (
+              <>
+                <View style={detailStyles.tallyTrack}>
+                  <View style={[detailStyles.tallyFill, { width: `${pct}%` }]} />
+                  <View style={detailStyles.tallyMidline} />
+                </View>
+                <View style={detailStyles.tallySplitRow}>
+                  <Text style={[detailStyles.tallySplitText, { color: PD_SUP }]}>
+                    SUPPORT {pct}% · {support.toLocaleString()}
+                  </Text>
+                  <Text style={[detailStyles.tallySplitText, { color: PD_OPP }]}>
+                    OPPOSE {100 - pct}% · {oppose.toLocaleString()}
+                  </Text>
+                </View>
+              </>
+            );
+
+            // PD1 early-voting card — gold progress dots toward the threshold.
+            const earlyVotingCard = (
+              <View style={detailStyles.card}>
+                <View style={detailStyles.cardHeaderRow}>
+                  <Text style={detailStyles.cardLabel}>{ended ? 'FINAL COUNT' : 'EARLY VOTING'}</Text>
+                  <Text style={detailStyles.cardMono}>{total} BALLOTS CAST{ended ? ' · FINAL' : ''}</Text>
+                </View>
+                <View style={detailStyles.dotsRow}>
+                  {Array.from({ length: TALLY_THRESHOLD }).map((_, i) => (
+                    <View key={i} style={[detailStyles.dot, { backgroundColor: i < total ? GOLD : PD_SFH }]} />
+                  ))}
+                </View>
+                <Text style={detailStyles.cardFootnote}>
+                  {ended
+                    ? `Closed below the ${TALLY_THRESHOLD}-ballot threshold — the count is recorded, the split is never shown.`
+                    : `The split appears once ${TALLY_THRESHOLD} verified ballots are cast — early votes stay uninfluenced.`}
+                </Text>
+              </View>
+            );
+
+            // Gold receipt row — the screen's one gold moment (PD3/PD4).
+            const receiptRow = detailHasVoted ? (
+              <View style={detailStyles.receiptRow}>
+                <View style={detailStyles.receiptIcon}>
+                  <Ionicons name="checkmark" size={18} color={GOLD} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={detailStyles.receiptTitle}>
+                    {ended ? `You voted${votedSideLabel ? ` ${votedSideLabel}` : ''}` : `Ballot cast${votedSideLabel ? ` — ${votedSideLabel}` : ''}`}
+                  </Text>
+                  <Text style={detailStyles.receiptMeta}>
+                    ON THE PUBLIC LEDGER
+                    {receipt?.at ? ` · ${new Date(receipt.at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }).toUpperCase()}` : ''}
+                  </Text>
+                </View>
+              </View>
+            ) : null;
 
             return (
               <ScrollView contentContainerStyle={detailStyles.scrollContent} showsVerticalScrollIndicator={false}>
-                {/* Hero image with overlays */}
-                <View style={detailStyles.hero}>
-                  {detail.imageUrl ? (
-                    <ExpoImage source={{ uri: detail.imageUrl }} style={StyleSheet.absoluteFill} contentFit="cover" cachePolicy="memory-disk" transition={150} />
-                  ) : (
-                    <View style={[StyleSheet.absoluteFill, { backgroundColor: BG_RAISED }]} />
-                  )}
-                  <LinearGradient
-                    colors={['rgba(4,7,7,0.25)', 'rgba(4,7,7,0.6)', 'rgba(4,7,7,1)']}
-                    locations={[0, 0.55, 1]}
-                    style={StyleSheet.absoluteFill}
-                  />
-                  <View style={detailStyles.heroLocationPill}>
-                    <Ionicons name="location" size={11} color={FG} />
-                    <Text style={detailStyles.heroLocationText}>{location}</Text>
-                  </View>
-                  {!ended && timeRemaining ? (
-                    <View style={detailStyles.heroTimePill}>
-                      <Ionicons name="time-outline" size={11} color={GOLD} />
-                      <Text style={detailStyles.heroTimePillText}>{timeRemaining}</Text>
-                    </View>
-                  ) : null}
-                  <View style={[detailStyles.heroCategoryTag, { borderColor: `${categoryColor}66` }]}>
-                    <View style={[detailStyles.heroCategoryDot, { backgroundColor: categoryColor }]} />
-                    <Text style={[detailStyles.heroCategoryText, { color: categoryColor }]}>{category.toUpperCase()}</Text>
-                  </View>
-                </View>
-
-                {/* Body */}
                 <View style={detailStyles.body}>
-                  <Text style={detailStyles.tierLabel}>{tierLabel}</Text>
-                  <Text style={detailStyles.title}>{detail.title}</Text>
-
-                  <View style={detailStyles.proposerRow}>
-                    <View style={detailStyles.proposerAvatar}>
-                      <Text style={detailStyles.proposerDot}>·</Text>
+                  {/* Meta row: scope pill · category tag · clock */}
+                  <View style={detailStyles.metaRow}>
+                    {!!scopeLabel && (
+                      <View style={detailStyles.scopePill}>
+                        <Text style={detailStyles.scopePillText}>{scopeLabel}</Text>
+                      </View>
+                    )}
+                    <View style={[detailStyles.categoryPill, { borderColor: `${catColor}40`, backgroundColor: `${catColor}17` }]}>
+                      <Text style={[detailStyles.categoryPillText, { color: catColor }]}>{category}</Text>
                     </View>
-                    <Text style={detailStyles.proposerText}>
-                      Proposed by <Text style={{ color: FG }}>{detail.creatorName || 'Community Member'}</Text>
+                    <Text style={[detailStyles.metaClock, { color: ended ? PD_TX3 : GOLD }]}>
+                      {ended ? closedLabel : timeRemaining ? timeRemaining.toUpperCase() : ''}
                     </Text>
                   </View>
 
-                  <Text style={detailStyles.description}>{detail.description}</Text>
+                  {/* The question is the hero */}
+                  <Text style={detailStyles.title}>{detail.title}</Text>
 
-                  {/* Sentiment ledger */}
-                  {total === 0 ? (
-                    <View style={detailStyles.sentimentSection}>
-                      <View style={detailStyles.sentimentBarEmpty} />
-                      <Text style={detailStyles.noVotesText}>No votes yet</Text>
-                    </View>
+                  <Text style={detailStyles.proposer}>
+                    Proposed by <Text style={detailStyles.proposerName}>{detail.creatorName || 'Community Member'}</Text>
+                    {createdLabel ? ` · ${createdLabel}` : ''}
+                  </Text>
+
+                  {!!detail.description && <Text style={detailStyles.description}>{detail.description}</Text>}
+
+                  {/* ── Tally + actions, by state ─────────────────────────── */}
+                  {ended ? (
+                    // PD4 · ended — verdict card, then your-vote row, then Results route
+                    <>
+                      {aboveThreshold ? (
+                        <View style={[detailStyles.card, { borderColor: passed ? 'rgba(52,211,153,0.3)' : 'rgba(248,113,113,0.3)' }]}>
+                          <View style={detailStyles.cardHeaderRow}>
+                            <View style={detailStyles.verdictChip}>
+                              <Ionicons
+                                name={passed ? 'checkmark' : 'close'}
+                                size={12}
+                                color={passed ? PD_SUP : PD_OPP}
+                              />
+                              <Text style={[detailStyles.verdictText, { color: passed ? PD_SUP : PD_OPP }]}>
+                                {passed ? 'PASSED' : 'DID NOT PASS'}
+                              </Text>
+                            </View>
+                            <Text style={detailStyles.cardMono}>{total.toLocaleString()} VERIFIED · FINAL</Text>
+                          </View>
+                          {tallySplit}
+                          <Text style={detailStyles.cardFootnote}>
+                            Result recorded permanently. Anyone can audit the count on the public ledger.
+                          </Text>
+                        </View>
+                      ) : (
+                        earlyVotingCard
+                      )}
+                      {receiptRow}
+                      <TouchableOpacity
+                        style={detailStyles.resultsCard}
+                        activeOpacity={0.75}
+                        onPress={() => {
+                          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                          closeProposal();
+                          router.push('/(tabs)/results');
+                        }}
+                      >
+                        <View style={{ flex: 1 }}>
+                          <Text style={detailStyles.resultsCardTitle}>See full results</Text>
+                          <Text style={detailStyles.resultsCardSub}>Turnout, geography, and the audit trail</Text>
+                        </View>
+                        <Ionicons name="arrow-forward" size={16} color={PD_TX2} />
+                      </TouchableOpacity>
+                    </>
+                  ) : detailHasVoted ? (
+                    // PD3 · voted — gold receipt, then the revealed tally
+                    <>
+                      {receiptRow}
+                      {aboveThreshold ? (
+                        <View style={detailStyles.card}>
+                          <View style={detailStyles.cardHeaderRow}>
+                            <Text style={detailStyles.cardLabel}>LIVE TALLY</Text>
+                            <Text style={detailStyles.cardMono}>{total.toLocaleString()} VERIFIED</Text>
+                          </View>
+                          {tallySplit}
+                        </View>
+                      ) : (
+                        earlyVotingCard
+                      )}
+                    </>
+                  ) : !eligible ? (
+                    // PD5 · not eligible — full tally shown (they can't be swayed
+                    // into a vote they can't cast) + an honest explanation card
+                    <>
+                      {aboveThreshold ? (
+                        <View style={detailStyles.card}>
+                          <View style={detailStyles.cardHeaderRow}>
+                            <Text style={detailStyles.cardLabel}>LIVE COUNT</Text>
+                            <Text style={detailStyles.cardMono}>{total.toLocaleString()} BALLOTS CAST</Text>
+                          </View>
+                          {tallySplit}
+                        </View>
+                      ) : (
+                        earlyVotingCard
+                      )}
+                      <View style={detailStyles.eligCard}>
+                        <View style={detailStyles.eligHeaderRow}>
+                          <View style={detailStyles.eligIconTile}>
+                            <Ionicons
+                              name={isUnverifiedGeo ? 'shield-outline' : 'location-outline'}
+                              size={17}
+                              color={PD_TX2}
+                            />
+                          </View>
+                          <View style={{ flex: 1 }}>
+                            <Text style={detailStyles.eligTitle}>
+                              {isUnverifiedGeo
+                                ? 'Verify to cast your ballot'
+                                : regionName
+                                  ? `This ballot belongs to ${regionName} residents`
+                                  : 'Your ballot doesn’t count here'}
+                            </Text>
+                            <Text style={detailStyles.eligBody}>
+                              {isUnverifiedGeo
+                                ? 'Regional ballots are one person, one ballot — verified by government ID. You can watch the count and read the discussion.'
+                                : `${residence ? `Your verified residence is ${residence}, so your` : 'Your'} ballot doesn’t count here. You can watch the count and read the discussion.`}
+                            </Text>
+                          </View>
+                        </View>
+                        {isUnverifiedGeo && (
+                          <TouchableOpacity
+                            style={detailStyles.verifyCta}
+                            activeOpacity={0.85}
+                            onPress={() => {
+                              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                              closeProposal();
+                              setVerificationModalType('vote');
+                              setShowVerificationModal(true);
+                            }}
+                          >
+                            <Text style={detailStyles.verifyCtaText}>Verify my identity</Text>
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                      <Text style={detailStyles.ledgerLine}>ELIGIBILITY COMES FROM YOUR VERIFIED ID — NOT A SETTING</Text>
+                    </>
                   ) : (
-                    <View style={detailStyles.sentimentSection}>
-                      <View style={detailStyles.sentimentBar}>
-                        <View style={[detailStyles.sentimentFillSupport, { width: `${pct}%` }]} />
-                        <View style={[detailStyles.sentimentFillOppose, { width: `${100 - pct}%` }]} />
-                      </View>
-                      <View style={detailStyles.sentimentStats}>
-                        <View style={detailStyles.sentimentStat}>
-                          <Text style={[detailStyles.sentimentNum, { color: GREEN }]}>{(detail.supportVotes || 0).toLocaleString()}</Text>
-                          <Text style={detailStyles.sentimentLabel}>SUPPORT</Text>
+                    // PD1/PD2 · open, eligible, not voted — count card + vote actions
+                    <>
+                      {!aboveThreshold ? (
+                        earlyVotingCard
+                      ) : detailSplitRevealed ? (
+                        <View style={detailStyles.card}>
+                          <View style={detailStyles.cardHeaderRow}>
+                            <Text style={detailStyles.cardLabel}>LIVE COUNT</Text>
+                            <Text style={detailStyles.cardMono}>{total.toLocaleString()} BALLOTS CAST</Text>
+                          </View>
+                          {tallySplit}
                         </View>
-                        <View style={detailStyles.sentimentPct}>
-                          <Text style={detailStyles.sentimentPctText}>{pct}%</Text>
+                      ) : (
+                        <View style={detailStyles.card}>
+                          <View style={detailStyles.cardHeaderRow}>
+                            <Text style={detailStyles.cardLabel}>LIVE COUNT</Text>
+                            <Text style={detailStyles.cardMono}>{total.toLocaleString()} BALLOTS CAST</Text>
+                          </View>
+                          <View style={detailStyles.hiddenSplitRow}>
+                            <Ionicons name="eye-off-outline" size={13} color={PD_TX3} />
+                            <Text style={[detailStyles.cardFootnote, { flex: 1 }]}>
+                              The split is hidden until you vote — decide on the question, not the crowd.
+                            </Text>
+                          </View>
+                          <Text
+                            style={detailStyles.revealLink}
+                            onPress={() => {
+                              Haptics.selectionAsync();
+                              setDetailSplitRevealed(true);
+                            }}
+                          >
+                            Show current split anyway
+                          </Text>
                         </View>
-                        <View style={detailStyles.sentimentStatRight}>
-                          <Text style={[detailStyles.sentimentNum, { color: RED }]}>{(detail.opposeVotes || 0).toLocaleString()}</Text>
-                          <Text style={detailStyles.sentimentLabel}>OPPOSE</Text>
-                        </View>
-                      </View>
-                      <Text style={detailStyles.totalVoices}>{total.toLocaleString()} total voices</Text>
-                    </View>
-                  )}
-
-                  {/* Vote actions */}
-                  <View style={detailStyles.actionRow}>
-                    {ended ? (
-                      <View style={detailStyles.statusBanner}>
-                        <Ionicons name="flag-outline" size={14} color={RED} />
-                        <Text style={[detailStyles.statusBannerText, { color: RED }]}>Voting has ended</Text>
-                      </View>
-                    ) : detailHasVoted ? (
-                      <View style={detailStyles.statusBanner}>
-                        {/* Committed ballot renders gold — the act, per the design's color rules. */}
-                        <Ionicons name="checkmark-circle" size={14} color={GOLD} />
-                        <Text style={[detailStyles.statusBannerText, { color: GOLD }]}>Ballot cast · on the public ledger</Text>
-                      </View>
-                    ) : (
+                      )}
                       <View style={detailStyles.voteActions}>
                         <TouchableOpacity
                           style={[detailStyles.voteBtn, detailStyles.voteBtnSupport, detailIsVoting && { opacity: 0.5 }]}
                           onPress={() => {
-                            if (!detail) return;
                             const p = detail;
                             closeProposal();
                             // Route through the mandatory X1 confirm sheet — never cast directly.
@@ -2384,18 +2641,14 @@ export default function ProposalsScreen() {
                           activeOpacity={0.7}
                         >
                           {detailIsVoting ? (
-                            <ActivityIndicator size="small" color={GREEN} />
+                            <ActivityIndicator size="small" color={PD_SUP} />
                           ) : (
-                            <>
-                              <Ionicons name="checkmark" size={16} color={GREEN} />
-                              <Text style={[detailStyles.voteBtnText, { color: GREEN }]}>Support</Text>
-                            </>
+                            <Text style={[detailStyles.voteBtnText, { color: PD_SUP }]}>Support</Text>
                           )}
                         </TouchableOpacity>
                         <TouchableOpacity
                           style={[detailStyles.voteBtn, detailStyles.voteBtnOppose, detailIsVoting && { opacity: 0.5 }]}
                           onPress={() => {
-                            if (!detail) return;
                             const p = detail;
                             closeProposal();
                             // Route through the mandatory X1 confirm sheet — never cast directly.
@@ -2405,20 +2658,20 @@ export default function ProposalsScreen() {
                           activeOpacity={0.7}
                         >
                           {detailIsVoting ? (
-                            <ActivityIndicator size="small" color={RED} />
+                            <ActivityIndicator size="small" color={PD_OPP} />
                           ) : (
-                            <>
-                              <Ionicons name="close" size={16} color={RED} />
-                              <Text style={[detailStyles.voteBtnText, { color: RED }]}>Oppose</Text>
-                            </>
+                            <Text style={[detailStyles.voteBtnText, { color: PD_OPP }]}>Oppose</Text>
                           )}
                         </TouchableOpacity>
                       </View>
-                    )}
-                  </View>
+                      <Text style={detailStyles.ledgerLine}>RECORDED ON THE PUBLIC LEDGER · ONE PERSON, ONE BALLOT</Text>
+                    </>
+                  )}
+
+                  <View style={detailStyles.sectionDivider} />
                 </View>
 
-                {/* Discussion */}
+                {/* Voices */}
                 {detail?.id != null && (
                   <View style={{ paddingHorizontal: SPACING.lg }}>
                     <CommentsSection proposalId={detail.id} />
@@ -2642,39 +2895,12 @@ export default function ProposalsScreen() {
               </View>
             </View>
 
-            {/* IMAGE — optional, same picker logic */}
-            <View style={createStyles.section}>
-              <Text style={[createStyles.sectionLabel, { color: colors.textTertiary }]}>IMAGE · OPTIONAL</Text>
-              <TouchableOpacity
-                style={[createStyles.imageCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
-                onPress={pickImage}
-                activeOpacity={0.8}
-                accessibilityRole="button"
-                accessibilityLabel="Add an image"
-              >
-                {newProposal.imageUri ? (
-                  <Image source={{ uri: newProposal.imageUri }} style={createStyles.imagePreview} />
-                ) : (
-                  <View style={createStyles.imageEmpty}>
-                    <Ionicons name="image-outline" size={26} color={colors.textTertiary} />
-                    <Text style={[createStyles.imageEmptyText, { color: colors.textTertiary }]}>
-                      Tap to add image
-                    </Text>
-                  </View>
-                )}
-              </TouchableOpacity>
-              {!!newProposal.imageUri && (
-                <TouchableOpacity
-                  style={createStyles.imageRemoveBtn}
-                  onPress={() => setNewProposal((p) => ({ ...p, imageUri: '' }))}
-                  accessibilityRole="button"
-                  accessibilityLabel="Remove image"
-                >
-                  <Ionicons name="trash-outline" size={14} color={colors.error} />
-                  <Text style={[createStyles.imageRemoveText, { color: colors.error }]}>Remove</Text>
-                </TouchableOpacity>
-              )}
-            </View>
+            {/* Image picker removed per the design's "no mood photography on
+                ballots" rule — the feed never renders images and the ballot
+                should win on the question alone. Existing proposals with
+                images still display them in the detail view, and the upload
+                plumbing (pickImage, imageUri) stays for a future captioned
+                functional-attachments feature. */}
 
             {/* SCOPE — geo reach chips; non-global scopes still gate on verification */}
             <View style={createStyles.section}>
@@ -3166,7 +3392,17 @@ export default function ProposalsScreen() {
         voteType={pendingVote?.vote ?? lastVoteType}
         question={pendingVote?.proposal.title}
         onConfirm={confirmPendingVote}
-        onDismiss={() => setPendingVote(null)}
+        castState={pendingCastState}
+        onRetry={confirmPendingVote}
+        onDismiss={() => {
+          // Capture the seal outcome BEFORE clearing it — the S2a momentum
+          // promo may only fire after a confirmed cast, and only once the
+          // seal sheet has fully dismissed (never stacked on the seal).
+          const wasConfirmed = pendingCastState === 'confirmed';
+          setPendingVote(null);
+          setPendingCastState(undefined);
+          maybeShowMomentumPromo(wasConfirmed);
+        }}
         onShare={() => {
           // Return the Share promise so the seal sheet stays mounted while
           // the native share dialog is presenting.
@@ -3177,6 +3413,19 @@ export default function ProposalsScreen() {
 
       {/* P3 · How voting works — rules sheet, opened from the queue's info glyph */}
       <HowVotingWorksSheet visible={showHowVoting} onClose={() => setShowHowVoting(false)} />
+
+      {/* S2 · Premium promo sheet — momentum (post-ballot) and creation gate.
+          One gold CTA to the paywall, equal-weight dismiss, capped frequency. */}
+      <PremiumPromoSheet
+        visible={!!promoSheet}
+        variant={promoSheet?.variant ?? 'momentum'}
+        context={promoSheet?.context}
+        onClose={() => setPromoSheet(null)}
+        onSeePremium={() => {
+          setPromoSheet(null);
+          router.push('/modals/subscription');
+        }}
+      />
 
       {/* 2a · Observer region picker — regions derived from the open
           proposals' actual geoRestrictions. Display scoping ONLY; it never
@@ -3354,290 +3603,327 @@ const detailStyles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 18,
+    paddingHorizontal: 24,
     paddingTop: 14,
-    paddingBottom: 8,
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    zIndex: 10,
+    paddingBottom: 4,
   },
   headerBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(4,7,7,0.55)',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: PD_SF,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
+    borderColor: PD_BDS,
     alignItems: 'center',
     justifyContent: 'center',
   },
   scrollContent: {
     paddingBottom: 20,
   },
-  // Hero
-  hero: {
-    width: '100%',
-    height: 320,
-    position: 'relative',
-    overflow: 'hidden',
-    backgroundColor: BG_RAISED,
-  },
-  heroLocationPill: {
-    position: 'absolute',
-    top: 64,
-    left: 18,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 7,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 999,
-    backgroundColor: 'rgba(4,7,7,0.55)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
-  },
-  heroLocationText: {
-    fontSize: 11,
-    fontFamily: FONTS.sansMedium,
-    color: FG,
-    letterSpacing: -0.2,
-  },
-  heroTimePill: {
-    position: 'absolute',
-    top: 64,
-    right: 18,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 11,
-    paddingVertical: 6,
-    borderRadius: 999,
-    backgroundColor: 'rgba(4,7,7,0.55)',
-    borderWidth: 1,
-    borderColor: `${GOLD}55`,
-  },
-  heroTimePillText: {
-    fontSize: 10.5,
-    fontFamily: FONTS.sansSemiBold,
-    color: GOLD,
-    letterSpacing: 0.3,
-  },
-  heroCategoryTag: {
-    position: 'absolute',
-    bottom: 18,
-    left: 18,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 4,
-    backgroundColor: 'rgba(4,7,7,0.7)',
-    borderWidth: 1,
-  },
-  heroCategoryDot: {
-    width: 4,
-    height: 4,
-    borderRadius: 2,
-  },
-  heroCategoryText: {
-    fontFamily: MONO_FONT,
-    fontSize: 9.5,
-    letterSpacing: 1.4,
-  },
   // Body
   body: {
-    paddingHorizontal: 22,
-    paddingTop: 22,
+    paddingHorizontal: 26,
+    paddingTop: 14,
   },
-  tierLabel: {
-    fontFamily: MONO_FONT,
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flexWrap: 'wrap',
+    marginBottom: 16,
+  },
+  scopePill: {
+    backgroundColor: PD_SFH,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 100,
+  },
+  scopePillText: {
+    fontFamily: FONTS.sansSemiBold,
     fontSize: 9.5,
-    color: FG_FAINT,
-    letterSpacing: 1.6,
-    textTransform: 'uppercase',
-    marginBottom: 10,
+    letterSpacing: 1.14,
+    color: PD_TX3,
+  },
+  categoryPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 100,
+    borderWidth: 1,
+  },
+  categoryPillText: {
+    fontFamily: FONTS.sansSemiBold,
+    fontSize: 9.5,
+    letterSpacing: 1.14,
+  },
+  metaClock: {
+    marginLeft: 'auto',
+    fontFamily: MONO_FONT,
+    fontSize: 10.5,
+    fontVariant: ['tabular-nums'],
   },
   title: {
     fontFamily: SERIF_FONT,
-    fontSize: 30,
-    lineHeight: 36,
+    fontSize: 28,
+    lineHeight: 34.5,
     color: FG,
-    letterSpacing: -0.5,
-    marginBottom: 16,
+    letterSpacing: -0.34,
+    marginBottom: 14,
   },
-  proposerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 9,
+  proposer: {
+    fontFamily: FONTS.sans,
+    fontSize: 12.5,
+    color: PD_TX3,
+    marginBottom: 14,
+  },
+  proposerName: {
+    fontFamily: FONTS.sansSemiBold,
+    color: PD_TX2,
+  },
+  description: {
+    fontFamily: FONTS.sans,
+    fontSize: 14,
+    lineHeight: 23,
+    color: PD_TX2,
     marginBottom: 18,
   },
-  proposerAvatar: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: BG_RAISED,
+  // Count / tally cards
+  card: {
+    backgroundColor: PD_SF,
     borderWidth: 1,
-    borderColor: LINE_STRONG,
+    borderColor: PD_BDS,
+    borderRadius: 18,
+    paddingVertical: 16,
+    paddingHorizontal: 18,
+    gap: 11,
+    marginBottom: 16,
+  },
+  cardHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'baseline',
+    gap: 8,
+  },
+  cardLabel: {
+    fontFamily: FONTS.sansSemiBold,
+    fontSize: 10,
+    letterSpacing: 1.4,
+    color: PD_TX3,
+  },
+  cardMono: {
+    fontFamily: MONO_FONT,
+    fontSize: 11.5,
+    color: FG,
+    fontVariant: ['tabular-nums'],
+  },
+  cardFootnote: {
+    fontFamily: FONTS.sans,
+    fontSize: 11.5,
+    lineHeight: 17,
+    color: PD_TX3,
+  },
+  dotsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 5,
+  },
+  dot: {
+    width: 9,
+    height: 9,
+    borderRadius: 5,
+  },
+  hiddenSplitRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  revealLink: {
+    fontFamily: FONTS.sansMedium,
+    fontSize: 11.5,
+    color: PD_TX2,
+    textDecorationLine: 'underline',
+  },
+  tallyTrack: {
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: PD_OPP,
+    overflow: 'hidden',
+  },
+  tallyFill: {
+    height: '100%',
+    backgroundColor: PD_SUP,
+  },
+  tallyMidline: {
+    position: 'absolute',
+    left: '50%',
+    top: 0,
+    bottom: 0,
+    width: 1.5,
+    backgroundColor: FG,
+    opacity: 0.4,
+  },
+  tallySplitRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  tallySplitText: {
+    fontFamily: MONO_FONT,
+    fontSize: 10.5,
+    fontVariant: ['tabular-nums'],
+  },
+  verdictChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+  },
+  verdictText: {
+    fontFamily: FONTS.sansSemiBold,
+    fontSize: 10,
+    letterSpacing: 1.4,
+  },
+  // Gold receipt row — the screen's one gold moment
+  receiptRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: 'rgba(234,186,88,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(234,186,88,0.3)',
+    borderRadius: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    marginBottom: 16,
+  },
+  receiptIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: 'rgba(234,186,88,0.15)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  proposerDot: {
-    fontSize: 16,
-    color: GOLD,
-    lineHeight: 16,
-    marginTop: -4,
-  },
-  proposerText: {
-    fontSize: 12.5,
-    color: FG_MUTED,
-    letterSpacing: -0.1,
-  },
-  description: {
-    fontSize: 14.5,
-    lineHeight: 22,
-    color: FG_MUTED,
-    letterSpacing: -0.1,
-    marginBottom: 26,
-  },
-  // Sentiment
-  sentimentSection: {
-    paddingTop: 18,
-    paddingBottom: 6,
-    borderTopWidth: 1,
-    borderTopColor: LINE_COLOR,
-    marginBottom: 22,
-  },
-  sentimentBar: {
-    height: 7,
-    borderRadius: 3.5,
-    overflow: 'hidden',
-    flexDirection: 'row',
-    backgroundColor: LINE_COLOR,
-    marginBottom: 12,
-  },
-  sentimentBarEmpty: {
-    height: 7,
-    borderRadius: 3.5,
-    backgroundColor: LINE_COLOR,
-    marginBottom: 12,
-  },
-  sentimentFillSupport: {
-    height: '100%',
-    backgroundColor: GREEN,
-  },
-  sentimentFillOppose: {
-    height: '100%',
-    backgroundColor: RED,
-    opacity: 0.85,
-  },
-  sentimentStats: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  sentimentStat: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: 7,
-  },
-  sentimentStatRight: {
-    flexDirection: 'row-reverse',
-    alignItems: 'baseline',
-    gap: 7,
-  },
-  sentimentNum: {
-    fontFamily: SERIF_FONT,
-    fontSize: 22,
-    letterSpacing: -0.5,
-  },
-  sentimentLabel: {
-    fontSize: 10.5,
-    fontFamily: FONTS.sansMedium,
-    color: FG_FAINT,
-    letterSpacing: 1.4,
-    textTransform: 'uppercase',
-  },
-  sentimentPct: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 4,
-    backgroundColor: BG_RAISED,
-    borderWidth: 1,
-    borderColor: LINE_STRONG,
-  },
-  sentimentPctText: {
-    fontFamily: MONO_FONT,
-    fontSize: 11,
+  receiptTitle: {
+    fontFamily: FONTS.sansSemiBold,
+    fontSize: 13.5,
     color: FG,
-    letterSpacing: 0.3,
   },
-  noVotesText: {
-    fontSize: 12,
-    fontFamily: FONTS.sansMedium,
-    color: FG_FAINT,
-    letterSpacing: 0.4,
-    textAlign: 'center',
-    marginTop: 4,
-  },
-  totalVoices: {
+  receiptMeta: {
     fontFamily: MONO_FONT,
-    fontSize: 10.5,
-    color: FG_FAINT,
-    letterSpacing: 1.2,
-    textTransform: 'uppercase',
-    textAlign: 'center',
-    marginTop: 14,
+    fontSize: 10,
+    color: PD_TX3,
+    letterSpacing: 0.5,
+    marginTop: 2,
+    fontVariant: ['tabular-nums'],
   },
-  // Actions
-  actionRow: {
-    marginTop: 4,
-  },
+  // Vote actions (PD1/PD2)
   voteActions: {
     flexDirection: 'row',
-    gap: 12,
+    gap: 10,
+    marginBottom: 14,
   },
   voteBtn: {
     flex: 1,
-    flexDirection: 'row',
+    height: 58,
+    borderRadius: 16,
+    borderWidth: 1.5,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 16,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    backgroundColor: 'transparent',
   },
   voteBtnSupport: {
-    borderColor: GREEN,
-    backgroundColor: `${GREEN}10`,
+    backgroundColor: 'rgba(52,211,153,0.08)',
+    borderColor: 'rgba(52,211,153,0.35)',
   },
   voteBtnOppose: {
-    borderColor: RED,
-    backgroundColor: `${RED}10`,
+    backgroundColor: 'rgba(248,113,113,0.07)',
+    borderColor: 'rgba(248,113,113,0.3)',
   },
   voteBtnText: {
-    fontSize: 14,
     fontFamily: FONTS.sansSemiBold,
-    letterSpacing: 0.3,
+    fontSize: 16,
   },
-  statusBanner: {
+  ledgerLine: {
+    fontFamily: MONO_FONT,
+    fontSize: 9.5,
+    letterSpacing: 1.33,
+    color: PD_TX3,
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  // PD5 eligibility card
+  eligCard: {
+    backgroundColor: PD_SF,
+    borderWidth: 1,
+    borderColor: PD_BD,
+    borderRadius: 18,
+    paddingVertical: 17,
+    paddingHorizontal: 18,
+    gap: 12,
+    marginBottom: 14,
+  },
+  eligHeaderRow: {
     flexDirection: 'row',
+    gap: 12,
+  },
+  eligIconTile: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: PD_SFH,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 14,
-    borderRadius: 10,
-    backgroundColor: BG_RAISED,
-    borderWidth: 1,
-    borderColor: LINE_STRONG,
   },
-  statusBannerText: {
-    fontSize: 13,
+  eligTitle: {
     fontFamily: FONTS.sansSemiBold,
-    letterSpacing: 0.3,
+    fontSize: 13.5,
+    color: FG,
+  },
+  eligBody: {
+    fontFamily: FONTS.sans,
+    fontSize: 11.5,
+    lineHeight: 16.5,
+    color: PD_TX3,
+    marginTop: 2,
+  },
+  verifyCta: {
+    height: 46,
+    borderRadius: 13,
+    backgroundColor: GOLD,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  verifyCtaText: {
+    fontFamily: FONTS.sansSemiBold,
+    fontSize: 13.5,
+    color: '#040707',
+  },
+  // PD4 results route
+  resultsCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: PD_SF,
+    borderWidth: 1,
+    borderColor: PD_BDS,
+    borderRadius: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    marginBottom: 16,
+  },
+  resultsCardTitle: {
+    fontFamily: FONTS.sansSemiBold,
+    fontSize: 13,
+    color: FG,
+  },
+  resultsCardSub: {
+    fontFamily: FONTS.sans,
+    fontSize: 11.5,
+    color: PD_TX3,
+    marginTop: 1,
+  },
+  sectionDivider: {
+    height: 1,
+    backgroundColor: PD_BDS,
+    marginBottom: 6,
   },
 });
 
@@ -4314,7 +4600,9 @@ const feedStyles = StyleSheet.create({
     fontSize: 11,
     paddingHorizontal: 7,
     paddingVertical: 1,
-    borderRadius: 100,
+    // Radius must stay below half the rendered height — larger values on a
+    // backgrounded Text render as broken lens shapes on iOS.
+    borderRadius: 8,
     overflow: 'hidden',
     fontVariant: ['tabular-nums'],
   },

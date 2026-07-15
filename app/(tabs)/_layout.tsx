@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Tabs, router } from 'expo-router';
 import { View, StyleSheet, Platform, Modal } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -13,6 +13,7 @@ import Animated, {
 import { useTheme, ANIMATION, FONTS } from '../../lib/theme';
 import { useAuthStore } from '../../lib/auth';
 import { Onboarding, hasCompletedOnboarding, resetOnboarding } from '../../components/Onboarding';
+import { AppOpenInterstitial, shouldShowPromo, markPromoShown } from '../../components/ui';
 import {
   registerForPushNotifications,
   savePushTokenToServer,
@@ -96,6 +97,38 @@ export default function TabLayout() {
   const handleOnboardingComplete = () => {
     setShowOnboarding(false);
   };
+
+  // ── S3a · App-open interstitial ──────────────────────────────────────
+  // Full-screen Premium takeover on tab-layout mount. Manners: only after
+  // onboarding is settled, never in the same session onboarding was shown,
+  // only for authenticated non-premium non-demo users, at most once per
+  // session, and capped by the global promo timestamp ("once a month" is
+  // printed on its face, so shouldShowPromo('app-open') enforces 30 days).
+  const [showInterstitial, setShowInterstitial] = useState(false);
+  const interstitialAttemptedRef = useRef(false);
+  const onboardingShownThisSessionRef = useRef(false);
+  useEffect(() => {
+    if (showOnboarding) onboardingShownThisSessionRef.current = true;
+  }, [showOnboarding]);
+
+  useEffect(() => {
+    if (!onboardingChecked || showOnboarding) return;
+    if (onboardingShownThisSessionRef.current) return; // never same session as onboarding
+    if (interstitialAttemptedRef.current) return; // once per session
+    if (!user?.id || !token || user.email === DEMO_EMAIL) return;
+    const isPremiumUser = !!user.isPremium || user.subscriptionStatus === 'active';
+    if (isPremiumUser) return;
+    interstitialAttemptedRef.current = true;
+    let alive = true;
+    shouldShowPromo('app-open')
+      .then((ok) => {
+        if (!alive || !ok) return;
+        markPromoShown('app-open');
+        setShowInterstitial(true);
+      })
+      .catch(() => { /* promo is best-effort */ });
+    return () => { alive = false; };
+  }, [onboardingChecked, showOnboarding, user?.id, user?.email, user?.isPremium, user?.subscriptionStatus, token]);
 
   // Push notification registration. Waits until onboarding is settled so
   // the iOS permission prompt never stacks on the onboarding modal. iOS
@@ -232,6 +265,17 @@ export default function TabLayout() {
     >
       <Onboarding onComplete={handleOnboardingComplete} />
     </Modal>
+
+    {/* S3a · App-open Premium interstitial (own full-screen Modal). The ✕ is
+        full-size from frame one; the dismiss is named for where it goes. */}
+    <AppOpenInterstitial
+      visible={showInterstitial}
+      onClose={() => setShowInterstitial(false)}
+      onSeePremium={() => {
+        setShowInterstitial(false);
+        router.push('/modals/subscription');
+      }}
+    />
     </>
   );
 }
