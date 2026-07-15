@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { View, StyleSheet, ActivityIndicator, Text, TouchableOpacity } from 'react-native';
+import { View, StyleSheet, ActivityIndicator, Text, TouchableOpacity, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 import { useLocalSearchParams, router } from 'expo-router';
@@ -9,7 +9,9 @@ import { useTheme, FONTS } from '../../lib/theme';
 import { veriffApi, kycApi } from '../../lib/api';
 import { useAuthStore } from '../../lib/auth';
 
-type ErrorState = null | 'no-session' | 'webview-error' | 'cancelled';
+type ErrorState = null | 'no-session' | 'webview-error' | 'cancelled' | 'duplicate';
+
+const SUPPORT_EMAIL = 'support@representvote.com';
 
 // Only load KYC-provider URLs in the WebView. The session URL comes from
 // our backend, but defense-in-depth: a compromised response or MITM'd
@@ -78,7 +80,15 @@ export default function VeriffScreen() {
   const handleVerificationComplete = useCallback(async () => {
     try {
       if (verificationId) {
-        await kycApi.checkDecision(verificationId);
+        const decision = await kycApi.checkDecision(verificationId);
+        // P2 · the provider approved the documents but this identity has
+        // already verified a different account — the server refused the
+        // claim. Show the duplicate-identity screen instead of the profile.
+        if (decision.data?.reason === 'duplicate_identity') {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+          setErrorState('duplicate');
+          return;
+        }
       }
     } catch {
       /* non-fatal */
@@ -168,9 +178,93 @@ export default function VeriffScreen() {
     </TouchableOpacity>
   );
 
+  // ── P2 · duplicate identity detected ─────────────────────────────────
+  // The documents were genuine — but this identity already verified a
+  // different account. One person, one account: no retry offered. The two
+  // honest paths are "sign in to the account you verified first" and
+  // "report it" (someone may have used their ID).
+  if (errorState === 'duplicate') {
+    const caseRef = `RV-DUP-${String(verificationId || '').replace(/[^a-zA-Z0-9]/g, '').slice(-5).toUpperCase() || 'REVIEW'}`;
+    const reportSubject = encodeURIComponent(`Duplicate identity report — CASE ${caseRef}`);
+    const reportBody = encodeURIComponent(
+      `I attempted to verify my identity and was told my ID is already attached to another Represent account. That wasn't me.\n\nCase: ${caseRef}\n\nPlease investigate.`,
+    );
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+        <View style={styles.brandedBody}>
+          <View style={styles.topRow}>
+            {CloseCircle}
+            <Text style={[styles.caseLabel, { color: colors.textTertiary }]}>CASE {caseRef}</Text>
+          </View>
+
+          <View style={styles.errorCenter}>
+            <View style={[styles.errorCircle, { backgroundColor: colors.warningSurface, borderColor: `${colors.warning}4D` }]}>
+              <Ionicons name="shield-outline" size={38} color={colors.warning} />
+            </View>
+            <Text style={[styles.errorTitle, { color: colors.text }]}>This identity is already verified</Text>
+            <Text style={[styles.errorSubtitle, { color: colors.textSecondary }]}>
+              One person, one ballot means an identity can only ever hold one account. This ID is
+              already attached to another verified account.
+            </Text>
+
+            {/* A / B paths */}
+            <View style={[styles.checklistCard, { backgroundColor: colors.surface, borderColor: colors.borderSubtle, paddingVertical: 14 }]}>
+              <View style={styles.dupPathRow}>
+                <Text style={[styles.dupPathKey, { color: colors.gold }]}>A</Text>
+                <Text style={[styles.dupPathText, { color: colors.textSecondary }]}>
+                  <Text style={[styles.dupPathLead, { color: colors.text }]}>That was me.</Text>
+                  {' '}Sign in to your existing account — your record and verification are intact.
+                </Text>
+              </View>
+              <View style={[styles.dupPathDivider, { backgroundColor: colors.borderSubtle }]} />
+              <View style={styles.dupPathRow}>
+                <Text style={[styles.dupPathKey, { color: colors.error }]}>B</Text>
+                <Text style={[styles.dupPathText, { color: colors.textSecondary }]}>
+                  <Text style={[styles.dupPathLead, { color: colors.text }]}>That wasn't me.</Text>
+                  {' '}Someone may have used your ID. Report it and a human will investigate.
+                </Text>
+              </View>
+            </View>
+          </View>
+
+          <View style={styles.bottomStack}>
+            <TouchableOpacity
+              style={[styles.primaryButton, { backgroundColor: colors.goldFill }]}
+              activeOpacity={0.8}
+              accessibilityRole="button"
+              onPress={async () => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                try {
+                  await useAuthStore.getState().logout();
+                } catch { /* proceed regardless */ }
+                router.replace('/');
+              }}
+            >
+              <Text style={styles.primaryButtonText}>Sign In to My Account</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.dupReportButton, { borderColor: `${colors.error}80` }]}
+              activeOpacity={0.8}
+              accessibilityRole="button"
+              onPress={() => {
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+                Linking.openURL(`mailto:${SUPPORT_EMAIL}?subject=${reportSubject}&body=${reportBody}`);
+              }}
+            >
+              <Text style={[styles.dupReportText, { color: colors.error }]}>Report — This Wasn't Me</Text>
+            </TouchableOpacity>
+            <Text style={[styles.attemptLine, { color: colors.textTertiary }]}>
+              Nothing about this attempt is recorded on the ledger
+            </Text>
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   // ── P1 · failure / decline states — honest retry layout ─────────────
   if (errorState) {
-    const messages: Record<Exclude<ErrorState, null>, { title: string; subtitle: string; icon: keyof typeof Ionicons.glyphMap }> = {
+    const messages: Record<Exclude<ErrorState, null | 'duplicate'>, { title: string; subtitle: string; icon: keyof typeof Ionicons.glyphMap }> = {
       'no-session': {
         title: "Couldn't start verification",
         subtitle: 'No verification session was found. Nothing was saved. Tap Try Again to start a new one.',
@@ -187,7 +281,7 @@ export default function VeriffScreen() {
         icon: 'card-outline',
       },
     };
-    const msg = messages[errorState];
+    const msg = messages[errorState as Exclude<ErrorState, null | 'duplicate'>];
     const attempt = Math.min(failures + 1, 5);
 
     return (
@@ -397,6 +491,16 @@ const styles = StyleSheet.create({
   trustCard: { flexDirection: 'row', gap: 11, alignItems: 'flex-start', borderWidth: 1, borderRadius: 14, paddingVertical: 13, paddingHorizontal: 15 },
   trustText: { flex: 1, fontFamily: FONTS.sans, fontSize: 12, lineHeight: 18 },
   trustLead: { fontFamily: FONTS.sansSemiBold },
+
+  // P2 duplicate identity
+  caseLabel: { fontFamily: FONTS.mono, fontSize: 10.5, letterSpacing: 1.05 },
+  dupPathRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 11 },
+  dupPathKey: { fontFamily: FONTS.monoSemiBold, fontSize: 11, marginTop: 1 },
+  dupPathText: { flex: 1, fontFamily: FONTS.sans, fontSize: 12.5, lineHeight: 19 },
+  dupPathLead: { fontFamily: FONTS.sansSemiBold },
+  dupPathDivider: { height: 1, marginVertical: 12 },
+  dupReportButton: { height: 50, borderRadius: 15, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
+  dupReportText: { fontFamily: FONTS.sansSemiBold, fontSize: 15 },
 
   // P1 failure
   errorCenter: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 20 },

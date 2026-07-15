@@ -295,6 +295,559 @@ a{color:inherit;text-decoration:none}
 .ftr .legal{display:flex;gap:16px;font-size:12px;color:var(--tx3)}
 `;
 
+// ── Web voting overlay (ported from the pre-Record /p/:id page) ─────────────
+// Same four-step flow and identical API wiring as the old handler (auth →
+// Didit verify → vote → success), restyled to the Record tokens. The JS is
+// kept behaviorally verbatim — endpoints, payloads, and fallbacks unchanged.
+const WEBVOTE_CSS = `
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.82);backdrop-filter:blur(4px);display:flex;align-items:flex-end;justify-content:center;z-index:1000}
+@media(min-width:560px){.overlay{align-items:center;padding:24px}}
+.ov-card{width:100%;max-width:480px;background:var(--sf);border:1px solid var(--bd);border-radius:24px 24px 0 0;padding:24px;max-height:93vh;overflow-y:auto}
+@media(min-width:560px){.ov-card{border-radius:20px}}
+.ov-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
+.ov-title{font-family:'Newsreader',Georgia,serif;font-size:20px;font-weight:500;color:var(--tx)}
+.ov-close{background:var(--sfh);border:none;color:var(--tx);width:32px;height:32px;border-radius:50%;font-size:18px;cursor:pointer;line-height:1;display:flex;align-items:center;justify-content:center}
+.ov-sub{font-size:13px;color:var(--tx2);line-height:1.55;margin-bottom:20px}
+.step-label{font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.14em;color:var(--gdt);margin-bottom:12px}
+.field{margin-bottom:14px}
+.field label{display:block;font-size:11px;font-weight:600;color:var(--tx3);margin-bottom:6px;text-transform:uppercase;letter-spacing:.08em}
+.field input{width:100%;background:var(--sfh);border:1px solid var(--bd);border-radius:10px;padding:12px 14px;color:var(--tx);font-size:15px;outline:none;box-sizing:border-box;font-family:inherit}
+.field input:focus{border-color:rgba(234,186,88,.5)}
+.tabs{display:flex;gap:0;background:var(--sfh);border-radius:10px;padding:3px;margin-bottom:20px}
+.tab-btn{flex:1;padding:8px;border:none;background:transparent;color:var(--tx3);font-family:inherit;font-size:14px;font-weight:600;border-radius:8px;cursor:pointer;transition:all .15s}
+.tab-btn.active{background:var(--gd);color:#040707}
+.action-btn{display:block;width:100%;background:var(--gd);color:#040707;border:none;border-radius:12px;padding:14px;font-family:inherit;font-weight:600;font-size:15px;cursor:pointer;margin-top:6px;text-align:center;box-sizing:border-box}
+.action-btn:disabled{opacity:.5;cursor:default}
+.secondary-btn{display:block;width:100%;background:transparent;border:1px solid var(--bd);color:var(--tx2);border-radius:12px;padding:12px;font-family:inherit;font-size:14px;cursor:pointer;margin-top:10px;box-sizing:border-box}
+.secondary-btn:disabled{opacity:.4;cursor:default}
+.social-wrap{display:flex;flex-direction:column;gap:10px;margin-bottom:18px}
+.social-btn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;background:#fff;color:#1f1f1f;border:1px solid var(--bd);border-radius:12px;padding:12px;font-family:inherit;font-weight:600;font-size:14px;cursor:pointer;box-sizing:border-box;transition:opacity .15s}
+.social-btn:disabled{opacity:.5;cursor:default}
+.social-btn svg{width:18px;height:18px;flex-shrink:0}
+.social-btn.apple-btn{background:#000;color:#fff;border-color:#000}
+.social-divider{display:flex;align-items:center;gap:10px;margin-bottom:16px;color:var(--tx3);font-size:12px}
+.social-divider::before,.social-divider::after{content:'';flex:1;height:1px;background:var(--bds)}
+.err-msg{font-size:13px;color:var(--opp);margin-top:10px;padding:10px 12px;background:rgba(248,113,113,.08);border-radius:8px;border:1px solid rgba(248,113,113,.2);display:none}
+.vote-btn{width:100%;padding:16px;border-radius:12px;font-family:inherit;font-size:16px;font-weight:600;cursor:pointer;border:1.5px solid transparent;margin-bottom:10px;transition:opacity .15s;box-sizing:border-box}
+.vote-btn:disabled{opacity:.45;cursor:default}
+.vote-support{background:rgba(52,211,153,.08);border-color:rgba(52,211,153,.35);color:var(--sup)}
+.vote-oppose{background:rgba(248,113,113,.07);border-color:rgba(248,113,113,.3);color:var(--opp)}
+.vote-opt{background:rgba(234,186,88,.1);color:var(--gdt);border-color:rgba(234,186,88,.3)}
+.success-icon{width:56px;height:56px;border-radius:50%;background:rgba(234,186,88,.12);border:1px solid rgba(234,186,88,.4);display:flex;align-items:center;justify-content:center;font-size:24px;color:var(--gdt);margin:0 auto 14px}
+.success-title{font-family:'Newsreader',Georgia,serif;font-size:22px;font-weight:500;text-align:center;margin-bottom:8px;color:var(--tx)}
+.success-sub{font-size:14px;color:var(--tx2);text-align:center;margin-bottom:20px}
+.live-tally{background:var(--sfh);border:1px solid var(--bds);border-radius:12px;padding:16px;margin-bottom:20px}
+.live-tally .tally-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;font-size:13px}
+.live-tally .tally-label{color:var(--tx2)}
+.live-tally .tally-val{font-family:'JetBrains Mono',monospace;font-weight:500}
+.live-tally .support{color:var(--sup)}
+.live-tally .oppose{color:var(--opp)}
+.live-tally .bar2{height:6px;border-radius:3px;background:var(--bds);overflow:hidden;margin-bottom:10px}
+.live-tally .bar-inner-s{height:100%;border-radius:3px;background:var(--sup)}
+.live-tally .bar-inner-o{height:100%;border-radius:3px;background:var(--opp)}
+.live-total{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--tx3);text-align:center;margin-top:8px}
+.verify-icon{width:48px;height:48px;border-radius:50%;background:rgba(234,186,88,.1);border:1px solid rgba(234,186,88,.3);display:flex;align-items:center;justify-content:center;font-size:22px;margin:0 auto 14px}
+.app-handoff{background:linear-gradient(135deg,rgba(234,186,88,.07) 0%,rgba(234,186,88,.03) 100%);border:1px solid rgba(234,186,88,.25);border-radius:14px;padding:16px;margin-bottom:14px;text-align:center}
+.app-handoff-title{font-size:13px;font-weight:600;color:var(--gdt);margin-bottom:4px}
+.app-handoff-sub{font-size:12px;color:var(--tx3);margin-bottom:12px;line-height:1.4}
+.app-btn{display:block;background:var(--gd);color:#040707;border:none;border-radius:11px;padding:13px 16px;font-family:inherit;font-weight:600;font-size:14px;cursor:pointer;width:100%;text-align:center;box-sizing:border-box}
+.web-continue{display:block;font-size:12px;color:var(--tx3);text-align:center;margin-top:10px;cursor:pointer;background:none;border:none;width:100%;padding:4px;font-family:inherit}
+.vote-now-btn{display:block;width:100%;border:none;cursor:pointer;font-family:inherit}
+.applink{display:block;text-align:center;font-size:12.5px;color:var(--tx3);text-decoration:underline;text-underline-offset:3px;margin-top:2px}
+.terms-line{font-size:11.5px;line-height:1.5;color:var(--tx3);text-align:center;margin-top:12px}
+.terms-line a{color:var(--tx2);text-decoration:underline;text-underline-offset:2px}
+.confirm-line{font-size:14.5px;line-height:1.55;color:var(--tx);margin-bottom:16px}
+.pr-reveal{font-size:12px;font-weight:500;color:var(--tx2);text-decoration:underline;text-underline-offset:3px;cursor:pointer;background:none;border:none;padding:0;font-family:inherit;text-align:left}
+`;
+
+// Overlay markup + client JS. `b` drives the labels; `proposal` supplies the
+// raw voteType/options; `host` builds the Apple redirect URI.
+function webVoteHtml(b: BallotVM, proposal: any, host: string): string {
+  const voteType = proposal.voteType && proposal.voteType !== "yes-no" ? proposal.voteType : "binary";
+  const options: string[] = (() => {
+    try {
+      const o = proposal.options;
+      if (!o) return [];
+      const a = typeof o === "string" ? JSON.parse(o) : o;
+      return Array.isArray(a) ? a.map(String) : [];
+    } catch { return []; }
+  })();
+  const pdata = JSON.stringify({
+    id: b.id,
+    voteType,
+    options,
+    geoLabel: b.geo.length > 0 ? b.geo.join(" · ") : "",
+    isClosed: b.ended,
+  });
+  const authConfig = JSON.stringify({
+    googleClientId: process.env.GOOGLE_WEB_CLIENT_ID || "",
+    appleServicesId: process.env.APPLE_SERVICES_ID || "",
+    redirectUri: `https://${host}/p/${b.id}`,
+  });
+
+  return `
+  <!-- ── Web voting overlay ─────────────────────────────────────────────── -->
+  <div class="overlay" id="vote-overlay" style="display:none" onclick="if(event.target===this)window.closeOverlay()">
+    <div class="ov-card">
+      <div class="ov-header">
+        <span class="ov-title" id="ov-title">Cast your ballot</span>
+        <button class="ov-close" onclick="window.closeOverlay()" aria-label="Close">&#215;</button>
+      </div>
+      <!-- Step: auth -->
+      <div id="step-auth">
+        <p class="step-label">Step 1 — Identify yourself</p>
+        <div class="social-wrap">
+          <button class="social-btn" id="google-signin-btn" onclick="window.signInWithGoogle()">
+            <svg viewBox="0 0 48 48"><path fill="#4285F4" d="M45.12 24.5c0-1.56-.14-3.06-.4-4.5H24v8.51h11.84c-.51 2.75-2.06 5.08-4.39 6.64v5.52h7.11c4.16-3.83 6.56-9.47 6.56-16.17z"/><path fill="#34A853" d="M24 46c5.94 0 10.92-1.97 14.56-5.33l-7.11-5.52c-1.97 1.32-4.49 2.1-7.45 2.1-5.73 0-10.58-3.87-12.31-9.07H4.34v5.7C7.96 41.07 15.4 46 24 46z"/><path fill="#FBBC05" d="M11.69 28.18C11.25 26.86 11 25.45 11 24s.25-2.86.69-4.18v-5.7H4.34C2.85 17.09 2 20.45 2 24s.85 6.91 2.34 9.88l7.35-5.7z"/><path fill="#EA4335" d="M24 10.75c3.23 0 6.13 1.11 8.41 3.29l6.31-6.31C34.91 4.18 29.93 2 24 2 15.4 2 7.96 6.93 4.34 14.12l7.35 5.7c1.73-5.2 6.58-9.07 12.31-9.07z"/></svg>
+            <span>Continue with Google</span>
+          </button>
+          <button class="social-btn apple-btn" id="apple-signin-btn" onclick="window.signInWithApple()">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.05 12.536c-.02-2.11 1.73-3.13 1.81-3.18-.99-1.44-2.53-1.64-3.08-1.66-1.31-.13-2.56.77-3.23.77-.66 0-1.69-.75-2.78-.73-1.43.02-2.75.83-3.48 2.11-1.49 2.58-.38 6.4 1.06 8.49.71 1.03 1.55 2.18 2.66 2.14 1.07-.04 1.47-.69 2.76-.69 1.28 0 1.65.69 2.78.66 1.15-.02 1.87-1.04 2.57-2.08.81-1.19 1.15-2.35 1.16-2.41-.02-.01-2.22-.85-2.24-3.42zM14.9 6.29c.58-.71.98-1.68.87-2.66-.84.04-1.87.57-2.47 1.27-.54.63-1.02 1.63-.89 2.59.94.07 1.9-.48 2.49-1.2z"/></svg>
+            <span>Continue with Apple</span>
+          </button>
+        </div>
+        <div class="social-divider">or use email</div>
+        <div class="tabs">
+          <button class="tab-btn active" data-tab="login" onclick="window.switchAuthTab('login')">Log in</button>
+          <button class="tab-btn" data-tab="signup" onclick="window.switchAuthTab('signup')">Sign up</button>
+        </div>
+        <div id="tab-login">
+          <div class="field"><label>Email</label><input type="email" id="auth-email" placeholder="you@example.com" autocomplete="email"/></div>
+          <div class="field"><label>Password</label><input type="password" id="auth-password" placeholder="••••••••" autocomplete="current-password"/></div>
+          <button class="action-btn" id="auth-submit-btn" onclick="window.submitLogin()">Continue →</button>
+        </div>
+        <div id="tab-signup" style="display:none">
+          <div class="field"><label>Full name</label><input type="text" id="auth-name" placeholder="Jane Doe" autocomplete="name"/></div>
+          <div class="field"><label>Email</label><input type="email" id="auth-email-2" placeholder="you@example.com" autocomplete="email"/></div>
+          <div class="field"><label>Password (min 8 chars)</label><input type="password" id="auth-password-2" placeholder="••••••••" autocomplete="new-password"/></div>
+          <button class="action-btn" id="auth-signup-btn" onclick="window.submitSignup()">Create account →</button>
+          <p class="terms-line">By creating an account you agree to the <a href="/terms" target="_blank">Terms of Service</a> and <a href="/privacy" target="_blank">Privacy Policy</a>.</p>
+        </div>
+        <div class="err-msg" id="auth-error"></div>
+      </div>
+      <!-- Step: verify -->
+      <div id="step-verify" style="display:none">
+        <div class="verify-icon">&#128282;</div>
+        <p class="step-label" style="text-align:center">Step 2 — Verify your identity</p>
+        <p class="ov-sub">Represent requires a one-time identity check to ensure one person, one ballot. Takes about 2 minutes and is reusable for all future questions.</p>
+        <button class="action-btn" id="start-verify-btn" onclick="window.startVerification()">Verify my identity</button>
+        <button class="secondary-btn" id="check-verify-btn" style="display:none" onclick="window.checkVerification()">I've completed verification →</button>
+        <div class="err-msg" id="verify-error"></div>
+      </div>
+      <!-- Step: vote -->
+      <div id="step-vote" style="display:none">
+        <p class="step-label">Step 3 — Cast your ballot</p>
+        <p class="ov-sub" style="margin-bottom:16px">${esc(b.title)}</p>
+        <div id="vote-buttons"></div>
+        <div id="vote-confirm" style="display:none">
+          <p class="confirm-line" id="confirm-line"></p>
+          <button class="vote-btn" id="confirm-cast-btn">Confirm — cast my ballot</button>
+          <button class="secondary-btn" id="confirm-back-btn">Back</button>
+        </div>
+        <div class="err-msg" id="vote-error"></div>
+      </div>
+      <!-- Step: success -->
+      <div id="step-success" style="display:none">
+        <div class="success-icon">&#10003;</div>
+        <p class="success-title">Ballot recorded!</p>
+        <p class="success-sub">Your verified vote is on the public ledger. Live results below.</p>
+        <div class="live-tally">
+          <div class="tally-row">
+            <span class="tally-label">Support</span>
+            <span class="tally-val support" id="success-support">${b.pct}%</span>
+          </div>
+          <div class="bar2"><div class="bar-inner-s" id="success-bar-s" style="width:${b.pct}%"></div></div>
+          <div class="tally-row">
+            <span class="tally-label">Oppose</span>
+            <span class="tally-val oppose" id="success-oppose">${100 - b.pct}%</span>
+          </div>
+          <div class="bar2"><div class="bar-inner-o" id="success-bar-o" style="width:${100 - b.pct}%"></div></div>
+          <p class="live-total" id="success-total">${fmt(b.total)} verified vote${b.total !== 1 ? "s" : ""}</p>
+        </div>
+        <div class="app-handoff">
+          <p class="app-handoff-title">Your Represent account is ready</p>
+          <p class="app-handoff-sub">Vote on every question, follow results in real time, and keep your civic record — all in the app.</p>
+          <button class="app-btn" onclick="window.openAppOrStore()">Keep voting in the app ↗</button>
+        </div>
+        <button class="web-continue" onclick="window.closeOverlay()">Continue on web</button>
+      </div>
+    </div>
+  </div>
+  <script id="pdata" type="application/json">${pdata}</script>
+  <script id="auth-config" type="application/json">${authConfig}</script>
+  <script>
+  (function(){
+    var JWT_KEY='rp_web_jwt';
+    var jwt=null;
+    var authMode='login';
+    var PID,VOTE_TYPE,OPTIONS,GEO_LABEL,IS_CLOSED;
+    var _vId=null;
+    var _pollTimer=null,_pollCount=0;
+    var _pendingPos=null,_pendingIdx=null;
+    var AUTH_CFG={};
+    var _googleCodeClient=null;
+    var _appleInited=false;
+    try {
+      var _acEl=document.getElementById('auth-config');
+      AUTH_CFG=_acEl?JSON.parse(_acEl.textContent):{};
+    } catch(e) { AUTH_CFG={}; }
+    function socialErr(msg){
+      var g=document.getElementById('google-signin-btn'),a=document.getElementById('apple-signin-btn');
+      if(g)g.disabled=false;if(a)a.disabled=false;
+      setErr('auth',msg);
+    }
+    function finishSocialLogin(res){
+      var g=document.getElementById('google-signin-btn'),a=document.getElementById('apple-signin-btn');
+      if(g)g.disabled=false;if(a)a.disabled=false;
+      if(!res.ok){socialErr(res.d.error||'Sign-in failed.');return;}
+      jwt=res.d.token;localStorage.setItem(JWT_KEY,jwt);
+      if(res.d.user&&res.d.user.verified){showStep('vote');}else{showStep('verify');}
+    }
+    window.signInWithGoogle=function(){
+      if(!AUTH_CFG.googleClientId){socialErr('Google sign-in is not configured.');return;}
+      if(typeof google==='undefined'||!google.accounts||!google.accounts.oauth2){
+        socialErr('Google sign-in is still loading. Please try again in a moment.');return;
+      }
+      var g=document.getElementById('google-signin-btn'),a=document.getElementById('apple-signin-btn');
+      if(g)g.disabled=true;if(a)a.disabled=true;
+      setErr('auth','');
+      if(!_googleCodeClient){
+        _googleCodeClient=google.accounts.oauth2.initCodeClient({
+          client_id:AUTH_CFG.googleClientId,
+          scope:'openid email profile',
+          ux_mode:'popup',
+          callback:function(response){
+            if(!response||response.error||!response.code){
+              socialErr('Google sign-in was cancelled or failed.');return;
+            }
+            fetch('/api/auth/google/web',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:response.code})})
+            .then(function(r){return r.json().then(function(d){return{ok:r.ok,d:d};});})
+            .then(finishSocialLogin)
+            .catch(function(){socialErr('Network error. Please try again.');});
+          },
+        });
+      }
+      _googleCodeClient.requestCode();
+    };
+    window.signInWithApple=function(){
+      if(!AUTH_CFG.appleServicesId){socialErr('Apple sign-in is not configured.');return;}
+      if(typeof AppleID==='undefined'||!AppleID.auth){
+        socialErr('Apple sign-in is still loading. Please try again in a moment.');return;
+      }
+      var g=document.getElementById('google-signin-btn'),a=document.getElementById('apple-signin-btn');
+      if(g)g.disabled=true;if(a)a.disabled=true;
+      setErr('auth','');
+      if(!_appleInited){
+        AppleID.auth.init({
+          clientId:AUTH_CFG.appleServicesId,
+          scope:'name email',
+          redirectURI:AUTH_CFG.redirectUri,
+          usePopup:true,
+        });
+        _appleInited=true;
+      }
+      AppleID.auth.signIn().then(function(resp){
+        var idToken=resp&&resp.authorization&&resp.authorization.id_token;
+        if(!idToken){socialErr('Apple sign-in did not return a valid token.');return;}
+        var name=resp.user&&resp.user.name?resp.user.name:undefined;
+        var email=resp.user&&resp.user.email?resp.user.email:undefined;
+        fetch('/api/auth/apple/web',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id_token:idToken,name:name,email:email})})
+        .then(function(r){return r.json().then(function(d){return{ok:r.ok,d:d};});})
+        .then(finishSocialLogin)
+        .catch(function(){socialErr('Network error. Please try again.');});
+      }).catch(function(err){
+        if(err&&err.error==='popup_closed_by_user'){socialErr('Sign-in was cancelled.');return;}
+        socialErr('Apple sign-in was cancelled or failed.');
+      });
+    };
+    function he(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+    window.openVoteOverlay=function(){
+      var el=document.getElementById('vote-overlay');if(!el)return;
+      el.style.display='flex';
+      jwt=localStorage.getItem(JWT_KEY);
+      if(jwt){checkAuthAndAdvance();}else{showStep('auth');}
+    };
+    window.closeOverlay=function(){
+      stopPoll();
+      var el=document.getElementById('vote-overlay');if(el)el.style.display='none';
+    };
+    window.switchAuthTab=function(mode){
+      authMode=mode;
+      var l=document.getElementById('tab-login'),s=document.getElementById('tab-signup');
+      if(l)l.style.display=mode==='login'?'':'none';
+      if(s)s.style.display=mode==='signup'?'':'none';
+      var tabs=document.querySelectorAll('.tab-btn');
+      for(var i=0;i<tabs.length;i++)tabs[i].classList.toggle('active',tabs[i].dataset.tab===mode);
+      setErr('auth','');
+    };
+    window.submitLogin=function(){
+      var email=document.getElementById('auth-email').value.trim();
+      var pw=document.getElementById('auth-password').value;
+      if(!email||!pw){setErr('auth','Email and password are required.');return;}
+      var btn=document.getElementById('auth-submit-btn');
+      btn.disabled=true;btn.textContent='Please wait…';
+      fetch('/api/auth/mobile/email/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:email,password:pw})})
+      .then(function(r){return r.json().then(function(d){return{ok:r.ok,d:d};});})
+      .then(function(res){
+        if(!res.ok){setErr('auth',res.d.error||'Login failed.');btn.disabled=false;btn.textContent='Continue →';return;}
+        jwt=res.d.token;localStorage.setItem(JWT_KEY,jwt);
+        if(res.d.user&&res.d.user.verified){showStep('vote');}else{showStep('verify');}
+      }).catch(function(){setErr('auth','Network error. Please try again.');btn.disabled=false;btn.textContent='Continue →';});
+    };
+    window.submitSignup=function(){
+      var name=document.getElementById('auth-name').value.trim();
+      var email=document.getElementById('auth-email-2').value.trim();
+      var pw=document.getElementById('auth-password-2').value;
+      if(!name||!email||!pw){setErr('auth','All fields are required.');return;}
+      if(pw.length<8){setErr('auth','Password must be at least 8 characters.');return;}
+      var btn=document.getElementById('auth-signup-btn');
+      btn.disabled=true;btn.textContent='Creating account…';
+      fetch('/api/auth/mobile/email/signup',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:email,password:pw,name:name})})
+      .then(function(r){return r.json().then(function(d){return{ok:r.ok,d:d};});})
+      .then(function(res){
+        if(!res.ok){setErr('auth',res.d.error||'Sign-up failed.');btn.disabled=false;btn.textContent='Create account →';return;}
+        jwt=res.d.token;localStorage.setItem(JWT_KEY,jwt);
+        showStep('verify');
+      }).catch(function(){setErr('auth','Network error.');btn.disabled=false;btn.textContent='Create account →';});
+    };
+    window.startVerification=function(){
+      var btn=document.getElementById('start-verify-btn');
+      btn.disabled=true;btn.textContent='Opening…';
+      apiFetch('/api/didit/create-session',{method:'POST',body:JSON.stringify({flow:'standard'})})
+      .then(function(r){return r.json().then(function(d){return{ok:r.ok,d:d};});})
+      .then(function(res){
+        if(!res.ok){
+          if(res.d.error&&res.d.error.indexOf('already verified')!==-1){showStep('vote');return;}
+          setErr('verify',res.d.error||'Could not start verification.');btn.disabled=false;btn.textContent='Verify my identity';return;
+        }
+        _vId=res.d.verificationId||res.d.sessionToken||null;
+        window.open(res.d.sessionUrl,'_blank');
+        var cb=document.getElementById('check-verify-btn');if(cb)cb.style.display='';
+        btn.textContent='Waiting for verification…';
+        startPoll();
+      }).catch(function(){setErr('verify','Network error.');btn.disabled=false;btn.textContent='Verify my identity';});
+    };
+    window.checkVerification=function(){
+      var btn=document.getElementById('check-verify-btn');
+      btn.disabled=true;btn.textContent='Checking…';
+      setErr('verify','');
+      var cdUrl='/api/didit/check-decision'+(_vId?'?verificationId='+encodeURIComponent(_vId):'');
+      apiFetch(cdUrl,{})
+      .then(function(r){return r.json().then(function(d){return{ok:r.ok,status:r.status,d:d};});})
+      .then(function(res){
+        if(!res.ok){
+          var msg=(res.d&&res.d.error)||('Verification check failed (HTTP '+res.status+').');
+          setErr('verify',msg);
+          btn.disabled=false;btn.textContent="I've completed verification →";
+          return;
+        }
+        if(res.d.reason==='duplicate_identity'){
+          setErr('verify',res.d.message||'This ID has already been used to verify another Represent account. One person, one account.');
+          btn.disabled=false;btn.textContent="I've completed verification →";
+          return;
+        }
+        var status=res.d.status?res.d.status.toLowerCase():'unknown';
+        if(status==='approved'){
+          showStep('vote');
+          return;
+        }
+        apiFetch('/api/auth/verify',{})
+        .then(function(r2){return r2.json().then(function(d2){return{ok:r2.ok,d:d2};});})
+        .then(function(res2){
+          if(res2.ok&&res2.d.user&&res2.d.user.verified===true){
+            showStep('vote');
+          }else{
+            setErr('verify','Verification not complete yet. Please finish in the new tab, then try again. Status: '+status+'.');
+            btn.disabled=false;btn.textContent="I've completed verification →";
+          }
+        }).catch(function(){
+          setErr('verify','Network error while confirming verification. Please try again.');
+          btn.disabled=false;btn.textContent="I've completed verification →";
+        });
+      }).catch(function(){
+        setErr('verify','Network error. Please check your connection and try again.');
+        btn.disabled=false;btn.textContent="I've completed verification →";
+      });
+    };
+    window.openAppOrStore=function(){
+      var STORE='${APP_STORE_URL}';
+      var DEEP='represent://open';
+      var fallback=setTimeout(function(){window.location.href=STORE;},1500);
+      window.addEventListener('visibilitychange',function onVis(){
+        if(document.hidden){clearTimeout(fallback);}
+        window.removeEventListener('visibilitychange',onVis);
+      },{once:true});
+      window.location.href=DEEP;
+    };
+    window.submitVote=function(position,optionIndex){
+      var btns=document.querySelectorAll('.vote-btn');
+      for(var i=0;i<btns.length;i++)btns[i].disabled=true;
+      var selectedOption=(optionIndex!=null&&OPTIONS)?OPTIONS[optionIndex]:undefined;
+      var body={proposalId:PID,position:position};
+      if(selectedOption!=null)body.selectedOption=selectedOption;
+      apiFetch('/api/voting/submit',{method:'POST',body:JSON.stringify(body)})
+      .then(function(r){return r.json().then(function(d){return{ok:r.ok,status:r.status,d:d};});})
+      .then(function(res){
+        if(!res.ok){
+          var msg=(res.d&&res.d.error)||'Could not submit your vote.';
+          if(res.status===403&&msg.toLowerCase().indexOf('geographic')!==-1){
+            msg=GEO_LABEL?'This question is open to verified '+GEO_LABEL+' residents. Your verified location does not match.':'You do not meet the geographic requirements for this question.';
+          }else if(msg.indexOf('already voted')!==-1){msg='You have already cast a ballot on this question.';}
+          else if(msg.indexOf('deadline')!==-1||msg.indexOf('ended')!==-1){msg='Voting on this question has ended.';}
+          else if(msg.indexOf('verification')!==-1||msg.indexOf('identity')!==-1){showStep('verify');return;}
+          setErr('vote',msg);
+          for(var i=0;i<btns.length;i++)btns[i].disabled=false;return;
+        }
+        var ps=document.getElementById('pr-split');if(ps)ps.style.display='flex';
+        var rl=document.getElementById('pr-reveal');if(rl)rl.style.display='none';
+        showStep('success');loadLiveTally();
+      }).catch(function(){setErr('vote','Network error.');for(var i=0;i<btns.length;i++)btns[i].disabled=false;});
+    };
+    function showStep(n){
+      if(n!=='verify')stopPoll();
+      if(n==='vote')backToChoices();
+      var all=['auth','verify','vote','success'];
+      for(var i=0;i<all.length;i++){var el=document.getElementById('step-'+all[i]);if(el)el.style.display=(all[i]===n?'':'none');}
+      var titles={auth:'Identify yourself',verify:'Verify identity',vote:'Cast your ballot',success:'Ballot recorded'};
+      var t=document.getElementById('ov-title');if(t&&titles[n])t.textContent=titles[n];
+    }
+    function apiFetch(url,opts){
+      var headers={'Content-Type':'application/json'};
+      if(jwt)headers['Authorization']='Bearer '+jwt;
+      return fetch(url,{method:opts.method||'GET',headers:headers,body:opts.body||undefined});
+    }
+    function checkAuthAndAdvance(){
+      apiFetch('/api/auth/verify',{}).then(function(r){
+        if(!r.ok){localStorage.removeItem(JWT_KEY);jwt=null;showStep('auth');return;}
+        r.json().then(function(d){if(d.user&&d.user.verified){showStep('vote');}else{showStep('verify');}});
+      }).catch(function(){showStep('auth');});
+    }
+    function loadLiveTally(){
+      if(!PID)return;
+      fetch('/api/p/'+PID+'/tally').then(function(r){return r.json();}).then(function(d){
+        var tot=d.totalVotes||0;
+        var el=document.getElementById('success-total');if(el)el.textContent=tot.toLocaleString()+' verified ballot'+(tot!==1?'s':'')+' cast';
+        if(tot>0){
+          var sp=Math.round(d.supportVotes/tot*100),op=100-sp;
+          var se=document.getElementById('success-support'),oe=document.getElementById('success-oppose');
+          var sb=document.getElementById('success-bar-s'),ob=document.getElementById('success-bar-o');
+          if(se)se.textContent=sp+'% Support';if(oe)oe.textContent=op+'% Oppose';
+          if(sb)sb.style.width=sp+'%';if(ob)ob.style.width=op+'%';
+        }
+      }).catch(function(){});
+    }
+    function setErr(step,msg){
+      var el=document.getElementById(step+'-error');if(!el)return;
+      el.textContent=msg;el.style.display=msg?'':'none';
+    }
+    function buildVoteButtons(){
+      var c=document.getElementById('vote-buttons');if(!c)return;
+      if(VOTE_TYPE==='multiple-choice'&&OPTIONS&&OPTIONS.length>0){
+        var html='';
+        for(var i=0;i<OPTIONS.length;i++){
+          html+='<button class="vote-btn vote-opt" data-idx="'+i+'">'+he(OPTIONS[i])+'</button>';
+        }
+        c.innerHTML=html;
+        var optBtns=c.querySelectorAll('.vote-opt');
+        for(var j=0;j<optBtns.length;j++){
+          (function(b){
+            b.addEventListener('click',function(){askConfirm('multiple-choice',+b.dataset.idx);});
+          })(optBtns[j]);
+        }
+      }else{
+        c.innerHTML='<button class="vote-btn vote-support">✓ Support</button>'
+          +'<button class="vote-btn vote-oppose">✗ Oppose</button>';
+        var sb=c.querySelector('.vote-support'),ob=c.querySelector('.vote-oppose');
+        if(sb)sb.addEventListener('click',function(){askConfirm('support',null);});
+        if(ob)ob.addEventListener('click',function(){askConfirm('oppose',null);});
+      }
+    }
+    /* Confirm-before-cast — a ballot is permanent, so no single tap may
+       submit one. Mirrors the app's mandatory X1 confirm sheet. */
+    function askConfirm(pos,idx){
+      _pendingPos=pos;_pendingIdx=idx;
+      var line=document.getElementById('confirm-line');
+      var cbtn=document.getElementById('confirm-cast-btn');
+      if(line){
+        var what=pos==='support'?'Support':pos==='oppose'?'Oppose':'"'+(OPTIONS&&OPTIONS[idx]!=null?OPTIONS[idx]:'this option')+'"';
+        line.textContent='You are casting '+what+'. A ballot is recorded permanently and cannot be changed.';
+      }
+      if(cbtn){
+        cbtn.className='vote-btn '+(pos==='support'?'vote-support':pos==='oppose'?'vote-oppose':'vote-opt');
+        cbtn.disabled=false;
+      }
+      var vb=document.getElementById('vote-buttons'),vc=document.getElementById('vote-confirm');
+      if(vb)vb.style.display='none';if(vc)vc.style.display='';
+      setErr('vote','');
+    }
+    function backToChoices(){
+      var vb=document.getElementById('vote-buttons'),vc=document.getElementById('vote-confirm');
+      if(vc)vc.style.display='none';if(vb)vb.style.display='';
+      var btns=document.querySelectorAll('.vote-btn');
+      for(var i=0;i<btns.length;i++)btns[i].disabled=false;
+      _pendingPos=null;_pendingIdx=null;
+      setErr('vote','');
+    }
+    /* Verification auto-poll — the manual button stays as a fallback. */
+    function startPoll(){
+      stopPoll();_pollCount=0;
+      _pollTimer=setInterval(function(){
+        _pollCount++;
+        if(_pollCount>75){stopPoll();return;}
+        pollVerify();
+      },4000);
+    }
+    function stopPoll(){if(_pollTimer){clearInterval(_pollTimer);_pollTimer=null;}}
+    function pollVerify(){
+      var cdUrl='/api/didit/check-decision'+(_vId?'?verificationId='+encodeURIComponent(_vId):'');
+      apiFetch(cdUrl,{})
+      .then(function(r){return r.json().then(function(d){return{ok:r.ok,d:d};});})
+      .then(function(res){
+        if(!res.ok)return;
+        if(res.d.reason==='duplicate_identity'){
+          stopPoll();
+          setErr('verify',res.d.message||'This ID has already been used to verify another Represent account. One person, one account.');
+          return;
+        }
+        var st=res.d.status?res.d.status.toLowerCase():'';
+        if(st==='approved'){stopPoll();showStep('vote');return;}
+        if(st==='declined'){
+          stopPoll();
+          setErr('verify','Verification was declined. You can try again.');
+          var b2=document.getElementById('start-verify-btn');
+          if(b2){b2.disabled=false;b2.textContent='Try again';}
+          return;
+        }
+        if(_pollCount%3===0){
+          apiFetch('/api/auth/verify',{})
+          .then(function(r2){return r2.json();})
+          .then(function(d2){if(d2.user&&d2.user.verified===true){stopPoll();showStep('vote');}})
+          .catch(function(){});
+        }
+      }).catch(function(){});
+    }
+    try {
+      var _el=document.getElementById('pdata');
+      var _pd=_el?JSON.parse(_el.textContent):{};
+      PID=_pd.id;
+      VOTE_TYPE=_pd.voteType||'binary';
+      OPTIONS=_pd.options||[];
+      GEO_LABEL=_pd.geoLabel||'';
+      IS_CLOSED=_pd.isClosed||false;
+    } catch(e) {
+      console.error('[Represent] pdata parse error:',e);
+      OPTIONS=[];VOTE_TYPE='binary';
+    }
+    buildVoteButtons();
+    var _cc=document.getElementById('confirm-cast-btn');
+    if(_cc)_cc.addEventListener('click',function(){window.submitVote(_pendingPos,_pendingIdx);});
+    var _cb=document.getElementById('confirm-back-btn');
+    if(_cb)_cb.addEventListener('click',backToChoices);
+    document.addEventListener('keydown',function(e){if(e.key==='Escape')window.closeOverlay();});
+  })();
+  </script>`;
+}
+
 const CHECK_SVG = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg>`;
 const X_SVG = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`;
 
@@ -418,20 +971,25 @@ function howSectionHtml(): string {
   </section>`;
 }
 
-function convertCardHtml(b: BallotVM | null): string {
+function convertCardHtml(b: BallotVM | null, canWebVote = false): string {
   const line = b && !b.ended && b.region
     ? `Live in ${esc(b.region)}? Add yours before it closes.`
     : b && !b.ended
       ? `This ballot is open now. Add yours before it closes.`
       : `Open ballots are being counted right now. Add your voice.`;
+  const cta = canWebVote
+    ? `<button class="gold-btn vote-now-btn" onclick="window.openVoteOverlay()">Vote now — no app needed</button>
+      <span class="under-cta mono" style="letter-spacing:.1em">VERIFY ONCE · CHECKED, NEVER KEPT</span>
+      <a class="applink" href="${APP_STORE_URL}">Or get Represent for iPhone →</a>`
+    : `<a class="gold-btn" href="${APP_STORE_URL}">Get Represent — it&#39;s free</a>
+      <span class="under-cta mono" style="letter-spacing:.1em">VERIFY ONCE · CHECKED, NEVER KEPT</span>`;
   return `<div class="convert">
     <div style="flex:1">
       <div class="big">This count is one verified person, one ballot.</div>
       <div class="sub">${line}</div>
     </div>
     <div class="convert-cta">
-      <a class="gold-btn" href="${APP_STORE_URL}">Get Represent — it&#39;s free</a>
-      <span class="under-cta mono" style="letter-spacing:.1em">VERIFY ONCE · CHECKED, NEVER KEPT</span>
+      ${cta}
     </div>
   </div>`;
 }
@@ -678,6 +1236,9 @@ export function registerPublicRecordRoutes(app: any, storage: any) {
       const b = toVM(proposal);
       const pageUrl = `${SITE}/p/${encodeURIComponent(b.id)}`;
       const isMC = proposal.voteType && proposal.voteType !== "yes-no";
+      // In-browser voting supports yes/no and multiple-choice (the overlay
+      // has no ranked-choice UI — those ballots vote in the app).
+      const canWebVote = !b.ended && (!proposal.voteType || proposal.voteType === "yes-no" || proposal.voteType === "multiple-choice");
 
       // Status line for crumb
       const statusCrumb = b.ended
@@ -699,12 +1260,27 @@ export function registerPublicRecordRoutes(app: any, storage: any) {
             : `The split appears once ${TALLY_THRESHOLD} verified ballots are cast — early votes stay uninfluenced.`}</div>
         </div>`;
       } else if (!b.ended) {
-        tallyModule = `<div class="module">
-          <div class="head"><span class="label">LIVE TALLY</span><span class="count">${fmt(b.total)} VERIFIED BALLOTS</span></div>
-          ${tallyBarHtml(b.pct, "big")}
-          <div class="splitrow" style="font-size:13px"><span class="s">SUPPORT ${b.pct}% · ${fmt(b.support)}</span><span class="o">OPPOSE ${100 - b.pct}% · ${fmt(b.oppose)}</span></div>
-          <div class="foot">Live count — updates as verified ${b.region ? `residents of ${esc(b.region)}` : "citizens"} cast their ballots.</div>
-        </div>`;
+        if (canWebVote) {
+          // PD2 on the web: a reader here is a potential voter, so the split
+          // stays hidden until they cast (or explicitly opt in) — same
+          // anti-bandwagon default as the app's detail sheet.
+          tallyModule = `<div class="module">
+            <div class="head"><span class="label">LIVE COUNT</span><span class="count">${fmt(b.total)} BALLOTS CAST</span></div>
+            <div id="pr-split" style="display:none;flex-direction:column;gap:14px">
+              ${tallyBarHtml(b.pct, "big")}
+              <div class="splitrow" style="font-size:13px"><span class="s">SUPPORT ${b.pct}% · ${fmt(b.support)}</span><span class="o">OPPOSE ${100 - b.pct}% · ${fmt(b.oppose)}</span></div>
+            </div>
+            <div class="foot">The split is hidden until you vote — decide on the question, not the crowd.</div>
+            <button class="pr-reveal" id="pr-reveal" onclick="document.getElementById('pr-split').style.display='flex';this.style.display='none'">Show current split anyway</button>
+          </div>`;
+        } else {
+          tallyModule = `<div class="module">
+            <div class="head"><span class="label">LIVE TALLY</span><span class="count">${fmt(b.total)} VERIFIED BALLOTS</span></div>
+            ${tallyBarHtml(b.pct, "big")}
+            <div class="splitrow" style="font-size:13px"><span class="s">SUPPORT ${b.pct}% · ${fmt(b.support)}</span><span class="o">OPPOSE ${100 - b.pct}% · ${fmt(b.oppose)}</span></div>
+            <div class="foot">Live count — updates as verified ${b.region ? `residents of ${esc(b.region)}` : "citizens"} cast their ballots.</div>
+          </div>`;
+        }
       } else {
         tallyModule = `<div class="module ${b.passed ? "passed" : "failed"}">
           <div class="head">
@@ -738,7 +1314,10 @@ export function registerPublicRecordRoutes(app: any, storage: any) {
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:image" content="${SITE}/og/p/${encodeURIComponent(b.id)}">
 <meta name="twitter:title" content="${esc(b.title)}">
-<meta name="twitter:description" content="${esc(ogDesc)}">`;
+<meta name="twitter:description" content="${esc(ogDesc)}">
+${canWebVote ? `<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="https://appleid.cdn-apple.com/appleauth/static/jsapi/appleid/1/en_US/appleid.auth.js" async defer></script>
+<style>${WEBVOTE_CSS}</style>` : ""}`;
 
       const body = `
         <main class="perma pad">
@@ -752,12 +1331,13 @@ export function registerPublicRecordRoutes(app: any, storage: any) {
           </div>
           ${b.description ? `<p class="desc">${esc(b.description)}</p>` : ""}
           ${tallyModule}
-          ${convertCardHtml(b)}
+          ${convertCardHtml(b, canWebVote)}
           <div class="ledgerline">
             <span>EVERY BALLOT RECORDED ON A PUBLIC, TAMPER-EVIDENT LEDGER</span>
             <a href="/record#how">How counting works</a>
           </div>
-        </main>`;
+        </main>
+        ${canWebVote ? webVoteHtml(b, proposal, String(req.get?.("host") || "representportal.com")) : ""}`;
 
       send(res, pageShell({
         title: `${b.title} — The Public Record`,

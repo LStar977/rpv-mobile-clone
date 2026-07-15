@@ -793,7 +793,7 @@ export const kycApi = {
     const body = Object.keys(payload).length ? JSON.stringify(payload) : undefined;
     return apiRequest('/api/didit/create-session', { method: 'POST', body });
   },
-  async checkDecision(verificationId: string): Promise<ApiResponse<{ status: string; decision?: string }>> {
+  async checkDecision(verificationId: string): Promise<ApiResponse<{ status: string; decision?: string; reason?: string; message?: string }>> {
     return apiRequest(`/api/didit/check-decision?verificationId=${verificationId}`);
   },
 };
