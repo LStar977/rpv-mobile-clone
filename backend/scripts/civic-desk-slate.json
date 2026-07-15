@@ -1,0 +1,172 @@
+[
+  {
+    "title": "Binding International AI Safety Treaty",
+    "description": "Establish a UN-backed treaty requiring all signatory nations to adopt baseline safety standards for frontier AI systems: pre-deployment evaluations, incident reporting, mandatory red-teaming, and a shared registry of high-capability models. Backed by an independent oversight body funded through member contributions.",
+    "category": "Technology",
+    "geoRestrictions": [],
+    "deadlineDays": 21
+  },
+  {
+    "title": "Global Plastic Pollution Treaty with Production Caps",
+    "description": "Support a legally binding UN treaty that caps global virgin plastic production, phases out the most harmful single-use plastics within 5 years, requires extended producer responsibility, and funds cleanup of ocean plastic through a per-tonne levy on petrochemical producers.",
+    "category": "Environment",
+    "geoRestrictions": [],
+    "deadlineDays": 18
+  },
+  {
+    "title": "Federal Dental Care Expansion",
+    "description": "Expand the Canadian Dental Care Plan to cover all residents under $90,000 household income, including orthodontics for children and seniors' dentures. Full implementation by 2027.",
+    "category": "Healthcare",
+    "geoRestrictions": [
+      "Canada"
+    ],
+    "deadlineDays": 21
+  },
+  {
+    "title": "High-Speed Rail: Toronto-Montreal Corridor",
+    "description": "Build dedicated high-speed rail connecting Toronto, Ottawa, and Montreal with trains reaching 300 km/h. Journey time: Toronto to Montreal in 2 hours. Estimated cost: $12 billion over 10 years.",
+    "category": "Transportation",
+    "geoRestrictions": [
+      "Canada"
+    ],
+    "deadlineDays": 35
+  },
+  {
+    "title": "Indigenous Clean Water Guarantee",
+    "description": "Commit $5 billion over 5 years to end all boil-water advisories on First Nations reserves permanently, with ongoing funding for water infrastructure maintenance and operator training.",
+    "category": "Infrastructure",
+    "geoRestrictions": [
+      "Canada"
+    ],
+    "deadlineDays": 25
+  },
+  {
+    "title": "National 4-Day Work Week Trial",
+    "description": "Fund a 2-year pilot program offering tax incentives to 1,000 companies that adopt a 4-day work week without reducing pay, measuring productivity, employee wellbeing, and economic impact.",
+    "category": "Economy",
+    "geoRestrictions": [
+      "Canada"
+    ],
+    "deadlineDays": 10
+  },
+  {
+    "title": "National Childcare Fee Cap at $10/Day",
+    "description": "Expand the $10/day childcare program to all provinces and territories by 2026, with federal funding guarantees and workforce investment to create 250,000 new childcare spaces.",
+    "category": "Education",
+    "geoRestrictions": [
+      "Canada"
+    ],
+    "deadlineDays": 14
+  },
+  {
+    "title": "National Pharmacare Program",
+    "description": "Create universal prescription drug coverage providing essential medications at no cost to all Canadian residents, funded through federal health transfers and bulk purchasing agreements saving $5 billion annually.",
+    "category": "Healthcare",
+    "geoRestrictions": [
+      "Canada"
+    ],
+    "deadlineDays": 28
+  },
+  {
+    "title": "Alberta Green Hydrogen Hub",
+    "description": "Invest $2 billion in green hydrogen production facilities using Alberta's wind and solar resources, creating 15,000 jobs and positioning Alberta as North America's clean energy leader.",
+    "category": "Environment",
+    "geoRestrictions": [
+      "Canada",
+      "Alberta"
+    ],
+    "deadlineDays": 30
+  },
+  {
+    "title": "Alberta Rural Healthcare Access",
+    "description": "Build 20 new rural health clinics and offer $100,000 signing bonuses for doctors committing to 5 years in underserved communities. Include telemedicine hubs in every town over 1,000 people.",
+    "category": "Healthcare",
+    "geoRestrictions": [
+      "Canada",
+      "Alberta"
+    ],
+    "deadlineDays": 19
+  },
+  {
+    "title": "GO Transit All-Day Service",
+    "description": "Implement 15-minute all-day GO train service on all lines, not just rush hour, with reduced fares for off-peak travel and integrated fare structure with local transit systems.",
+    "category": "Transportation",
+    "geoRestrictions": [
+      "Canada",
+      "Ontario"
+    ],
+    "deadlineDays": 12
+  },
+  {
+    "title": "Old-Growth Forest Protection",
+    "description": "Permanently protect all remaining old-growth forests in BC (2.7 million hectares), with $500 million transition fund for forestry workers and communities to shift to sustainable industries.",
+    "category": "Environment",
+    "geoRestrictions": [
+      "Canada",
+      "British Columbia"
+    ],
+    "deadlineDays": 16
+  },
+  {
+    "title": "Ontario Hospital Capacity Expansion",
+    "description": "Build 5 new hospitals and expand 15 existing facilities, adding 3,000 beds provincewide over 7 years. Includes recruitment bonuses for nurses and fast-tracked credential recognition for internationally trained doctors.",
+    "category": "Healthcare",
+    "geoRestrictions": [
+      "Canada",
+      "Ontario"
+    ],
+    "deadlineDays": 24
+  },
+  {
+    "title": "Ontario Rent Control Restoration",
+    "description": "Restore rent control to all rental units including those built after 2018, capping annual increases at 2.5% or inflation rate (whichever is lower) for the next 5 years.",
+    "category": "Housing",
+    "geoRestrictions": [
+      "Canada",
+      "Ontario"
+    ],
+    "deadlineDays": 17
+  },
+  {
+    "title": "Quebec Healthcare Wait Time Guarantee",
+    "description": "Guarantee maximum wait times for surgeries (90 days) and specialist appointments (30 days), with patients able to access private clinics at public rates if times are exceeded.",
+    "category": "Healthcare",
+    "geoRestrictions": [
+      "Canada",
+      "Quebec"
+    ],
+    "deadlineDays": 22
+  },
+  {
+    "title": "SkyTrain Extension to Langley",
+    "description": "Accelerate the SkyTrain extension to Langley with completion by 2028, adding 8 new stations and park-and-ride facilities to reduce Highway 1 congestion and connect growing suburbs.",
+    "category": "Transportation",
+    "geoRestrictions": [
+      "Canada",
+      "British Columbia"
+    ],
+    "deadlineDays": 26
+  },
+  {
+    "title": "Calgary Green Line LRT",
+    "description": "Restore full funding for the Green Line LRT connecting North Central to Seton, with 28 stations over 46 km. Largest infrastructure project in Calgary's history.",
+    "category": "Transportation",
+    "geoRestrictions": [
+      "Canada",
+      "Alberta",
+      "Calgary"
+    ],
+    "deadlineDays": 20
+  },
+  {
+    "title": "Toronto Protected Bike Lane Network",
+    "description": "Build 100 km of physically separated bike lanes connecting all neighborhoods to downtown by 2028, with secure bike parking at every TTC station and 500 new Bike Share stations.",
+    "category": "Transportation",
+    "geoRestrictions": [
+      "Canada",
+      "Ontario",
+      "Toronto"
+    ],
+    "deadlineDays": 13
+  }
+]
