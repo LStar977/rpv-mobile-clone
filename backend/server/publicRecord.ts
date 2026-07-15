@@ -354,6 +354,10 @@ const WEBVOTE_CSS = `
 .web-continue{display:block;font-size:12px;color:var(--tx3);text-align:center;margin-top:10px;cursor:pointer;background:none;border:none;width:100%;padding:4px;font-family:inherit}
 .vote-now-btn{display:block;width:100%;border:none;cursor:pointer;font-family:inherit}
 .applink{display:block;text-align:center;font-size:12.5px;color:var(--tx3);text-decoration:underline;text-underline-offset:3px;margin-top:2px}
+.terms-line{font-size:11.5px;line-height:1.5;color:var(--tx3);text-align:center;margin-top:12px}
+.terms-line a{color:var(--tx2);text-decoration:underline;text-underline-offset:2px}
+.confirm-line{font-size:14.5px;line-height:1.55;color:var(--tx);margin-bottom:16px}
+.pr-reveal{font-size:12px;font-weight:500;color:var(--tx2);text-decoration:underline;text-underline-offset:3px;cursor:pointer;background:none;border:none;padding:0;font-family:inherit;text-align:left}
 `;
 
 // Overlay markup + client JS. `b` drives the labels; `proposal` supplies the
@@ -417,6 +421,7 @@ function webVoteHtml(b: BallotVM, proposal: any, host: string): string {
           <div class="field"><label>Email</label><input type="email" id="auth-email-2" placeholder="you@example.com" autocomplete="email"/></div>
           <div class="field"><label>Password (min 8 chars)</label><input type="password" id="auth-password-2" placeholder="••••••••" autocomplete="new-password"/></div>
           <button class="action-btn" id="auth-signup-btn" onclick="window.submitSignup()">Create account →</button>
+          <p class="terms-line">By creating an account you agree to the <a href="/terms" target="_blank">Terms of Service</a> and <a href="/privacy" target="_blank">Privacy Policy</a>.</p>
         </div>
         <div class="err-msg" id="auth-error"></div>
       </div>
@@ -434,6 +439,11 @@ function webVoteHtml(b: BallotVM, proposal: any, host: string): string {
         <p class="step-label">Step 3 — Cast your ballot</p>
         <p class="ov-sub" style="margin-bottom:16px">${esc(b.title)}</p>
         <div id="vote-buttons"></div>
+        <div id="vote-confirm" style="display:none">
+          <p class="confirm-line" id="confirm-line"></p>
+          <button class="vote-btn" id="confirm-cast-btn">Confirm — cast my ballot</button>
+          <button class="secondary-btn" id="confirm-back-btn">Back</button>
+        </div>
         <div class="err-msg" id="vote-error"></div>
       </div>
       <!-- Step: success -->
@@ -472,6 +482,8 @@ function webVoteHtml(b: BallotVM, proposal: any, host: string): string {
     var authMode='login';
     var PID,VOTE_TYPE,OPTIONS,GEO_LABEL,IS_CLOSED;
     var _vId=null;
+    var _pollTimer=null,_pollCount=0;
+    var _pendingPos=null,_pendingIdx=null;
     var AUTH_CFG={};
     var _googleCodeClient=null;
     var _appleInited=false;
@@ -556,6 +568,7 @@ function webVoteHtml(b: BallotVM, proposal: any, host: string): string {
       if(jwt){checkAuthAndAdvance();}else{showStep('auth');}
     };
     window.closeOverlay=function(){
+      stopPoll();
       var el=document.getElementById('vote-overlay');if(el)el.style.display='none';
     };
     window.switchAuthTab=function(mode){
@@ -610,7 +623,8 @@ function webVoteHtml(b: BallotVM, proposal: any, host: string): string {
         _vId=res.d.verificationId||res.d.sessionToken||null;
         window.open(res.d.sessionUrl,'_blank');
         var cb=document.getElementById('check-verify-btn');if(cb)cb.style.display='';
-        btn.textContent='Verification opened in new tab';
+        btn.textContent='Waiting for verification…';
+        startPoll();
       }).catch(function(){setErr('verify','Network error.');btn.disabled=false;btn.textContent='Verify my identity';});
     };
     window.checkVerification=function(){
@@ -684,10 +698,14 @@ function webVoteHtml(b: BallotVM, proposal: any, host: string): string {
           setErr('vote',msg);
           for(var i=0;i<btns.length;i++)btns[i].disabled=false;return;
         }
+        var ps=document.getElementById('pr-split');if(ps)ps.style.display='flex';
+        var rl=document.getElementById('pr-reveal');if(rl)rl.style.display='none';
         showStep('success');loadLiveTally();
       }).catch(function(){setErr('vote','Network error.');for(var i=0;i<btns.length;i++)btns[i].disabled=false;});
     };
     function showStep(n){
+      if(n!=='verify')stopPoll();
+      if(n==='vote')backToChoices();
       var all=['auth','verify','vote','success'];
       for(var i=0;i<all.length;i++){var el=document.getElementById('step-'+all[i]);if(el)el.style.display=(all[i]===n?'':'none');}
       var titles={auth:'Identify yourself',verify:'Verify identity',vote:'Cast your ballot',success:'Ballot recorded'};
@@ -733,16 +751,80 @@ function webVoteHtml(b: BallotVM, proposal: any, host: string): string {
         var optBtns=c.querySelectorAll('.vote-opt');
         for(var j=0;j<optBtns.length;j++){
           (function(b){
-            b.addEventListener('click',function(){window.submitVote('multiple-choice',+b.dataset.idx);});
+            b.addEventListener('click',function(){askConfirm('multiple-choice',+b.dataset.idx);});
           })(optBtns[j]);
         }
       }else{
         c.innerHTML='<button class="vote-btn vote-support">✓ Support</button>'
           +'<button class="vote-btn vote-oppose">✗ Oppose</button>';
         var sb=c.querySelector('.vote-support'),ob=c.querySelector('.vote-oppose');
-        if(sb)sb.addEventListener('click',function(){window.submitVote('support',null);});
-        if(ob)ob.addEventListener('click',function(){window.submitVote('oppose',null);});
+        if(sb)sb.addEventListener('click',function(){askConfirm('support',null);});
+        if(ob)ob.addEventListener('click',function(){askConfirm('oppose',null);});
       }
+    }
+    /* Confirm-before-cast — a ballot is permanent, so no single tap may
+       submit one. Mirrors the app's mandatory X1 confirm sheet. */
+    function askConfirm(pos,idx){
+      _pendingPos=pos;_pendingIdx=idx;
+      var line=document.getElementById('confirm-line');
+      var cbtn=document.getElementById('confirm-cast-btn');
+      if(line){
+        var what=pos==='support'?'Support':pos==='oppose'?'Oppose':'"'+(OPTIONS&&OPTIONS[idx]!=null?OPTIONS[idx]:'this option')+'"';
+        line.textContent='You are casting '+what+'. A ballot is recorded permanently and cannot be changed.';
+      }
+      if(cbtn){
+        cbtn.className='vote-btn '+(pos==='support'?'vote-support':pos==='oppose'?'vote-oppose':'vote-opt');
+        cbtn.disabled=false;
+      }
+      var vb=document.getElementById('vote-buttons'),vc=document.getElementById('vote-confirm');
+      if(vb)vb.style.display='none';if(vc)vc.style.display='';
+      setErr('vote','');
+    }
+    function backToChoices(){
+      var vb=document.getElementById('vote-buttons'),vc=document.getElementById('vote-confirm');
+      if(vc)vc.style.display='none';if(vb)vb.style.display='';
+      var btns=document.querySelectorAll('.vote-btn');
+      for(var i=0;i<btns.length;i++)btns[i].disabled=false;
+      _pendingPos=null;_pendingIdx=null;
+      setErr('vote','');
+    }
+    /* Verification auto-poll — the manual button stays as a fallback. */
+    function startPoll(){
+      stopPoll();_pollCount=0;
+      _pollTimer=setInterval(function(){
+        _pollCount++;
+        if(_pollCount>75){stopPoll();return;}
+        pollVerify();
+      },4000);
+    }
+    function stopPoll(){if(_pollTimer){clearInterval(_pollTimer);_pollTimer=null;}}
+    function pollVerify(){
+      var cdUrl='/api/didit/check-decision'+(_vId?'?verificationId='+encodeURIComponent(_vId):'');
+      apiFetch(cdUrl,{})
+      .then(function(r){return r.json().then(function(d){return{ok:r.ok,d:d};});})
+      .then(function(res){
+        if(!res.ok)return;
+        if(res.d.reason==='duplicate_identity'){
+          stopPoll();
+          setErr('verify',res.d.message||'This ID has already been used to verify another Represent account. One person, one account.');
+          return;
+        }
+        var st=res.d.status?res.d.status.toLowerCase():'';
+        if(st==='approved'){stopPoll();showStep('vote');return;}
+        if(st==='declined'){
+          stopPoll();
+          setErr('verify','Verification was declined. You can try again.');
+          var b2=document.getElementById('start-verify-btn');
+          if(b2){b2.disabled=false;b2.textContent='Try again';}
+          return;
+        }
+        if(_pollCount%3===0){
+          apiFetch('/api/auth/verify',{})
+          .then(function(r2){return r2.json();})
+          .then(function(d2){if(d2.user&&d2.user.verified===true){stopPoll();showStep('vote');}})
+          .catch(function(){});
+        }
+      }).catch(function(){});
     }
     try {
       var _el=document.getElementById('pdata');
@@ -757,6 +839,10 @@ function webVoteHtml(b: BallotVM, proposal: any, host: string): string {
       OPTIONS=[];VOTE_TYPE='binary';
     }
     buildVoteButtons();
+    var _cc=document.getElementById('confirm-cast-btn');
+    if(_cc)_cc.addEventListener('click',function(){window.submitVote(_pendingPos,_pendingIdx);});
+    var _cb=document.getElementById('confirm-back-btn');
+    if(_cb)_cb.addEventListener('click',backToChoices);
     document.addEventListener('keydown',function(e){if(e.key==='Escape')window.closeOverlay();});
   })();
   </script>`;
@@ -1174,12 +1260,27 @@ export function registerPublicRecordRoutes(app: any, storage: any) {
             : `The split appears once ${TALLY_THRESHOLD} verified ballots are cast — early votes stay uninfluenced.`}</div>
         </div>`;
       } else if (!b.ended) {
-        tallyModule = `<div class="module">
-          <div class="head"><span class="label">LIVE TALLY</span><span class="count">${fmt(b.total)} VERIFIED BALLOTS</span></div>
-          ${tallyBarHtml(b.pct, "big")}
-          <div class="splitrow" style="font-size:13px"><span class="s">SUPPORT ${b.pct}% · ${fmt(b.support)}</span><span class="o">OPPOSE ${100 - b.pct}% · ${fmt(b.oppose)}</span></div>
-          <div class="foot">Live count — updates as verified ${b.region ? `residents of ${esc(b.region)}` : "citizens"} cast their ballots.</div>
-        </div>`;
+        if (canWebVote) {
+          // PD2 on the web: a reader here is a potential voter, so the split
+          // stays hidden until they cast (or explicitly opt in) — same
+          // anti-bandwagon default as the app's detail sheet.
+          tallyModule = `<div class="module">
+            <div class="head"><span class="label">LIVE COUNT</span><span class="count">${fmt(b.total)} BALLOTS CAST</span></div>
+            <div id="pr-split" style="display:none;flex-direction:column;gap:14px">
+              ${tallyBarHtml(b.pct, "big")}
+              <div class="splitrow" style="font-size:13px"><span class="s">SUPPORT ${b.pct}% · ${fmt(b.support)}</span><span class="o">OPPOSE ${100 - b.pct}% · ${fmt(b.oppose)}</span></div>
+            </div>
+            <div class="foot">The split is hidden until you vote — decide on the question, not the crowd.</div>
+            <button class="pr-reveal" id="pr-reveal" onclick="document.getElementById('pr-split').style.display='flex';this.style.display='none'">Show current split anyway</button>
+          </div>`;
+        } else {
+          tallyModule = `<div class="module">
+            <div class="head"><span class="label">LIVE TALLY</span><span class="count">${fmt(b.total)} VERIFIED BALLOTS</span></div>
+            ${tallyBarHtml(b.pct, "big")}
+            <div class="splitrow" style="font-size:13px"><span class="s">SUPPORT ${b.pct}% · ${fmt(b.support)}</span><span class="o">OPPOSE ${100 - b.pct}% · ${fmt(b.oppose)}</span></div>
+            <div class="foot">Live count — updates as verified ${b.region ? `residents of ${esc(b.region)}` : "citizens"} cast their ballots.</div>
+          </div>`;
+        }
       } else {
         tallyModule = `<div class="module ${b.passed ? "passed" : "failed"}">
           <div class="head">
