@@ -7,6 +7,13 @@ import { setupAuth, isAuthenticated } from "./replitAuth";
 import { setupBadgeRoutes } from "./badge-routes";
 import { renderShareCardPNG, shareCardsEnabled } from "./shareCard";
 import { registerPublicRecordRoutes } from "./publicRecord";
+import {
+  identityHashFromParts,
+  identityPartsFromVeriff,
+  identityPartsFromDidit,
+  claimIdentity,
+  DUPLICATE_IDENTITY_MESSAGE,
+} from "./identityClaims";
 import { passportNFTs, activatedRidings, electoralRidingQRCodes, proposals, votes, voteTokenClaims, organizations, transactions, proposalReports, userMutes, proposalComments, users as usersTable } from "@shared/schema";
 import { getMemberLimit, getTierLimits, isFeatureEnabled, tierDisplayName, type OrgTier } from "@shared/tier-limits";
 import {
@@ -2105,6 +2112,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         log(`Veriff decision response: status=${status} for sessionId=${sessionId}`);
 
         if (status === 'approved') {
+          // One verified person, one account — refuse if this identity
+          // already verified a different account.
+          const dupe = await claimIdentity(
+            identityHashFromParts(identityPartsFromVeriff(decisionData.verification || {})),
+            userId, 'veriff', log,
+          );
+          if (dupe === 'taken') {
+            return res.json({ verified: false, message: DUPLICATE_IDENTITY_MESSAGE });
+          }
+
           // User is approved! Update database
           await storage.updateUserVerification(userId, {
             verified: true,
@@ -2157,6 +2174,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
             if (approvedVerification) {
               log(`Found approved verification in /attempts: ${approvedVerification.id}`);
+
+              // One verified person, one account.
+              const dupe = await claimIdentity(
+                identityHashFromParts(identityPartsFromVeriff(approvedVerification)),
+                userId, 'veriff', log,
+              );
+              if (dupe === 'taken') {
+                return res.json({ verified: false, message: DUPLICATE_IDENTITY_MESSAGE });
+              }
 
               // User is approved! Update database
               await storage.updateUserVerification(userId, {
@@ -2258,6 +2284,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         log(`Veriff data: document.country=${document.country}, address.country=${address.country}, address.state=${address.state}, address.city=${address.city}`);
 
+        // One verified person, one account — refuse if this identity
+        // already verified a different account.
+        const dupe = await claimIdentity(
+          identityHashFromParts(identityPartsFromVeriff(verification)),
+          userId, 'veriff', log,
+        );
+        if (dupe === 'taken') {
+          return res.status(200).json({ received: true });
+        }
+
         await storage.updateUserVerification(userId, updateData);
 
         await grantInitialBallotsIfNeeded(userId);
@@ -2321,6 +2357,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         log(`Veriff webhook data: document.country=${document.country}, address.country=${address.country}`);
+
+        // One verified person, one account.
+        const dupe = await claimIdentity(
+          identityHashFromParts(identityPartsFromVeriff(verification)),
+          userId, 'veriff', log,
+        );
+        if (dupe === 'taken') {
+          return res.status(200).json({ received: true });
+        }
+
         await storage.updateUserVerification(userId, updateData);
         await grantInitialBallotsIfNeeded(userId);
         // UPDATE 25: org billing has moved to vote-time. The originatingOrgId
@@ -2764,6 +2810,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
           updateData.citizenshipVerifiedAt = new Date();
         }
 
+        // One verified person, one account.
+        const dupe = await claimIdentity(
+          identityHashFromParts(identityPartsFromDidit(decision || req.body, fields)),
+          userId, 'didit', log,
+        );
+        if (dupe === 'taken') {
+          return res.status(200).json({ received: true });
+        }
+
         await storage.updateUserVerification(userId, updateData);
         await grantInitialBallotsIfNeeded(userId);
         // UPDATE 25: org billing has moved to vote-time (see comment in
@@ -2812,6 +2867,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (fields.gender) updateData.gender = fields.gender;
           if (fields.firstName) updateData.firstName = fields.firstName;
           if (fields.lastName) updateData.lastName = fields.lastName;
+
+          // One verified person, one account.
+          const dupe = await claimIdentity(
+            identityHashFromParts(identityPartsFromDidit(decision, fields)),
+            userId, 'didit', log,
+          );
+          if (dupe === 'taken') {
+            return res.json({ status: 'declined', decision: 'declined', reason: 'duplicate_identity', message: DUPLICATE_IDENTITY_MESSAGE });
+          }
+
           await storage.updateUserVerification(userId, updateData);
           await grantInitialBallotsIfNeeded(userId);
           log(`User verified via Didit check-decision: user=${rid(userId)}, country=${fields.country}`);
@@ -2932,6 +2997,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (person.gender) {
           // Veriff returns 'M' or 'F', normalize to 'male'/'female'
           updateData.gender = person.gender === 'M' ? 'male' : person.gender === 'F' ? 'female' : person.gender.toLowerCase();
+        }
+
+        // One verified person, one account.
+        const dupe = await claimIdentity(
+          identityHashFromParts(identityPartsFromVeriff(verification)),
+          userId, 'veriff', log,
+        );
+        if (dupe === 'taken') {
+          return res.json({ status: 'declined', decision: 'declined', reason: 'duplicate_identity', message: DUPLICATE_IDENTITY_MESSAGE });
         }
 
         log(`Veriff check-decision: Updating user ${userId} with: ${JSON.stringify(updateData)}`);
