@@ -357,6 +357,10 @@ const WEBVOTE_CSS = `
 .terms-line{font-size:11.5px;line-height:1.5;color:var(--tx3);text-align:center;margin-top:12px}
 .terms-line a{color:var(--tx2);text-decoration:underline;text-underline-offset:2px}
 .confirm-line{font-size:14.5px;line-height:1.55;color:var(--tx);margin-bottom:16px}
+.verify-opt{display:block;width:100%;text-align:left;background:var(--sfh);border:1.5px solid var(--bd);border-radius:12px;padding:13px 15px;margin-bottom:10px;cursor:pointer;box-sizing:border-box;font-family:inherit}
+.verify-opt.selected{border-color:rgba(234,186,88,.55);background:rgba(234,186,88,.07)}
+.verify-opt .vo-title{display:block;font-size:14px;font-weight:600;color:var(--tx);margin-bottom:3px}
+.verify-opt .vo-sub{display:block;font-size:12px;line-height:1.45;color:var(--tx3)}
 .pr-reveal{font-size:12px;font-weight:500;color:var(--tx2);text-decoration:underline;text-underline-offset:3px;cursor:pointer;background:none;border:none;padding:0;font-family:inherit;text-align:left}
 `;
 
@@ -378,6 +382,7 @@ function webVoteHtml(b: BallotVM, proposal: any, host: string): string {
     options,
     geoLabel: b.geo.length > 0 ? b.geo.join(" · ") : "",
     isClosed: b.ended,
+    requiresCitizenship: !!proposal.requiresCitizenship,
   });
   const authConfig = JSON.stringify({
     googleClientId: process.env.GOOGLE_WEB_CLIENT_ID || "",
@@ -427,9 +432,17 @@ function webVoteHtml(b: BallotVM, proposal: any, host: string): string {
       </div>
       <!-- Step: verify -->
       <div id="step-verify" style="display:none">
-        <div class="verify-icon">&#128282;</div>
+        <div class="verify-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#EABA58" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><polyline points="9 12 11 14 15 10"></polyline></svg></div>
         <p class="step-label" style="text-align:center">Step 2 — Verify your identity</p>
-        <p class="ov-sub">Represent requires a one-time identity check to ensure one person, one ballot. Takes about 2 minutes and is reusable for all future questions.</p>
+        <p class="ov-sub" id="verify-note">Represent requires a one-time identity check to ensure one person, one ballot. Takes about 2 minutes and is reusable for all future questions.</p>
+        <button type="button" class="verify-opt selected" id="opt-standard" onclick="window.selectFlow('standard')">
+          <span class="vo-title">Standard — government ID</span>
+          <span class="vo-sub">Driver's licence, provincial ID, or passport. Unlocks voting in your verified region.</span>
+        </button>
+        <button type="button" class="verify-opt" id="opt-citizen" onclick="window.selectFlow('citizen')">
+          <span class="vo-title">Citizen — passport + proof of address</span>
+          <span class="vo-sub">Everything in standard, plus ballots open to verified citizens only.</span>
+        </button>
         <button class="action-btn" id="start-verify-btn" onclick="window.startVerification()">Verify my identity</button>
         <a class="secondary-btn" id="verify-link" target="_blank" rel="noopener" style="display:none;text-align:center;text-decoration:none">Verification didn't open? Tap here</a>
         <button class="secondary-btn" id="check-verify-btn" style="display:none" onclick="window.checkVerification()">I've completed verification →</button>
@@ -485,6 +498,8 @@ function webVoteHtml(b: BallotVM, proposal: any, host: string): string {
     var _vId=null;
     var _pollTimer=null,_pollCount=0;
     var _pendingPos=null,_pendingIdx=null;
+    var _flow='standard';
+    var REQ_CITIZEN=false;
     var AUTH_CFG={};
     var _googleCodeClient=null;
     var _appleInited=false;
@@ -504,7 +519,7 @@ function webVoteHtml(b: BallotVM, proposal: any, host: string): string {
       jwt=res.d.token;localStorage.setItem(JWT_KEY,jwt);
       /* The google/apple web login responses omit the verified flag — never
          assume unverified from absence. Ask the canonical endpoint instead. */
-      if(res.d.user&&res.d.user.verified){showStep('vote');}else{checkAuthAndAdvance();}
+      if(res.d.user&&res.d.user.verified&&!REQ_CITIZEN){showStep('vote');}else{checkAuthAndAdvance();}
     }
     window.signInWithGoogle=function(){
       if(!AUTH_CFG.googleClientId){socialErr('Google sign-in is not configured.');return;}
@@ -570,6 +585,21 @@ function webVoteHtml(b: BallotVM, proposal: any, host: string): string {
       jwt=localStorage.getItem(JWT_KEY);
       if(jwt){checkAuthAndAdvance();}else{showStep('auth');}
     };
+    window.selectFlow=function(f){
+      _flow=f==='citizen'?'citizen':'standard';
+      var so=document.getElementById('opt-standard'),co=document.getElementById('opt-citizen');
+      if(so)so.classList.toggle('selected',_flow==='standard');
+      if(co)co.classList.toggle('selected',_flow==='citizen');
+    };
+    function setVerifyNote(msg){
+      var el=document.getElementById('verify-note');if(el&&msg)el.textContent=msg;
+    }
+    function requireCitizenVerify(){
+      selectFlowSafe('citizen');
+      setVerifyNote('This ballot is open to verified citizens. Verify citizenship (passport + proof of address) to cast it — it also covers standard verification.');
+      showStep('verify');
+    }
+    function selectFlowSafe(f){if(window.selectFlow)window.selectFlow(f);}
     window.closeOverlay=function(){
       stopPoll();
       var el=document.getElementById('vote-overlay');if(el)el.style.display='none';
@@ -594,7 +624,7 @@ function webVoteHtml(b: BallotVM, proposal: any, host: string): string {
       .then(function(res){
         if(!res.ok){setErr('auth',res.d.error||'Login failed.');btn.disabled=false;btn.textContent='Continue →';return;}
         jwt=res.d.token;localStorage.setItem(JWT_KEY,jwt);
-        if(res.d.user&&res.d.user.verified){showStep('vote');}else{showStep('verify');}
+        if(res.d.user&&res.d.user.verified&&!REQ_CITIZEN){showStep('vote');}else{checkAuthAndAdvance();}
       }).catch(function(){setErr('auth','Network error. Please try again.');btn.disabled=false;btn.textContent='Continue →';});
     };
     window.submitSignup=function(){
@@ -610,13 +640,13 @@ function webVoteHtml(b: BallotVM, proposal: any, host: string): string {
       .then(function(res){
         if(!res.ok){setErr('auth',res.d.error||'Sign-up failed.');btn.disabled=false;btn.textContent='Create account →';return;}
         jwt=res.d.token;localStorage.setItem(JWT_KEY,jwt);
-        showStep('verify');
+        if(REQ_CITIZEN){requireCitizenVerify();}else{showStep('verify');}
       }).catch(function(){setErr('auth','Network error.');btn.disabled=false;btn.textContent='Create account →';});
     };
     window.startVerification=function(){
       var btn=document.getElementById('start-verify-btn');
       btn.disabled=true;btn.textContent='Opening…';
-      apiFetch('/api/didit/create-session',{method:'POST',body:JSON.stringify({flow:'standard'})})
+      apiFetch('/api/didit/create-session',{method:'POST',body:JSON.stringify({flow:_flow})})
       .then(function(r){return r.json().then(function(d){return{ok:r.ok,d:d};});})
       .then(function(res){
         if(!res.ok){
@@ -670,14 +700,15 @@ function webVoteHtml(b: BallotVM, proposal: any, host: string): string {
           return;
         }
         var status=res.d.status?res.d.status.toLowerCase():'unknown';
-        if(status==='approved'){
+        if(status==='approved'&&_flow!=='citizen'&&!REQ_CITIZEN){
           showStep('vote');
           return;
         }
         apiFetch('/api/auth/verify',{})
         .then(function(r2){return r2.json().then(function(d2){return{ok:r2.ok,d:d2};});})
         .then(function(res2){
-          if(res2.ok&&res2.d.user&&res2.d.user.verified===true){
+          var u2=res2.ok&&res2.d.user?res2.d.user:null;
+          if(u2&&(REQ_CITIZEN?u2.citizenshipVerified===true:u2.verified===true)){
             showStep('vote');
           }else{
             setErr('verify','Verification not complete yet. Please finish in the new tab, then try again. Status: '+status+'.');
@@ -715,7 +746,8 @@ function webVoteHtml(b: BallotVM, proposal: any, host: string): string {
           var msg=(res.d&&res.d.error)||'Could not submit your vote.';
           if(res.status===403&&msg.toLowerCase().indexOf('geographic')!==-1){
             msg=GEO_LABEL?'This question is open to verified '+GEO_LABEL+' residents. Your verified location does not match.':'You do not meet the geographic requirements for this question.';
-          }else if(msg.indexOf('already voted')!==-1){msg='You have already cast a ballot on this question.';}
+          }else if(msg.toLowerCase().indexOf('citizens only')!==-1||msg.toLowerCase().indexOf('verified citizens')!==-1){requireCitizenVerify();return;}
+          else if(msg.indexOf('already voted')!==-1){msg='You have already cast a ballot on this question.';}
           else if(msg.indexOf('deadline')!==-1||msg.indexOf('ended')!==-1){msg='Voting on this question has ended.';}
           else if(msg.indexOf('verification')!==-1||msg.indexOf('identity')!==-1){showStep('verify');return;}
           setErr('vote',msg);
@@ -742,7 +774,11 @@ function webVoteHtml(b: BallotVM, proposal: any, host: string): string {
     function checkAuthAndAdvance(){
       apiFetch('/api/auth/verify',{}).then(function(r){
         if(!r.ok){localStorage.removeItem(JWT_KEY);jwt=null;showStep('auth');return;}
-        r.json().then(function(d){if(d.user&&d.user.verified){showStep('vote');}else{showStep('verify');}});
+        r.json().then(function(d){
+          if(!d.user){showStep('auth');return;}
+          if(REQ_CITIZEN&&d.user.citizenshipVerified!==true){requireCitizenVerify();return;}
+          if(d.user.verified){showStep('vote');}else{showStep('verify');}
+        });
       }).catch(function(){showStep('auth');});
     }
     function loadLiveTally(){
@@ -833,7 +869,7 @@ function webVoteHtml(b: BallotVM, proposal: any, host: string): string {
           return;
         }
         var st=res.d.status?res.d.status.toLowerCase():'';
-        if(st==='approved'){stopPoll();showStep('vote');return;}
+        if(st==='approved'&&_flow!=='citizen'&&!REQ_CITIZEN){stopPoll();showStep('vote');return;}
         if(st==='declined'){
           stopPoll();
           setErr('verify','Verification was declined. You can try again.');
@@ -841,10 +877,18 @@ function webVoteHtml(b: BallotVM, proposal: any, host: string): string {
           if(b2){b2.disabled=false;b2.textContent='Try again';}
           return;
         }
-        if(_pollCount%3===0){
+        /* Citizen flow (or citizens-only ballot): the citizenship stamp is
+           written by the server webhook, so advance only once the canonical
+           endpoint confirms it. Standard flow checks every third poll. */
+        if(st==='approved'||_pollCount%3===0){
           apiFetch('/api/auth/verify',{})
           .then(function(r2){return r2.json();})
-          .then(function(d2){if(d2.user&&d2.user.verified===true){stopPoll();showStep('vote');}})
+          .then(function(d2){
+            if(!d2.user)return;
+            if(REQ_CITIZEN){
+              if(d2.user.citizenshipVerified===true){stopPoll();showStep('vote');}
+            }else if(d2.user.verified===true){stopPoll();showStep('vote');}
+          })
           .catch(function(){});
         }
       }).catch(function(){});
@@ -857,6 +901,8 @@ function webVoteHtml(b: BallotVM, proposal: any, host: string): string {
       OPTIONS=_pd.options||[];
       GEO_LABEL=_pd.geoLabel||'';
       IS_CLOSED=_pd.isClosed||false;
+      REQ_CITIZEN=!!_pd.requiresCitizenship;
+      if(REQ_CITIZEN)selectFlowSafe('citizen');
     } catch(e) {
       console.error('[Represent] pdata parse error:',e);
       OPTIONS=[];VOTE_TYPE='binary';
