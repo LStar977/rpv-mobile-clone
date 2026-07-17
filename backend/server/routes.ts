@@ -814,54 +814,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      // Check geo-restrictions for geo-gated proposals
+      // Check geo-restrictions for geo-gated proposals.
+      //
+      // geoRestrictions is a HIERARCHY, not a list of alternatives:
+      //   ["Canada"]                        → all of Canada
+      //   ["Canada", "Alberta"]             → Alberta residents only
+      //   ["Canada", "Alberta", "Calgary"]  → Calgary residents only
+      // The user's verified location must match EVERY level. (The previous
+      // any-element-matches check let any Canadian vote on any provincial or
+      // municipal ballot, because the "Canada" element alone matched. Same
+      // semantics as the client's canUserVoteOnProposal.)
       if (isGeoGated) {
         // Use user's verified profile location from database
-        const userCountry = user?.country;
-        const userState = user?.state;
-        const userCity = user?.city;
+        const userLocation = [user?.country, user?.state, user?.city];
 
-        log(`Vote validation START - userCountry="${userCountry}", userState="${userState}", userCity="${userCity}", geoRestrictions=${JSON.stringify(geoRestrictions)}`);
+        log(`Vote validation START - userLocation=${JSON.stringify(userLocation)}, geoRestrictions=${JSON.stringify(geoRestrictions)}`);
 
-        // Build user location variations from most specific to least
-        const userGeoVariations: string[] = [];
-        if (userCountry) {
-          userGeoVariations.push(userCountry);
-        }
-        if (userCountry && userState) {
-          userGeoVariations.push(`${userCountry}-${userState}`);
-        }
-        if (userCountry && userState && userCity) {
-          userGeoVariations.push(`${userCountry}-${userState}-${userCity}`);
-        }
+        const canVote = geoRestrictions.every((restriction: any, index: number) => {
+          const level = userLocation[index];
+          return (
+            !!level &&
+            String(level).trim().toLowerCase() === String(restriction ?? "").trim().toLowerCase()
+          );
+        });
 
-        log(`User geo variations: ${JSON.stringify(userGeoVariations)}`);
-
-        // Check if any proposal geo-restriction matches any user location variation
-        let canVote = false;
-        for (const geo of geoRestrictions) {
-          if (!geo) continue; // Skip empty entries
-          const geoTrimmed = String(geo).trim();
-          log(`Checking geo restriction: "${geoTrimmed}"`);
-          for (const variation of userGeoVariations) {
-            const variationTrimmed = String(variation).trim();
-            // Exact match or hierarchical match (e.g., "Canada-AB-Calgary" matches "Canada" or "Canada-AB")
-            const isExactMatch = variationTrimmed === geoTrimmed;
-            const isHierarchicalMatch = variationTrimmed.startsWith(geoTrimmed + '-');
-            const matches = isExactMatch || isHierarchicalMatch;
-            log(`  Variation "${variationTrimmed}" vs Geo "${geoTrimmed}": exact=${isExactMatch}, hierarchical=${isHierarchicalMatch}, result=${matches}`);
-            if (matches) {
-              canVote = true;
-              break;
-            }
-          }
-          if (canVote) break;
-        }
-
-        log(`Vote validation result: canVote=${canVote}, geoRestrictions=${JSON.stringify(geoRestrictions)}, userVariations=${JSON.stringify(userGeoVariations)}`);
+        log(`Vote validation result: canVote=${canVote}, geoRestrictions=${JSON.stringify(geoRestrictions)}, userLocation=${JSON.stringify(userLocation)}`);
 
         if (!canVote) {
-          return res.status(403).json({ error: "You don't meet the geographic restrictions for this proposal" });
+          const region = geoRestrictions[geoRestrictions.length - 1];
+          return res.status(403).json({
+            error: `You don't meet the geographic restrictions for this proposal — it is open to verified ${region} residents.`,
+          });
         }
       }
 
