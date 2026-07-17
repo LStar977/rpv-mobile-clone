@@ -168,5 +168,305 @@
       "Toronto"
     ],
     "deadlineDays": 13
+  },
+  {
+    "title": "Ontario Homebuyer HST Rebate",
+    "description": "Bill 114, the HST Relief Implementation Act, would let the province rebate the Ontario portion of HST on certain newly built homes, worth up to roughly $130,000 for eligible buyers. The government says it lowers purchase costs and spurs construction. Critics ask why it was left out of the original budget and whether average buyers benefit. The bill is currently before the legislature.",
+    "category": "Economy",
+    "geoRestrictions": [
+      "Canada",
+      "Ontario"
+    ],
+    "deadlineDays": 14
+  },
+  {
+    "title": "Highway 413 Construction",
+    "description": "Highway 413 is a proposed 400-series highway across the northwest Greater Toronto Area, linking Halton, Peel and York regions. Provincial legislation exempts it from a full environmental assessment to speed construction. Supporters say it eases gridlock and supports growth. Opponents cite farmland, Greenbelt and wetland losses, and note studies estimating limited time savings. Early works are underway while legal and Indigenous consultation questions continue.",
+    "category": "Transportation",
+    "geoRestrictions": [
+      "Canada",
+      "Ontario"
+    ],
+    "deadlineDays": 28
+  },
+  {
+    "title": "GTA Transit Fare Integration",
+    "description": "Bill 98, the Fare Alignment and Seamless Transit Act, would align fares and transfers across transit systems in the Greater Toronto and Hamilton Area so riders pay more consistent fares when crossing between agencies like the TTC, GO Transit and regional services. Supporters say it removes double fares and simplifies commutes. Opponents question the cost and how lost revenue would be covered. It is being debated provincially.",
+    "category": "Transportation",
+    "geoRestrictions": [
+      "Canada",
+      "Ontario"
+    ],
+    "deadlineDays": 10
+  },
+  {
+    "title": "Toronto Bike Lane Provincial Oversight",
+    "description": "Under Bill 212, municipalities must get provincial approval to install bike lanes that remove a lane of vehicle traffic, and the province gained power to remove existing lanes on Bloor Street, Yonge Street and University Avenue in Toronto. Supporters say it prioritizes reducing car congestion. Opponents cite cyclist safety and question the evidence that bike lanes worsen traffic. Removals and a court challenge remain ongoing.",
+    "category": "Transportation",
+    "geoRestrictions": [
+      "Canada",
+      "Ontario"
+    ],
+    "deadlineDays": 18
+  },
+  {
+    "title": "Ontario Supervised Consumption Site Defunding",
+    "description": "Ontario has ended provincial funding for supervised drug consumption sites, where people use pre-obtained drugs under supervision, replacing them with Homelessness and Addiction Recovery Treatment (HART) hubs focused on treatment and housing, and has barred new sites from opening. Supporters say resources should fund recovery, not drug use. Opponents, including many clinicians, warn removing supervised sites will increase overdoses and public drug use. Closures proceeded through 2026.",
+    "category": "Healthcare",
+    "geoRestrictions": [
+      "Canada",
+      "Ontario"
+    ],
+    "deadlineDays": 25
+  },
+  {
+    "title": "Ontario Private Clinic Surgical Expansion",
+    "description": "Ontario is expanding the number of surgeries and diagnostic procedures performed at privately operated clinics that are still paid for by OHIP, aiming to reduce hospital wait-lists for procedures such as cataract, hip and knee operations. Supporters say it shortens waits and uses existing capacity. Opponents worry it draws staff from public hospitals and could lead to added charges. The expansion continues under provincial policy.",
+    "category": "Healthcare",
+    "geoRestrictions": [
+      "Canada",
+      "Ontario"
+    ],
+    "deadlineDays": 9
+  },
+  {
+    "title": "Ontario Family Doctor Access Program",
+    "description": "Ontario has committed to connecting every resident to a family doctor or primary care team, expanding funding for new teams as more than two million people are estimated to lack a regular provider. Supporters say universal primary care improves health and reduces emergency visits. Opponents question whether targets and funding are realistic given physician shortages. Implementation and its pace are actively debated.",
+    "category": "Healthcare",
+    "geoRestrictions": [
+      "Canada",
+      "Ontario"
+    ],
+    "deadlineDays": 30
+  },
+  {
+    "title": "Ontario Internationally Trained Health Worker Licensing",
+    "description": "Ontario has changed licensing rules to let internationally trained nurses and doctors begin practising sooner, including faster registration and supervised practice, to address staffing shortages. Supporters say it quickly adds qualified workers and helps newcomers use their skills. Opponents want assurance that standards and patient safety are maintained during faster assessment. The province continues to adjust these rules with regulatory colleges.",
+    "category": "Healthcare",
+    "geoRestrictions": [
+      "Canada",
+      "Ontario"
+    ],
+    "deadlineDays": 16
+  },
+  {
+    "title": "Ontario Auto Insurance Benefit Changes",
+    "description": "As of July 1, 2026, Ontario changed auto insurance so that only medical, rehabilitation and attendant care benefits remain mandatory, while benefits like income replacement, caregiver and death benefits became optional add-ons. Supporters say drivers can tailor coverage and avoid paying for benefits they already have. Opponents warn some drivers will be underinsured after serious crashes. The changes are now in effect.",
+    "category": "Economy",
+    "geoRestrictions": [
+      "Canada",
+      "Ontario"
+    ],
+    "deadlineDays": 12
+  },
+  {
+    "title": "Ontario Small Modular Nuclear Reactors",
+    "description": "Ontario Power Generation is building small modular reactors at the Darlington site, intended to be among the first grid-scale units in a G7 country, to expand low-emission electricity as demand grows. Supporters cite reliable, low-carbon power and jobs. Opponents question costs, waste and whether conservation or renewables would be cheaper. Construction and additional units are proceeding.",
+    "category": "Environment",
+    "geoRestrictions": [
+      "Canada",
+      "Ontario"
+    ],
+    "deadlineDays": 24
+  },
+  {
+    "title": "Ontario Ring of Fire Development",
+    "description": "The Ring of Fire is a mineral-rich region in Ontario's far north containing metals used in batteries and electronics. Provincial legislation creates 'special economic zones' to speed mining and road approvals there. Supporters cite jobs and a domestic critical-minerals supply. Opponents, including some First Nations, cite treaty rights, consultation and effects on wetlands that store carbon. Approvals and legal questions are ongoing.",
+    "category": "Environment",
+    "geoRestrictions": [
+      "Canada",
+      "Ontario"
+    ],
+    "deadlineDays": 33
+  },
+  {
+    "title": "Ontario Endangered Species Protection Changes",
+    "description": "Ontario replaced its Endangered Species Act with a new framework that narrows automatic habitat protections and streamlines approvals for development and resource projects. Supporters say the old rules delayed housing and infrastructure without clear benefit. Opponents, including many biologists, say weaker habitat rules will accelerate species decline. The changes took effect recently and remain contested.",
+    "category": "Environment",
+    "geoRestrictions": [
+      "Canada",
+      "Ontario"
+    ],
+    "deadlineDays": 8
+  },
+  {
+    "title": "Ontario Natural Gas Power Expansion",
+    "description": "Ontario's electricity system operator has procured new and expanded natural gas-fired generation to meet rising demand and support the grid during peak periods. Supporters say gas plants provide reliable power that renewables alone cannot yet guarantee. Opponents say new gas increases emissions and conflicts with climate targets, favouring storage, efficiency and clean sources. Procurements and plant approvals are ongoing.",
+    "category": "Environment",
+    "geoRestrictions": [
+      "Canada",
+      "Ontario"
+    ],
+    "deadlineDays": 20
+  },
+  {
+    "title": "Ontario School Cellphone Restrictions",
+    "description": "Ontario requires students' phones to be kept away and out of use during class time, with tighter limits for younger grades, to reduce classroom distraction. Supporters point to research linking phone use to lower attention and to bullying. Opponents question enforcement and say phones can aid learning and safety. The policy is in force across publicly funded schools and its effects are debated.",
+    "category": "Education",
+    "geoRestrictions": [
+      "Canada",
+      "Ontario"
+    ],
+    "deadlineDays": 15
+  },
+  {
+    "title": "Ontario Post-Secondary Tuition Freeze End",
+    "description": "Ontario ended its multi-year freeze on domestic tuition, allowing colleges and universities to raise fees, while announcing new sector funding after federal cuts to international student permits strained budgets. Supporters say institutions need the revenue to avoid program cuts. Opponents say higher tuition worsens affordability for students already carrying debt. The change applies from the current academic year.",
+    "category": "Education",
+    "geoRestrictions": [
+      "Canada",
+      "Ontario"
+    ],
+    "deadlineDays": 27
+  },
+  {
+    "title": "Ontario Science Centre Relocation",
+    "description": "Ontario is relocating the Ontario Science Centre from its longtime North York building to a new, smaller facility at Ontario Place on the waterfront, budgeted at about $1 billion and slated to open around 2029; the province closed the old site in 2024 citing roof issues. Supporters say a modern downtown centre draws more visitors. Opponents question the closure's rationale and reduced access for school groups.",
+    "category": "Education",
+    "geoRestrictions": [
+      "Canada",
+      "Ontario"
+    ],
+    "deadlineDays": 11
+  },
+  {
+    "title": "Ontario Development Charges Reduction",
+    "description": "Development charges are fees municipalities levy on new construction to pay for infrastructure like roads, water and transit. Ontario, with federal support, is moving to reduce these charges on new housing to lower building costs. Supporters say it makes homes cheaper and speeds construction. Opponents, including many municipalities, warn lost fees shift infrastructure costs onto property taxpayers unless replaced. The measures are under discussion.",
+    "category": "Housing",
+    "geoRestrictions": [
+      "Canada",
+      "Ontario"
+    ],
+    "deadlineDays": 22
+  },
+  {
+    "title": "Ontario Provincial Bail Reform",
+    "description": "Ontario has introduced measures to tighten its bail system and pursue unpaid bail debts using tools like liens and garnishments, complementing new federal bail rules aimed at repeat and violent offenders. Supporters say stricter bail improves public safety and accountability. Opponents, including some legal experts, question whether the changes reduce crime and warn of effects on the presumption of innocence and jail crowding. The measures are now in effect.",
+    "category": "Public Safety",
+    "geoRestrictions": [
+      "Canada",
+      "Ontario"
+    ],
+    "deadlineDays": 35
+  },
+  {
+    "title": "Ontario Highway 401 Tunnel Study",
+    "description": "The province is studying a proposal to build a tunnel beneath Highway 401 through the Greater Toronto Area to add capacity and reduce congestion on one of North America's busiest highways. Supporters say new capacity is needed for a growing region. Opponents cite the likely multi-billion-dollar cost, engineering uncertainty, and evidence that added road capacity can generate more traffic. A feasibility study is underway.",
+    "category": "Infrastructure",
+    "geoRestrictions": [
+      "Canada",
+      "Ontario"
+    ],
+    "deadlineDays": 13
+  },
+  {
+    "title": "Toronto Renoviction Licence Bylaw",
+    "description": "Toronto's Rental Renovation Licence Bylaw requires landlords who need a unit vacant for major renovations to obtain a city licence, notify tenants, and provide plans and relocation or compensation, aiming to curb 'renovictions' that displace tenants and raise rents. Supporters say it deters bad-faith evictions and protects affordable units. Opponents, including some landlords, say added fees and paperwork delay legitimate repairs. The bylaw is in effect.",
+    "category": "Housing",
+    "geoRestrictions": [
+      "Canada",
+      "Ontario",
+      "Toronto"
+    ],
+    "deadlineDays": 19
+  },
+  {
+    "title": "Toronto Housing Near Transit Zoning",
+    "description": "Toronto is changing zoning to allow taller and denser housing around roughly 120 transit stations, permitting apartments in areas once limited to lower-density buildings. Supporters say building homes near transit eases the housing shortage and boosts ridership. Opponents in some neighbourhoods raise concerns about density, shadowing and local infrastructure. The zoning changes are moving through council and public consultation.",
+    "category": "Housing",
+    "geoRestrictions": [
+      "Canada",
+      "Ontario",
+      "Toronto"
+    ],
+    "deadlineDays": 31
+  },
+  {
+    "title": "Toronto TTC Fare Freeze",
+    "description": "Toronto's 2026 budget freezes TTC fares for a third straight year and introduces a monthly fare cap so riders stop paying after a set number of trips. Supporters say it helps affordability and encourages transit use. Opponents note frozen fares leave the TTC more reliant on property taxes and other city revenue amid budget pressures. The freeze and cap are part of the adopted budget.",
+    "category": "Transportation",
+    "geoRestrictions": [
+      "Canada",
+      "Ontario",
+      "Toronto"
+    ],
+    "deadlineDays": 7
+  },
+  {
+    "title": "Toronto Small Business Property Tax Reduction",
+    "description": "Toronto's 2026 budget increases the property tax reduction for eligible small commercial properties to 20 percent, up from 15 percent, lowering tax bills for tens of thousands of small businesses. Supporters say it helps neighbourhood shops facing high costs. Opponents note the forgone revenue must be recovered elsewhere in the budget. The measure was adopted by council.",
+    "category": "Economy",
+    "geoRestrictions": [
+      "Canada",
+      "Ontario",
+      "Toronto"
+    ],
+    "deadlineDays": 17
+  },
+  {
+    "title": "Toronto Vacant Home Tax",
+    "description": "Toronto's Vacant Home Tax charges an annual levy on residential properties left empty for most of the year, intended to push units back into use and raise revenue for housing. Supporters say it discourages speculation and empty homes in a tight market. Opponents cite billing errors, appeals and the burden of yearly declarations on ordinary owners. The tax and its rate remain under review.",
+    "category": "Economy",
+    "geoRestrictions": [
+      "Canada",
+      "Ontario",
+      "Toronto"
+    ],
+    "deadlineDays": 26
+  },
+  {
+    "title": "Toronto Police Service Funding Increase",
+    "description": "Toronto's 2026 budget raises funding for the Toronto Police Service by more than $90 million as part of a multi-year plan to hire hundreds of new officers, alongside more paramedics. Supporters say added staffing improves response times and safety. Opponents question the increase amid a corruption probe and argue more money should go to prevention and social services. Council approved the funding.",
+    "category": "Public Safety",
+    "geoRestrictions": [
+      "Canada",
+      "Ontario",
+      "Toronto"
+    ],
+    "deadlineDays": 23
+  },
+  {
+    "title": "Toronto Automated Speed Enforcement",
+    "description": "Toronto operates automated speed enforcement cameras that ticket speeding drivers by mail, mainly in school and community safety zones, and has debated expanding them, while the province has signalled it may restrict their use. Supporters cite lower speeds and fewer collisions where cameras operate. Opponents call them a revenue grab and question fairness and signage. The program's future is contested between the city and province.",
+    "category": "Public Safety",
+    "geoRestrictions": [
+      "Canada",
+      "Ontario",
+      "Toronto"
+    ],
+    "deadlineDays": 34
+  },
+  {
+    "title": "Toronto Gardiner Expressway Rehabilitation",
+    "description": "Toronto is carrying out a multi-year, multi-billion-dollar rehabilitation of the elevated Gardiner Expressway, replacing the aging deck to keep the route safe while managing lane closures and traffic. Supporters say the highway is essential and must be maintained. Opponents question the cost and argue money could go to transit or to removing sections of the elevated road. The work and its funding are ongoing debates at council.",
+    "category": "Infrastructure",
+    "geoRestrictions": [
+      "Canada",
+      "Ontario",
+      "Toronto"
+    ],
+    "deadlineDays": 29
+  },
+  {
+    "title": "Toronto FIFA World Cup Hosting Costs",
+    "description": "Toronto is hosting matches for the 2026 FIFA World Cup, with city spending on stadium upgrades, security, transit and fan events running into the hundreds of millions of dollars. Supporters point to tourism, global exposure and economic activity. Opponents question whether the public return justifies the cost and where the money could otherwise go. The event is underway and final costs are being tracked.",
+    "category": "Infrastructure",
+    "geoRestrictions": [
+      "Canada",
+      "Ontario",
+      "Toronto"
+    ],
+    "deadlineDays": 32
+  },
+  {
+    "title": "Toronto City Building Fund Levy",
+    "description": "The City Building Fund is a dedicated portion of Toronto property taxes that pays for transit and housing capital projects. The 2026 budget raises this levy by 1.5 percent, adding to homeowners' bills to fund projects like transit maintenance and expansion. Supporters say steady, dedicated funding is needed for aging infrastructure. Opponents say it adds to affordability pressures on top of the base tax increase. It was adopted with the budget.",
+    "category": "Infrastructure",
+    "geoRestrictions": [
+      "Canada",
+      "Ontario",
+      "Toronto"
+    ],
+    "deadlineDays": 14
   }
 ]
