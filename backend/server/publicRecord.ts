@@ -431,6 +431,7 @@ function webVoteHtml(b: BallotVM, proposal: any, host: string): string {
         <p class="step-label" style="text-align:center">Step 2 — Verify your identity</p>
         <p class="ov-sub">Represent requires a one-time identity check to ensure one person, one ballot. Takes about 2 minutes and is reusable for all future questions.</p>
         <button class="action-btn" id="start-verify-btn" onclick="window.startVerification()">Verify my identity</button>
+        <a class="secondary-btn" id="verify-link" target="_blank" rel="noopener" style="display:none;text-align:center;text-decoration:none">Verification didn't open? Tap here</a>
         <button class="secondary-btn" id="check-verify-btn" style="display:none" onclick="window.checkVerification()">I've completed verification →</button>
         <div class="err-msg" id="verify-error"></div>
       </div>
@@ -501,7 +502,9 @@ function webVoteHtml(b: BallotVM, proposal: any, host: string): string {
       if(g)g.disabled=false;if(a)a.disabled=false;
       if(!res.ok){socialErr(res.d.error||'Sign-in failed.');return;}
       jwt=res.d.token;localStorage.setItem(JWT_KEY,jwt);
-      if(res.d.user&&res.d.user.verified){showStep('vote');}else{showStep('verify');}
+      /* The google/apple web login responses omit the verified flag — never
+         assume unverified from absence. Ask the canonical endpoint instead. */
+      if(res.d.user&&res.d.user.verified){showStep('vote');}else{checkAuthAndAdvance();}
     }
     window.signInWithGoogle=function(){
       if(!AUTH_CFG.googleClientId){socialErr('Google sign-in is not configured.');return;}
@@ -617,11 +620,31 @@ function webVoteHtml(b: BallotVM, proposal: any, host: string): string {
       .then(function(r){return r.json().then(function(d){return{ok:r.ok,d:d};});})
       .then(function(res){
         if(!res.ok){
-          if(res.d.error&&res.d.error.indexOf('already verified')!==-1){showStep('vote');return;}
-          setErr('verify',res.d.error||'Could not start verification.');btn.disabled=false;btn.textContent='Verify my identity';return;
+          var em=(res.d&&res.d.error?String(res.d.error):'').toLowerCase();
+          if(em.indexOf('already verified')!==-1){showStep('vote');return;}
+          /* However the server phrased it — check the canonical status
+             before showing an error. An already-verified account belongs
+             on the vote step, not in a dead end. */
+          apiFetch('/api/auth/verify',{})
+          .then(function(r2){return r2.json().then(function(d2){return{ok:r2.ok,d:d2};});})
+          .then(function(res2){
+            if(res2.ok&&res2.d.user&&res2.d.user.verified===true){showStep('vote');return;}
+            setErr('verify',(res.d&&res.d.error)||'Could not start verification. Please try again.');
+            btn.disabled=false;btn.textContent='Verify my identity';
+          }).catch(function(){
+            setErr('verify',(res.d&&res.d.error)||'Could not start verification. Please try again.');
+            btn.disabled=false;btn.textContent='Verify my identity';
+          });
+          return;
         }
         _vId=res.d.verificationId||res.d.sessionToken||null;
-        window.open(res.d.sessionUrl,'_blank');
+        var vlink=document.getElementById('verify-link');
+        if(vlink){vlink.href=res.d.sessionUrl;}
+        var w=window.open(res.d.sessionUrl,'_blank');
+        if(!w&&vlink){
+          /* Pop-up blocked (common on iOS Safari) — surface a direct link. */
+          vlink.style.display='';
+        }
         var cb=document.getElementById('check-verify-btn');if(cb)cb.style.display='';
         btn.textContent='Waiting for verification…';
         startPoll();
