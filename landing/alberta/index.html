@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Alberta Shadow Referendum — live verified results | Represent</title>
+<meta name="description" content="All 10 official referendum questions, answered by identity-verified Albertans. See where the province actually stands.">
+<meta property="og:title" content="The Alberta Shadow Referendum — live verified results">
+<meta property="og:description" content="All 10 official referendum questions, answered by identity-verified Albertans. See where the province actually stands.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://representvote.com/">
+<meta property="og:image" content="https://representvote.com/assets/og/og-master.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://representvote.com/assets/og/og-master.png">
+<link rel="canonical" href="https://representvote.com/">
+<link rel="icon" type="image/png" href="../assets/logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..700;1,9..144,400..700&family=Onest:wght@400..800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --lp-bg: #000000;
+    --lp-card: #0c0b08;
+    --lp-card-hover: #110f0a;
+    --lp-card-shadow: none;
+    --lp-hairline: rgba(242, 230, 204, 0.09);
+    --lp-hairline-soft: rgba(242, 230, 204, 0.07);
+    --lp-divider: rgba(242, 230, 204, 0.10);
+    --lp-track: rgba(242, 230, 204, 0.12);
+    --lp-bar: #f2e6cc;
+    --lp-ghost-border: rgba(242, 230, 204, 0.28);
+    --lp-text-strong: #f2e6cc;
+    --lp-text: rgba(242, 230, 204, 0.88);
+    --lp-text-soft: rgba(242, 230, 204, 0.78);
+    --lp-faint: rgba(242, 230, 204, 0.6);
+    --lp-muted: #8a8275;
+    --lp-gold: #d4a949;
+    --lp-gold-text: #d4a949;
+    --lp-gold-hover: #e0b25a;
+    --lp-gold-border: rgba(212, 169, 73, 0.3);
+    --lp-gold-border-strong: rgba(212, 169, 73, 0.6);
+    --lp-chip-mono-border: rgba(138, 130, 117, 0.4);
+    --lp-sticky-bg: rgba(0, 0, 0, 0.94);
+    --lp-sticky-border: rgba(242, 230, 204, 0.12);
+  }
+  html[data-theme="light"] {
+    --lp-bg: #FBF7EE;
+    --lp-card: #FFFFFF;
+    --lp-card-hover: #FFFDF6;
+    --lp-card-shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 8px 24px rgba(0, 0, 0, 0.06);
+    --lp-hairline: rgba(0, 0, 0, 0.08);
+    --lp-hairline-soft: rgba(0, 0, 0, 0.06);
+    --lp-divider: rgba(0, 0, 0, 0.08);
+    --lp-track: rgba(0, 0, 0, 0.10);
+    --lp-bar: #B8902F;
+    --lp-ghost-border: rgba(0, 0, 0, 0.22);
+    --lp-text-strong: #0B0B0B;
+    --lp-text: #2A2622;
+    --lp-text-soft: rgba(42, 38, 34, 0.85);
+    --lp-faint: #6E6557;
+    --lp-muted: #6E6557;
+    --lp-gold: #B8902F;
+    --lp-gold-text: #8A6A1B;
+    --lp-gold-hover: #9F7B22;
+    --lp-gold-border: rgba(184, 144, 47, 0.45);
+    --lp-gold-border-strong: rgba(184, 144, 47, 0.75);
+    --lp-chip-mono-border: rgba(110, 101, 87, 0.45);
+    --lp-sticky-bg: rgba(251, 247, 238, 0.96);
+    --lp-sticky-border: rgba(0, 0, 0, 0.10);
+  }
+  html { scroll-behavior: smooth; background: var(--lp-bg); }
+  body { margin: 0; background: var(--lp-bg); color: var(--lp-text); -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+  html[data-theme="light"] #lp-root { background-image: radial-gradient(rgba(110, 101, 87, 0.08) 1px, transparent 1px); background-size: 24px 24px; }
+  ::selection { background: #d4a949; color: #000000; }
+  a:focus-visible, button:focus-visible { outline: 2px solid var(--lp-gold); outline-offset: 3px; }
+
+  .rv-gold-btn { display: inline-flex; align-items: center; background: #D4A949; color: #000000; text-decoration: none; font-weight: 700; letter-spacing: 0.01em; border-radius: 999px; transition: background 200ms cubic-bezier(0.2,0.7,0.2,1), transform 120ms cubic-bezier(0.2,0.7,0.2,1); }
+  .rv-gold-btn:hover { background: #E0B25A; }
+  .rv-gold-btn:active { background: #B8923E; transform: scale(0.98); }
+  .rv-ghost-btn { display: inline-flex; align-items: center; background: transparent; border: 1px solid var(--lp-ghost-border); color: var(--lp-text-strong); text-decoration: none; font-weight: 600; border-radius: 999px; transition: border-color 200ms cubic-bezier(0.2,0.7,0.2,1), color 200ms cubic-bezier(0.2,0.7,0.2,1); }
+  .rv-ghost-btn:hover { border-color: var(--lp-gold-border-strong); }
+  .rv-card-link { text-decoration: none; color: var(--lp-text-strong); transition: border-color 200ms cubic-bezier(0.2,0.7,0.2,1), background 200ms cubic-bezier(0.2,0.7,0.2,1); }
+  .rv-card-link:hover { border-color: var(--lp-gold-border-strong) !important; background: var(--lp-card-hover) !important; }
+  .rv-flink { color: var(--lp-muted); text-decoration: none; transition: color 200ms cubic-bezier(0.2,0.7,0.2,1); }
+  .rv-flink:hover { color: var(--lp-gold-hover); }
+  .rv-theme-btn { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: 50%; background: transparent; border: none; padding: 0; cursor: pointer; color: var(--lp-muted); transition: color 200ms cubic-bezier(0.2,0.7,0.2,1); }
+  .rv-theme-btn:hover { color: var(--lp-gold-text); }
+  .rv-icon-sun { display: block; }
+  .rv-icon-moon { display: none; }
+  html[data-theme="light"] .rv-icon-sun { display: none; }
+  html[data-theme="light"] .rv-icon-moon { display: block; }
+
+  @keyframes rvPulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(98,168,112,0.5); } 60% { box-shadow: 0 0 0 6px rgba(98,168,112,0); } }
+  @keyframes rvFadeUp { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
+  @media (min-width: 820px) { #rv-sticky { display: none; } }
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    * { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+  }
+</style>
+<script>
+  (function () {
+    try {
+      var stored = localStorage.getItem('represent_theme');
+      var theme = (stored === 'light' || stored === 'dark') ? stored : (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+      document.documentElement.setAttribute('data-theme', theme);
+    } catch (e) {}
+  })();
+</script>
+</head>
+<body>
+
+<div id="lp-root" style="background: var(--lp-bg); color: var(--lp-text-strong); font-family: Onest, -apple-system, 'Segoe UI', sans-serif; font-size: 17px; line-height: 1.65; overflow-x: clip;">
+
+  <!-- 1 · Announcement bar -->
+  <a href="#referendum" style="display: block; background: #D4A949; color: #000000; text-decoration: none; text-align: center; font-size: 13px; font-weight: 600; letter-spacing: 0.02em; padding: 9px 16px; line-height: 1.4;">Alberta votes October 19. The Shadow Referendum is live now.&nbsp;↓</a>
+
+  <!-- Header -->
+  <header style="max-width: 1180px; margin: 0 auto; padding: 20px clamp(20px, 5vw, 48px); display: flex; align-items: center; justify-content: space-between; gap: 16px;">
+    <div style="display: flex; align-items: center; gap: 12px;">
+      <img src="../assets/logo.png" alt="Represent logo — a raised gold hand with a smaller cream hand in front" width="36" height="36" style="display: block; width: 36px; height: 36px; border-radius: 50%;" />
+      <span style="font-family: Fraunces, Georgia, serif; font-size: 21px; font-weight: 600; letter-spacing: 0.005em; color: var(--lp-text-strong);">Represent</span>
+    </div>
+    <div style="display: flex; align-items: center; gap: 10px;">
+      <button type="button" id="rv-theme-toggle" class="rv-theme-btn" aria-label="Toggle colour theme">
+        <svg class="rv-icon-sun" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2"></path><path d="M12 20v2"></path><path d="m4.93 4.93 1.41 1.41"></path><path d="m17.66 17.66 1.41 1.41"></path><path d="M2 12h2"></path><path d="M20 12h2"></path><path d="m6.34 17.66-1.41 1.41"></path><path d="m19.07 4.93-1.41 1.41"></path></svg>
+        <svg class="rv-icon-moon" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"></path></svg>
+      </button>
+      <a href="https://apps.apple.com/ca/app/id6756912022" class="rv-ghost-btn" style="font-size: 14px; padding: 9px 18px; gap: 8px;">Download</a>
+    </div>
+  </header>
+
+  <!-- 2 · Hero -->
+  <section id="rv-hero" style="max-width: 1180px; margin: 0 auto; padding: clamp(28px, 6vh, 72px) clamp(20px, 5vw, 48px) clamp(56px, 8vh, 96px); display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 430px), 1fr)); gap: clamp(40px, 5vw, 72px); align-items: center; min-height: min(82svh, 860px);">
+
+    <div style="display: flex; flex-direction: column; align-items: flex-start; gap: 22px;">
+      <div style="display: inline-flex; align-items: center; gap: 9px; font-size: 11.5px; font-weight: 700; letter-spacing: 0.18em; color: var(--lp-gold-text); text-transform: uppercase; animation: rvFadeUp 700ms cubic-bezier(0.2,0.7,0.2,1) both;">
+        <span style="width: 7px; height: 7px; border-radius: 50%; background: #62A870; animation: rvPulse 2.2s cubic-bezier(0.2,0.7,0.2,1) infinite;"></span>
+        <span>Live · The Alberta Shadow Referendum</span>
+      </div>
+      <h1 style="margin: 0; font-family: Fraunces, Georgia, serif; font-weight: 600; font-size: clamp(37px, 6.2vw, 72px); line-height: 1.04; letter-spacing: -0.015em; color: var(--lp-text-strong); text-wrap: balance; animation: rvFadeUp 700ms cubic-bezier(0.2,0.7,0.2,1) 80ms both;">Alberta votes in <span style="color: var(--lp-gold-text);"><span id="rv-days">—</span> days</span>.<br />Where do verified Albertans actually stand?</h1>
+      <p style="margin: 0; max-width: 58ch; font-size: clamp(15.5px, 1.5vw, 18px); line-height: 1.65; color: var(--lp-text); animation: rvFadeUp 700ms cubic-bezier(0.2,0.7,0.2,1) 160ms both;">All 10 official referendum questions are live on Represent — open only to identity-verified Albertans. No bots. No brigading. No out-of-province noise. One person, one vote, provable.</p>
+      <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px; animation: rvFadeUp 700ms cubic-bezier(0.2,0.7,0.2,1) 240ms both;">
+        <a href="https://apps.apple.com/ca/app/id6756912022" class="rv-gold-btn" style="font-size: 16px; padding: 15px 28px;">Download on the App Store</a>
+        <a href="#referendum" class="rv-ghost-btn" style="font-size: 16px; padding: 14px 26px;">See the live results&nbsp;↓</a>
+      </div>
+      <div id="rv-countdown" style="font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 12.5px; letter-spacing: 0.1em; color: var(--lp-muted); text-transform: uppercase; animation: rvFadeUp 700ms cubic-bezier(0.2,0.7,0.2,1) 320ms both;">&nbsp;</div>
+    </div>
+
+    <!-- Hero visual: Q10 live tally card -->
+    <div style="justify-self: center; width: 100%; max-width: 470px; background: var(--lp-card); box-shadow: var(--lp-card-shadow); border: 1px solid var(--lp-gold-border); border-radius: 18px; padding: clamp(22px, 3vw, 30px); display: flex; flex-direction: column; gap: 20px; animation: rvFadeUp 700ms cubic-bezier(0.2,0.7,0.2,1) 300ms both;">
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
+        <div style="display: inline-flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 700; letter-spacing: 0.16em; color: var(--lp-muted); text-transform: uppercase;">
+          <span style="width: 6px; height: 6px; border-radius: 50%; background: #62A870; animation: rvPulse 2.2s cubic-bezier(0.2,0.7,0.2,1) infinite;"></span>
+          <span>Question 10 · Live tally</span>
+        </div>
+        <span style="background: var(--lp-gold); color: #000000; font-size: 10px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; padding: 4px 10px; border-radius: 999px;">Citizens only</span>
+      </div>
+      <div style="font-family: Fraunces, Georgia, serif; font-size: clamp(21px, 2.2vw, 25px); font-weight: 600; line-height: 1.25; letter-spacing: -0.01em; color: var(--lp-text-strong); text-wrap: balance;">Remain in Canada, or begin the separation process?</div>
+
+      <div style="display: flex; flex-direction: column; gap: 8px;">
+        <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 12px;">
+          <span style="font-size: 14.5px; font-weight: 600; color: var(--lp-text);">Remain a province in Canada</span>
+          <span data-q10="remainPct" style="font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 22px; font-weight: 600; color: var(--lp-text-strong);">—</span>
+        </div>
+        <div style="height: 8px; border-radius: 999px; background: var(--lp-track); overflow: hidden;">
+          <div data-q10="remainBar" style="height: 100%; width: 0%; border-radius: 999px; background: var(--lp-bar); transition: width 1100ms cubic-bezier(0.2,0.7,0.2,1);"></div>
+        </div>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 8px;">
+        <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 12px;">
+          <span style="font-size: 14.5px; font-weight: 600; color: var(--lp-text);">Begin the separation process</span>
+          <span data-q10="beginPct" style="font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 22px; font-weight: 600; color: var(--lp-text-strong);">—</span>
+        </div>
+        <div style="height: 8px; border-radius: 999px; background: var(--lp-track); overflow: hidden;">
+          <div data-q10="beginBar" style="height: 100%; width: 0%; border-radius: 999px; background: var(--lp-bar); transition: width 1100ms cubic-bezier(0.2,0.7,0.2,1) 120ms;"></div>
+        </div>
+      </div>
+
+      <div style="border-top: 1px solid var(--lp-divider); padding-top: 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;">
+        <span style="font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 13px; color: var(--lp-text);"><span data-q10="ballots" style="color: var(--lp-gold-text); font-weight: 600;">—</span> verified ballots</span>
+        <span id="rv-q10-status" style="font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 10px; letter-spacing: 0.12em; color: var(--lp-muted); text-transform: uppercase;">Syncing live tally…</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3 · Credibility strip -->
+  <section style="border-top: 1px solid var(--lp-hairline); border-bottom: 1px solid var(--lp-hairline);">
+    <p style="max-width: 1180px; margin: 0 auto; padding: 18px clamp(20px, 5vw, 48px); text-align: center; font-size: 13.5px; line-height: 1.8; color: var(--lp-muted); letter-spacing: 0.01em;">Identity verified by government ID&nbsp;&nbsp;·&nbsp;&nbsp;Geo-located from documents, not GPS&nbsp;&nbsp;·&nbsp;&nbsp;Every vote on a public ledger&nbsp;&nbsp;·&nbsp;&nbsp;Verification is free</p>
+  </section>
+
+  <!-- 4 · Why this exists -->
+  <section style="max-width: 1180px; margin: 0 auto; padding: clamp(72px, 10vw, 130px) clamp(20px, 5vw, 48px) 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr)); gap: clamp(28px, 5vw, 80px); align-items: start;">
+    <div style="display: flex; flex-direction: column; gap: 18px;">
+      <div style="font-size: 11.5px; font-weight: 700; letter-spacing: 0.18em; color: var(--lp-gold-text); text-transform: uppercase;">Why this exists</div>
+      <h2 style="margin: 0; font-family: Fraunces, Georgia, serif; font-weight: 600; font-size: clamp(29px, 3.4vw, 42px); line-height: 1.12; letter-spacing: -0.012em; color: var(--lp-text-strong); text-wrap: balance;">The biggest petition in Canadian history was dismissed in one news cycle.</h2>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 22px; font-size: 17px; line-height: 1.7; color: var(--lp-text);">
+      <p style="margin: 0;">In December 2023, <span style="font-feature-settings: 'tnum' 1; font-weight: 600; color: var(--lp-text-strong);">386,698</span> people signed a parliamentary e-petition — the largest in Canadian history. It changed nothing. Signatures only required an email address, so critics could wave it away as bots, duplicates, and foreign interference. Nobody could prove them wrong.</p>
+      <blockquote style="margin: 6px 0; padding-left: 22px; border-left: 2px solid var(--lp-gold); font-family: Fraunces, Georgia, serif; font-style: italic; font-size: clamp(21px, 2.2vw, 25px); line-height: 1.4; color: var(--lp-text-strong);">The moment a result matters, “it’s all fake” ends the conversation.</blockquote>
+      <p style="margin: 0;">That’s the flaw in every petition, every online poll, every hashtag.</p>
+      <p style="margin: 0;">Represent makes that attack impossible. Every voter is verified against a government document. Every vote is geo-located to a real riding. Every tally can be audited by anyone — including the people who don’t like the result.</p>
+    </div>
+  </section>
+
+  <!-- 5 · How it works -->
+  <section style="max-width: 1180px; margin: 0 auto; padding: clamp(72px, 10vw, 130px) clamp(20px, 5vw, 48px) 0; display: flex; flex-direction: column; gap: clamp(28px, 4vw, 44px);">
+    <h2 style="margin: 0; font-family: Fraunces, Georgia, serif; font-weight: 600; font-size: clamp(29px, 3.4vw, 42px); line-height: 1.12; letter-spacing: -0.012em; color: var(--lp-text-strong);">Three minutes to a vote that counts.</h2>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 16px;">
+      <div style="background: var(--lp-card); box-shadow: var(--lp-card-shadow); border: 1px solid var(--lp-hairline); border-radius: 14px; padding: 28px; display: flex; flex-direction: column; gap: 14px;">
+        <div style="font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 13px; font-weight: 600; letter-spacing: 0.1em; color: var(--lp-gold-text);">01</div>
+        <div style="font-size: 19px; font-weight: 700; color: var(--lp-text-strong);">Verify once.</div>
+        <p style="margin: 0; font-size: 15.5px; line-height: 1.65; color: var(--lp-text-soft);">Scan your ID and take a selfie. Free, takes about two minutes, and your documents are never stored on our servers.</p>
+      </div>
+      <div style="background: var(--lp-card); box-shadow: var(--lp-card-shadow); border: 1px solid var(--lp-hairline); border-radius: 14px; padding: 28px; display: flex; flex-direction: column; gap: 14px;">
+        <div style="font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 13px; font-weight: 600; letter-spacing: 0.1em; color: var(--lp-gold-text);">02</div>
+        <div style="font-size: 19px; font-weight: 700; color: var(--lp-text-strong);">Vote on what matters.</div>
+        <p style="margin: 0; font-size: 15.5px; line-height: 1.65; color: var(--lp-text-soft);">Proposals are gated to your verified location — your province’s questions are decided by your province’s people.</p>
+      </div>
+      <div style="background: var(--lp-card); box-shadow: var(--lp-card-shadow); border: 1px solid var(--lp-hairline); border-radius: 14px; padding: 28px; display: flex; flex-direction: column; gap: 14px;">
+        <div style="font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 13px; font-weight: 600; letter-spacing: 0.1em; color: var(--lp-gold-text);">03</div>
+        <div style="font-size: 19px; font-weight: 700; color: var(--lp-text-strong);">Point to the proof.</div>
+        <p style="margin: 0; font-size: 15.5px; line-height: 1.65; color: var(--lp-text-soft);">Your vote becomes part of a public, tamper-proof tally that anyone can verify. Share it. Cite it. Defend it.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 6 · The Shadow Referendum -->
+  <section id="referendum" style="max-width: 1180px; margin: 0 auto; padding: clamp(72px, 10vw, 130px) clamp(20px, 5vw, 48px) 0; display: flex; flex-direction: column; gap: clamp(28px, 4vw, 40px); scroll-margin-top: 24px;">
+    <div style="display: flex; flex-direction: column; gap: 16px; max-width: 760px;">
+      <div style="display: inline-flex; align-items: center; gap: 9px; font-size: 11.5px; font-weight: 700; letter-spacing: 0.18em; color: var(--lp-gold-text); text-transform: uppercase;">
+        <span style="width: 7px; height: 7px; border-radius: 50%; background: #62A870; animation: rvPulse 2.2s cubic-bezier(0.2,0.7,0.2,1) infinite;"></span>
+        <span>Live now · Closes October 18</span>
+      </div>
+      <h2 style="margin: 0; font-family: Fraunces, Georgia, serif; font-weight: 600; font-size: clamp(29px, 3.4vw, 42px); line-height: 1.12; letter-spacing: -0.012em; color: var(--lp-text-strong);">All ten questions. Verified voters only.</h2>
+      <p style="margin: 0; font-size: 17px; line-height: 1.7; color: var(--lp-text);">The same questions Albertans will see on the official ballot — answered early, in public, by verified citizens. When the official results come in on October 19, compare them to ours.</p>
+      <p style="margin: 10px 0 0; font-size: 13px; line-height: 1.6; color: var(--lp-muted);">Represent takes no position on any referendum question. We run the count — verified, public, and auditable — nothing more.</p>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr)); gap: 16px;">
+
+      <!-- Q10 feature card -->
+      <a href="https://representportal.com/p/80b8cec4-4690-4e0c-b92f-9563b8c2fd95" class="rv-card-link" style="grid-column: 1 / -1; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr)); gap: clamp(24px, 4vw, 56px); align-items: center; background: var(--lp-card); box-shadow: var(--lp-card-shadow); border: 1px solid var(--lp-gold-border); border-radius: 18px; padding: clamp(24px, 3.5vw, 40px);">
+        <div style="display: flex; flex-direction: column; gap: 14px;">
+          <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+            <span style="font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 12px; font-weight: 600; letter-spacing: 0.12em; color: var(--lp-muted); text-transform: uppercase;">Question 10</span>
+            <span style="background: var(--lp-gold); color: #000000; font-size: 10px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; padding: 4px 10px; border-radius: 999px;">Citizens only</span>
+          </div>
+          <div style="font-family: Fraunces, Georgia, serif; font-size: clamp(24px, 2.6vw, 32px); font-weight: 600; line-height: 1.18; letter-spacing: -0.012em; text-wrap: balance;">Remain in Canada, or begin the separation process?</div>
+          <p style="margin: 0; font-size: 15px; line-height: 1.6; color: var(--lp-text-soft);">The choice question counted first on election night. Verified Canadian citizenship is required to cast this ballot.</p>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 18px;">
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 12px;">
+              <span style="font-size: 14px; font-weight: 600; color: var(--lp-text);">Remain a province in Canada</span>
+              <span data-q10="remainPct2" style="font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 17px; font-weight: 600;">—</span>
+            </div>
+            <div style="height: 7px; border-radius: 999px; background: var(--lp-track); overflow: hidden;">
+              <div data-q10="remainBar2" style="height: 100%; width: 0%; border-radius: 999px; background: var(--lp-bar); transition: width 1100ms cubic-bezier(0.2,0.7,0.2,1);"></div>
+            </div>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 12px;">
+              <span style="font-size: 14px; font-weight: 600; color: var(--lp-text);">Begin the separation process</span>
+              <span data-q10="beginPct2" style="font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 17px; font-weight: 600;">—</span>
+            </div>
+            <div style="height: 7px; border-radius: 999px; background: var(--lp-track); overflow: hidden;">
+              <div data-q10="beginBar2" style="height: 100%; width: 0%; border-radius: 999px; background: var(--lp-bar); transition: width 1100ms cubic-bezier(0.2,0.7,0.2,1) 120ms;"></div>
+            </div>
+          </div>
+          <div data-q10="votesLabel" style="font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 12.5px; color: var(--lp-muted);">Awaiting live tally</div>
+        </div>
+      </a>
+
+      <!-- Q1–Q9 cards (populated with live tallies by landing.js) -->
+      <!-- generated: see QUESTIONS in landing.js — card markup must stay in sync -->
+      <div id="rv-grid" style="display: contents;"></div>
+    </div>
+
+    <div style="display: flex; justify-content: center; padding-top: 8px;">
+      <a href="https://apps.apple.com/ca/app/id6756912022" class="rv-gold-btn" style="font-size: 16px; padding: 15px 28px;">Cast your ballot — download Represent</a>
+    </div>
+  </section>
+
+  <!-- 6b · What you can do all year -->
+  <section style="max-width: 1180px; margin: 0 auto; padding: clamp(72px, 10vw, 130px) clamp(20px, 5vw, 48px) 0; display: flex; flex-direction: column; gap: clamp(28px, 4vw, 44px);">
+    <div style="display: flex; flex-direction: column; gap: 16px; max-width: 800px;">
+      <div style="font-size: 11.5px; font-weight: 700; letter-spacing: 0.18em; color: var(--lp-gold-text); text-transform: uppercase;">What you can do all year</div>
+      <h2 style="margin: 0; font-family: Fraunces, Georgia, serif; font-weight: 600; font-size: clamp(29px, 3.4vw, 42px); line-height: 1.12; letter-spacing: -0.012em; color: var(--lp-text-strong);">This is bigger than one referendum.</h2>
+      <p style="margin: 0; max-width: 70ch; font-size: 17px; line-height: 1.7; color: var(--lp-text);">Represent isn’t a campaign — it’s the place verified citizens go when something matters in their community, their province, or their country. Here’s what lives here every day.</p>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 16px;">
+      <div style="background: var(--lp-card); box-shadow: var(--lp-card-shadow); border: 1px solid var(--lp-hairline); border-radius: 14px; padding: 28px; display: flex; flex-direction: column; gap: 14px;">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="display: block; color: var(--lp-gold);"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"></path><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><path d="M12 17h.01"></path></svg>
+        <div style="font-size: 18px; font-weight: 700; line-height: 1.35; color: var(--lp-text-strong);">Wonder what your neighbours actually think? Ask them.</div>
+        <p style="margin: 0; font-size: 15.5px; line-height: 1.65; color: var(--lp-text-soft);">Create a proposal scoped to your city, riding, or country. Only verified people in that geography can answer. Get a real answer from real people — not strangers on the internet pretending to be locals.</p>
+      </div>
+      <div style="background: var(--lp-card); box-shadow: var(--lp-card-shadow); border: 1px solid var(--lp-hairline); border-radius: 14px; padding: 28px; display: flex; flex-direction: column; gap: 14px;">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="display: block; color: var(--lp-gold);"><path d="M14 9a2 2 0 0 1-2 2H6l-4 4V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2z"></path><path d="M18 9h2a2 2 0 0 1 2 2v11l-4-4h-6a2 2 0 0 1-2-2v-1"></path><path d="M5.5 6.5l1.7 1.7L10.5 5"></path></svg>
+        <div style="font-size: 18px; font-weight: 700; line-height: 1.35; color: var(--lp-text-strong);">Debate the issue, not the trolls.</div>
+        <p style="margin: 0; font-size: 15.5px; line-height: 1.65; color: var(--lp-text-soft);">Every comment comes from an identity-verified voter in the proposal’s scope. No bots, no brigades, no rage-farming accounts. Just neighbours arguing in public, on the record.</p>
+      </div>
+      <div style="background: var(--lp-card); box-shadow: var(--lp-card-shadow); border: 1px solid var(--lp-hairline); border-radius: 14px; padding: 28px; display: flex; flex-direction: column; gap: 14px;">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="display: block; color: var(--lp-gold);"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
+        <div style="font-size: 18px; font-weight: 700; line-height: 1.35; color: var(--lp-text-strong);">Every vote becomes a link you can send.</div>
+        <p style="margin: 0; font-size: 15.5px; line-height: 1.65; color: var(--lp-text-soft);">Each proposal has a public page with live results and a permanent audit trail. Share it with a councillor, a journalist, your union president — anyone who needs proof that real people, in a real place, said what they said.</p>
+      </div>
+    </div>
+
+    <div style="display: flex; flex-direction: column; align-items: center; gap: 22px; text-align: center;">
+      <p style="margin: 0; font-size: 13.5px; line-height: 1.7; color: var(--lp-muted);">Also on Represent: private votes for organizations&nbsp;&nbsp;·&nbsp;&nbsp;AI-powered legislation monitoring&nbsp;&nbsp;·&nbsp;&nbsp;more coming.</p>
+      <a href="https://apps.apple.com/ca/app/id6756912022" class="rv-gold-btn" style="font-size: 16px; padding: 15px 28px;">Download Represent</a>
+    </div>
+  </section>
+
+  <!-- 7 · Trust & privacy -->
+  <section style="max-width: 1180px; margin: 0 auto; padding: clamp(72px, 10vw, 130px) clamp(20px, 5vw, 48px) 0; display: flex; flex-direction: column; gap: clamp(28px, 4vw, 44px);">
+    <h2 style="margin: 0; font-family: Fraunces, Georgia, serif; font-weight: 600; font-size: clamp(29px, 3.4vw, 42px); line-height: 1.12; letter-spacing: -0.012em; color: var(--lp-text-strong); max-width: 18ch; text-wrap: balance;">“Why would I give a voting app my ID?”</h2>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 16px;">
+      <div style="background: var(--lp-card); box-shadow: var(--lp-card-shadow); border: 1px solid var(--lp-hairline); border-radius: 14px; padding: 28px; display: flex; flex-direction: column; gap: 12px;">
+        <div style="font-size: 18px; font-weight: 700; line-height: 1.35; color: var(--lp-text-strong);">We never see your documents the way you fear.</div>
+        <p style="margin: 0; font-size: 15.5px; line-height: 1.65; color: var(--lp-text-soft);">Verification is handled by a certified identity provider. We receive a yes/no and your verified region — not copies of your passport. A breach of our servers cannot leak documents we never hold.</p>
+      </div>
+      <div style="background: var(--lp-card); box-shadow: var(--lp-card-shadow); border: 1px solid var(--lp-hairline); border-radius: 14px; padding: 28px; display: flex; flex-direction: column; gap: 12px;">
+        <div style="font-size: 18px; font-weight: 700; line-height: 1.35; color: var(--lp-text-strong);">Your vote is pseudonymous in public.</div>
+        <p style="margin: 0; font-size: 15.5px; line-height: 1.65; color: var(--lp-text-soft);">The public ledger shows that a verified Albertan voted — not your name. Identity and ballot are linked only enough to prevent fraud, never for display.</p>
+      </div>
+      <div style="background: var(--lp-card); box-shadow: var(--lp-card-shadow); border: 1px solid var(--lp-hairline); border-radius: 14px; padding: 28px; display: flex; flex-direction: column; gap: 12px;">
+        <div style="font-size: 18px; font-weight: 700; line-height: 1.35; color: var(--lp-text-strong);">We will never sell your data or run political ads. Ever.</div>
+        <p style="margin: 0; font-size: 15.5px; line-height: 1.65; color: var(--lp-text-soft);">Our policy bans political advertising permanently. We make money from optional premium features and organization tools — not from you being the product.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 8 · For organizations -->
+  <section id="orgs" style="max-width: 1180px; margin: 0 auto; padding: clamp(72px, 10vw, 130px) clamp(20px, 5vw, 48px) 0; scroll-margin-top: 24px;">
+    <div style="border: 1px solid var(--lp-sticky-border); border-radius: 18px; padding: clamp(28px, 4vw, 48px); display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr)); gap: clamp(24px, 4vw, 64px); align-items: center;">
+      <div style="display: flex; flex-direction: column; gap: 14px;">
+        <div style="font-size: 11.5px; font-weight: 700; letter-spacing: 0.18em; color: var(--lp-gold-text); text-transform: uppercase;">Unions · Associations · Municipalities · Parties</div>
+        <h2 style="margin: 0; font-family: Fraunces, Georgia, serif; font-weight: 600; font-size: clamp(26px, 3vw, 36px); line-height: 1.15; letter-spacing: -0.012em; color: var(--lp-text-strong);">Your members have opinions. Get proof.</h2>
+      </div>
+      <div style="display: flex; flex-direction: column; align-items: flex-start; gap: 20px;">
+        <p style="margin: 0; font-size: 16.5px; line-height: 1.7; color: var(--lp-text);">Run verified votes inside your organization — strike mandates, board elections, member consultations, budget priorities. Identity-verified membership, turnout you can defend, results no one can dispute.</p>
+        <a href="mailto:hello@representvote.com" class="rv-ghost-btn" style="font-size: 15px; padding: 12px 24px;">Talk to us&nbsp;→&nbsp;hello@representvote.com</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- 9 · Final CTA -->
+  <section id="get" style="max-width: 1180px; margin: 0 auto; padding: clamp(96px, 14vw, 180px) clamp(20px, 5vw, 48px); display: flex; flex-direction: column; align-items: center; gap: 20px; text-align: center; scroll-margin-top: 24px;">
+    <h2 style="margin: 0; font-family: Fraunces, Georgia, serif; font-weight: 600; font-size: clamp(38px, 6vw, 68px); line-height: 1.05; letter-spacing: -0.015em; color: var(--lp-text-strong);">Be counted. Provably.</h2>
+    <p style="margin: 0; font-size: 18px; line-height: 1.6; color: var(--lp-text);">Free to download. Free to verify. Free to vote.</p>
+    <a href="https://apps.apple.com/ca/app/id6756912022" class="rv-gold-btn" style="font-size: 17px; padding: 17px 34px; margin-top: 8px;">Download on the App Store</a>
+    <div style="font-size: 13.5px; color: var(--lp-muted);">iPhone today. Android soon.</div>
+  </section>
+
+  <!-- 10 · Footer -->
+  <footer style="border-top: 1px solid var(--lp-hairline);">
+    <div style="max-width: 1180px; margin: 0 auto; padding: clamp(40px, 6vw, 64px) clamp(20px, 5vw, 48px) 120px; display: flex; flex-direction: column; gap: 28px;">
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 24px; flex-wrap: wrap;">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <img src="../assets/logo.png" alt="Represent logo" width="30" height="30" style="display: block; width: 30px; height: 30px; border-radius: 50%;" />
+          <span style="font-size: 14.5px; color: var(--lp-text);">Verified civic voice, built in Canada.</span>
+        </div>
+        <nav style="display: flex; flex-wrap: wrap; gap: 22px; font-size: 14px;">
+          <a href="https://apps.apple.com/ca/app/id6756912022" class="rv-flink">App Store</a>
+          <a href="https://representportal.com/privacy" class="rv-flink">Privacy</a>
+          <a href="https://representportal.com/terms" class="rv-flink">Terms</a>
+          <a href="mailto:hello@representvote.com" class="rv-flink">Contact</a>
+          <a href="#orgs" class="rv-flink">For Organizations</a>
+        </nav>
+      </div>
+      <p style="margin: 0; max-width: 78ch; font-size: 13.5px; line-height: 1.7; color: var(--lp-faint); border-top: 1px solid var(--lp-hairline-soft); padding-top: 24px;">Represent is an independent civic platform. We are not affiliated with Elections Alberta or any government, party, or campaign. The Shadow Referendum is an unofficial, non-binding public opinion measure.</p>
+    </div>
+  </footer>
+
+  <!-- Sticky mobile CTA -->
+  <div id="rv-sticky" style="position: fixed; left: 0; right: 0; bottom: 0; z-index: 50; background: var(--lp-sticky-bg); border-top: 1px solid var(--lp-sticky-border); padding: 10px 16px calc(10px + env(safe-area-inset-bottom)); display: flex; align-items: center; justify-content: space-between; gap: 12px; transform: translateY(110%); transition: transform 320ms cubic-bezier(0.2,0.7,0.2,1);">
+    <div style="display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: var(--lp-text); min-width: 0;">
+      <span style="flex: none; width: 6px; height: 6px; border-radius: 50%; background: #62A870; animation: rvPulse 2.2s cubic-bezier(0.2,0.7,0.2,1) infinite;"></span>
+      <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">The Shadow Referendum is live</span>
+    </div>
+    <a href="https://apps.apple.com/ca/app/id6756912022" class="rv-gold-btn" style="flex: none; font-size: 14px; padding: 11px 20px;">Get the app</a>
+  </div>
+
+</div>
+
+<script src="landing.js" defer></script>
+</body>
+</html>

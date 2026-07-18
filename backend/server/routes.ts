@@ -441,6 +441,139 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ballot permalink (R1/R2/R3 design). Registered before the SPA catch-all.
   registerPublicRecordRoutes(app, storage);
 
+  // ── Public JSON for the representvote.com pages (CORS-open, read-only) ──
+  const publicCors = (res: any) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Cache-Control", "public, max-age=60");
+  };
+  const PUBLIC_TALLY_THRESHOLD = 25;
+
+  // Alberta Shadow Referendum — the /alberta campaign page hard-codes these
+  // proposal ids. Yes/no splits obey the threshold rule: below 25 verified
+  // ballots only the count is returned, never the split.
+  const ALBERTA_REFERENDUM_IDS = [
+    "65bc4f40-ed16-4a0e-8851-9b8903f9ec14",
+    "2a0e78ef-f87f-4051-977b-acbbe071c258",
+    "759945a4-040a-4321-a2f7-45c52fb574d5",
+    "0b69ee1d-a4e5-4415-93c8-ad8b3272565a",
+    "64c7abd0-538b-4d41-8bb1-0f055f8cc77f",
+    "1497849e-d3c3-4180-8bcf-b7badd85e117",
+    "9d2f763c-bf7a-4f39-925b-087129e4e1af",
+    "daac1ce4-0392-4043-9868-34a2e3a17e74",
+    "57576c44-49b2-4336-9839-3460b4e1b3c9",
+    "80b8cec4-4690-4e0c-b92f-9563b8c2fd95",
+  ];
+
+  app.get("/api/public/referendum-tallies", async (_req: any, res: any) => {
+    try {
+      publicCors(res);
+      const out: any[] = [];
+      for (const id of ALBERTA_REFERENDUM_IDS) {
+        const p = await storage.getProposal(id);
+        if (!p || (p as any).hiddenAt) continue;
+        if (p.voteType === "multiple-choice") {
+          const counts = await (storage as any).countVotesPerOption(id);
+          const fullCounts: Record<string, number> = {};
+          for (const opt of ((p.options ?? []) as string[])) fullCounts[opt] = counts?.[opt] ?? 0;
+          const totalVotes = Object.values(fullCounts).reduce((a, b) => a + b, 0);
+          if (totalVotes >= PUBLIC_TALLY_THRESHOLD) {
+            out.push({ id, totalVotes, options: fullCounts });
+          } else {
+            out.push({ id, totalVotes, belowThreshold: true });
+          }
+        } else {
+          const support = Number(p.supportVotes) || 0;
+          const oppose = Number(p.opposeVotes) || 0;
+          const totalVotes = support + oppose;
+          if (totalVotes >= PUBLIC_TALLY_THRESHOLD) {
+            out.push({ id, supportVotes: support, opposeVotes: oppose, totalVotes });
+          } else {
+            out.push({ id, totalVotes, belowThreshold: true });
+          }
+        }
+      }
+      res.json({ proposals: out, threshold: PUBLIC_TALLY_THRESHOLD });
+    } catch (e: any) {
+      log(`referendum-tallies error: ${e?.message || e}`);
+      res.status(500).json({ error: "Failed to fetch tallies" });
+    }
+  });
+
+  // Landing hero — the top open public yes/no ballot with its live tally.
+  // Same selection logic as the /record marquee; threshold rules apply.
+  app.get("/api/public/marquee", async (_req: any, res: any) => {
+    try {
+      publicCors(res);
+      const all = await storage.getAllProposals();
+      const now = Date.now();
+      const open = (Array.isArray(all) ? all : []).filter((p: any) => {
+        if (p.hiddenAt || p.organizationId) return false;
+        if (p.voteType && p.voteType !== "yes-no") return false;
+        if (!p.deadline) return false;
+        return new Date(p.deadline).getTime() > now;
+      });
+      const summarize = (p: any) => {
+        const support = Number(p.supportVotes) || 0;
+        const oppose = Number(p.opposeVotes) || 0;
+        const total = support + oppose;
+        const geo: string[] = Array.isArray(p.geoRestrictions) ? p.geoRestrictions : [];
+        const tier = geo.length === 0 ? "GLOBAL" : geo.length === 1 ? "FEDERAL" : geo.length === 2 ? "PROVINCIAL" : "MUNICIPAL";
+        const ended = !!(p.deadline && new Date(p.deadline).getTime() <= now);
+        const aboveThreshold = total >= PUBLIC_TALLY_THRESHOLD;
+        return {
+          id: p.id,
+          title: p.title,
+          tier,
+          region: geo.length > 0 ? geo[geo.length - 1] : null,
+          deadline: p.deadline,
+          ended,
+          totalVotes: total,
+          aboveThreshold,
+          ...(aboveThreshold ? { supportVotes: support, opposeVotes: oppose } : {}),
+        };
+      };
+
+      const publicAll = (Array.isArray(all) ? all : []).filter(
+        (p: any) => !p.hiddenAt && !p.organizationId && (!p.voteType || p.voteType === "yes-no"),
+      );
+      const stats = {
+        ballotsRun: publicAll.length,
+        ballotsCast: publicAll.reduce(
+          (s2: number, p: any) => s2 + (Number(p.supportVotes) || 0) + (Number(p.opposeVotes) || 0),
+          0,
+        ),
+        openNow: open.length,
+      };
+
+      const scored = open
+        .map((p: any) => ({ p, total: (Number(p.supportVotes) || 0) + (Number(p.opposeVotes) || 0) }))
+        .sort((a: any, b: any) => b.total - a.total);
+      const pick = scored.length > 0 ? (scored.find((s2: any) => s2.total >= PUBLIC_TALLY_THRESHOLD) ?? scored[0]) : null;
+
+      // Record teaser: the 3 most recently closed ballots, padded with open
+      // ones when fewer than 3 have closed. Real rows only — never samples.
+      const closed = publicAll
+        .filter((p: any) => p.deadline && new Date(p.deadline).getTime() <= now)
+        .sort((a: any, b: any) => new Date(b.deadline).getTime() - new Date(a.deadline).getTime());
+      const teaserPool = [...closed.slice(0, 3)];
+      for (const s2 of scored) {
+        if (teaserPool.length >= 3) break;
+        if (pick && s2.p.id === pick.p.id) continue;
+        teaserPool.push(s2.p);
+      }
+
+      res.json({
+        ballot: pick ? summarize(pick.p) : null,
+        teaser: teaserPool.map(summarize),
+        stats,
+        threshold: PUBLIC_TALLY_THRESHOLD,
+      });
+    } catch (e: any) {
+      log(`public marquee error: ${e?.message || e}`);
+      res.status(500).json({ error: "Failed to fetch marquee" });
+    }
+  });
+
   // Setup badge system routes
   setupBadgeRoutes(app);
 

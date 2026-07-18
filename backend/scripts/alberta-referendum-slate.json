@@ -1,0 +1,87 @@
+[
+  {
+    "id": "65bc4f40-ed16-4a0e-8851-9b8903f9ec14",
+    "num": 1,
+    "title": "Provincial control over immigration",
+    "description": "Whether Alberta should seek control over the selection and settlement of immigrants to the province — a power currently held largely by the federal government. One of the questions on Alberta's October 19 referendum ballot, answered early, in public, by verified Albertans. Compare with the official result after October 19. Represent takes no position on any referendum question.",
+    "category": "Government",
+    "voteType": "yes-no"
+  },
+  {
+    "id": "2a0e78ef-f87f-4051-977b-acbbe071c258",
+    "num": 2,
+    "title": "Program eligibility by immigration status",
+    "description": "Whether eligibility for certain provincially funded programs should differ based on immigration status. One of the questions on Alberta's October 19 referendum ballot, answered early, in public, by verified Albertans. Compare with the official result after October 19. Represent takes no position on any referendum question.",
+    "category": "Government",
+    "voteType": "yes-no"
+  },
+  {
+    "id": "759945a4-040a-4321-a2f7-45c52fb574d5",
+    "num": 3,
+    "title": "A 12-month residency rule for social supports",
+    "description": "Whether access to provincial social supports should require twelve months of residency in Alberta. One of the questions on Alberta's October 19 referendum ballot, answered early, in public, by verified Albertans. Compare with the official result after October 19. Represent takes no position on any referendum question.",
+    "category": "Government",
+    "voteType": "yes-no"
+  },
+  {
+    "id": "0b69ee1d-a4e5-4415-93c8-ad8b3272565a",
+    "num": 4,
+    "title": "Health and education fees for non-permanent residents",
+    "description": "Whether non-permanent residents should pay fees for provincially funded health care and schooling. One of the questions on Alberta's October 19 referendum ballot, answered early, in public, by verified Albertans. Compare with the official result after October 19. Represent takes no position on any referendum question.",
+    "category": "Government",
+    "voteType": "yes-no"
+  },
+  {
+    "id": "64c7abd0-538b-4d41-8bb1-0f055f8cc77f",
+    "num": 5,
+    "title": "Proof of citizenship to vote",
+    "description": "Whether proof of Canadian citizenship should be required to vote in Alberta elections. This ballot is open to verified citizens. One of the questions on Alberta's October 19 referendum ballot, answered early, in public, by verified Albertans. Compare with the official result after October 19. Represent takes no position on any referendum question.",
+    "category": "Government",
+    "voteType": "yes-no",
+    "requiresCitizenship": true
+  },
+  {
+    "id": "1497849e-d3c3-4180-8bcf-b7badd85e117",
+    "num": 6,
+    "title": "Provincial selection of superior-court judges",
+    "description": "Whether Alberta should select the judges of its superior courts, who are currently appointed federally. One of the questions on Alberta's October 19 referendum ballot, answered early, in public, by verified Albertans. Compare with the official result after October 19. Represent takes no position on any referendum question.",
+    "category": "Government",
+    "voteType": "yes-no"
+  },
+  {
+    "id": "9d2f763c-bf7a-4f39-925b-087129e4e1af",
+    "num": 7,
+    "title": "Abolishing the federal Senate",
+    "description": "Whether Alberta should advocate for abolishing the Senate of Canada. One of the questions on Alberta's October 19 referendum ballot, answered early, in public, by verified Albertans. Compare with the official result after October 19. Represent takes no position on any referendum question.",
+    "category": "Government",
+    "voteType": "yes-no"
+  },
+  {
+    "id": "daac1ce4-0392-4043-9868-34a2e3a17e74",
+    "num": 8,
+    "title": "Opting out of federal programs, keeping the funding",
+    "description": "Whether Alberta should opt out of federal cost-shared programs while retaining the associated federal funding. One of the questions on Alberta's October 19 referendum ballot, answered early, in public, by verified Albertans. Compare with the official result after October 19. Represent takes no position on any referendum question.",
+    "category": "Government",
+    "voteType": "yes-no"
+  },
+  {
+    "id": "57576c44-49b2-4336-9839-3460b4e1b3c9",
+    "num": 9,
+    "title": "Provincial law priority in shared jurisdiction",
+    "description": "Whether, in areas of jurisdiction shared with the federal government, provincial law should take priority in Alberta. One of the questions on Alberta's October 19 referendum ballot, answered early, in public, by verified Albertans. Compare with the official result after October 19. Represent takes no position on any referendum question.",
+    "category": "Government",
+    "voteType": "yes-no"
+  },
+  {
+    "id": "80b8cec4-4690-4e0c-b92f-9563b8c2fd95",
+    "num": 10,
+    "title": "Remain in Canada, or begin the separation process?",
+    "description": "The direction question: should Alberta remain a province of Canada, or begin the process of separating? Answered as a choice between the two. One of the questions on Alberta's October 19 referendum ballot, answered early, in public, by verified Albertans. Compare with the official result after October 19. Represent takes no position on any referendum question.",
+    "category": "Government",
+    "voteType": "multiple-choice",
+    "options": [
+      "Alberta should remain a province of Canada",
+      "Alberta should begin the process of separating from Canada"
+    ]
+  }
+]

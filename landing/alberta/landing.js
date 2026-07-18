@@ -140,13 +140,19 @@
       if (!p) return;
       var yes = Number(p.supportVotes) || 0;
       var no = Number(p.opposeVotes) || 0;
-      var total = yes + no;
+      var total = Number(p.totalVotes) || (yes + no);
       var yesEl = document.querySelector('[data-q="' + q.id + '"][data-field="yes"]');
       var noEl = document.querySelector('[data-q="' + q.id + '"][data-field="no"]');
       var barEl = document.querySelector('[data-q="' + q.id + '"][data-field="bar"]');
       var votesEl = document.querySelector('[data-q="' + q.id + '"][data-field="votes"]');
       if (total === 0) {
         if (votesEl) votesEl.textContent = 'Be the first verified ballot';
+        return;
+      }
+      // Below the 25-ballot threshold the server withholds the split —
+      // show the count only, never a percentage.
+      if (p.belowThreshold) {
+        if (votesEl) votesEl.textContent = fmt(total) + ' of 25 ballots \u00b7 split publishes at 25';
         return;
       }
       var yesPct = Math.round((yes / total) * 100);
@@ -159,7 +165,14 @@
     // Q10 multiple-choice (hero card + feature card)
     var p10 = byId[Q10_ID];
     var status = document.getElementById('rv-q10-status');
-    if (p10) {
+    if (p10 && p10.belowThreshold) {
+      var totalB = Number(p10.totalVotes) || 0;
+      var ballotsElB = q10El('ballots');
+      if (ballotsElB) ballotsElB.textContent = fmt(totalB);
+      var votesLabelB = q10El('votesLabel');
+      if (votesLabelB) votesLabelB.textContent = fmt(totalB) + ' of 25 ballots \u00b7 split publishes at 25';
+      if (status) status.textContent = 'Early voting';
+    } else if (p10) {
       var remain = 0, begin = 0;
       if (p10.options && typeof p10.options === 'object') {
         Object.keys(p10.options).forEach(function (opt) {
