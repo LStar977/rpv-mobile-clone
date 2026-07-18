@@ -284,6 +284,12 @@ export function VoteConfirmationOverlay({
 
   const handleRetry = onRetry ?? onConfirm;
 
+  // Early dismissal: the confirm step is always escapable, and the sealed
+  // (confirmed) receipt can be tapped away without waiting out the auto-dismiss
+  // timer. A pending cast stays locked — the ledger write is in flight — and a
+  // failed cast requires its explicit Try Again / Dismiss buttons.
+  const canDismissEarly = phase === 'confirm' || (phase === 'cast' && isSealed);
+
   const castTitle = isFailed
     ? 'Ballot not cast'
     : isPending
@@ -299,11 +305,11 @@ export function VoteConfirmationOverlay({
     // Modal so the sheet renders above the floating tab bar — as a plain
     // absolute-positioned view it slides up BEHIND the tab bar, clipping the
     // seal's share pill and leaving the tabs tappable mid-cast.
-    <Modal visible transparent statusBarTranslucent animationType="none" onRequestClose={phase === 'confirm' ? handleGoBack : undefined}>
+    <Modal visible transparent statusBarTranslucent animationType="none" onRequestClose={canDismissEarly ? handleGoBack : undefined}>
     <View style={styles.root} pointerEvents="auto">
       {/* 75% scrim — the queue stays dimly visible behind the decision */}
       <Animated.View style={[styles.scrim, { backgroundColor: colors.overlay }, scrimStyle]}>
-        <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={phase === 'confirm' ? handleGoBack : undefined} />
+        <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={canDismissEarly ? handleGoBack : undefined} />
       </Animated.View>
 
       <Animated.View
