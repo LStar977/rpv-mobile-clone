@@ -1,0 +1,312 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Represent — Democracy in your pocket</title>
+<meta name="description" content="The Represent app: every open ballot in your street, city, province, and country — verified, sealed, and counted from your phone. Free on iOS.">
+<meta property="og:title" content="Represent — Democracy in your pocket">
+<meta property="og:description" content="Every open ballot where you live — verified, sealed, counted from your phone. Free on iOS.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://representvote.com/app">
+<link rel="icon" href="../assets/logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400;1,6..72,500&family=Onest:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ── National Ledger family · the one page where ivory meets obsidian ── */
+:root{
+  --bg:#FAF8F5;--elev:#FFFDF9;--rec:#F5F2ED;--hi:#F0EBE2;
+  --ink:#181510;--t2:#57534A;--t3:#8B8578;
+  --bd:rgba(24,21,16,.12);--bds:rgba(24,21,16,.07);
+  --gd:#EABA58;--gdt:#C99A38;
+  color-scheme:light;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font-family:'Onest',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+a{text-decoration:none;color:inherit}
+.serif{font-family:'Newsreader',Georgia,serif}
+.mono{font-family:'JetBrains Mono',ui-monospace,monospace}
+.wrap{max-width:1440px;margin:0 auto}
+.pad{padding-left:72px;padding-right:72px}
+@media(max-width:900px){.pad{padding-left:26px;padding-right:26px}}
+
+/* Masthead */
+.mast{border-bottom:3px double var(--bd)}
+.mast-in{display:flex;align-items:center;justify-content:space-between;height:110px}
+.mast .side{font-family:'JetBrains Mono',monospace;font-weight:500;font-size:12px;letter-spacing:.18em;color:var(--t3)}
+.mast .side:hover{color:var(--gdt)}
+.mast .side.gold{color:var(--gdt)}
+.wordmark{font-weight:600;font-size:22px;letter-spacing:.52em;margin-right:-.52em;color:var(--ink)}
+@media(max-width:900px){
+  .mast-in{flex-direction:column;justify-content:center;gap:6px;height:90px}
+  .mast .side.left{display:none}
+  .wordmark{font-size:15px;letter-spacing:.46em;margin-right:-.46em}
+  .mast .side{font-size:8.5px;letter-spacing:.2em}
+}
+
+/* Hero */
+.hero{position:relative;overflow:hidden;border-bottom:1px solid var(--bd)}
+.hero-ring{position:absolute;top:-140px;right:-260px;width:820px;height:820px;border-radius:50%;border:1.5px solid rgba(201,154,56,.4);pointer-events:none}
+.hero-in{position:relative;display:flex;gap:60px;padding-top:110px;padding-bottom:110px;align-items:flex-start}
+.hero .copy{flex:1;display:flex;flex-direction:column;gap:36px;max-width:700px}
+.hero .eyebrow{font-family:'JetBrains Mono',monospace;font-weight:600;font-size:14px;letter-spacing:.34em;color:var(--gdt)}
+.hero h1{font-family:'Newsreader',Georgia,serif;font-weight:500;font-size:clamp(50px,7.6vw,110px);line-height:1.05;letter-spacing:-.02em;color:var(--ink)}
+.hero h1 em{font-style:italic;font-weight:400}
+.hero .sub{font-size:clamp(15px,1.9vw,22px);line-height:1.55;color:var(--t2);max-width:560px}
+.hero .cta-row{display:flex;align-items:center;gap:34px;flex-wrap:wrap}
+.gold-btn{display:inline-flex;align-items:center;justify-content:center;height:62px;padding:0 48px;border-radius:100px;background:var(--gd);color:#181510;font-weight:600;font-size:19px;box-shadow:0 14px 40px rgba(201,154,56,.3);transition:transform .15s ease}
+.gold-btn:hover{transform:translateY(-1px)}
+.cta-note{font-family:'JetBrains Mono',monospace;font-weight:500;font-size:13px;letter-spacing:.14em;color:var(--t3)}
+
+/* The phone — obsidian on ivory */
+.phone{flex:none;width:380px;background:#040707;border-radius:52px;border:4px solid rgba(24,21,16,.85);box-shadow:0 60px 140px rgba(24,21,16,.35);overflow:hidden;position:relative;padding:80px 24px 30px}
+.phone .island{position:absolute;top:16px;left:50%;transform:translateX(-50%);width:120px;height:34px;background:#000;border-radius:20px}
+.phone .top{display:flex;align-items:center;justify-content:space-between;margin-bottom:15px}
+.phone .title{font-family:'Newsreader',Georgia,serif;font-weight:500;font-size:32px;color:#F4F5F6}
+.phone .vbadge{display:flex;align-items:center;gap:6px;padding:8px 13px;border-radius:100px;background:rgba(234,186,88,.08);border:1px solid rgba(234,186,88,.25);font-weight:600;font-size:10.5px;letter-spacing:.1em;color:#EABA58}
+.pcard{background:#141818;border:1px solid rgba(244,245,246,.05);border-radius:20px;padding:18px;display:flex;flex-direction:column;gap:12px;margin-bottom:14px}
+.pcard .chiprow{display:flex;align-items:center;justify-content:space-between}
+.pcard .chip{font-weight:600;font-size:9px;letter-spacing:.12em;color:#7A7D7E;background:#202626;padding:5px 10px;border-radius:100px}
+.pcard .closes{display:flex;align-items:center;gap:5px;font-family:'JetBrains Mono',monospace;font-weight:600;font-size:9.5px;color:#EABA58}
+.pcard .closes .dot{width:6px;height:6px;border-radius:3px;background:#EABA58}
+.pcard .closes.muted{color:#7A7D7E}
+.pcard .q{font-family:'Newsreader',Georgia,serif;font-weight:500;font-size:17.5px;line-height:1.3;color:#F4F5F6;text-wrap:pretty}
+.pcard .bar{height:6px;border-radius:3px;background:#F87171;overflow:hidden}
+.pcard .bar .fill{height:100%;background:#34D399}
+.pcard .nums{display:flex;justify-content:space-between;font-family:'JetBrains Mono',monospace;font-weight:500;font-size:9px}
+.pcard .btns{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.pcard .btn-s{height:44px;border-radius:13px;background:rgba(52,211,153,.08);border:1.5px solid rgba(52,211,153,.35);display:flex;align-items:center;justify-content:center;font-weight:600;font-size:13px;color:#34D399}
+.pcard .btn-o{height:44px;border-radius:13px;background:rgba(248,113,113,.07);border:1.5px solid rgba(248,113,113,.3);display:flex;align-items:center;justify-content:center;font-weight:600;font-size:13px;color:#F87171}
+@media(max-width:1160px){
+  .hero-in{flex-direction:column;gap:36px;padding-top:60px;padding-bottom:70px}
+  .hero .eyebrow{font-size:9.5px;letter-spacing:.24em}
+  .hero .cta-row{flex-direction:column;align-items:stretch;gap:14px;width:100%}
+  .gold-btn{height:56px;padding:0;width:100%;font-size:16.5px}
+  .cta-note{text-align:center;font-size:10px;letter-spacing:.16em}
+  .hero-ring{top:-100px;right:-180px;width:440px;height:440px}
+  .phone{width:270px;margin:0 auto;border-radius:38px;border-width:3px;padding:50px 16px 22px}
+  .phone .island{top:12px;width:84px;height:24px;border-radius:13px}
+  .phone .title{font-size:22px}
+  .pcard{border-radius:14px;padding:13px;gap:8px;margin-bottom:10px}
+  .pcard .q{font-size:13px}
+  .pcard .btn-s,.pcard .btn-o{height:32px;border-radius:9px;font-size:10px;border-width:1px}
+}
+
+/* Feature triptych */
+.feat{display:grid;grid-template-columns:1fr 1fr 1fr;border-bottom:1px solid var(--bd);background:var(--elev)}
+.feat .col{padding:84px 56px;display:flex;flex-direction:column;gap:20px;border-right:1px solid var(--bds)}
+.feat .col:last-child{border-right:none}
+.feat .eyebrow{font-family:'JetBrains Mono',monospace;font-weight:600;font-size:13px;letter-spacing:.24em;color:var(--gdt)}
+.feat .t{font-family:'Newsreader',Georgia,serif;font-weight:500;font-size:28px;line-height:1.25;color:var(--ink)}
+.feat .b{font-size:15.5px;line-height:1.6;color:var(--t2)}
+.mini{background:#040707;border-radius:20px;padding:20px;display:flex;flex-direction:column;gap:10px;margin-top:10px;font-feature-settings:'tnum' 1}
+.mini.cred{border:1px solid rgba(234,186,88,.35)}
+.mini .chip{font-weight:600;font-size:9px;letter-spacing:.12em;color:#7A7D7E;background:#202626;padding:5px 10px;border-radius:100px;width:fit-content}
+.mini .q{font-family:'Newsreader',Georgia,serif;font-weight:500;font-size:16px;line-height:1.32;color:#F4F5F6}
+.mini .bar{height:6px;border-radius:3px;background:#F87171;overflow:hidden}
+.mini .bar .fill{height:100%;background:#34D399}
+.mini .cast{display:flex;align-items:center;gap:10px;font-family:'Newsreader',Georgia,serif;font-weight:500;font-size:17px;color:#F4F5F6}
+.mini .kv{display:flex;justify-content:space-between;font-family:'JetBrains Mono',monospace;font-weight:500;font-size:9.5px}
+.mini .kv .k{color:#7A7D7E}
+.mini .credrow{display:flex;justify-content:space-between;align-items:center;font-family:'JetBrains Mono',monospace;font-weight:600;font-size:9.5px;letter-spacing:.18em;color:#EABA58}
+.mini .name{font-family:'Newsreader',Georgia,serif;font-weight:500;font-size:20px;color:#F4F5F6}
+.mini .loc{font-family:'JetBrains Mono',monospace;font-weight:500;font-size:9.5px;color:#7A7D7E}
+@media(max-width:900px){
+  .feat{grid-template-columns:1fr}
+  .feat .col{padding:28px 26px;border-right:none;border-top:2px solid var(--bd);gap:8px}
+  .feat .col:first-child{border-top:none}
+  .feat .eyebrow{font-size:9.5px;letter-spacing:.2em}
+  .feat .t{font-size:20px}
+  .feat .b{font-size:13px;line-height:1.55}
+  .mini{border-radius:14px;padding:16px;gap:9px;margin-top:6px}
+}
+
+/* Notifications + Sentinel */
+.duo{display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid var(--bd)}
+.duo .col{padding:84px 72px;display:flex;flex-direction:column;gap:17px;border-right:1px solid var(--bds)}
+.duo .col:last-child{border-right:none}
+.duo .eyebrow{font-family:'JetBrains Mono',monospace;font-weight:600;font-size:13px;letter-spacing:.24em;color:var(--gdt)}
+.duo .t{font-family:'Newsreader',Georgia,serif;font-weight:500;font-size:30px;line-height:1.25;color:var(--ink)}
+.duo .b{font-size:15.5px;line-height:1.6;color:var(--t2)}
+@media(max-width:900px){
+  .duo{grid-template-columns:1fr}
+  .duo .col{padding:28px 26px;border-right:none;border-top:2px solid var(--bd);gap:8px}
+  .duo .col:first-child{border-top:none}
+  .duo .eyebrow{font-size:9.5px;letter-spacing:.2em}
+  .duo .t{font-size:20px}
+  .duo .b{font-size:13px;line-height:1.55}
+}
+
+/* Promise strip */
+.strip{display:flex;align-items:center;justify-content:center;gap:66px;padding:96px 26px;border-bottom:1px solid var(--bd);background:var(--elev);flex-wrap:wrap}
+.strip span.promise{font-family:'JetBrains Mono',monospace;font-weight:500;font-size:14px;letter-spacing:.2em;color:var(--t3)}
+.strip .sep{width:5px;height:5px;border-radius:3px;background:var(--gdt)}
+@media(max-width:900px){
+  .strip{flex-direction:column;gap:12px;padding:56px 26px}
+  .strip span.promise{font-size:10px;letter-spacing:.16em}
+  .strip .sep{display:none}
+}
+
+/* Final CTA */
+.close{position:relative;overflow:hidden}
+.close-in{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:38px;padding-top:120px;padding-bottom:120px;text-align:center}
+.close .glow{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:1100px;height:1100px;border-radius:50%;background:radial-gradient(circle,rgba(201,154,56,.1) 0%,transparent 62%);pointer-events:none}
+.close h2{position:relative;font-family:'Newsreader',Georgia,serif;font-weight:500;font-size:clamp(30px,4.6vw,62px);line-height:1.15;letter-spacing:-.016em;color:var(--ink);max-width:860px;text-wrap:balance}
+.close .cta-col{position:relative;display:flex;flex-direction:column;align-items:center;gap:16px;width:100%}
+@media(max-width:900px){
+  .close-in{gap:24px;padding-top:66px;padding-bottom:66px}
+  .close .gold-btn{width:100%;max-width:340px}
+}
+
+/* Footer */
+footer{border-top:3px double var(--bd)}
+.foot-in{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;padding:64px 26px}
+.foot-in .wordmark{font-size:16px}
+.foot-links{display:flex;flex-wrap:wrap;justify-content:center;gap:12px 36px;font-family:'JetBrains Mono',monospace;font-weight:500;font-size:12px;letter-spacing:.14em;color:var(--t3)}
+.foot-links a:hover{color:var(--gdt)}
+.foot-copy{font-family:'JetBrains Mono',monospace;font-weight:400;font-size:11.5px;color:var(--t3)}
+@media(max-width:900px){
+  .foot-in{gap:14px;padding:44px 26px}
+  .foot-in .wordmark{font-size:13px;letter-spacing:.44em;margin-right:-.44em}
+  .foot-links{gap:10px 20px;font-size:9.5px;letter-spacing:.12em}
+  .foot-copy{font-size:9.5px}
+}
+</style>
+</head>
+<body>
+
+<!-- MASTHEAD -->
+<header class="mast">
+  <div class="wrap pad mast-in">
+    <a class="side left" href="/">← REPRESENTVOTE.COM</a>
+    <a class="wordmark" href="/">REPRESENT</a>
+    <span class="side gold">GET THE APP</span>
+  </div>
+</header>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-ring"></div>
+  <div class="wrap pad hero-in">
+    <div class="copy">
+      <span class="eyebrow mono">THE APP · FREE ON IOS</span>
+      <h1>Democracy in your <em>pocket.</em></h1>
+      <p class="sub">Every open ballot in your street, city, province, and country — verified, sealed, and counted from your phone.</p>
+      <div class="cta-row">
+        <a class="gold-btn" href="https://apps.apple.com/ca/app/id6756912022">Download on the App Store</a>
+        <span class="cta-note mono">FREE · VERIFY ONCE · ~2 MIN</span>
+      </div>
+    </div>
+    <!-- Product mockup — sample ballots for illustration -->
+    <div class="phone" aria-label="Represent app preview (illustration)">
+      <div class="island"></div>
+      <div class="top">
+        <span class="title serif">Vote</span>
+        <span class="vbadge"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#EABA58" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><polyline points="9 12 11 14 15 10"></polyline></svg>VERIFIED</span>
+      </div>
+      <div class="pcard">
+        <div class="chiprow"><span class="chip">CALGARY · MUNICIPAL</span><span class="closes"><span class="dot"></span>CLOSES 10 PM</span></div>
+        <span class="q">Commercial Vacancy Tax — 3% on storefronts empty over 6 months?</span>
+        <div class="bar"><div class="fill" style="width:42%"></div></div>
+        <div class="nums"><span style="color:#34D399">SUPPORT 42%</span><span style="color:#F87171">OPPOSE 58%</span></div>
+        <div class="btns"><span class="btn-s">Support</span><span class="btn-o">Oppose</span></div>
+      </div>
+      <div class="pcard">
+        <div class="chiprow"><span class="chip">ALBERTA · PROVINCIAL</span><span class="closes muted">21D LEFT</span></div>
+        <span class="q">Cap residential property tax increases at 2% annually?</span>
+        <div class="bar"><div class="fill" style="width:54%"></div></div>
+        <div class="nums"><span style="color:#34D399">SUPPORT 54%</span><span style="color:#F87171">OPPOSE 46%</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section class="wrap feat">
+  <div class="col">
+    <span class="eyebrow mono">THE FEED</span>
+    <span class="t">Every ballot you're eligible for. One feed.</span>
+    <span class="b">Scoped by your verified residence — street to country. Nothing you can't vote on, nothing you'd miss.</span>
+    <div class="mini">
+      <span class="chip">WARD 8 · YOUR STREET</span>
+      <span class="q">Add weekend express bus routes?</span>
+      <div class="bar"><div class="fill" style="width:68%"></div></div>
+    </div>
+  </div>
+  <div class="col">
+    <span class="eyebrow mono">THE SEAL</span>
+    <span class="t">A receipt for every ballot.</span>
+    <span class="b">Cast, sealed, and written to the public ledger — with a receipt you can verify anytime, from anywhere.</span>
+    <div class="mini">
+      <span class="cast"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#EABA58" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg>Ballot cast.</span>
+      <div class="kv"><span class="k">LEDGER ID</span><span style="color:#EABA58">#84F2…9C1B</span></div>
+      <div class="kv"><span class="k">STATUS</span><span style="color:#34D399">COUNTED ✓</span></div>
+    </div>
+  </div>
+  <div class="col">
+    <span class="eyebrow mono">YOUR CREDENTIAL</span>
+    <span class="t">One identity. Checked, never kept.</span>
+    <span class="b">Verify once with government ID. Your document is discarded; your standing as one real voter is permanent.</span>
+    <div class="mini cred">
+      <div class="credrow"><span>VERIFIED CITIZEN</span><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#EABA58" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><polyline points="9 12 11 14 15 10"></polyline></svg></div>
+      <span class="name">Your name here</span>
+      <span class="loc">YOUR CITY · PROVINCE · CANADA</span>
+    </div>
+  </div>
+</section>
+
+<!-- NOTIFICATIONS + SENTINEL -->
+<section class="wrap duo">
+  <div class="col">
+    <span class="eyebrow mono">NOTIFICATIONS</span>
+    <span class="t">Know the moment a ballot opens where you live.</span>
+    <span class="b">New proposals, closing-soon reminders, final results — each one a switch you control.</span>
+  </div>
+  <div class="col">
+    <span class="eyebrow mono">SENTINEL</span>
+    <span class="t">An analyst that reads every question with you.</span>
+    <span class="b">Sentinel grades any proposal's governance — clarity, fiscal accountability, enforcement — before you vote.</span>
+  </div>
+</section>
+
+<!-- PROMISES -->
+<section class="strip">
+  <span class="promise mono">CHECKED, NEVER KEPT</span>
+  <span class="sep"></span>
+  <span class="promise mono">ONE PERSON, ONE BALLOT</span>
+  <span class="sep"></span>
+  <span class="promise mono">NO ADS · NO DATA SALES</span>
+</section>
+
+<!-- FINAL CTA -->
+<section class="close">
+  <div class="glow"></div>
+  <div class="pad close-in">
+    <h2>Carry your voice with you.</h2>
+    <div class="cta-col">
+      <a class="gold-btn" href="https://apps.apple.com/ca/app/id6756912022">Download Represent — free</a>
+      <span class="cta-note mono">IOS TODAY · ANDROID IN DEVELOPMENT</span>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="foot-in">
+    <a class="wordmark" href="/">REPRESENT</a>
+    <div class="foot-links">
+      <a href="https://representportal.com/record">THE RECORD</a>
+      <a href="https://representportal.com/record#how">HOW COUNTING WORKS</a>
+      <a href="/alberta">ALBERTA REFERENDUM</a>
+      <a href="https://representportal.com/privacy">PRIVACY</a>
+      <a href="https://representportal.com/terms">TERMS</a>
+      <a href="mailto:support@representvote.com">CONTACT</a>
+    </div>
+    <span class="foot-copy">© <span id="yr"></span> REPRESENT · CALGARY, CANADA</span>
+  </div>
+</footer>
+
+<script>document.getElementById('yr').textContent = String(new Date().getFullYear());</script>
+</body>
+</html>

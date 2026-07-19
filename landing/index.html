@@ -3,330 +3,509 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Represent — Verified citizens. Real questions. Counted in public.</title>
-<meta name="description" content="Represent is where verified citizens vote on what governs their street, their city, and their country — between elections, on the record. One person, one ballot, on a public, tamper-evident ledger.">
-<meta property="og:title" content="Represent — The Digital Ballot">
-<meta property="og:description" content="Verified citizens. Real questions. Counted in public. Vote on what governs you — no app needed.">
+<title>Represent — A verified national record</title>
+<meta name="description" content="Represent is where verified citizens vote on real questions — street, city, province, country — every ballot on a public, tamper-evident record. One person, one ballot, on the record.">
+<meta property="og:title" content="Represent — A Verified National Record">
+<meta property="og:description" content="Verified citizens voting on real questions — every ballot on a public, tamper-evident record. One person, one ballot.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://representvote.com">
 <link rel="icon" href="assets/logo.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Newsreader:opsz,wght@6..72,400;6..72,500&family=Onest:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400;1,6..72,500&family=Onest:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
+/* ── The National Ledger · light theme, deliberately ─────────────── */
 :root{
-  --bg:#040707;--sf:#141818;--sfh:#202626;
-  --bd:rgba(244,245,246,.08);--bds:rgba(244,245,246,.05);
-  --tx:#F4F5F6;--tx2:#B8BABB;--tx3:#7A7D7E;
-  --gd:#EABA58;--gdt:#EABA58;--sup:#34D399;--opp:#F87171;
-  color-scheme:dark;
-}
-@media (prefers-color-scheme: light){
-  :root{
-    --bg:#FAF8F5;--sf:#FFFDF9;--sfh:#F0EBE2;
-    --bd:rgba(24,21,16,.10);--bds:rgba(24,21,16,.07);
-    --tx:#181510;--tx2:#57534A;--tx3:#8B8578;
-    --gd:#EABA58;--gdt:#C99A38;--sup:#0E9F6E;--opp:#DC2626;
-    color-scheme:light;
-  }
+  --bg:#FAF8F5;--elev:#FFFDF9;--rec:#F5F2ED;--hi:#F0EBE2;
+  --ink:#181510;--t2:#57534A;--t3:#8B8578;
+  --bd:rgba(24,21,16,.12);--bds:rgba(24,21,16,.07);
+  --gd:#EABA58;--gdt:#C99A38;--sup:#0E9F6E;--opp:#DC2626;
+  color-scheme:light;
 }
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:var(--bg);color:var(--tx);font-family:'Onest',-apple-system,system-ui,sans-serif;line-height:1.5}
-a{color:inherit;text-decoration:none}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--ink);font-family:'Onest',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+a{text-decoration:none;color:inherit}
 .serif{font-family:'Newsreader',Georgia,serif}
-.mono{font-family:'JetBrains Mono',ui-monospace,monospace;font-feature-settings:'tnum' 1}
+.mono{font-family:'JetBrains Mono',ui-monospace,monospace}
+.hidden{display:none !important}
 .wrap{max-width:1440px;margin:0 auto}
 .pad{padding-left:72px;padding-right:72px}
-@media (max-width:760px){.pad{padding-left:20px;padding-right:20px}}
-section{border-bottom:1px solid var(--bds)}
+@media(max-width:860px){.pad{padding-left:26px;padding-right:26px}}
 
-/* nav */
-.nav{display:flex;align-items:center;justify-content:space-between;padding-top:24px;padding-bottom:24px;gap:14px}
-.nav .wm{font-weight:600;font-size:15px;letter-spacing:.22em;color:var(--gdt)}
-.nav-links{display:flex;align-items:center;gap:32px}
-.nav-links a{font-weight:500;font-size:14px;color:var(--tx3)}
-.nav-links a:hover{color:var(--tx)}
-.nav-links .pill{font-weight:600;font-size:13.5px;color:var(--tx);border:1px solid var(--bd);padding:11px 23px;border-radius:100px}
-@media (max-width:760px){.nav-links a:not(.pill){display:none}}
-
-/* hero */
-.hero{position:relative;overflow:hidden;padding-top:80px;padding-bottom:76px}
-.hero-glow{position:absolute;top:-380px;left:50%;transform:translateX(-50%);width:1500px;height:1200px;border-radius:50%;background:radial-gradient(circle,rgba(234,186,88,.08) 0%,rgba(234,186,88,.03) 45%,transparent 70%);pointer-events:none}
-.hero-inner{position:relative;display:flex;align-items:center;gap:80px}
-@media (max-width:1000px){.hero{padding-top:48px;padding-bottom:52px}.hero-inner{flex-direction:column;align-items:stretch;gap:40px}}
-.hero-copy{flex:1;display:flex;flex-direction:column;gap:24px}
-.eyebrow{font-family:'JetBrains Mono',monospace;font-weight:500;font-size:12px;letter-spacing:.26em;color:var(--gdt)}
-.hero h1{font-family:'Newsreader',Georgia,serif;font-weight:500;font-size:clamp(38px,4.6vw,62px);line-height:1.08;letter-spacing:-.016em;text-wrap:balance}
-.hero .sub{font-size:18px;line-height:1.6;color:var(--tx2);max-width:520px}
-.hero .applink{font-size:13px;color:var(--tx3)}
-.hero .applink a{font-weight:600;color:var(--tx2);text-decoration:underline;text-underline-offset:3px}
-.hero .trustline{font-family:'JetBrains Mono',monospace;font-weight:500;font-size:11px;letter-spacing:.14em;color:var(--tx3)}
-
-/* hero ballot card */
-.hero-card-col{flex:none;width:460px;display:flex;flex-direction:column;gap:12px}
-@media (max-width:1000px){.hero-card-col{width:100%}}
-.ballot-card{background:linear-gradient(160deg,var(--sf),var(--bg) 90%);border:1px solid rgba(234,186,88,.35);border-radius:22px;padding:30px 32px;display:flex;flex-direction:column;gap:16px;box-shadow:0 40px 100px rgba(0,0,0,.5)}
-@media (max-width:760px){.ballot-card{padding:22px 20px}}
-.bc-top{display:flex;align-items:center;justify-content:space-between;gap:10px}
-.bc-open{display:flex;align-items:center;gap:8px;font-family:'JetBrains Mono',monospace;font-weight:500;font-size:11px;letter-spacing:.12em;color:var(--gdt)}
-.bc-open .dot{width:7px;height:7px;border-radius:4px;background:var(--gd)}
-.bc-closes{font-family:'JetBrains Mono',monospace;font-weight:500;font-size:11px;color:var(--tx3)}
-.bc-q{font-family:'Newsreader',Georgia,serif;font-weight:500;font-size:26px;line-height:1.28;text-wrap:pretty;min-height:2.5em}
-.bc-tally{display:flex;flex-direction:column;gap:8px}
-.bc-bar{height:11px;border-radius:6px;background:var(--opp);overflow:hidden;position:relative}
-.bc-bar .fill{height:100%;background:var(--sup)}
-.bc-bar .mid{position:absolute;left:50%;top:0;bottom:0;width:1.5px;background:var(--tx);opacity:.4}
-.bc-split{display:flex;justify-content:space-between;font-family:'JetBrains Mono',monospace;font-weight:500;font-size:11px;font-feature-settings:'tnum' 1}
-.bc-split .s{color:var(--sup)}.bc-split .o{color:var(--opp)}
-.bc-below{font-family:'JetBrains Mono',monospace;font-weight:500;font-size:11px;color:var(--tx3);font-feature-settings:'tnum' 1}
-.bc-cta{display:flex;height:52px;border-radius:14px;background:var(--gd);align-items:center;justify-content:center;font-weight:600;font-size:15px;color:#040707}
-.bc-cta:hover{filter:brightness(1.05)}
-.bc-verify{text-align:center;font-family:'JetBrains Mono',monospace;font-weight:500;font-size:9.5px;letter-spacing:.12em;color:var(--tx3)}
-.bc-foot{display:flex;justify-content:space-between;align-items:center;gap:10px;padding-top:2px}
-.bc-count{font-family:'JetBrains Mono',monospace;font-weight:500;font-size:10.5px;color:var(--tx3);font-feature-settings:'tnum' 1}
-.bc-record{font-weight:500;font-size:12px;color:var(--tx2);text-decoration:underline;text-underline-offset:3px}
-.bc-caption{text-align:center;font-size:11.5px;color:var(--tx3)}
-
-/* sections */
-.sec{padding-top:72px;padding-bottom:72px}
-@media (max-width:760px){.sec{padding-top:48px;padding-bottom:48px}}
-.h2{font-family:'Newsreader',Georgia,serif;font-weight:500;font-size:clamp(28px,3.2vw,38px);line-height:1.15;letter-spacing:-.012em}
-.sub2{font-size:16px;line-height:1.6;color:var(--tx2)}
-.grid3{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:28px}
-.card{background:var(--sf);border:1px solid var(--bds);border-radius:20px;padding:30px;display:flex;flex-direction:column;gap:14px}
-.card .num{font-family:'JetBrains Mono',monospace;font-weight:500;font-size:13px;letter-spacing:.2em;color:var(--gdt)}
-.card .t{font-family:'Newsreader',Georgia,serif;font-weight:500;font-size:22px}
-.card .t2{font-weight:600;font-size:16px}
-.card .b{font-size:14.5px;line-height:1.6;color:var(--tx2)}
-.card .tag{font-family:'JetBrains Mono',monospace;font-weight:500;font-size:10px;letter-spacing:.14em;color:var(--tx3)}
-
-/* petition story */
-.story{max-width:820px;display:flex;flex-direction:column;gap:22px}
-.story p{font-size:16.5px;line-height:1.7;color:var(--tx2)}
-.story b{color:var(--tx)}
-.pull{border-left:2px solid var(--gd);padding:6px 0 6px 22px;font-family:'Newsreader',Georgia,serif;font-style:italic;font-weight:500;font-size:22px;line-height:1.4;color:var(--tx)}
-
-/* record teaser */
-.teaser-head{display:flex;align-items:baseline;justify-content:space-between;gap:16px;flex-wrap:wrap}
-.teaser-link{font-weight:500;font-size:13px;color:var(--tx2);text-decoration:underline;text-underline-offset:3px;flex:none}
-.rows{display:flex;flex-direction:column;border-top:1px solid var(--bds);margin-top:32px}
-.row{display:flex;align-items:center;gap:28px;padding:22px 8px;border-bottom:1px solid var(--bds)}
-.row .qcol{flex:1;display:flex;flex-direction:column;gap:6px;min-width:0}
-.row .meta{font-family:'JetBrains Mono',monospace;font-weight:500;font-size:11px;letter-spacing:.1em;color:var(--tx3)}
-.row .q{font-family:'Newsreader',Georgia,serif;font-weight:500;font-size:20px;line-height:1.3}
-.row .q:hover{text-decoration:underline;text-underline-offset:3px}
-.row .tcol{flex:none;width:250px;display:flex;flex-direction:column;gap:6px}
-.row .bar{height:7px;border-radius:4px;background:var(--opp);overflow:hidden}
-.row .bar .fill{height:100%;background:var(--sup)}
-.row .pcts{display:flex;justify-content:space-between;font-family:'JetBrains Mono',monospace;font-weight:500;font-size:10px;font-feature-settings:'tnum' 1}
-.row .note{font-family:'JetBrains Mono',monospace;font-weight:500;font-size:10px;color:var(--tx3)}
-.row .scol{flex:none;width:118px;display:flex;align-items:center;gap:7px;font-weight:600;font-size:10.5px;letter-spacing:.12em}
-.row .livedot{width:7px;height:7px;border-radius:4px;background:var(--gd)}
-.row .compact{display:none;font-family:'JetBrains Mono',monospace;font-weight:500;font-size:11px;color:var(--tx3);font-feature-settings:'tnum' 1}
-.row .compact .s{color:var(--sup)}.row .compact .o{color:var(--opp)}
-@media (max-width:760px){
-  .row{gap:14px;padding:18px 2px}
-  .row .tcol,.row .scol{display:none}
-  .row .compact{display:block}
-  .row .q{font-size:17px}
+/* ── Masthead ─────────────────────────────────────────────────────── */
+.mast{border-bottom:3px double var(--bd)}
+.mast-in{display:flex;align-items:center;justify-content:space-between;height:110px}
+.mast .side{font-family:'JetBrains Mono',monospace;font-weight:500;font-size:12px;letter-spacing:.18em;color:var(--t3)}
+.mast .side.gold{color:var(--gdt)}
+.mast .side:hover{color:var(--gdt)}
+.wordmark{font-weight:600;font-size:22px;letter-spacing:.52em;margin-right:-.52em;color:var(--ink)}
+@media(max-width:860px){
+  .mast-in{flex-direction:column;justify-content:center;gap:6px;height:90px}
+  .mast .side.left{display:none}
+  .wordmark{font-size:15px;letter-spacing:.46em;margin-right:-.46em}
+  .mast .side{font-size:8.5px;letter-spacing:.2em}
 }
-.stats{display:flex;gap:44px;margin-top:34px;flex-wrap:wrap}
-.stat{display:flex;flex-direction:column;gap:3px}
-.stat .n{font-family:'JetBrains Mono',monospace;font-weight:500;font-size:24px;font-feature-settings:'tnum' 1}
-.stat .l{font-family:'JetBrains Mono',monospace;font-weight:500;font-size:10px;letter-spacing:.14em;color:var(--tx3)}
 
-/* why different */
-.why{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:28px}
-.why .col{display:flex;flex-direction:column;gap:12px;border-top:1px solid rgba(234,186,88,.35);padding-top:22px}
-.why .t{font-family:'Newsreader',Georgia,serif;font-weight:500;font-size:21px}
-.why .b{font-size:14.5px;line-height:1.6;color:var(--tx2)}
+/* ── Hero ─────────────────────────────────────────────────────────── */
+.hero{position:relative;overflow:hidden;border-bottom:1px solid var(--bd)}
+.hero-ring1{position:absolute;top:-140px;right:-320px;width:920px;height:920px;border-radius:50%;border:1.5px solid rgba(201,154,56,.4);pointer-events:none}
+.hero-ring2{position:absolute;top:-60px;right:-240px;width:760px;height:760px;border-radius:50%;border:1px solid rgba(201,154,56,.22);display:flex;align-items:center;justify-content:center;pointer-events:none}
+.hero-in{position:relative;display:flex;flex-direction:column;gap:40px;padding-top:110px;padding-bottom:110px;max-width:1100px}
+.hero .eyebrow{font-family:'JetBrains Mono',monospace;font-weight:600;font-size:14px;letter-spacing:.34em;color:var(--gdt)}
+.hero h1{font-family:'Newsreader',Georgia,serif;font-weight:500;font-size:clamp(52px,8.2vw,118px);line-height:1.06;letter-spacing:-.02em;color:var(--ink)}
+.hero h1 em{font-style:italic;font-weight:400}
+.hero .sub{font-size:clamp(16px,2vw,23px);line-height:1.55;color:var(--t2);max-width:640px}
+.hero .cta-row{display:flex;align-items:center;gap:34px;flex-wrap:wrap}
+.gold-btn{display:inline-flex;align-items:center;justify-content:center;height:62px;padding:0 50px;border-radius:100px;background:var(--gd);color:#181510;font-weight:600;font-size:19px;box-shadow:0 14px 40px rgba(201,154,56,.3);transition:transform .15s ease}
+.gold-btn:hover{transform:translateY(-1px)}
+.cta-note{font-family:'JetBrains Mono',monospace;font-weight:500;font-size:13px;letter-spacing:.14em;color:var(--t3)}
+@media(max-width:860px){
+  .hero-ring1{top:-120px;right:-200px;width:480px;height:480px}
+  .hero-ring2{display:none}
+  .hero-in{gap:26px;padding-top:70px;padding-bottom:70px}
+  .hero .eyebrow{font-size:9.5px;letter-spacing:.24em}
+  .hero .cta-row{flex-direction:column;align-items:stretch;gap:14px}
+  .gold-btn{height:56px;padding:0;font-size:17px;width:100%}
+  .cta-note{text-align:center;font-size:10px;letter-spacing:.16em}
+}
 
-/* orgs */
-.orgs{display:flex;align-items:center;gap:40px;flex-wrap:wrap}
-.orgs .copy{flex:1;min-width:280px;display:flex;flex-direction:column;gap:14px}
-.orgs .learn{align-self:flex-start;font-weight:600;font-size:13.5px;color:var(--tx);border:1px solid var(--bd);padding:11px 23px;border-radius:100px}
+/* ── Ledger counter ───────────────────────────────────────────────── */
+.counter{border-bottom:1px solid var(--bd);background:var(--elev)}
+.counter-in{display:flex;align-items:center;justify-content:space-between;gap:40px;padding-top:70px;padding-bottom:70px}
+.counter .label{display:flex;flex-direction:column;gap:10px;width:200px;flex:none}
+.counter .label span{font-family:'JetBrains Mono',monospace;font-weight:600;font-size:12.5px;line-height:1.7;letter-spacing:.2em;color:var(--t3)}
+.counter .label .rule{width:34px;height:2px;background:var(--gdt)}
+.counter .label.right{text-align:right;align-items:flex-end}
+.counter .label.right span{font-weight:500;letter-spacing:.16em}
+.digits{display:flex;align-items:center;gap:12px;font-feature-settings:'tnum' 1;flex-wrap:wrap;justify-content:center}
+.digit{width:88px;height:128px;background:var(--rec);border:1px solid var(--bd);border-radius:10px;display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;font-weight:500;font-size:76px;color:var(--ink)}
+.digit.last{border-color:rgba(201,154,56,.5);color:var(--gdt)}
+.comma{font-family:'JetBrains Mono',monospace;font-weight:500;font-size:54px;color:var(--t3)}
+@media(max-width:1100px){
+  .counter-in{flex-direction:column;gap:16px;padding-top:44px;padding-bottom:44px}
+  .counter .label,.counter .label.right{width:auto;text-align:center;align-items:center}
+  .counter .label span{font-size:9.5px;letter-spacing:.22em}
+  .counter .label span br{display:none}
+  .counter .label .rule{display:none}
+  .digits{gap:5px}
+  .digit{width:38px;height:56px;border-radius:6px;font-size:32px}
+  .comma{font-size:24px}
+}
 
-/* final CTA */
-.final{display:flex;flex-direction:column;align-items:center;gap:18px;text-align:center;padding-top:88px;padding-bottom:88px}
-.final .gold-btn{display:inline-block;padding:17px 34px;border-radius:15px;background:var(--gd);font-weight:600;font-size:16px;color:#040707}
-.final .trustline{font-family:'JetBrains Mono',monospace;font-weight:500;font-size:11px;letter-spacing:.14em;color:var(--tx3)}
+/* ── 1-2-3 ────────────────────────────────────────────────────────── */
+.steps{display:grid;grid-template-columns:1fr 1fr 1fr;border-bottom:1px solid var(--bd)}
+.step{padding:88px 64px;display:flex;flex-direction:column;gap:24px;border-right:1px solid var(--bds)}
+.step:last-child{border-right:none}
+.step .big{font-family:'Newsreader',Georgia,serif;font-weight:400;font-size:140px;line-height:1;color:var(--hi);-webkit-text-stroke:1px var(--bd)}
+.step .t{font-family:'Newsreader',Georgia,serif;font-weight:500;font-size:34px;color:var(--ink)}
+.step .b{font-size:17px;line-height:1.65;color:var(--t2)}
+.step .tag{font-family:'JetBrains Mono',monospace;font-weight:500;font-size:12.5px;letter-spacing:.16em;color:var(--gdt)}
+@media(max-width:860px){
+  .steps{grid-template-columns:1fr}
+  .step{flex-direction:row;gap:22px;padding:28px 26px;border-right:none;border-bottom:1px solid var(--bds);align-items:flex-start}
+  .step:last-child{border-bottom:none}
+  .step .big{font-size:64px;flex:none}
+  .step .inner{display:flex;flex-direction:column;gap:8px;padding-top:6px}
+  .step .t{font-size:22px}
+  .step .b{font-size:14px;line-height:1.6}
+  .step .tag{font-size:10px;letter-spacing:.14em}
+}
+@media(min-width:861px){.step .inner{display:flex;flex-direction:column;gap:24px}}
 
-/* footer */
-.ftr{padding-top:26px;padding-bottom:34px;display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap}
-.ftr .links{display:flex;gap:20px;flex-wrap:wrap;font-size:12.5px;color:var(--tx3)}
-.ftr .links a:hover{color:var(--tx)}
-.ftr .mark{font-family:'JetBrains Mono',monospace;font-weight:500;font-size:11px;letter-spacing:.14em;color:var(--tx3)}
-.hidden{display:none !important}
+/* ── Why this exists ──────────────────────────────────────────────── */
+.why{border-bottom:1px solid var(--bd);background:var(--elev)}
+.why-in{padding-top:96px;padding-bottom:96px;max-width:980px}
+.why .eyebrow{display:block;font-family:'JetBrains Mono',monospace;font-weight:600;font-size:13px;letter-spacing:.24em;color:var(--gdt);margin-bottom:18px}
+.why h2{font-family:'Newsreader',Georgia,serif;font-weight:500;font-size:clamp(28px,3.4vw,44px);line-height:1.2;color:var(--ink);margin-bottom:30px;max-width:860px}
+.why p{font-size:17px;line-height:1.7;color:var(--t2);max-width:760px;margin-bottom:22px}
+.why p b{color:var(--ink)}
+.why .pull{border-left:2px solid var(--gdt);padding:8px 0 8px 26px;font-family:'Newsreader',Georgia,serif;font-style:italic;font-weight:500;font-size:clamp(20px,2.2vw,26px);line-height:1.45;color:var(--ink);margin:30px 0;max-width:700px}
+@media(max-width:860px){
+  .why-in{padding-top:56px;padding-bottom:56px}
+  .why .eyebrow{font-size:10px;letter-spacing:.2em}
+  .why p{font-size:14px;line-height:1.65}
+}
+
+/* ── From the Public Record ───────────────────────────────────────── */
+.record{border-bottom:1px solid var(--bd)}
+.record-in{padding-top:90px;padding-bottom:64px}
+.record-head{display:flex;align-items:baseline;justify-content:space-between;gap:20px;padding-bottom:34px}
+.record-head h2{font-family:'Newsreader',Georgia,serif;font-weight:500;font-size:clamp(26px,3.2vw,44px);color:var(--ink)}
+.record-link{font-family:'JetBrains Mono',monospace;font-weight:500;font-size:13px;letter-spacing:.16em;color:var(--t3);border-bottom:1px solid var(--bd);padding-bottom:4px;white-space:nowrap}
+.record-link:hover{color:var(--gdt);border-color:rgba(201,154,56,.4)}
+.rows{display:flex;flex-direction:column}
+.row{display:grid;grid-template-columns:220px 1fr 320px 140px;gap:38px;align-items:center;padding:32px 0;border-top:1px solid var(--bds)}
+.rows .row:first-child{border-top:1px solid var(--bd)}
+.rows .row:last-child{border-bottom:1px solid var(--bd)}
+.row:hover .q{color:var(--gdt)}
+.row .meta{display:flex;flex-direction:column;font-family:'JetBrains Mono',monospace;font-weight:500;font-size:12.5px;line-height:1.7;letter-spacing:.12em;color:var(--t3)}
+.row .meta .status{display:none}
+.row .q{font-family:'Newsreader',Georgia,serif;font-weight:500;font-size:25px;line-height:1.3;color:var(--ink);text-wrap:pretty;transition:color .15s ease}
+.tally{display:flex;flex-direction:column;gap:9px;font-feature-settings:'tnum' 1}
+.bar{height:8px;border-radius:4px;background:var(--opp);overflow:hidden}
+.bar .fill{height:100%;background:var(--sup)}
+.split{display:flex;justify-content:space-between;font-family:'JetBrains Mono',monospace;font-weight:500;font-size:11.5px}
+.split .s{color:var(--sup)}.split .o{color:var(--opp)}
+.dots{display:flex;align-items:center;gap:14px}
+.dots .dotrow{display:flex;gap:5px}
+.dots .dot{width:10px;height:10px;border-radius:5px;background:var(--gdt)}
+.dots .dot.empty{background:var(--hi);border:1px solid var(--bd)}
+.dots .note{font-family:'JetBrains Mono',monospace;font-weight:500;font-size:11.5px;color:var(--t3)}
+.status{justify-self:end;display:inline-flex;align-items:center;gap:8px;font-family:'JetBrains Mono',monospace;font-weight:600;font-size:11.5px;letter-spacing:.1em;padding:8px 16px;border-radius:100px;white-space:nowrap}
+.status.live{color:var(--gdt);background:rgba(201,154,56,.12)}
+.status.live .livedot{width:7px;height:7px;border-radius:4px;background:var(--gdt)}
+.status.passed{color:var(--sup);background:rgba(14,159,110,.1)}
+.status.failed{color:var(--opp);background:rgba(220,38,38,.08)}
+.status.none{color:var(--t3);background:var(--rec)}
+@media(max-width:1000px){
+  .record-in{padding-top:56px;padding-bottom:40px}
+  .record-head{flex-direction:column;align-items:flex-start;gap:10px;padding-bottom:22px}
+  .row{grid-template-columns:1fr;gap:12px;padding:24px 0}
+  .row .meta{flex-direction:row;align-items:center;gap:10px;font-size:10px;letter-spacing:.1em}
+  .row .meta .m2{display:none}
+  .row .meta .status{display:inline-flex;margin-left:auto}
+  .row > .status{display:none}
+  .row .q{font-size:19px;line-height:1.32}
+  .status{font-size:10px;padding:5px 11px}
+}
+
+/* ── How counting works ───────────────────────────────────────────── */
+.audit{border-bottom:1px solid var(--bd)}
+.audit-in{padding-top:90px;padding-bottom:90px;display:flex;flex-direction:column;gap:52px}
+.audit .head{display:flex;flex-direction:column;gap:14px}
+.audit .eyebrow{font-family:'JetBrains Mono',monospace;font-weight:600;font-size:13px;letter-spacing:.24em;color:var(--gdt)}
+.audit h2{font-family:'Newsreader',Georgia,serif;font-weight:500;font-size:clamp(26px,3.2vw,44px);color:var(--ink)}
+.audit .chain{display:grid;grid-template-columns:1fr 56px 1fr 56px 1fr;align-items:stretch}
+.audit .card{background:var(--elev);border:1px solid var(--bd);border-radius:18px;padding:32px;display:flex;flex-direction:column;gap:15px}
+.audit .card .k{font-family:'JetBrains Mono',monospace;font-weight:500;font-size:12.5px;letter-spacing:.16em;color:var(--t3)}
+.audit .card .t{font-family:'Newsreader',Georgia,serif;font-weight:500;font-size:25px;color:var(--ink)}
+.audit .card .b{font-size:15.5px;line-height:1.6;color:var(--t2)}
+.audit .card .m{font-family:'JetBrains Mono',monospace;font-weight:500;font-size:12px;color:var(--gdt)}
+.audit .card .m.link{border-bottom:1px solid rgba(201,154,56,.4);padding-bottom:3px;width:fit-content}
+.audit .arrow{display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;font-weight:500;font-size:24px;color:var(--gdt)}
+@media(max-width:860px){
+  .audit-in{padding-top:52px;padding-bottom:52px;gap:24px}
+  .audit .eyebrow{font-size:10px;letter-spacing:.2em}
+  .audit .chain{display:flex;flex-direction:column;gap:12px}
+  .audit .card{border-radius:14px;padding:20px;gap:8px}
+  .audit .card .k{font-size:10px;letter-spacing:.14em}
+  .audit .card .t{font-size:18px}
+  .audit .card .b{font-size:13px;line-height:1.55}
+  .audit .arrow{font-size:18px;transform:rotate(90deg)}
+}
+
+/* ── Plain answers ────────────────────────────────────────────────── */
+.faq{border-bottom:1px solid var(--bd);background:var(--elev)}
+.faq-in{padding-top:90px;padding-bottom:70px;display:flex;gap:80px}
+.faq .head{flex:none;width:360px;display:flex;flex-direction:column;gap:16px}
+.faq .eyebrow{font-family:'JetBrains Mono',monospace;font-weight:600;font-size:13px;letter-spacing:.24em;color:var(--gdt)}
+.faq h2{font-family:'Newsreader',Georgia,serif;font-weight:500;font-size:clamp(26px,3.2vw,44px);line-height:1.15;color:var(--ink)}
+.faq .list{flex:1;display:flex;flex-direction:column}
+.faq .qa{border-top:1px solid var(--bds);padding:28px 0;display:flex;flex-direction:column;gap:10px}
+.faq .qa:first-child{border-top:1px solid var(--bd)}
+.faq .qa:last-child{border-bottom:1px solid var(--bd)}
+.faq .qa .qq{font-family:'Newsreader',Georgia,serif;font-weight:500;font-size:23px;color:var(--ink)}
+.faq .qa .aa{font-size:16px;line-height:1.6;color:var(--t2);max-width:700px}
+@media(max-width:1000px){
+  .faq-in{flex-direction:column;gap:24px;padding-top:52px;padding-bottom:44px}
+  .faq .head{width:auto;gap:8px}
+  .faq .eyebrow{font-size:10px;letter-spacing:.2em}
+  .faq .qa{padding:18px 0;gap:6px}
+  .faq .qa .qq{font-size:17px}
+  .faq .qa .aa{font-size:13px;line-height:1.55}
+}
+
+/* ── Organizations ────────────────────────────────────────────────── */
+.orgs{border-bottom:1px solid var(--bd)}
+.orgs-in{padding-top:80px;padding-bottom:80px;display:flex;align-items:center;gap:80px}
+.orgs .copy{flex:1;display:flex;flex-direction:column;gap:20px}
+.orgs .eyebrow{font-family:'JetBrains Mono',monospace;font-weight:600;font-size:13px;letter-spacing:.24em;color:var(--gdt)}
+.orgs h2{font-family:'Newsreader',Georgia,serif;font-weight:500;font-size:clamp(26px,3vw,40px);line-height:1.2;color:var(--ink)}
+.orgs .b{font-size:16.5px;line-height:1.65;color:var(--t2);max-width:560px}
+.orgs .link{font-family:'JetBrains Mono',monospace;font-weight:500;font-size:13px;letter-spacing:.14em;color:var(--t3);border-bottom:1px solid var(--bd);padding-bottom:4px;width:fit-content}
+.orgs .link:hover{color:var(--gdt);border-color:rgba(201,154,56,.4)}
+.org-card{flex:none;width:420px;background:var(--elev);border:1px solid var(--bd);border-radius:18px;padding:32px;display:flex;flex-direction:column;gap:17px;font-feature-settings:'tnum' 1}
+.org-card .top{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.org-card .who{font-family:'JetBrains Mono',monospace;font-weight:600;font-size:10.5px;letter-spacing:.14em;color:var(--t3)}
+.org-card .pill{font-family:'JetBrains Mono',monospace;font-weight:600;font-size:10.5px;color:var(--sup);background:rgba(14,159,110,.1);padding:5px 12px;border-radius:100px}
+.org-card .q{font-family:'Newsreader',Georgia,serif;font-weight:500;font-size:21px;line-height:1.3;color:var(--ink)}
+.org-card .turnout{font-size:12.5px;color:var(--t3)}
+.org-card .sample{font-family:'JetBrains Mono',monospace;font-weight:500;font-size:9.5px;letter-spacing:.14em;color:var(--t3)}
+@media(max-width:1000px){
+  .orgs-in{flex-direction:column;align-items:stretch;gap:20px;padding-top:52px;padding-bottom:52px}
+  .orgs .eyebrow{font-size:10px;letter-spacing:.2em}
+  .orgs .b{font-size:13.5px;line-height:1.6}
+  .org-card{width:100%;border-radius:14px;padding:20px;gap:12px}
+  .org-card .q{font-size:16px}
+}
+
+/* ── Manifesto quote ──────────────────────────────────────────────── */
+.quote{border-bottom:1px solid var(--bd)}
+.quote-in{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:36px;padding-top:120px;padding-bottom:120px;text-align:center;max-width:1120px;margin:0 auto}
+.quote .rule{width:44px;height:2px;background:var(--gdt)}
+.quote .big{font-family:'Newsreader',Georgia,serif;font-style:italic;font-weight:400;font-size:clamp(30px,5vw,68px);line-height:1.24;letter-spacing:-.014em;color:var(--ink);text-wrap:balance}
+.quote .tag{font-family:'JetBrains Mono',monospace;font-weight:500;font-size:13px;letter-spacing:.3em;color:var(--t3)}
+@media(max-width:860px){
+  .quote-in{gap:24px;padding-top:70px;padding-bottom:70px}
+  .quote .rule{width:34px}
+  .quote .tag{font-size:9.5px;letter-spacing:.24em}
+}
+
+/* ── Unlike triptych ──────────────────────────────────────────────── */
+.unlike{display:grid;grid-template-columns:1fr 1fr 1fr;border-bottom:1px solid var(--bd);background:var(--elev)}
+.unlike .col{padding:96px 64px;display:flex;flex-direction:column;gap:20px;border-right:1px solid var(--bds)}
+.unlike .col:last-child{border-right:none}
+.unlike .eyebrow{font-family:'JetBrains Mono',monospace;font-weight:600;font-size:13px;letter-spacing:.24em;color:var(--gdt)}
+.unlike .t{font-family:'Newsreader',Georgia,serif;font-weight:500;font-size:30px;line-height:1.25;color:var(--ink)}
+.unlike .b{font-size:16px;line-height:1.65;color:var(--t2)}
+@media(max-width:860px){
+  .unlike{grid-template-columns:1fr}
+  .unlike .col{padding:32px 26px;border-right:none;border-bottom:1px solid var(--bds);gap:10px}
+  .unlike .col:last-child{border-bottom:none}
+  .unlike .eyebrow{font-size:10px;letter-spacing:.2em}
+  .unlike .t{font-size:21px}
+  .unlike .b{font-size:13.5px;line-height:1.6}
+}
+
+/* ── Final CTA ────────────────────────────────────────────────────── */
+.close{position:relative;overflow:hidden}
+.close-in{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:40px;padding-top:130px;padding-bottom:130px;text-align:center}
+.close .glow{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:1200px;height:1200px;border-radius:50%;background:radial-gradient(circle,rgba(201,154,56,.1) 0%,transparent 62%);pointer-events:none}
+.seal{position:relative;width:160px;height:160px}
+.seal svg.ring{transform:rotate(-90deg)}
+.seal .check{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
+.close h2{position:relative;font-family:'Newsreader',Georgia,serif;font-weight:500;font-size:clamp(32px,4.8vw,64px);line-height:1.15;letter-spacing:-.016em;color:var(--ink);max-width:860px;text-wrap:balance}
+.close .cta-col{position:relative;display:flex;flex-direction:column;align-items:center;gap:18px;width:100%}
+.close .cta-note{font-size:13px;letter-spacing:.2em}
+@media(max-width:860px){
+  .close-in{gap:26px;padding-top:70px;padding-bottom:70px}
+  .seal{width:110px;height:110px}
+  .close .gold-btn{width:100%;max-width:340px}
+  .close .cta-note{font-size:9.5px;letter-spacing:.18em}
+}
+
+/* ── Footer ───────────────────────────────────────────────────────── */
+footer{border-top:3px double var(--bd)}
+.foot-in{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;padding:64px 26px}
+.foot-in .wordmark{font-size:16px}
+.foot-links{display:flex;flex-wrap:wrap;justify-content:center;gap:12px 36px;font-family:'JetBrains Mono',monospace;font-weight:500;font-size:12px;letter-spacing:.14em;color:var(--t3)}
+.foot-links a:hover{color:var(--gdt)}
+.foot-copy{font-family:'JetBrains Mono',monospace;font-weight:400;font-size:11.5px;color:var(--t3)}
+@media(max-width:860px){
+  .foot-in{gap:14px;padding:44px 26px}
+  .foot-in .wordmark{font-size:13px;letter-spacing:.44em;margin-right:-.44em}
+  .foot-links{gap:10px 20px;font-size:9.5px;letter-spacing:.12em}
+  .foot-copy{font-size:9.5px}
+}
 </style>
 </head>
 <body>
-<div class="wrap">
 
-  <header class="nav pad">
-    <a class="wm" href="/">REPRESENT</a>
-    <nav class="nav-links">
-      <a href="https://representportal.com/record">The Record</a>
-      <a href="#how">How counting works</a>
-      <a href="#orgs">Organizations</a>
-      <a class="pill" href="https://apps.apple.com/ca/app/id6756912022">Get the app</a>
-    </nav>
-  </header>
+<!-- MASTHEAD -->
+<header class="mast">
+  <div class="wrap pad mast-in">
+    <span class="side left">EST. 2026 · CALGARY, CANADA</span>
+    <a class="wordmark" href="/">REPRESENT</a>
+    <a class="side" href="https://representportal.com/record">THE PUBLIC RECORD ↗</a>
+  </div>
+</header>
 
-  <!-- HERO -->
-  <section class="hero pad">
-    <div class="hero-glow"></div>
-    <div class="hero-inner">
-      <div class="hero-copy">
-        <span class="eyebrow">THE DIGITAL BALLOT</span>
-        <h1>Verified citizens. Real questions. Counted in public.</h1>
-        <p class="sub">Represent is where you vote on what governs your street, your city, and your country — between elections, on the record.</p>
-        <p class="applink">Prefer the app? <a href="https://apps.apple.com/ca/app/id6756912022">Download free on the App Store</a></p>
-        <span class="trustline mono">ONE PERSON, ONE BALLOT · CHECKED, NEVER KEPT</span>
-      </div>
-      <div class="hero-card-col">
-        <div class="ballot-card" id="hero-card">
-          <div class="bc-top">
-            <span class="bc-open"><span class="dot"></span><span id="bc-scope">LOADING THE LIVE BALLOT…</span></span>
-            <span class="bc-closes" id="bc-closes"></span>
-          </div>
-          <div class="bc-q" id="bc-q">&nbsp;</div>
-          <div class="bc-tally" id="bc-tally"></div>
-          <a class="bc-cta" id="bc-cta" href="https://representportal.com/record">Cast your ballot — no app needed</a>
-          <span class="bc-verify">QUICK VERIFY IN THE BROWSER · ONE PERSON, ONE BALLOT</span>
-          <div class="bc-foot">
-            <span class="bc-count" id="bc-count"></span>
-            <a class="bc-record" href="https://representportal.com/record">See the full record →</a>
-          </div>
-        </div>
-        <span class="bc-caption hidden" id="bc-caption">A real ballot, counting right now. Not a mockup.</span>
-      </div>
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-ring1"></div>
+  <div class="hero-ring2">
+    <svg width="300" height="300" viewBox="0 0 24 24" fill="none" stroke="rgba(201,154,56,.14)" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg>
+  </div>
+  <div class="wrap pad hero-in">
+    <span class="eyebrow mono">A VERIFIED NATIONAL RECORD</span>
+    <h1>Your voice beyond the <em>ballot box.</em></h1>
+    <p class="sub">Verified citizens voting on real questions — street, city, province, country — every ballot on a public, tamper-evident record.</p>
+    <div class="cta-row">
+      <a class="gold-btn" href="https://representportal.com/record">Cast your first ballot</a>
+      <span class="cta-note mono">FREE · VERIFY ONCE · ONE PERSON, ONE BALLOT</span>
     </div>
-  </section>
+  </div>
+</section>
 
-  <!-- HOW IT WORKS -->
-  <section class="sec pad" id="how">
-    <h2 class="h2" style="margin-bottom:40px">How it works</h2>
-    <div class="grid3">
+<!-- LEDGER COUNTER (rendered from live data; hidden if unavailable) -->
+<section class="counter hidden" id="counter">
+  <div class="wrap pad counter-in">
+    <div class="label"><span>BALLOTS <br>RECORDED <br>TO DATE</span><div class="rule"></div></div>
+    <div class="digits" id="digits"></div>
+    <div class="label right"><span>UPDATED <br>CONTINUOUSLY <br>PUBLIC</span></div>
+  </div>
+</section>
+
+<!-- 1 · 2 · 3 -->
+<section class="wrap steps">
+  <div class="step"><span class="big serif">1</span><div class="inner">
+    <span class="t">Verify once.</span>
+    <span class="b">Your government ID is checked to prove you're one real person, then discarded. We keep the proof — never the document.</span>
+    <span class="tag mono">CHECKED, NEVER KEPT</span>
+  </div></div>
+  <div class="step"><span class="big serif">2</span><div class="inner">
+    <span class="t">Vote on what governs you.</span>
+    <span class="b">Real questions from your street, your city, your province, your country — one feed, scoped to where you actually live.</span>
+    <span class="tag mono">STREET → CITY → PROVINCE → CANADA</span>
+  </div></div>
+  <div class="step"><span class="big serif">3</span><div class="inner">
+    <span class="t">On the record. Forever.</span>
+    <span class="b">Every ballot lands on a public, tamper-evident record that anyone can audit — no account, no app required.</span>
+    <span class="tag mono">INDEPENDENTLY AUDITABLE</span>
+  </div></div>
+</section>
+
+<!-- WHY THIS EXISTS -->
+<section class="why">
+  <div class="wrap pad why-in">
+    <span class="eyebrow mono">WHY THIS EXISTS</span>
+    <h2>The biggest petition in Canadian history was dismissed in one news cycle.</h2>
+    <p>In December 2023, <b>386,698</b> people signed a parliamentary e-petition — the largest in Canadian history. It changed nothing. Signatures only required an email address, so critics could wave it away as bots, duplicates, and foreign interference. Nobody could prove them wrong.</p>
+    <div class="pull">The moment a result matters, &ldquo;it&rsquo;s all fake&rdquo; ends the conversation.</div>
+    <p>That&rsquo;s the flaw in every petition, every online poll, every hashtag.</p>
+    <p>Represent makes that attack impossible. Every voter is verified against a government document. Every ballot is tied to a verified residence. Every tally can be audited by anyone — including the people who don&rsquo;t like the result.</p>
+  </div>
+</section>
+
+<!-- FROM THE PUBLIC RECORD (live rows; hidden if unavailable) -->
+<section class="record hidden" id="record">
+  <div class="wrap pad record-in">
+    <div class="record-head">
+      <h2>From the Public Record</h2>
+      <a class="record-link mono" href="https://representportal.com/record">BROWSE EVERY BALLOT ↗</a>
+    </div>
+    <div class="rows" id="rows"></div>
+  </div>
+</section>
+
+<!-- HOW COUNTING WORKS -->
+<section class="audit" id="how">
+  <div class="wrap pad audit-in">
+    <div class="head">
+      <span class="eyebrow mono">HOW COUNTING WORKS</span>
+      <h2>Don't trust us. Audit us.</h2>
+    </div>
+    <div class="chain">
       <div class="card">
-        <span class="num">01</span>
-        <span class="t">Verify once</span>
-        <span class="b">Your government ID is checked against public records, then discarded. We keep the proof you're a real, unique person — never the document.</span>
-        <span class="tag">CHECKED, NEVER KEPT</span>
+        <span class="k mono">YOUR BALLOT</span>
+        <span class="t">Cast &amp; sealed</span>
+        <span class="b">Signed by your verified identity — one person, provably unable to vote twice.</span>
       </div>
+      <div class="arrow mono">→</div>
       <div class="card">
-        <span class="num">02</span>
-        <span class="t">Vote where you live</span>
-        <span class="b">Real questions from your street to your country — transit lines, tax rules, national programs. Your verified residence sets what you're eligible to decide.</span>
-        <span class="tag">CITY · PROVINCE · CANADA</span>
+        <span class="k mono">THE LEDGER</span>
+        <span class="t">A permanent entry</span>
+        <span class="b">Appended to a public, tamper-evident record. Changing any past entry would break every entry after it — visibly.</span>
+        <span class="m mono">APPEND-ONLY · HASH-CHAINED</span>
       </div>
+      <div class="arrow mono">→</div>
       <div class="card">
-        <span class="num">03</span>
-        <span class="t">On the record</span>
-        <span class="b">Every ballot lands on a public, tamper-evident ledger. Anyone — including you — can audit every count, forever.</span>
-        <span class="tag">TAMPER-EVIDENT · AUDITABLE</span>
+        <span class="k mono">ANYONE</span>
+        <span class="t">Recount it yourself</span>
+        <span class="b">Every count on this site can be re-derived from the raw record — no account, no app, no permission needed.</span>
+        <a class="m mono link" href="https://representportal.com/record#how">READ THE METHODOLOGY ↗</a>
       </div>
     </div>
-  </section>
+  </div>
+</section>
 
-  <!-- WHY THIS EXISTS -->
-  <section class="sec pad">
-    <span class="eyebrow" style="display:block;margin-bottom:16px">WHY THIS EXISTS</span>
-    <h2 class="h2" style="margin-bottom:26px;max-width:820px">The biggest petition in Canadian history was dismissed in one news cycle.</h2>
-    <div class="story">
-      <p>In December 2023, <b>386,698</b> people signed a parliamentary e-petition — the largest in Canadian history. It changed nothing. Signatures only required an email address, so critics could wave it away as bots, duplicates, and foreign interference. Nobody could prove them wrong.</p>
-      <div class="pull">The moment a result matters, &ldquo;it&rsquo;s all fake&rdquo; ends the conversation.</div>
-      <p>That&rsquo;s the flaw in every petition, every online poll, every hashtag.</p>
-      <p>Represent makes that attack impossible. Every voter is verified against a government document. Every ballot is tied to a verified residence. Every tally can be audited by anyone — including the people who don&rsquo;t like the result.</p>
+<!-- PLAIN ANSWERS -->
+<section class="faq">
+  <div class="wrap pad faq-in">
+    <div class="head">
+      <span class="eyebrow mono">PLAIN ANSWERS</span>
+      <h2>Asked constantly. Answered honestly.</h2>
     </div>
-  </section>
-
-  <!-- RECORD TEASER -->
-  <section class="sec pad">
-    <div class="teaser-head">
-      <div style="display:flex;flex-direction:column;gap:10px">
-        <h2 class="h2">We count in public.</h2>
-        <p class="sub2">Every ballot ever run, with its verified count — open to anyone, no account needed.</p>
-      </div>
-      <a class="teaser-link" href="https://representportal.com/record">Browse the Public Record →</a>
+    <div class="list">
+      <div class="qa"><span class="qq">Is my vote anonymous?</span><span class="aa">Ballots are tied to a public per-person address, not your name. Your name is never published; the record proves one person voted once without saying who they are.</span></div>
+      <div class="qa"><span class="qq">What happens to my ID?</span><span class="aa">It's checked to prove you're one real person, then discarded. We keep the proof of verification — never the document.</span></div>
+      <div class="qa"><span class="qq">Who can see the results?</span><span class="aa">Everyone. Every count is public at 25 or more verified ballots — no account required, and no one can pay to promote or bury a result.</span></div>
+      <div class="qa"><span class="qq">Is this legally binding?</span><span class="aa">No — and we won't pretend otherwise. Represent is the verified public record of what citizens actually want. Its power is that no official can say &ldquo;nobody asked for this&rdquo; when thousands of verified constituents are on the record.</span></div>
     </div>
-    <div class="rows" id="teaser-rows"></div>
-    <div class="stats hidden" id="stats">
-      <div class="stat"><span class="n" id="stat-run"></span><span class="l">BALLOTS RUN</span></div>
-      <div class="stat"><span class="n" id="stat-cast"></span><span class="l">BALLOTS CAST</span></div>
-      <div class="stat"><span class="n" id="stat-open" style="color:var(--gdt)"></span><span class="l" style="color:var(--gdt)">OPEN NOW</span></div>
+  </div>
+</section>
+
+<!-- FOR ORGANIZATIONS -->
+<section class="orgs" id="orgs">
+  <div class="wrap pad orgs-in">
+    <div class="copy">
+      <span class="eyebrow mono">FOR ORGANIZATIONS</span>
+      <h2>Votes your members can't dispute.</h2>
+      <span class="b">Unions, student associations, leagues, and co-ops run ratifications and board votes on the same verified record — every member proven real, every count auditable by the people it governs.</span>
+      <a class="link mono" href="mailto:sales@representvote.com?subject=Represent%20for%20our%20organization">REPRESENT FOR ORGANIZATIONS ↗</a>
     </div>
-  </section>
-
-  <!-- WHY DIFFERENT -->
-  <section class="sec pad">
-    <h2 class="h2" style="margin-bottom:40px">Why this counts when polls don't</h2>
-    <div class="why">
-      <div class="col">
-        <span class="t">One person, one ballot</span>
-        <span class="b">Every count is verified humans, each counted once. No bots, no brigades, no duplicate accounts — verification makes them impossible, not just against the rules.</span>
-      </div>
-      <div class="col">
-        <span class="t">Counted, not estimated</span>
-        <span class="b">A poll asks 1,000 people and models the rest. Represent counts every ballot actually cast and shows you the exact number — with the math open to audit.</span>
-      </div>
-      <div class="col">
-        <span class="t">Never for sale</span>
-        <span class="b">No ads. No selling reach, placement, or results. The record can't be bought — that's the entire point of keeping one.</span>
-      </div>
+    <div class="org-card">
+      <div class="top"><span class="who mono">A RATIFICATION VOTE</span><span class="pill mono">RATIFIED</span></div>
+      <span class="q">Accept the 2026–29 collective agreement?</span>
+      <div class="tally"><div class="bar"><div class="fill" style="width:71%"></div></div>
+      <div class="split mono"><span class="s">YES 71%</span><span class="o">NO 29%</span></div></div>
+      <span class="turnout">Every member verified · turnout provable to the percent</span>
+      <span class="sample mono">ILLUSTRATION — YOUR ORG'S BALLOT HERE</span>
     </div>
-  </section>
+  </div>
+</section>
 
-  <!-- TRUST FAQ -->
-  <section class="sec pad">
-    <h2 class="h2 serif" style="margin-bottom:40px">&ldquo;Why would I give a voting app my ID?&rdquo;</h2>
-    <div class="grid3">
-      <div class="card">
-        <span class="t2">We never see your documents the way you fear.</span>
-        <span class="b">Verification is handled by a certified identity provider. We receive a yes/no and your verified region — not copies of your passport. A breach of our servers cannot leak documents we never hold.</span>
-      </div>
-      <div class="card">
-        <span class="t2">Your vote is pseudonymous in public.</span>
-        <span class="b">The public ledger shows that a verified citizen voted — not your name. Identity and ballot are linked only enough to prevent fraud, never for display.</span>
-      </div>
-      <div class="card">
-        <span class="t2">We will never sell your data or run political ads. Ever.</span>
-        <span class="b">Our policy bans political advertising permanently. We make money from optional premium features and organization tools — not from you being the product.</span>
-      </div>
+<!-- MANIFESTO -->
+<section class="quote">
+  <div class="pad quote-in">
+    <div class="rule"></div>
+    <div class="big serif">Democracy shouldn't happen once every four years.</div>
+    <span class="tag mono">ONE PERSON · ONE BALLOT · ON THE RECORD</span>
+  </div>
+</section>
+
+<!-- UNLIKE -->
+<section class="wrap unlike">
+  <div class="col">
+    <span class="eyebrow mono">UNLIKE COMMENTS</span>
+    <span class="t">One person, one ballot — never bots, never brigades.</span>
+    <span class="b">Every count is of verified citizens. No one votes twice; no one votes for you.</span>
+  </div>
+  <div class="col">
+    <span class="eyebrow mono">UNLIKE POLLS</span>
+    <span class="t">Counted, not estimated.</span>
+    <span class="b">No sampling, no margin of error. The number is the number — and anyone can audit it.</span>
+  </div>
+  <div class="col">
+    <span class="eyebrow mono">UNLIKE PLATFORMS</span>
+    <span class="t">Your ballot is never for sale.</span>
+    <span class="b">No ads, no data sales, no paid placement in results. Premium tools fund the record.</span>
+  </div>
+</section>
+
+<!-- FINAL CTA -->
+<section class="close">
+  <div class="glow"></div>
+  <div class="pad close-in">
+    <div class="seal">
+      <svg class="ring" width="100%" height="100%" viewBox="0 0 104 104"><circle cx="52" cy="52" r="48" fill="none" stroke="var(--hi)" stroke-width="3.5"></circle><circle cx="52" cy="52" r="48" fill="none" stroke="var(--gdt)" stroke-width="3.5" stroke-linecap="round"></circle></svg>
+      <div class="check"><svg width="46%" height="46%" viewBox="0 0 24 24" fill="none" stroke="var(--gdt)" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg></div>
     </div>
-  </section>
-
-  <!-- ORGANIZATIONS -->
-  <section class="sec pad" id="orgs">
-    <div class="orgs">
-      <div class="copy">
-        <span class="eyebrow">FOR ORGANIZATIONS</span>
-        <h2 class="h2">Votes your members can't dispute.</h2>
-        <p class="sub2" style="max-width:560px">Unions, student associations, leagues, and co-ops run ratifications and board votes on the same verified, auditable ledger.</p>
-        <a class="learn" href="mailto:sales@representvote.com?subject=Represent%20for%20our%20organization">Learn more</a>
-      </div>
+    <h2>Add your voice to the record.</h2>
+    <div class="cta-col">
+      <a class="gold-btn" href="https://apps.apple.com/ca/app/id6756912022">Download Represent — free</a>
+      <span class="cta-note mono">VERIFY ONCE · ONE PERSON, ONE BALLOT</span>
     </div>
-  </section>
+  </div>
+</section>
 
-  <!-- FINAL CTA -->
-  <section class="final pad">
-    <h2 class="h2 serif" style="font-size:clamp(32px,4vw,46px)">Your voice, on the record.</h2>
-    <a class="gold-btn" href="https://apps.apple.com/ca/app/id6756912022">Download on the App Store</a>
-    <span class="trustline mono">VERIFY ONCE · ONE PERSON, ONE BALLOT</span>
-  </section>
-
-  <footer class="ftr pad">
-    <span style="font-weight:600;font-size:13px;letter-spacing:.22em;color:var(--gdt)">REPRESENT</span>
-    <nav class="links">
-      <a href="https://representportal.com/record">The Record</a>
-      <a href="/alberta">Alberta Shadow Referendum</a>
-      <a href="https://representportal.com/privacy">Privacy</a>
-      <a href="https://representportal.com/terms">Terms</a>
-      <a href="mailto:hello@representvote.com">Contact</a>
-    </nav>
-    <span class="mark">© <span id="yr"></span> REPRESENT · MADE IN CANADA</span>
-  </footer>
-
-</div>
+<!-- FOOTER -->
+<footer>
+  <div class="foot-in">
+    <a class="wordmark" href="/">REPRESENT</a>
+    <div class="foot-links">
+      <a href="https://representportal.com/record">THE RECORD</a>
+      <a href="https://representportal.com/record#how">HOW COUNTING WORKS</a>
+      <a href="/app">THE APP</a>
+      <a href="/alberta">ALBERTA REFERENDUM</a>
+      <a href="https://representportal.com/privacy">PRIVACY</a>
+      <a href="https://representportal.com/terms">TERMS</a>
+      <a href="mailto:support@representvote.com">CONTACT</a>
+    </div>
+    <span class="foot-copy">© <span id="yr"></span> REPRESENT · CALGARY, CANADA</span>
+  </div>
+</footer>
 
 <script>
 (function () {
@@ -347,84 +526,76 @@ section{border-bottom:1px solid var(--bds)}
     return (ended ? 'CLOSED ' : 'CLOSES ') + md;
   }
 
-  // ── Hero: the live votable ballot ─────────────────────────────────
-  function heroFallback() {
-    document.getElementById('bc-scope').textContent = 'THE COUNT IS LIVE';
-    document.getElementById('bc-q').textContent = 'Real ballots are open on the Public Record right now.';
-    document.getElementById('bc-cta').textContent = 'See the open ballots';
-  }
-  function renderHero(b, threshold) {
-    if (!b) return heroFallback();
-    document.getElementById('bc-scope').textContent = 'OPEN NOW · ' + (b.tier || 'PUBLIC');
-    document.getElementById('bc-closes').textContent = closesLabel(b.deadline, false);
-    document.getElementById('bc-q').textContent = b.title;
-    var tally = document.getElementById('bc-tally');
-    if (b.aboveThreshold && b.totalVotes > 0) {
-      var pct = Math.round((b.supportVotes / b.totalVotes) * 100);
-      tally.innerHTML =
-        '<div class="bc-bar"><div class="fill" style="width:' + pct + '%"></div><div class="mid"></div></div>' +
-        '<div class="bc-split"><span class="s">SUPPORT ' + pct + '% · ' + fmt(b.supportVotes) + '</span>' +
-        '<span class="o">OPPOSE ' + (100 - pct) + '% · ' + fmt(b.opposeVotes) + '</span></div>';
-      document.getElementById('bc-count').textContent = fmt(b.totalVotes) + ' VERIFIED BALLOTS · LIVE';
-    } else {
-      tally.innerHTML = '<span class="bc-below">' + fmt(b.totalVotes) + ' OF ' + threshold +
-        ' BALLOTS · THE SPLIT PUBLISHES AT ' + threshold + '</span>';
-      document.getElementById('bc-count').textContent = 'EARLY VOTING · LIVE';
+  // ── Ledger counter: one engraved cell per digit, newest digit gold ──
+  function renderCounter(n) {
+    if (typeof n !== 'number' || !isFinite(n) || n < 0) return;
+    var str = Math.floor(n).toLocaleString('en-US');
+    var host = document.getElementById('digits');
+    var html = '';
+    for (var i = 0; i < str.length; i++) {
+      var ch = str.charAt(i);
+      if (ch === ',') html += '<span class="comma">,</span>';
+      else html += '<div class="digit' + (i === str.length - 1 ? ' last' : '') + '">' + ch + '</div>';
     }
-    var cta = document.getElementById('bc-cta');
-    cta.href = PORTAL + '/p/' + encodeURIComponent(b.id);
-    document.getElementById('bc-caption').classList.remove('hidden');
+    host.innerHTML = html;
+    document.getElementById('counter').classList.remove('hidden');
   }
 
-  // ── Record teaser rows + stats ────────────────────────────────────
-  function rowHtml(r) {
-    var meta = [r.region ? String(r.region).toUpperCase() : null, r.tier,
-      r.ended ? closesLabel(r.deadline, true) : 'OPEN · ' + closesLabel(r.deadline, false)]
+  // ── Public Record rows ─────────────────────────────────────────────
+  function statusHtml(r) {
+    if (!r.ended) return '<span class="status live"><span class="livedot"></span>LIVE</span>';
+    if (r.aboveThreshold && r.totalVotes > 0) {
+      return r.supportVotes > r.opposeVotes
+        ? '<span class="status passed">PASSED</span>'
+        : '<span class="status failed">DID NOT PASS</span>';
+    }
+    return '<span class="status none">NO RESULT</span>';
+  }
+  function rowHtml(r, threshold) {
+    var meta = [r.region ? String(r.region).toUpperCase() : null, r.tier ? String(r.tier).toUpperCase() : null]
       .filter(Boolean).join(' · ');
-    var href = PORTAL + '/p/' + encodeURIComponent(r.id);
-    var tcol, compact, scol;
+    var metaLine2 = r.aboveThreshold && r.totalVotes > 0
+      ? fmt(r.totalVotes) + ' VERIFIED'
+      : closesLabel(r.deadline, r.ended);
+    var tcol;
     if (r.aboveThreshold && r.totalVotes > 0) {
       var pct = Math.round((r.supportVotes / r.totalVotes) * 100);
-      tcol = '<div class="tcol"><div class="bar"><div class="fill" style="width:' + pct + '%"></div></div>' +
-        '<div class="pcts"><span style="color:var(--sup)">' + pct + '%</span><span style="color:var(--tx3)">' +
-        fmt(r.totalVotes) + '</span><span style="color:var(--opp)">' + (100 - pct) + '%</span></div></div>';
-      compact = '<span class="compact"><span class="s">' + pct + '</span>–<span class="o">' + (100 - pct) +
-        '</span> · ' + fmt(r.totalVotes) + '</span>';
-      if (!r.ended) scol = '<span class="scol" style="color:var(--gdt)"><span class="livedot"></span>LIVE</span>';
-      else if (r.supportVotes > r.opposeVotes) scol = '<span class="scol" style="color:var(--sup)">✓ PASSED</span>';
-      else scol = '<span class="scol" style="color:var(--opp)">✕ DID NOT PASS</span>';
+      tcol = '<div class="tally"><div class="bar"><div class="fill" style="width:' + pct + '%"></div></div>' +
+        '<div class="split"><span class="s">SUPPORT ' + pct + '% · ' + fmt(r.supportVotes) + '</span>' +
+        '<span class="o">OPPOSE ' + (100 - pct) + '% · ' + fmt(r.opposeVotes) + '</span></div></div>';
     } else {
-      tcol = '<div class="tcol"><span class="note">' + fmt(r.totalVotes) + ' BALLOTS · TALLY AT 25</span></div>';
-      compact = '<span class="compact">' + fmt(r.totalVotes) + ' BALLOTS · TALLY AT 25</span>';
-      scol = r.ended
-        ? '<span class="scol" style="color:var(--tx3)">NO RESULT</span>'
-        : '<span class="scol" style="color:var(--gdt)"><span class="livedot"></span>LIVE</span>';
+      var filled = Math.max(0, Math.min(10, Math.round((r.totalVotes / threshold) * 10)));
+      var dots = '';
+      for (var i = 0; i < 10; i++) dots += '<span class="dot' + (i < filled ? '' : ' empty') + '"></span>';
+      tcol = '<div class="dots"><div class="dotrow">' + dots + '</div>' +
+        '<span class="note">' + fmt(r.totalVotes) + ' OF ' + threshold + ' · TALLY AT ' + threshold + '</span></div>';
     }
-    return '<a class="row" href="' + href + '"><div class="qcol"><span class="meta">' + esc(meta) +
-      '</span><span class="q">' + esc(r.title) + '</span>' + compact + '</div>' + tcol + scol + '</a>';
+    return '<a class="row" href="' + PORTAL + '/p/' + encodeURIComponent(r.id) + '">' +
+      '<span class="meta mono"><span class="m1">' + esc(meta) + '</span><span class="m2">' + esc(metaLine2) + '</span>' + statusHtml(r) + '</span>' +
+      '<span class="q serif">' + esc(r.title) + '</span>' + tcol +
+      statusHtml(r) + '</a>';
   }
 
   fetch(PORTAL + '/api/public/marquee', { headers: { Accept: 'application/json' } })
     .then(function (r) { if (!r.ok) throw new Error('http ' + r.status); return r.json(); })
     .then(function (d) {
-      renderHero(d.ballot, d.threshold || 25);
-      var rows = document.getElementById('teaser-rows');
-      if (Array.isArray(d.teaser) && d.teaser.length > 0) {
-        rows.innerHTML = d.teaser.map(rowHtml).join('');
-      } else {
-        rows.classList.add('hidden');
-      }
-      if (d.stats) {
-        document.getElementById('stat-run').textContent = fmt(d.stats.ballotsRun);
-        document.getElementById('stat-cast').textContent = fmt(d.stats.ballotsCast);
-        document.getElementById('stat-open').textContent = fmt(d.stats.openNow);
-        document.getElementById('stats').classList.remove('hidden');
+      var threshold = d.threshold || 25;
+      if (d.stats && typeof d.stats.ballotsCast === 'number') renderCounter(d.stats.ballotsCast);
+      var list = [];
+      if (d.ballot) list.push(d.ballot);
+      if (Array.isArray(d.teaser)) list = list.concat(d.teaser);
+      var seen = {};
+      list = list.filter(function (r) {
+        if (!r || !r.id || seen[r.id]) return false;
+        seen[r.id] = true;
+        return true;
+      }).slice(0, 3);
+      if (list.length > 0) {
+        document.getElementById('rows').innerHTML = list.map(function (r) { return rowHtml(r, threshold); }).join('');
+        document.getElementById('record').classList.remove('hidden');
       }
     })
-    .catch(function () {
-      heroFallback();
-      document.getElementById('teaser-rows').classList.add('hidden');
-    });
+    .catch(function () { /* sections stay hidden — never fake numbers */ });
 })();
 </script>
 </body>
