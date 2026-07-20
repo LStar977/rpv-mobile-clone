@@ -159,6 +159,21 @@ const BASE_CSS = `
     color-scheme:light;
   }
 }
+/* Explicit choice (header toggle, stored in localStorage) beats the system theme */
+:root[data-theme="dark"]{
+  --bg:#040707;--sf:#141818;--sfh:#202626;
+  --bd:rgba(244,245,246,.08);--bds:rgba(244,245,246,.05);
+  --tx:#F4F5F6;--tx2:#B8BABB;--tx3:#7A7D7E;
+  --gd:#EABA58;--gdt:#EABA58;--sup:#34D399;--opp:#F87171;
+  color-scheme:dark;
+}
+:root[data-theme="light"]{
+  --bg:#FAF8F5;--sf:#FFFDF9;--sfh:#F0EBE2;
+  --bd:rgba(24,21,16,.10);--bds:rgba(24,21,16,.07);
+  --tx:#181510;--tx2:#57534A;--tx3:#8B8578;
+  --gd:#EABA58;--gdt:#C99A38;--sup:#0E9F6E;--opp:#DC2626;
+  color-scheme:light;
+}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--tx);font-family:'Onest',-apple-system,system-ui,sans-serif;line-height:1.5}
 a{color:inherit;text-decoration:none}
@@ -178,6 +193,15 @@ a{color:inherit;text-decoration:none}
 .hdr-nav a.on{font-weight:600;color:var(--tx)}
 .hdr-nav a.cta{font-weight:600;font-size:13.5px;color:var(--tx);border:1px solid var(--bd);padding:11px 22px;border-radius:100px}
 @media (max-width:760px){.hdr-nav a:not(.cta){display:none}}
+.theme-btn{cursor:pointer;background:none;border:1px solid var(--bd);border-radius:100px;padding:10px 16px;font-family:'JetBrains Mono',monospace;font-weight:600;font-size:10.5px;letter-spacing:.14em;color:var(--tx3)}
+.theme-btn:hover{color:var(--gdt);border-color:rgba(234,186,88,.4)}
+.theme-btn .to-light{display:inline}
+.theme-btn .to-dark{display:none}
+@media (prefers-color-scheme: light){.theme-btn .to-light{display:none}.theme-btn .to-dark{display:inline}}
+:root[data-theme="dark"] .theme-btn .to-light{display:inline}
+:root[data-theme="dark"] .theme-btn .to-dark{display:none}
+:root[data-theme="light"] .theme-btn .to-light{display:none}
+:root[data-theme="light"] .theme-btn .to-dark{display:inline}
 
 /* hero */
 .hero{padding-top:56px;padding-bottom:38px;border-bottom:1px solid var(--bds);display:flex;flex-direction:column;gap:18px}
@@ -259,6 +283,11 @@ a{color:inherit;text-decoration:none}
 .chip{font-weight:600;font-size:10.5px;letter-spacing:.12em;color:var(--tx3);background:var(--sfh);padding:7px 14px;border-radius:100px}
 .chip.cat-blue{color:#60A5FA;background:rgba(96,165,250,.09);border:1px solid rgba(96,165,250,.25)}
 .chip.cat-amber{color:#FBBF24;background:rgba(251,191,36,.07);border:1px solid rgba(251,191,36,.25)}
+@media (prefers-color-scheme: light){.chip.cat-blue{color:#2563EB}.chip.cat-amber{color:#B45309}}
+:root[data-theme="dark"] .chip.cat-blue{color:#60A5FA}
+:root[data-theme="dark"] .chip.cat-amber{color:#FBBF24}
+:root[data-theme="light"] .chip.cat-blue{color:#2563EB}
+:root[data-theme="light"] .chip.cat-amber{color:#B45309}
 .chip-note{font-family:'JetBrains Mono',monospace;font-weight:500;font-size:11px;color:var(--tx3);margin-left:6px}
 .perma .desc{font-size:16.5px;line-height:1.7;color:var(--tx2);max-width:820px;white-space:pre-line}
 .module{background:var(--sf);border:1px solid var(--bds);border-radius:20px;padding:28px 32px;display:flex;flex-direction:column;gap:14px}
@@ -943,6 +972,7 @@ function pageShell(opts: {
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Newsreader:opsz,wght@6..72,400;6..72,500&family=Onest:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script>(function(){try{var t=localStorage.getItem("pr_theme");if(t==="light"||t==="dark")document.documentElement.setAttribute("data-theme",t);}catch(e){}})();</script>
 ${opts.extraHead || ""}
 <style>${BASE_CSS}</style>
 </head>
@@ -953,6 +983,7 @@ ${opts.extraHead || ""}
     <nav class="hdr-nav">
       <a href="/record" class="${opts.activeNav === "record" ? "on" : ""}">Record</a>
       <a href="/record#how">How counting works</a>
+      <button class="theme-btn" id="theme-toggle" type="button" aria-label="Switch theme"><span class="to-light">LIGHT</span><span class="to-dark">DARK</span></button>
       <a class="cta" href="${APP_STORE_URL}">Get the app</a>
     </nav>
   </header>
@@ -963,6 +994,19 @@ ${opts.extraHead || ""}
     <span class="mark">REPRESENT · ${new Date().getFullYear()}</span>
   </footer>
 </div>
+<script>(function(){
+  var b=document.getElementById("theme-toggle");
+  if(!b)return;
+  b.addEventListener("click",function(){
+    var cur=document.documentElement.getAttribute("data-theme");
+    if(cur!=="light"&&cur!=="dark"){
+      cur=(window.matchMedia&&window.matchMedia("(prefers-color-scheme: light)").matches)?"light":"dark";
+    }
+    var next=cur==="light"?"dark":"light";
+    document.documentElement.setAttribute("data-theme",next);
+    try{localStorage.setItem("pr_theme",next)}catch(e){}
+  });
+})();</script>
 </body>
 </html>`;
 }
