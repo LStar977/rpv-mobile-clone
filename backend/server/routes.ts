@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage-db";
-import { baseNetwork } from "./base-network";
+import { baseNetwork, BASE_CONFIG } from "./base-network";
 import { log } from "./app";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { setupBadgeRoutes } from "./badge-routes";
@@ -729,8 +729,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json({
         address: wallet.address,
-        network: 'Base Sepolia',
-        chainId: 84532,
+        network: BASE_CONFIG.chainName,
+        chainId: BASE_CONFIG.chainId,
         rpvBalance,
         deployedAt: wallet.deployedAt,
       });

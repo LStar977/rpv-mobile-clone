@@ -393,7 +393,7 @@ export class BaseNetworkManager {
         maxFeePerGas: feeData.maxFeePerGas,
         maxPriorityFeePerGas: feeData.maxPriorityFeePerGas,
         nonce: nonce,
-        chainId: 84532, // Base Sepolia
+        chainId: BASE_CONFIG.chainId,
       };
 
       // Sign transaction with user's private key
