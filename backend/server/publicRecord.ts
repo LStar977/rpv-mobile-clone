@@ -316,6 +316,24 @@ a{color:inherit;text-decoration:none}
 .how-card .t{font-weight:600;font-size:14px;margin-bottom:6px}
 .how-card .b{font-size:13px;line-height:1.6;color:var(--tx2)}
 
+/* methodology */
+.meth-link{display:inline-block;margin-top:26px;font-family:'JetBrains Mono',monospace;font-weight:500;font-size:12px;letter-spacing:.14em;color:var(--gdt);border-bottom:1px solid rgba(234,186,88,.4);padding-bottom:4px}
+.meth{padding-top:34px;padding-bottom:10px;max-width:860px}
+.meth h2{margin:0 0 14px;font-weight:500;font-size:26px}
+.meth p{font-size:15.5px;line-height:1.65;color:var(--tx2);margin:0 0 14px}
+.meth p b{color:var(--tx)}
+.meth-table{width:100%;border-collapse:collapse;margin:6px 0 16px;font-size:12.5px}
+.meth-table td{border-top:1px solid var(--bds);padding:10px 14px 10px 0;vertical-align:top;word-break:break-all}
+.meth-table td:first-child{width:120px;color:var(--tx3);letter-spacing:.12em;font-weight:600;white-space:nowrap}
+.meth-code{background:var(--sf);border:1px solid var(--bds);border-radius:12px;padding:16px 18px;font-size:12.5px;line-height:1.7;margin:6px 0 16px;overflow-x:auto;color:var(--tx)}
+.meth-addr{color:var(--gdt);word-break:break-all}
+.meth-note{border-left:2px solid var(--gdt);padding:4px 0 4px 18px;margin:18px 0 6px}
+.meth-note p{margin:8px 0 0;font-size:14px}
+.meth-steps{margin:0 0 14px;padding-left:22px;display:flex;flex-direction:column;gap:10px;font-size:15.5px;line-height:1.6;color:var(--tx2)}
+.meth-limits{margin:0 0 14px;padding-left:22px;display:flex;flex-direction:column;gap:10px;font-size:15px;line-height:1.6;color:var(--tx2)}
+.meth-limits b,.meth-steps b{color:var(--tx)}
+.meth-small{font-size:13px;color:var(--tx3)}
+
 /* footer */
 .ftr{margin-top:40px;padding-top:26px;padding-bottom:34px;border-top:1px solid var(--bds);display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap}
 .ftr .note{font-size:12.5px;color:var(--tx3)}
@@ -1081,7 +1099,100 @@ function howSectionHtml(): string {
       <div class="how-card"><div class="t">One person, one ballot</div><div class="b">Every number on this site is one verified person. Ballots are recorded on a public, tamper-evident ledger anyone can audit.</div></div>
       <div class="how-card"><div class="t">The ${TALLY_THRESHOLD}-ballot threshold</div><div class="b">A split is only published once ${TALLY_THRESHOLD} verified ballots are cast — early votes stay uninfluenced. Below the threshold, only the count is shown. Ever.</div></div>
     </div>
+    <a class="meth-link mono" href="/record/methodology">READ THE FULL METHODOLOGY — RECOUNT A BALLOT YOURSELF ↗</a>
   </section>`;
+}
+
+// ── /record/methodology ──────────────────────────────────────────────────────
+// The full audit guide: what gets written to the chain, how position
+// addresses are derived, and how anyone can recount a ballot with no
+// account. Network facts come from env so the page flips automatically
+// when BASE_NETWORK=mainnet is set.
+
+function methodologyPageHtml(): string {
+  const isMainnet = process.env.BASE_NETWORK === "mainnet";
+  const chainName = isMainnet ? "Base Mainnet" : "Base Sepolia";
+  const explorer = isMainnet ? "https://basescan.org" : "https://sepolia.basescan.org";
+  const rpv = process.env.RPV_TOKEN_ADDRESS || "";
+  const rpvLink = rpv
+    ? `<a class="meth-addr" href="${explorer}/token/${rpv}" rel="noopener">${rpv}</a>`
+    : `<span class="meth-addr">published at launch</span>`;
+
+  // Worked example: Alberta Shadow Referendum Q1 (fixed ballot id). The
+  // addresses below are precomputed from the formula in this page and can
+  // be re-derived by anyone.
+  const exId = "65bc4f40-ed16-4a0e-8851-9b8903f9ec14";
+  const exSupport = "0xe14B064E3AaBB2dbf910897F3714731D982BAf7f";
+  const exOppose = "0x90Cdc7C7F432a28330055f4eEA8016E54e7eB665";
+
+  const testnetNote = isMainnet ? "" : `
+      <div class="meth-note">
+        <span class="mono" style="font-weight:600;letter-spacing:.14em;color:var(--gdt)">PILOT PHASE</span>
+        <p>The ledger currently runs on Base Sepolia, a public test network — gas is free while we grow. The mathematics on this page are identical on Base Mainnet, and the move is planned. Vote counts on this site are authoritative regardless of network.</p>
+      </div>`;
+
+  const body = `
+  <section class="hero pad">
+    <span class="crumb"><a href="/record">RECORD</a> / METHODOLOGY</span>
+    <h1 class="serif">Don&#39;t trust us. Audit us.</h1>
+    <p class="lede">This page explains exactly what Represent writes to the public ledger and how to recount any ballot yourself — no account, no app, no permission needed.</p>
+  </section>
+
+  <section class="meth pad">
+    <h2 class="serif">1 · What gets recorded</h2>
+    <p>Every vote on a public ballot is a transfer of exactly <b>1 RPV token</b> from the voter&#39;s wallet to a <b>position address</b> — a unique address that stands for &ldquo;support&rdquo; or &ldquo;oppose&rdquo; on that specific ballot. Nobody holds the keys to a position address; tokens sent there are votes, permanently.</p>
+    <table class="meth-table mono">
+      <tr><td>LEDGER</td><td>${chainName} — a public Ethereum network</td></tr>
+      <tr><td>VOTE TOKEN</td><td>Represent Vote Token (RPV) · ${rpvLink}</td></tr>
+      <tr><td>ONE VOTE</td><td>1 RPV transferred to a position address</td></tr>
+    </table>
+    ${testnetNote}
+  </section>
+
+  <section class="meth pad">
+    <h2 class="serif">2 · How position addresses are derived</h2>
+    <p>The position address for any ballot is pure arithmetic — no database, no server, no trust required:</p>
+    <div class="meth-code mono">address = last 20 bytes of keccak256( utf8( "&lt;ballot-id&gt;-support" ) )</div>
+    <p>The same rule with <span class="mono">-oppose</span> gives the oppose address. Anyone can run it — here it is in JavaScript with the ethers library:</p>
+    <div class="meth-code mono">const h = ethers.keccak256(ethers.toUtf8Bytes(ballotId + "-support"));<br>const supportAddress = ethers.getAddress("0x" + h.slice(-40));</div>
+    <p><b>Worked example.</b> Ballot <a href="/p/${exId}" class="meth-addr">${exId}</a> (&ldquo;Provincial control over immigration&rdquo;, Alberta Shadow Referendum Q1):</p>
+    <table class="meth-table mono">
+      <tr><td>SUPPORT</td><td><a class="meth-addr" href="${explorer}/address/${exSupport}" rel="noopener">${exSupport}</a></td></tr>
+      <tr><td>OPPOSE</td><td><a class="meth-addr" href="${explorer}/address/${exOppose}" rel="noopener">${exOppose}</a></td></tr>
+    </table>
+    <p>Run the formula yourself and you will get these exact addresses. If we ever published a different address for this ballot, the mismatch would be provable.</p>
+    <p class="meth-small">Multiple-choice ballots use the same idea with one address per option, derived from the ballot id, the option&#39;s index, and the relay wallet&#39;s public address via the standard ABI encoding <span class="mono">(ballotId, optionIndex, relayerAddress, "OPTION_VOTE")</span>.</p>
+  </section>
+
+  <section class="meth pad">
+    <h2 class="serif">3 · Recount a ballot yourself</h2>
+    <ol class="meth-steps">
+      <li>Derive the ballot&#39;s support and oppose addresses with the formula above (or start from the worked example).</li>
+      <li>Open the RPV token on the block explorer: <span class="mono">${explorer}/token/${rpv || "…"}</span> and go to the <b>Transfers</b> tab.</li>
+      <li>Filter transfers <b>to</b> the support address. Each transfer of 1 RPV is one verified ballot in support. Count them.</li>
+      <li>Repeat for the oppose address. Compare both counts to the tally published on this site.</li>
+    </ol>
+    <p>Every transfer carries a timestamp and a transaction hash — the vote&#39;s permanent receipt. Changing or deleting a past entry is not possible on the network; that is what &ldquo;tamper-evident&rdquo; means here.</p>
+  </section>
+
+  <section class="meth pad">
+    <h2 class="serif">4 · What this proves — and what it doesn&#39;t</h2>
+    <p><b>It proves:</b> every recorded ballot is permanent, timestamped, and independently countable by anyone. No one — including us — can quietly alter a past vote, inflate a published split beyond what the chain supports, or delete history without the gap being visible.</p>
+    <p><b>Honest limits:</b></p>
+    <ul class="meth-limits">
+      <li><b>Wallets are app-managed.</b> Voters don&#39;t hold their own keys — a deliberate choice so nobody needs crypto knowledge to vote. The chain proves a vote is permanent and counted once; identity itself is enforced by government-ID verification, one verified person per account.</li>
+      <li><b>The site&#39;s tally is the authority.</b> Votes are recorded in our database first and written to the chain seconds later. A small number of chain writes can lag or fail; they are retried automatically, so the chain count can trail the live tally briefly.</li>
+      <li><b>Not everything is on-chain.</b> Organization ballots and ranked-choice ballots are recorded off-chain by design; demo-account votes never touch real tallies at all.</li>
+      <li><b>Wallets are pseudonymous, not anonymous.</b> No name is ever published. A wallet&#39;s votes are linkable to each other on-chain — but not to a person, unless that person links themselves.</li>
+    </ul>
+  </section>`;
+
+  return pageShell({
+    title: "Methodology — how to recount our ballots | Represent",
+    description: "Exactly what Represent writes to the public ledger, how position addresses are derived, and how anyone can recount any ballot with no account.",
+    canonical: `${SITE}/record/methodology`,
+    body,
+  });
 }
 
 function convertCardHtml(b: BallotVM | null, canWebVote = false): string {
@@ -1238,6 +1349,17 @@ export function registerPublicRecordRoutes(app: any, storage: any) {
     }
   });
 
+  // ── /record/methodology ─────────────────────────────────────────────────────
+  // Registered before /record/:regionSlug so "methodology" is never treated
+  // as a region name.
+  app.get("/record/methodology", (_req: any, res: any) => {
+    try {
+      send(res, methodologyPageHtml());
+    } catch (e) {
+      send(res, pageShell({ title: "Methodology — Represent", description: "How to recount our ballots.", canonical: `${SITE}/record/methodology`, body: `<div class="pad" style="padding-top:64px;padding-bottom:64px"><h1 class="serif">This page is briefly unavailable.</h1><p style="color:var(--tx3)">Try again in a moment.</p></div>` }), 500);
+    }
+  });
+
   // ── /record/sitemap.xml ─────────────────────────────────────────────────────
   app.get("/record/sitemap.xml", async (_req: any, res: any) => {
     try {
@@ -1245,6 +1367,7 @@ export function registerPublicRecordRoutes(app: any, storage: any) {
       const provinces = [...new Set(ballots.map((b) => b.province).filter(Boolean))];
       const urls = [
         `${SITE}/record`,
+        `${SITE}/record/methodology`,
         ...provinces.map((p) => `${SITE}/record/${slugify(p)}`),
         ...ballots.map((b) => `${SITE}/p/${encodeURIComponent(b.id)}`),
       ];

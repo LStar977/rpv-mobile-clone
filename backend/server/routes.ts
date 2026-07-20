@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage-db";
 import { baseNetwork, BASE_CONFIG } from "./base-network";
+import { startRelaySweeper } from "./relaySweeper";
 import { log } from "./app";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { setupBadgeRoutes } from "./badge-routes";
@@ -6293,10 +6294,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
     const failed = Object.entries(checks).filter(([, v]) => v !== "ok");
     if (failed.length > 0) {
-      return res.status(503).json({ status: "degraded", checks, network: "Base Sepolia" });
+      return res.status(503).json({ status: "degraded", checks, network: BASE_CONFIG.chainName });
     }
-    res.json({ status: "ok", checks, network: "Base Sepolia" });
+    res.json({ status: "ok", checks, network: BASE_CONFIG.chainName });
   });
+
+  // Reconcile chain ↔ database: recover or re-relay votes missing tx_hash.
+  startRelaySweeper();
 
   const httpServer = createServer(app);
 
