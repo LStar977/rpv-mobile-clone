@@ -219,6 +219,12 @@ export class DatabaseStorage implements IStorage {
     });
   }
 
+  // Backfills the on-chain tx hash after the fire-and-forget relay confirms.
+  // Safe because (userId, proposalId) is unique — one vote per person per ballot.
+  async updateVoteTxHash(userId: string, proposalId: string, txHash: string): Promise<void> {
+    await db.update(votes).set({ txHash }).where(and(eq(votes.userId, userId), eq(votes.proposalId, proposalId)));
+  }
+
   async getUserVotedProposals(userId: string): Promise<string[]> {
     const result = await db.select({ proposalId: votes.proposalId }).from(votes).where(eq(votes.userId, userId));
     return result.map(r => r.proposalId);
