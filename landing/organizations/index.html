@@ -1,0 +1,447 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Represent for Organizations — Every member decision, in one place</title>
+<meta name="description" content="Unions, student associations, leagues, and co-ops run elections, ratifications, polls, and surveys on verified ballots — unlimited questions, instant results, advanced analytics, and sub-groups for every chapter.">
+<meta property="og:title" content="Represent for Organizations">
+<meta property="og:description" content="Elections, ratifications, polls, and surveys on verified ballots — unlimited questions, instant results, advanced analytics.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://representvote.com/organizations">
+<link rel="icon" href="../assets/logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400;1,6..72,500&family=Onest:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ── National Ledger family · /organizations ─────────────────────── */
+:root{
+  --bg:#FAF8F5;--elev:#FFFDF9;--rec:#F5F2ED;--hi:#F0EBE2;
+  --ink:#181510;--t2:#57534A;--t3:#8B8578;
+  --bd:rgba(24,21,16,.12);--bds:rgba(24,21,16,.07);
+  --gd:#EABA58;--gdt:#C99A38;--sup:#0E9F6E;--opp:#DC2626;
+  color-scheme:light;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font-family:'Onest',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+a{text-decoration:none;color:inherit}
+.serif{font-family:'Newsreader',Georgia,serif}
+.mono{font-family:'JetBrains Mono',ui-monospace,monospace}
+.wrap{max-width:1440px;margin:0 auto}
+.pad{padding-left:72px;padding-right:72px}
+@media(max-width:900px){.pad{padding-left:26px;padding-right:26px}}
+
+/* Masthead */
+.mast{border-bottom:3px double var(--bd)}
+.mast-in{display:flex;align-items:center;justify-content:space-between;height:110px;gap:24px}
+.mast-nav{display:flex;align-items:center;gap:26px;flex:1;min-width:0}
+.mast-nav.right{justify-content:flex-end}
+.mast-nav a,.mast-nav span{font-family:'JetBrains Mono',monospace;font-weight:500;font-size:12px;letter-spacing:.14em;color:var(--t3);white-space:nowrap}
+.mast-nav a:hover{color:var(--gdt)}
+.mast-nav .on{color:var(--gdt)}
+.wordmark{font-weight:600;font-size:22px;letter-spacing:.52em;margin-right:-.52em;color:var(--ink);white-space:nowrap}
+@media(max-width:960px){
+  .mast-in{flex-direction:column;justify-content:center;gap:9px;height:auto;padding-top:18px;padding-bottom:16px}
+  .wordmark{font-size:15px;letter-spacing:.46em;margin-right:-.46em;order:-1}
+  .mast-nav,.mast-nav.right{flex:none;justify-content:center;flex-wrap:wrap;gap:8px 18px;width:100%}
+  .mast-nav a,.mast-nav span{font-size:9.5px;letter-spacing:.12em}
+}
+
+/* Hero */
+.hero{position:relative;overflow:hidden;border-bottom:1px solid var(--bd)}
+.hero-ring1{position:absolute;top:-160px;right:-300px;width:840px;height:840px;border-radius:50%;border:1.5px solid rgba(201,154,56,.4);pointer-events:none}
+.hero-ring2{position:absolute;top:-80px;right:-220px;width:680px;height:680px;border-radius:50%;border:1px solid rgba(201,154,56,.22);pointer-events:none}
+.hero-in{position:relative;display:flex;flex-direction:column;gap:36px;padding-top:100px;padding-bottom:100px;max-width:1060px}
+.hero .eyebrow{font-family:'JetBrains Mono',monospace;font-weight:600;font-size:14px;letter-spacing:.34em;color:var(--gdt)}
+.hero h1{font-family:'Newsreader',Georgia,serif;font-weight:500;font-size:clamp(44px,7vw,100px);line-height:1.06;letter-spacing:-.02em;color:var(--ink)}
+.hero h1 em{font-style:italic;font-weight:400}
+.hero .sub{font-size:clamp(15px,1.9vw,22px);line-height:1.55;color:var(--t2);max-width:660px}
+.hero .cta-row{display:flex;align-items:center;gap:34px;flex-wrap:wrap}
+.gold-btn{display:inline-flex;align-items:center;justify-content:center;height:62px;padding:0 48px;border-radius:100px;background:var(--gd);color:#181510;font-weight:600;font-size:19px;box-shadow:0 14px 40px rgba(201,154,56,.3);transition:transform .15s ease}
+.gold-btn:hover{transform:translateY(-1px)}
+.cta-note{font-family:'JetBrains Mono',monospace;font-weight:500;font-size:13px;letter-spacing:.14em;color:var(--t3)}
+@media(max-width:900px){
+  .hero-ring1{top:-100px;right:-180px;width:420px;height:420px}
+  .hero-ring2{display:none}
+  .hero-in{gap:22px;padding-top:56px;padding-bottom:60px}
+  .hero .eyebrow{font-size:9.5px;letter-spacing:.22em}
+  .hero .cta-row{flex-direction:column;align-items:stretch;gap:13px}
+  .gold-btn{height:54px;padding:0;width:100%;font-size:16px}
+  .cta-note{text-align:center;font-size:9.5px;letter-spacing:.14em}
+}
+
+/* Feature grid — the toolkit */
+.tools{border-bottom:1px solid var(--bd);background:var(--elev)}
+.tools-in{padding-top:90px;padding-bottom:90px;display:flex;flex-direction:column;gap:48px}
+.tools .head{display:flex;flex-direction:column;gap:14px}
+.tools .eyebrow{font-family:'JetBrains Mono',monospace;font-weight:600;font-size:13px;letter-spacing:.24em;color:var(--gdt)}
+.tools h2{font-family:'Newsreader',Georgia,serif;font-weight:500;font-size:clamp(26px,3.2vw,44px);color:var(--ink)}
+.tool-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:28px}
+.tool{background:var(--bg);border:1px solid var(--bd);border-radius:18px;padding:32px;display:flex;flex-direction:column;gap:13px}
+.tool .k{font-family:'JetBrains Mono',monospace;font-weight:600;font-size:12px;letter-spacing:.18em;color:var(--gdt)}
+.tool .t{font-family:'Newsreader',Georgia,serif;font-weight:500;font-size:24px;color:var(--ink)}
+.tool .b{font-size:15px;line-height:1.6;color:var(--t2)}
+@media(max-width:900px){
+  .tools-in{padding-top:52px;padding-bottom:52px;gap:24px}
+  .tools .eyebrow{font-size:10px;letter-spacing:.2em}
+  .tool-grid{grid-template-columns:1fr;gap:12px}
+  .tool{border-radius:14px;padding:20px;gap:7px}
+  .tool .k{font-size:10px;letter-spacing:.14em}
+  .tool .t{font-size:18px}
+  .tool .b{font-size:13px;line-height:1.55}
+}
+
+/* Who it's for */
+.who{border-bottom:1px solid var(--bd)}
+.who-in{padding-top:90px;padding-bottom:90px;display:flex;flex-direction:column;gap:48px}
+.who h2{font-family:'Newsreader',Georgia,serif;font-weight:500;font-size:clamp(26px,3.2vw,44px);color:var(--ink)}
+.who-grid{display:grid;grid-template-columns:1fr 1fr 1fr 1fr}
+.who-col{padding:0 40px;border-right:1px solid var(--bds);display:flex;flex-direction:column;gap:13px}
+.who-col:first-child{padding-left:0}
+.who-col:last-child{border-right:none;padding-right:0}
+.who-col .k{font-family:'JetBrains Mono',monospace;font-weight:600;font-size:12.5px;letter-spacing:.2em;color:var(--gdt)}
+.who-col .t{font-family:'Newsreader',Georgia,serif;font-weight:500;font-size:23px;line-height:1.25;color:var(--ink)}
+.who-col .b{font-size:15px;line-height:1.6;color:var(--t2)}
+@media(max-width:900px){
+  .who-in{padding-top:52px;padding-bottom:52px;gap:22px}
+  .who-grid{grid-template-columns:1fr 1fr;gap:16px}
+  .who-col{padding:14px 0 0;border-right:none;border-top:2px solid var(--bd);gap:6px}
+  .who-col .k{font-size:9px;letter-spacing:.16em}
+  .who-col .t{font-size:17px}
+  .who-col .b{font-size:12.5px;line-height:1.5}
+}
+
+/* Membership modes */
+.member{border-bottom:1px solid var(--bd);background:var(--elev)}
+.member-in{padding-top:90px;padding-bottom:90px;display:flex;flex-direction:column;gap:48px}
+.member .head{display:flex;flex-direction:column;gap:14px}
+.member .eyebrow{font-family:'JetBrains Mono',monospace;font-weight:600;font-size:13px;letter-spacing:.24em;color:var(--gdt)}
+.member h2{font-family:'Newsreader',Georgia,serif;font-weight:500;font-size:clamp(26px,3.2vw,44px);color:var(--ink)}
+.member-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:36px}
+.mcard{background:var(--bg);border:1px solid var(--bd);border-radius:18px;padding:32px;display:flex;flex-direction:column;gap:15px}
+.mcard .k{font-family:'JetBrains Mono',monospace;font-weight:500;font-size:12.5px;letter-spacing:.16em;color:var(--t3)}
+.mcard .t{font-family:'Newsreader',Georgia,serif;font-weight:500;font-size:25px;color:var(--ink)}
+.mcard .b{font-size:15.5px;line-height:1.6;color:var(--t2)}
+.member .note{font-family:'JetBrains Mono',monospace;font-weight:500;font-size:12.5px;letter-spacing:.16em;color:var(--t3);line-height:1.8}
+@media(max-width:900px){
+  .member-in{padding-top:52px;padding-bottom:52px;gap:22px}
+  .member .eyebrow{font-size:10px;letter-spacing:.2em}
+  .member-grid{grid-template-columns:1fr;gap:12px}
+  .mcard{border-radius:14px;padding:20px;gap:7px}
+  .mcard .t{font-size:18px}
+  .mcard .b{font-size:13px;line-height:1.55}
+  .member .note{font-size:9.5px;letter-spacing:.12em}
+}
+
+/* Example ratification */
+.example{border-bottom:1px solid var(--bd)}
+.example-in{padding-top:80px;padding-bottom:80px;display:flex;align-items:center;gap:80px}
+.example .copy{flex:1;display:flex;flex-direction:column;gap:20px}
+.example .eyebrow{font-family:'JetBrains Mono',monospace;font-weight:600;font-size:13px;letter-spacing:.24em;color:var(--gdt)}
+.example h2{font-family:'Newsreader',Georgia,serif;font-weight:500;font-size:clamp(26px,3vw,40px);line-height:1.2;color:var(--ink)}
+.example .b{font-size:16.5px;line-height:1.65;color:var(--t2);max-width:540px}
+.ex-card{flex:none;width:460px;background:var(--elev);border:1px solid var(--bd);border-radius:18px;padding:36px;display:flex;flex-direction:column;gap:18px;font-feature-settings:'tnum' 1}
+.ex-card .top{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.ex-card .who-l{font-family:'JetBrains Mono',monospace;font-weight:600;font-size:11px;letter-spacing:.14em;color:var(--t3)}
+.ex-card .pill{font-family:'JetBrains Mono',monospace;font-weight:600;font-size:11px;color:var(--sup);background:rgba(14,159,110,.1);padding:6px 14px;border-radius:100px}
+.ex-card .q{font-family:'Newsreader',Georgia,serif;font-weight:500;font-size:23px;line-height:1.3;color:var(--ink)}
+.ex-card .bar{height:9px;border-radius:5px;background:var(--opp);overflow:hidden}
+.ex-card .bar .fill{height:100%;background:var(--sup)}
+.ex-card .split{display:flex;justify-content:space-between;font-family:'JetBrains Mono',monospace;font-weight:500;font-size:11.5px}
+.ex-card .split .s{color:var(--sup)}.ex-card .split .o{color:var(--opp)}
+.ex-card .rule{height:1px;background:var(--bds)}
+.ex-card .foot{display:flex;justify-content:space-between;gap:10px;font-family:'JetBrains Mono',monospace;font-weight:500;font-size:11px;color:var(--t3);flex-wrap:wrap}
+.ex-card .sample{font-family:'JetBrains Mono',monospace;font-weight:500;font-size:9.5px;letter-spacing:.14em;color:var(--t3)}
+@media(max-width:1000px){
+  .example-in{flex-direction:column;align-items:stretch;gap:20px;padding-top:52px;padding-bottom:52px}
+  .example .eyebrow{font-size:10px;letter-spacing:.2em}
+  .example .b{font-size:13.5px;line-height:1.6}
+  .ex-card{width:100%;border-radius:14px;padding:20px;gap:12px}
+  .ex-card .q{font-size:16px}
+}
+
+/* Pricing */
+.pricing{border-bottom:1px solid var(--bd);background:var(--elev)}
+.pricing-in{padding-top:90px;padding-bottom:90px;display:flex;flex-direction:column;gap:48px}
+.pricing h2{font-family:'Newsreader',Georgia,serif;font-weight:500;font-size:clamp(26px,3.2vw,44px);color:var(--ink)}
+.price-grid{display:grid;grid-template-columns:1fr 1fr 1fr 1fr}
+.plan{padding:0 40px;border-right:1px solid var(--bds);display:flex;flex-direction:column;gap:16px}
+.plan:first-child{padding-left:0}
+.plan:last-child{border-right:none;padding-right:0}
+.plan .k{font-family:'JetBrains Mono',monospace;font-weight:600;font-size:12.5px;letter-spacing:.2em;color:var(--t3)}
+.plan .k.gold{color:var(--gdt)}
+.plan .p{font-family:'JetBrains Mono',monospace;font-weight:500;font-size:44px;color:var(--ink)}
+.plan .p small{font-family:'Onest',sans-serif;font-weight:400;font-size:16px;color:var(--t3)}
+.plan .seats{font-weight:500;font-size:16px;color:var(--ink)}
+.plan .b{font-size:14.5px;line-height:1.6;color:var(--t2)}
+.pricing .note{font-family:'JetBrains Mono',monospace;font-weight:500;font-size:12.5px;letter-spacing:.14em;color:var(--t3);line-height:1.9}
+.pricing .note a{color:var(--gdt);border-bottom:1px solid rgba(201,154,56,.4);padding-bottom:2px}
+@media(max-width:1000px){
+  .pricing-in{padding-top:52px;padding-bottom:52px;gap:20px}
+  .price-grid{grid-template-columns:1fr;gap:0}
+  .plan{flex-direction:row;align-items:baseline;justify-content:space-between;gap:14px;padding:18px 0;border-right:none;border-top:1px solid var(--bds);flex-wrap:wrap}
+  .plan:first-child{border-top:1px solid var(--bd);padding-left:0}
+  .plan:last-child{border-bottom:1px solid var(--bd)}
+  .plan .left{display:flex;flex-direction:column;gap:3px}
+  .plan .k{font-size:9.5px;letter-spacing:.16em}
+  .plan .p{font-size:26px}
+  .plan .p small{font-size:12px}
+  .plan .seats{font-size:14px}
+  .plan .b{font-size:12px;line-height:1.5;width:100%}
+  .pricing .note{font-size:9px;letter-spacing:.1em}
+}
+@media(min-width:1001px){.plan .left{display:flex;flex-direction:column;gap:16px}}
+
+/* Final CTA */
+.close{position:relative;overflow:hidden}
+.close-in{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:38px;padding-top:120px;padding-bottom:120px;text-align:center}
+.close .glow{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:1100px;height:1100px;border-radius:50%;background:radial-gradient(circle,rgba(201,154,56,.1) 0%,transparent 62%);pointer-events:none}
+.close h2{position:relative;font-family:'Newsreader',Georgia,serif;font-weight:500;font-size:clamp(30px,4.6vw,60px);line-height:1.16;letter-spacing:-.016em;color:var(--ink);max-width:820px;text-wrap:balance}
+.close .cta-col{position:relative;display:flex;flex-direction:column;align-items:center;gap:16px;width:100%}
+@media(max-width:900px){
+  .close-in{gap:24px;padding-top:64px;padding-bottom:64px}
+  .close .gold-btn{width:100%;max-width:340px}
+}
+
+/* Footer */
+footer{border-top:3px double var(--bd)}
+.foot-in{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;padding:64px 26px}
+.foot-in .wordmark{font-size:16px}
+.foot-links{display:flex;flex-wrap:wrap;justify-content:center;gap:12px 36px;font-family:'JetBrains Mono',monospace;font-weight:500;font-size:12px;letter-spacing:.14em;color:var(--t3)}
+.foot-links a:hover{color:var(--gdt)}
+.foot-copy{font-family:'JetBrains Mono',monospace;font-weight:400;font-size:11.5px;color:var(--t3)}
+@media(max-width:900px){
+  .foot-in{gap:14px;padding:44px 26px}
+  .foot-in .wordmark{font-size:13px;letter-spacing:.44em;margin-right:-.44em}
+  .foot-links{gap:10px 20px;font-size:9.5px;letter-spacing:.12em}
+  .foot-copy{font-size:9.5px}
+}
+</style>
+</head>
+<body>
+
+<!-- MASTHEAD -->
+<header class="mast">
+  <div class="wrap pad mast-in">
+    <nav class="mast-nav">
+      <a href="/app">THE APP</a>
+      <span class="on">ORGANIZATIONS</span>
+      <a href="/alberta">ALBERTA</a>
+    </nav>
+    <a class="wordmark" href="/">REPRESENT</a>
+    <nav class="mast-nav right">
+      <a href="https://representportal.com/record">THE PUBLIC RECORD ↗</a>
+    </nav>
+  </div>
+</header>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-ring1"></div>
+  <div class="hero-ring2"></div>
+  <div class="wrap pad hero-in">
+    <span class="eyebrow mono">UNIONS · STUDENT ASSOCIATIONS · LEAGUES · CO-OPS</span>
+    <h1>Every member decision, <em>in one place.</em></h1>
+    <p class="sub">Elections, ratifications, polls, and surveys on verified ballots — unlimited questions, instant results, and analytics your board can act on.</p>
+    <div class="cta-row">
+      <a class="gold-btn" href="https://apps.apple.com/ca/app/id6756912022">Start your organization — free</a>
+      <span class="cta-note mono">FREE UP TO 25 MEMBERS · SET UP IN MINUTES</span>
+    </div>
+  </div>
+</section>
+
+<!-- THE TOOLKIT -->
+<section class="tools">
+  <div class="wrap pad tools-in">
+    <div class="head">
+      <span class="eyebrow mono">THE TOOLKIT</span>
+      <h2>Ask anything. Count everything.</h2>
+    </div>
+    <div class="tool-grid">
+      <div class="tool">
+        <span class="k mono">UNLIMITED BALLOTS</span>
+        <span class="t">Questions without limits.</span>
+        <span class="b">Elections, ratifications, polls, surveys, budget votes — yes/no, multiple-choice, or ranked-choice. Run as many as you need on every plan.</span>
+      </div>
+      <div class="tool">
+        <span class="k mono">INSTANT RESULTS</span>
+        <span class="t">Counted as it happens.</span>
+        <span class="b">Live tallies the moment ballots come in, final results the moment voting closes. No counting night, no spreadsheet, no waiting.</span>
+      </div>
+      <div class="tool">
+        <span class="k mono">ADVANCED ANALYTICS</span>
+        <span class="t">Turnout you can act on.</span>
+        <span class="b">Participation by ballot, turnout trends over time, engagement across your membership — exportable for board reports.</span>
+      </div>
+      <div class="tool">
+        <span class="k mono">SUB-GROUPS</span>
+        <span class="t">Chapters, locals, wards.</span>
+        <span class="b">Give each chapter or local its own ballots and its own results under one organization — one roster, many rooms.</span>
+      </div>
+      <div class="tool">
+        <span class="k mono">ROSTER CONTROL</span>
+        <span class="t">Your list decides who's in.</span>
+        <span class="b">Invite codes for small groups, CSV roster import for big ones — and optional identity verification so every voter is provably one real member.</span>
+      </div>
+      <div class="tool">
+        <span class="k mono">AUDIT EXPORT</span>
+        <span class="t">Proof for the skeptics.</span>
+        <span class="b">Export a tamper-evident log of every ballot with cryptographic receipts. When someone disputes the count, hand them the record.</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- WHO IT'S FOR -->
+<section class="who">
+  <div class="wrap pad who-in">
+    <h2>Built for groups that answer to their members.</h2>
+    <div class="who-grid">
+      <div class="who-col">
+        <span class="k mono">UNIONS</span>
+        <span class="t">Ratifications and strike votes.</span>
+        <span class="b">Contract votes with turnout no bargaining table can question — counted instantly, auditable by every member.</span>
+      </div>
+      <div class="who-col">
+        <span class="k mono">STUDENT ASSOCIATIONS</span>
+        <span class="t">Elections students believe.</span>
+        <span class="b">One student, one ballot — roster-matched, with live results the moment polls close.</span>
+      </div>
+      <div class="who-col">
+        <span class="k mono">LEAGUES &amp; BOARDS</span>
+        <span class="t">Decisions on the record.</span>
+        <span class="b">Budgets, facilities, and bylaws decided by member vote — polls to test the room, ballots to settle it.</span>
+      </div>
+      <div class="who-col">
+        <span class="k mono">CO-OPS</span>
+        <span class="t">Governance members can audit.</span>
+        <span class="b">Every resolution and every count open to every member-owner, forever.</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- MEMBERSHIP -->
+<section class="member">
+  <div class="wrap pad member-in">
+    <div class="head">
+      <span class="eyebrow mono">MEMBERSHIP, VERIFIED</span>
+      <h2>You decide who gets in. We prove they're real.</h2>
+    </div>
+    <div class="member-grid">
+      <div class="mcard">
+        <span class="k mono">INVITE ONLY</span>
+        <span class="t">A code you share</span>
+        <span class="b">Members join with an invite link. Best for leagues and boards.</span>
+      </div>
+      <div class="mcard">
+        <span class="k mono">ROSTER MATCH</span>
+        <span class="t">Your member list</span>
+        <span class="b">Upload a roster — only people on it can join. Best for unions and student bodies.</span>
+      </div>
+      <div class="mcard">
+        <span class="k mono">OPEN TO A REGION</span>
+        <span class="t">Verified residents</span>
+        <span class="b">Any verified resident of a region you choose. Best for community groups.</span>
+      </div>
+    </div>
+    <span class="note mono">EVERY MEMBER VERIFIES THEIR OWN IDENTITY · MEMBERS NEVER PAY TO VOTE</span>
+  </div>
+</section>
+
+<!-- EXAMPLE -->
+<section class="example">
+  <div class="wrap pad example-in">
+    <div class="copy">
+      <span class="eyebrow mono">HOW IT LOOKS</span>
+      <h2>A ratification, counted in public.</h2>
+      <span class="b">When a union ratifies an agreement on Represent, every eligible member gets the ballot, the tally runs live, and any member can audit the final count. A challenge doesn't start an argument — the record answers it.</span>
+    </div>
+    <div class="ex-card">
+      <div class="top"><span class="who-l mono">A RATIFICATION VOTE</span><span class="pill mono">RATIFIED</span></div>
+      <span class="q">Accept the 2026–29 collective agreement?</span>
+      <div style="display:flex;flex-direction:column;gap:9px">
+        <div class="bar"><div class="fill" style="width:71%"></div></div>
+        <div class="split mono"><span class="s">YES 71%</span><span class="o">NO 29%</span></div>
+      </div>
+      <div class="rule"></div>
+      <div class="foot mono"><span>TURNOUT PROVABLE TO THE PERCENT</span><span>AUDITABLE BY EVERY MEMBER</span></div>
+      <span class="sample mono">ILLUSTRATION — YOUR ORG'S BALLOT HERE</span>
+    </div>
+  </div>
+</section>
+
+<!-- PRICING -->
+<section class="pricing">
+  <div class="wrap pad pricing-in">
+    <h2>Plain pricing. Members never pay.</h2>
+    <div class="price-grid">
+      <div class="plan">
+        <div class="left">
+          <span class="k mono">FREE</span>
+          <span class="p mono">$0</span>
+          <span class="seats">Up to 25 members</span>
+        </div>
+        <span class="b">Unlimited ballots — yes/no, multiple-choice, ranked-choice — and invite codes. Free for as long as you're small.</span>
+      </div>
+      <div class="plan">
+        <div class="left">
+          <span class="k mono">PRO</span>
+          <span class="p mono">$59<small>/mo</small></span>
+          <span class="seats">Up to 250 members</span>
+        </div>
+        <span class="b">CSV roster import, advanced analytics, API access, and optional member identity verification.</span>
+      </div>
+      <div class="plan">
+        <div class="left">
+          <span class="k mono gold">PLUS</span>
+          <span class="p mono">$179<small>/mo</small></span>
+          <span class="seats">Up to 1,000 members</span>
+        </div>
+        <span class="b">Everything in Pro, plus sub-groups for chapters and locals, SSO, and tamper-evident audit export.</span>
+      </div>
+      <div class="plan">
+        <div class="left">
+          <span class="k mono">BUSINESS</span>
+          <span class="p mono">$499<small>/mo</small></span>
+          <span class="seats">Up to 5,000 members</span>
+        </div>
+        <span class="b">Everything in Plus, with white-label branding, custom domain, and dedicated onboarding.</span>
+      </div>
+    </div>
+    <span class="note mono">MEMBERS NEVER PAY TO VOTE · NO ADS · NO DATA SALES<br>GOVERNMENT &amp; LARGER ORGANIZATIONS — <a href="mailto:sales@representvote.com?subject=Represent%20for%20our%20organization">CONTACT SALES</a></span>
+  </div>
+</section>
+
+<!-- FINAL CTA -->
+<section class="close">
+  <div class="glow"></div>
+  <div class="pad close-in">
+    <h2>Put it to a vote.</h2>
+    <div class="cta-col">
+      <a class="gold-btn" href="https://apps.apple.com/ca/app/id6756912022">Start your organization — free</a>
+      <span class="cta-note mono">FOUNDED IN THE APP · FREE UP TO 25 MEMBERS</span>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="foot-in">
+    <a class="wordmark" href="/">REPRESENT</a>
+    <div class="foot-links">
+      <a href="https://representportal.com/record">THE RECORD</a>
+      <a href="https://representportal.com/record#how">HOW COUNTING WORKS</a>
+      <a href="/app">THE APP</a>
+      <a href="/alberta">ALBERTA REFERENDUM</a>
+      <a href="https://representportal.com/privacy">PRIVACY</a>
+      <a href="https://representportal.com/terms">TERMS</a>
+      <a href="mailto:support@representvote.com">CONTACT</a>
+    </div>
+    <span class="foot-copy">© <span id="yr"></span> REPRESENT · CALGARY, CANADA</span>
+  </div>
+</footer>
+
+<script>document.getElementById('yr').textContent = String(new Date().getFullYear());</script>
+</body>
+</html>

@@ -33,16 +33,22 @@ a{text-decoration:none;color:inherit}
 
 /* Masthead */
 .mast{border-bottom:3px double var(--bd)}
-.mast-in{display:flex;align-items:center;justify-content:space-between;height:110px}
+.mast-in{display:flex;align-items:center;justify-content:space-between;height:110px;gap:24px}
 .mast .side{font-family:'JetBrains Mono',monospace;font-weight:500;font-size:12px;letter-spacing:.18em;color:var(--t3)}
 .mast .side:hover{color:var(--gdt)}
 .mast .side.gold{color:var(--gdt)}
-.wordmark{font-weight:600;font-size:22px;letter-spacing:.52em;margin-right:-.52em;color:var(--ink)}
-@media(max-width:900px){
-  .mast-in{flex-direction:column;justify-content:center;gap:6px;height:90px}
-  .mast .side.left{display:none}
-  .wordmark{font-size:15px;letter-spacing:.46em;margin-right:-.46em}
+.mast-nav{display:flex;align-items:center;gap:26px;flex:1;min-width:0}
+.mast-nav.right{justify-content:flex-end}
+.mast-nav a,.mast-nav span{font-family:'JetBrains Mono',monospace;font-weight:500;font-size:12px;letter-spacing:.14em;color:var(--t3);white-space:nowrap}
+.mast-nav a:hover{color:var(--gdt)}
+.mast-nav .on{color:var(--gdt)}
+.wordmark{font-weight:600;font-size:22px;letter-spacing:.52em;margin-right:-.52em;color:var(--ink);white-space:nowrap}
+@media(max-width:960px){
+  .mast-in{flex-direction:column;justify-content:center;gap:9px;height:auto;padding-top:18px;padding-bottom:16px}
+  .wordmark{font-size:15px;letter-spacing:.46em;margin-right:-.46em;order:-1}
   .mast .side{font-size:8.5px;letter-spacing:.2em}
+  .mast-nav,.mast-nav.right{flex:none;justify-content:center;flex-wrap:wrap;gap:8px 18px;width:100%}
+  .mast-nav a,.mast-nav span{font-size:9.5px;letter-spacing:.12em}
 }
 
 /* Hero */
@@ -179,9 +185,15 @@ footer{border-top:3px double var(--bd)}
 <!-- MASTHEAD -->
 <header class="mast">
   <div class="wrap pad mast-in">
-    <a class="side left" href="/">← REPRESENTVOTE.COM</a>
+    <nav class="mast-nav">
+      <span class="on">THE APP</span>
+      <a href="/organizations">ORGANIZATIONS</a>
+      <a href="/alberta">ALBERTA</a>
+    </nav>
     <a class="wordmark" href="/">REPRESENT</a>
-    <span class="side gold">GET THE APP</span>
+    <nav class="mast-nav right">
+      <a href="https://representportal.com/record">THE PUBLIC RECORD ↗</a>
+    </nav>
   </div>
 </header>
 
@@ -298,6 +310,7 @@ footer{border-top:3px double var(--bd)}
     <div class="foot-links">
       <a href="https://representportal.com/record">THE RECORD</a>
       <a href="https://representportal.com/record#how">HOW COUNTING WORKS</a>
+      <a href="/organizations">ORGANIZATIONS</a>
       <a href="/alberta">ALBERTA REFERENDUM</a>
       <a href="https://representportal.com/privacy">PRIVACY</a>
       <a href="https://representportal.com/terms">TERMS</a>

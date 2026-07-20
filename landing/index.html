@@ -35,16 +35,21 @@ a{text-decoration:none;color:inherit}
 
 /* ── Masthead ─────────────────────────────────────────────────────── */
 .mast{border-bottom:3px double var(--bd)}
-.mast-in{display:flex;align-items:center;justify-content:space-between;height:110px}
+.mast-in{display:flex;align-items:center;justify-content:space-between;height:110px;gap:24px}
 .mast .side{font-family:'JetBrains Mono',monospace;font-weight:500;font-size:12px;letter-spacing:.18em;color:var(--t3)}
 .mast .side.gold{color:var(--gdt)}
 .mast .side:hover{color:var(--gdt)}
-.wordmark{font-weight:600;font-size:22px;letter-spacing:.52em;margin-right:-.52em;color:var(--ink)}
-@media(max-width:860px){
-  .mast-in{flex-direction:column;justify-content:center;gap:6px;height:90px}
-  .mast .side.left{display:none}
-  .wordmark{font-size:15px;letter-spacing:.46em;margin-right:-.46em}
+.mast-nav{display:flex;align-items:center;gap:26px;flex:1;min-width:0}
+.mast-nav.right{justify-content:flex-end}
+.mast-nav a{font-family:'JetBrains Mono',monospace;font-weight:500;font-size:12px;letter-spacing:.14em;color:var(--t3);white-space:nowrap}
+.mast-nav a:hover,.mast-nav a.on{color:var(--gdt)}
+.wordmark{font-weight:600;font-size:22px;letter-spacing:.52em;margin-right:-.52em;color:var(--ink);white-space:nowrap}
+@media(max-width:960px){
+  .mast-in{flex-direction:column;justify-content:center;gap:9px;height:auto;padding-top:18px;padding-bottom:16px}
+  .wordmark{font-size:15px;letter-spacing:.46em;margin-right:-.46em;order:-1}
   .mast .side{font-size:8.5px;letter-spacing:.2em}
+  .mast-nav,.mast-nav.right{flex:none;justify-content:center;flex-wrap:wrap;gap:8px 18px;width:100%}
+  .mast-nav a{font-size:9.5px;letter-spacing:.12em}
 }
 
 /* ── Hero ─────────────────────────────────────────────────────────── */
@@ -223,6 +228,8 @@ a{text-decoration:none;color:inherit}
 .orgs .eyebrow{font-family:'JetBrains Mono',monospace;font-weight:600;font-size:13px;letter-spacing:.24em;color:var(--gdt)}
 .orgs h2{font-family:'Newsreader',Georgia,serif;font-weight:500;font-size:clamp(26px,3vw,40px);line-height:1.2;color:var(--ink)}
 .orgs .b{font-size:16.5px;line-height:1.65;color:var(--t2);max-width:560px}
+.orgs .orgfeats{display:flex;flex-wrap:wrap;gap:10px 12px;margin:4px 0 2px}
+.orgs .orgfeats span{font-weight:600;font-size:10.5px;letter-spacing:.14em;color:var(--gdt);background:rgba(201,154,56,.1);border:1px solid rgba(201,154,56,.3);padding:7px 13px;border-radius:100px;white-space:nowrap}
 .orgs .link{font-family:'JetBrains Mono',monospace;font-weight:500;font-size:13px;letter-spacing:.14em;color:var(--t3);border-bottom:1px solid var(--bd);padding-bottom:4px;width:fit-content}
 .orgs .link:hover{color:var(--gdt);border-color:rgba(201,154,56,.4)}
 .org-card{flex:none;width:420px;background:var(--elev);border:1px solid var(--bd);border-radius:18px;padding:32px;display:flex;flex-direction:column;gap:17px;font-feature-settings:'tnum' 1}
@@ -305,9 +312,15 @@ footer{border-top:3px double var(--bd)}
 <!-- MASTHEAD -->
 <header class="mast">
   <div class="wrap pad mast-in">
-    <span class="side left">EST. 2026 · CALGARY, CANADA</span>
+    <nav class="mast-nav">
+      <a href="/app">THE APP</a>
+      <a href="/organizations">ORGANIZATIONS</a>
+      <a href="/alberta">ALBERTA</a>
+    </nav>
     <a class="wordmark" href="/">REPRESENT</a>
-    <a class="side" href="https://representportal.com/record">THE PUBLIC RECORD ↗</a>
+    <nav class="mast-nav right">
+      <a href="https://representportal.com/record">THE PUBLIC RECORD ↗</a>
+    </nav>
   </div>
 </header>
 
@@ -431,9 +444,12 @@ footer{border-top:3px double var(--bd)}
   <div class="wrap pad orgs-in">
     <div class="copy">
       <span class="eyebrow mono">FOR ORGANIZATIONS</span>
-      <h2>Votes your members can't dispute.</h2>
-      <span class="b">Unions, student associations, leagues, and co-ops run ratifications and board votes on the same verified record — every member proven real, every count auditable by the people it governs.</span>
-      <a class="link mono" href="mailto:sales@representvote.com?subject=Represent%20for%20our%20organization">REPRESENT FOR ORGANIZATIONS ↗</a>
+      <h2>Everything your members decide, in one place.</h2>
+      <span class="b">Unions, student associations, leagues, and co-ops run elections, ratifications, polls, and surveys on verified ballots — unlimited questions, instant results, advanced analytics, and sub-groups for every chapter and local.</span>
+      <div class="orgfeats mono">
+        <span>UNLIMITED BALLOTS</span><span>INSTANT RESULTS</span><span>ADVANCED ANALYTICS</span><span>SUB-GROUPS</span>
+      </div>
+      <a class="link mono" href="/organizations">EXPLORE REPRESENT FOR ORGANIZATIONS ↗</a>
     </div>
     <div class="org-card">
       <div class="top"><span class="who mono">A RATIFICATION VOTE</span><span class="pill mono">RATIFIED</span></div>
@@ -498,6 +514,7 @@ footer{border-top:3px double var(--bd)}
       <a href="https://representportal.com/record">THE RECORD</a>
       <a href="https://representportal.com/record#how">HOW COUNTING WORKS</a>
       <a href="/app">THE APP</a>
+      <a href="/organizations">ORGANIZATIONS</a>
       <a href="/alberta">ALBERTA REFERENDUM</a>
       <a href="https://representportal.com/privacy">PRIVACY</a>
       <a href="https://representportal.com/terms">TERMS</a>
