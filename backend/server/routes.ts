@@ -1840,35 +1840,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Geo-gated Voting Route
-  app.post("/api/voting/geo-gated", async (req, res) => {
-    const { userId, proposalId, position, latitude, longitude, country, state } = req.body;
-
-    if (!userId || !proposalId || !position || !latitude || !longitude) {
-      return res.status(400).json({ error: "Location data required for geo-gated voting" });
-    }
-
-    try {
-      // Check if user is verified for geo-gated proposals
-      const user = await storage.getUser(userId);
-      if (!user?.verified) {
-        return res.status(403).json({ error: "Identity verification required for this proposal" });
-      }
-
-      await storage.recordVote(userId, proposalId, position);
-
-      log(`Geo-gated vote recorded: user=${rid(userId)}, proposal=${proposalId}, location=${country}/${state}`);
-
-      res.json({
-        success: true,
-        message: "Geo-gated vote recorded successfully",
-      });
-    } catch (error) {
-      log(`Geo-gated vote error: ${error}`);
-      res.status(500).json({ error: "Failed to record geo-gated vote" });
-    }
-  });
-
+  // The old /api/voting/geo-gated endpoint was removed: it accepted a userId
+  // from the request body with NO authentication, letting anyone record votes
+  // as any user, bypassing the duplicate-vote check, geo enforcement, and the
+  // on-chain path. Nothing in the app or web overlay ever called it. All
+  // voting goes through the authenticated /api/voting/submit above.
 
   // Debug: Reset verification for testing
   app.post("/api/debug/reset-verification", isAuthenticated, async (req: any, res) => {
