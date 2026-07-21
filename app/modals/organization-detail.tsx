@@ -261,7 +261,10 @@ function SectionTabs({ active, onChange, isAdmin, hasSubOrgs }: { active: TabTyp
                 activeOpacity={0.7}
                 onPress={() => { Haptics.selectionAsync(); onChange(t.key); }}
                 style={{
-                  height: 36, minWidth: 96,
+                  // minWidth is tuned so a fifth tab peeks past the screen edge —
+                  // the only affordance that this row scrolls. At 96 the first
+                  // four tabs fit exactly and admins never discover Settings.
+                  height: 36, minWidth: 84,
                   paddingHorizontal: 14,
                   borderRadius: 10,
                   backgroundColor: isActive ? colors.surfaceHighlight : 'transparent',
