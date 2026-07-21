@@ -5928,11 +5928,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      const [inserted] = await db.insert(proposalComments).values({
+      // .returning() yields 0 rows under the neon-http driver — generate the
+      // id client-side and read the row back instead.
+      const commentId = randomUUID();
+      await db.insert(proposalComments).values({
+        id: commentId,
         proposalId,
         userId,
         body: rawBody,
-      }).returning();
+      });
+      const [inserted] = await db.select().from(proposalComments).where(eq(proposalComments.id, commentId)).limit(1);
 
       const author = await storage.getUser(userId);
       res.status(201).json({

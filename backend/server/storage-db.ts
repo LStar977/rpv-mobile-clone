@@ -1,6 +1,6 @@
 import { db } from "./db";
 import { users, wallets, votes, proposals, proposalOptionAddresses, pricingPlans, platformSettings, voteTokenClaims, passportNFTs, ridingVerifications, electoralRidingQRCodes, referralCodes, referrals, organizations, organizationMembers, organizationInviteCodes, organizationInvites, organizationAnnouncements } from "@shared/schema";
-import { eq, and, gte, lt, sql } from "drizzle-orm";
+import { eq, and, gte, lt, sql, inArray } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { encryptPrivateKey, decryptPrivateKey, isEncrypted } from "./crypto";
 import type { User, Wallet, PricingPlan, InsertUser, UpsertUser, PassportNFT, ElectoralRidingQRCode } from "@shared/schema";
@@ -446,16 +446,21 @@ export class DatabaseStorage implements IStorage {
     return result[0];
   }
 
+  // NOTE: .returning() yields 0 rows under the production neon-http driver,
+  // so every insert below generates its id client-side and reads the row
+  // back explicitly. Do not "simplify" these back to .returning().
   async savePassportNFT(userId: string, nftTokenId: string, contractAddress: string, txHash: string): Promise<PassportNFT> {
-    const result = await db.insert(passportNFTs).values({
-      id: randomUUID(),
+    const id = randomUUID();
+    await db.insert(passportNFTs).values({
+      id,
       userId,
       nftTokenId,
       contractAddress,
       txHash,
       mintedAt: new Date(),
-    }).returning();
-    return result[0];
+    });
+    const rows = await db.select().from(passportNFTs).where(eq(passportNFTs.id, id)).limit(1);
+    return rows[0];
   }
 
   async verifyUserRiding(userId: string, ridingCode: string): Promise<void> {
@@ -477,15 +482,17 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createElectoralRidingQRCode(ridingCode: string, ridingName: string, qrDataUrl: string): Promise<ElectoralRidingQRCode> {
-    const result = await db.insert(electoralRidingQRCodes).values({
-      id: randomUUID(),
+    const id = randomUUID();
+    await db.insert(electoralRidingQRCodes).values({
+      id,
       ridingCode,
       ridingName,
       qrDataUrl,
       createdAt: new Date(),
       updatedAt: new Date(),
-    }).returning();
-    return result[0];
+    });
+    const rows = await db.select().from(electoralRidingQRCodes).where(eq(electoralRidingQRCodes.id, id)).limit(1);
+    return rows[0];
   }
 
   async getAllElectoralRidingQRCodes(): Promise<ElectoralRidingQRCode[]> {
@@ -544,8 +551,9 @@ export class DatabaseStorage implements IStorage {
 
   async createOrganization(name: string, creatorId: string, type: string, membershipType: string, emailDomain?: string): Promise<any> {
     const inviteCode = 'ORG-' + Math.random().toString(36).substring(2, 10).toUpperCase();
-    const result = await db.insert(organizations).values({
-      id: randomUUID(),
+    const id = randomUUID();
+    await db.insert(organizations).values({
+      id,
       name,
       creatorId,
       type,
@@ -555,8 +563,9 @@ export class DatabaseStorage implements IStorage {
       isActive: true,
       createdAt: new Date(),
       updatedAt: new Date(),
-    }).returning();
-    return result[0];
+    });
+    const rows = await db.select().from(organizations).where(eq(organizations.id, id)).limit(1);
+    return rows[0];
   }
 
   async getOrganization(orgId: string): Promise<any> {
@@ -771,8 +780,9 @@ export class DatabaseStorage implements IStorage {
 
   async createOrgInviteCode(orgId: string, createdBy: string, maxUses?: number, expiresAt?: Date): Promise<any> {
     const code = 'INV-' + Math.random().toString(36).substring(2, 10).toUpperCase();
-    const result = await db.insert(organizationInviteCodes).values({
-      id: randomUUID(),
+    const id = randomUUID();
+    await db.insert(organizationInviteCodes).values({
+      id,
       organizationId: orgId,
       code,
       createdBy,
@@ -780,8 +790,9 @@ export class DatabaseStorage implements IStorage {
       maxUses: maxUses || null,
       expiresAt: expiresAt || null,
       createdAt: new Date(),
-    }).returning();
-    return result[0];
+    });
+    const rows = await db.select().from(organizationInviteCodes).where(eq(organizationInviteCodes.id, id)).limit(1);
+    return rows[0];
   }
 
   async revokeOrgInviteCode(codeString: string, orgId: string): Promise<boolean> {
@@ -852,10 +863,12 @@ export class DatabaseStorage implements IStorage {
     // ON CONFLICT DO NOTHING: if a pending invite already exists for the same
     // (orgId, email) — e.g. the admin re-uploads a CSV with overlap — we skip
     // silently rather than erroring. The unique constraint catches it.
-    const result = await db.insert(organizationInvites).values(values)
-      .onConflictDoNothing({ target: [organizationInvites.organizationId, organizationInvites.email] })
-      .returning();
-    return result;
+    await db.insert(organizationInvites).values(values)
+      .onConflictDoNothing({ target: [organizationInvites.organizationId, organizationInvites.email] });
+    // Read back by the freshly generated tokens: conflict-skipped rows keep
+    // their OLD token, so this returns exactly the rows inserted just now.
+    const tokens = values.map((v) => v.inviteToken);
+    return await db.select().from(organizationInvites).where(inArray(organizationInvites.inviteToken, tokens));
   }
 
   async getOrgInvites(orgId: string, status?: string): Promise<any[]> {
@@ -919,15 +932,17 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createOrgAnnouncement(orgId: string, title: string, content: string, pinned: boolean = false): Promise<any> {
-    const result = await db.insert(organizationAnnouncements).values({
-      id: randomUUID(),
+    const id = randomUUID();
+    await db.insert(organizationAnnouncements).values({
+      id,
       organizationId: orgId,
       title,
       content,
       pinned,
       createdAt: new Date(),
-    }).returning();
-    return result[0];
+    });
+    const rows = await db.select().from(organizationAnnouncements).where(eq(organizationAnnouncements.id, id)).limit(1);
+    return rows[0];
   }
 
   async getOrgProposals(orgId: string): Promise<any[]> {
@@ -1155,8 +1170,9 @@ export class DatabaseStorage implements IStorage {
     description?: string,
   ): Promise<any> {
     const inviteCode = 'ORG-' + Math.random().toString(36).substring(2, 10).toUpperCase();
-    const result = await db.insert(organizations).values({
-      id: randomUUID(),
+    const id = randomUUID();
+    await db.insert(organizations).values({
+      id,
       name,
       description,
       creatorId,
@@ -1167,8 +1183,9 @@ export class DatabaseStorage implements IStorage {
       parentOrgId,
       createdAt: new Date(),
       updatedAt: new Date(),
-    } as any).returning();
-    return result[0];
+    } as any);
+    const rows = await db.select().from(organizations).where(eq(organizations.id, id)).limit(1);
+    return rows[0];
   }
 
   // Direct children only (one level down).
