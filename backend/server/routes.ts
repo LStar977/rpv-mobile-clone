@@ -28,7 +28,7 @@ import {
 import { checkContent } from "./profanityFilter";
 import { eq, count, and, sql, desc, isNull } from "drizzle-orm";
 import { db } from "./db";
-import { savePushToken, notifyNewProposal, notifyTokenClaimed, notifyProposalVote } from "./notifications";
+import { savePushToken, notifyNewProposal, notifyTokenClaimed, notifyProposalVote, notifyOrgProposal } from "./notifications";
 import { sendEmail, buildOrgInviteEmail } from "./email";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import jwt from "jsonwebtoken";
@@ -5240,6 +5240,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const updated = await storage.getProposal(proposal.id);
       log(`✅ Org proposal created: ${proposal.id} in org ${orgId}, voteType=${resolvedVoteType}`);
+
+      // Fire-and-forget: buzz every member except the author. Org proposals
+      // never appear in the public feed, so this is the only way members
+      // learn a ballot is open without manually checking the org.
+      notifyOrgProposal(
+        { id: orgId, name: org.name || 'your organization' },
+        { id: proposal.id, title },
+        members.map((m: any) => m.userId),
+        userId,
+      ).catch((err) => {
+        log(`Org proposal push error (non-critical): ${err}`);
+      });
+
       res.status(201).json(updated);
     } catch (error: any) {
       log(`Error creating org proposal: ${error.message}`);

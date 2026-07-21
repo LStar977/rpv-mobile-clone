@@ -164,6 +164,32 @@ export async function notifyNewProposal(proposal: {
   await sendPushNotifications(messages);
 }
 
+// Org proposals are invisible to the public feed, so members only ever
+// discover them by opening the org — unless we tell them. Notifies every
+// member except the author.
+export async function notifyOrgProposal(
+  org: { id: string; name: string },
+  proposal: { id: string; title: string },
+  memberUserIds: string[],
+  authorUserId: string,
+): Promise<void> {
+  const messages: ExpoPushMessage[] = [];
+  for (const userId of memberUserIds) {
+    if (!userId || userId === authorUserId) continue;
+    const tokens = await getUserPushTokens(userId);
+    for (const token of tokens) {
+      messages.push({
+        to: token,
+        title: `New ballot in ${org.name}`,
+        body: proposal.title,
+        data: { proposalId: proposal.id, organizationId: org.id, type: 'org_proposal' },
+        sound: 'default',
+      });
+    }
+  }
+  await sendPushNotifications(messages);
+}
+
 export async function notifyDeadlineApproaching(proposal: {
   id: string;
   title: string;

@@ -154,6 +154,12 @@ export default function TabLayout() {
   useEffect(() => {
     const sub = addNotificationResponseListener((response: any) => {
       const data = response?.notification?.request?.content?.data;
+      // Org ballots never appear in the public Vote feed — land those taps
+      // inside the organization itself.
+      if (data?.type === 'org_proposal' && data?.organizationId) {
+        router.push({ pathname: '/modals/organization-detail', params: { orgId: String(data.organizationId) } });
+        return;
+      }
       if (data?.proposalId || data?.type === 'new_proposal' || data?.type === 'deadline_reminder') {
         router.push('/(tabs)/proposals');
       }
