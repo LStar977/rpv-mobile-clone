@@ -1505,8 +1505,11 @@ export const organizationsApi = {
     return { data: [], error: result.error };
   },
 
-  async generateInviteCode(orgId: string): Promise<ApiResponse<{ code: string; expiresAt: string }>> {
-    return apiRequest(`/api/organizations/${orgId}/invite-codes`, { method: 'POST' });
+  async generateInviteCode(orgId: string, opts?: { expiresAt?: string; maxUses?: number }): Promise<ApiResponse<{ code: string; expiresAt: string }>> {
+    return apiRequest(`/api/organizations/${orgId}/invite-codes`, {
+      method: 'POST',
+      body: JSON.stringify(opts ?? {}),
+    });
   },
 
   async revokeInviteCode(orgId: string, code: string): Promise<ApiResponse<{ success: boolean }>> {

@@ -1352,11 +1352,21 @@ function BottomSheet({ onClose, children }: { onClose: () => void; children: Rea
   );
 }
 
-function InviteCodeModal({ visible, onClose, onConfirm, generating }: { visible: boolean; onClose: () => void; onConfirm: () => void; generating: boolean }) {
+function InviteCodeModal({ visible, onClose, onConfirm, generating }: { visible: boolean; onClose: () => void; onConfirm: (opts: { expiresAt: string; maxUses?: number }) => void; generating: boolean }) {
   const { colors } = useTheme();
   const [validity, setValidity] = useState<'24h' | '07d' | '30d' | '90d'>('30d');
   const [singleUse, setSingleUse] = useState(true);
   if (!visible) return null;
+  const VALIDITY_MS: Record<'24h' | '07d' | '30d' | '90d', number> = {
+    '24h': 24 * 3600000, '07d': 7 * 86400000, '30d': 30 * 86400000, '90d': 90 * 86400000,
+  };
+  const generate = () => {
+    if (generating) return;
+    onConfirm({
+      expiresAt: new Date(Date.now() + VALIDITY_MS[validity]).toISOString(),
+      maxUses: singleUse ? 1 : undefined,
+    });
+  };
   return (
     <BottomSheet onClose={onClose}>
       <View style={{ paddingHorizontal: SPACING.screenPadding }}>
@@ -1367,7 +1377,7 @@ function InviteCodeModal({ visible, onClose, onConfirm, generating }: { visible:
           Anyone with this code can join your organization.
         </Text>
 
-        <View style={{
+        <TouchableOpacity activeOpacity={0.75} onPress={generate} disabled={generating} style={{
           paddingHorizontal: 16, paddingVertical: 18,
           backgroundColor: colors.backgroundSecondary,
           borderWidth: 1, borderColor: colors.borderSubtle,
@@ -1382,7 +1392,7 @@ function InviteCodeModal({ visible, onClose, onConfirm, generating }: { visible:
           }}>
             {generating ? 'Generating…' : 'Tap to create'}
           </Text>
-        </View>
+        </TouchableOpacity>
 
         <Text style={{ fontFamily: FONTS.sansSemiBold, fontSize: 10.5, letterSpacing: 1.47, textTransform: 'uppercase', color: colors.textTertiary, marginBottom: 8 }}>Expires after</Text>
         <View style={{ flexDirection: 'row', gap: 6, marginBottom: 14 }}>
@@ -1435,7 +1445,7 @@ function InviteCodeModal({ visible, onClose, onConfirm, generating }: { visible:
           </TouchableOpacity>
           <TouchableOpacity
             activeOpacity={0.75}
-            onPress={() => { onConfirm(); onClose(); }}
+            onPress={generate}
             disabled={generating}
             style={{
               flex: 1.4, height: 48,
@@ -1910,13 +1920,19 @@ export default function OrganizationDetailScreen() {
     }
   };
 
-  const handleGenerateInviteCode = async () => {
+  const handleGenerateInviteCode = async (opts?: { expiresAt?: string; maxUses?: number }) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setGeneratingCode(true);
     try {
-      const result = await organizationsApi.generateInviteCode(params.orgId);
+      const result = await organizationsApi.generateInviteCode(params.orgId, opts);
       if (result.error) { Alert.alert('Error', result.error); return; }
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setShowInviteCodeModal(false);
+      const newCode = result.data?.code;
+      if (newCode) {
+        Clipboard.setString(newCode);
+        Alert.alert('Code created', `${newCode}\n\nCopied to your clipboard — send it to your members.`);
+      }
       fetchAdminData();
     } catch (error) {
       Alert.alert('Error', 'Failed to generate invite code.');
