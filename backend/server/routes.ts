@@ -551,16 +551,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .sort((a: any, b: any) => b.total - a.total);
       const pick = scored.length > 0 ? (scored.find((s2: any) => s2.total >= PUBLIC_TALLY_THRESHOLD) ?? scored[0]) : null;
 
-      // Record teaser: the 3 most recently closed ballots, padded with open
-      // ones when fewer than 3 have closed. Real rows only — never samples.
-      const closed = publicAll
-        .filter((p: any) => p.deadline && new Date(p.deadline).getTime() <= now)
-        .sort((a: any, b: any) => new Date(b.deadline).getTime() - new Date(a.deadline).getTime());
-      const teaserPool = [...closed.slice(0, 3)];
+      // Record teaser: the homepage's proof-of-life rows. Taste order:
+      //   1. OPEN ballots, most votes first (excluding the hero pick) — live
+      //      action beats history.
+      //   2. Closed ballots that finished ABOVE threshold (real published
+      //      results), most recently closed first.
+      // Closed-below-threshold ballots ("NO RESULT") never appear — a row of
+      // 1-vote dead questions reads as an abandoned product. Real rows only,
+      // never samples; fewer than 3 is fine.
+      const teaserPool: any[] = [];
       for (const s2 of scored) {
         if (teaserPool.length >= 3) break;
         if (pick && s2.p.id === pick.p.id) continue;
         teaserPool.push(s2.p);
+      }
+      if (teaserPool.length < 3) {
+        const closedWithResult = publicAll
+          .filter((p: any) => {
+            if (!p.deadline || new Date(p.deadline).getTime() > now) return false;
+            const total = (Number(p.supportVotes) || 0) + (Number(p.opposeVotes) || 0);
+            return total >= PUBLIC_TALLY_THRESHOLD;
+          })
+          .sort((a: any, b: any) => new Date(b.deadline).getTime() - new Date(a.deadline).getTime());
+        for (const p of closedWithResult) {
+          if (teaserPool.length >= 3) break;
+          teaserPool.push(p);
+        }
       }
 
       res.json({
