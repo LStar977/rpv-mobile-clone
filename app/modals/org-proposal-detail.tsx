@@ -21,6 +21,7 @@ import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, SHADOWS, FONTS } from '..
 import { RCVBallotInput } from '../../components/ui/RCVBallotInput';
 import { RCVResults } from '../../components/ui/RCVResults';
 import { MultipleChoiceBallot } from '../../components/ui/MultipleChoiceBallot';
+import { normalizeBallotOptions } from '../../lib/ballotOptions';
 import { MultipleChoiceResults } from '../../components/ui/MultipleChoiceResults';
 import { ProposalModerationMenu } from '../../components/moderation/ProposalModerationMenu';
 
@@ -59,22 +60,7 @@ export default function OrgProposalDetailScreen() {
   }>();
   const voteType: 'yes-no' | 'multiple-choice' | 'ranked-choice' =
     (params.voteType as any) || 'yes-no';
-  const proposalOptions: string[] = (() => {
-    try {
-      let parsed: any = JSON.parse(params.options || '[]');
-      // Some server paths return options as a JSON string rather than an
-      // array; the caller stringifies whatever it got, so we can arrive
-      // double-encoded. Unwrap until we hit the real array.
-      let hops = 0;
-      while (typeof parsed === 'string' && hops < 3) {
-        parsed = JSON.parse(parsed);
-        hops++;
-      }
-      return Array.isArray(parsed) ? parsed.filter((p) => typeof p === 'string') : [];
-    } catch {
-      return [];
-    }
-  })();
+  const proposalOptions: string[] = normalizeBallotOptions(params.options);
 
   const orgId = params.orgId || '';
   const proposalId = params.proposalId || '';

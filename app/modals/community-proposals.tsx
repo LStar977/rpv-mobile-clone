@@ -13,6 +13,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
+import { normalizeBallotOptions } from '../../lib/ballotOptions';
 import { proposalsApi, Proposal } from '../../lib/api';
 import { useAuthStore } from '../../lib/auth';
 import { canUserVoteOnProposal, getTierLabel, getLocationLabel } from '../../lib/proposalGeo';
@@ -143,7 +144,7 @@ export default function CommunityProposalsScreen() {
         category: p.category || 'General',
         deadline: p.deadline || '',
         voteType,
-        options: JSON.stringify((p as any).options ?? []),
+        options: JSON.stringify(normalizeBallotOptions((p as any).options)),
         creatorId: String((p as any).creatorId ?? (p as any).userId ?? ''),
         creatorName: p.creatorName || 'Community Member',
         requiresCitizenship: (p as any).requiresCitizenship ? '1' : '',

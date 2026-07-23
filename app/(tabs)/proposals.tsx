@@ -20,6 +20,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
+import { normalizeBallotOptions } from '../../lib/ballotOptions';
 import Animated, {
   FadeIn,
   FadeInDown,
@@ -1821,7 +1822,7 @@ export default function ProposalsScreen() {
           category: p.category || 'General',
           deadline: p.deadline || '',
           voteType,
-          options: JSON.stringify((p as any).options ?? []),
+          options: JSON.stringify(normalizeBallotOptions((p as any).options)),
           creatorId: String((p as any).creatorId ?? (p as any).userId ?? ''),
           creatorName: p.creatorName || 'Community Member',
           requiresCitizenship: (p as any).requiresCitizenship ? '1' : '',

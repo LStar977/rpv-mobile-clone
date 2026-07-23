@@ -6,6 +6,7 @@ import { Image as ExpoImage } from 'expo-image';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import Svg, { Circle, Line, Path, Defs, Stop, LinearGradient as SvgLinearGradient } from 'react-native-svg';
 import * as Haptics from 'expo-haptics';
+import { normalizeBallotOptions } from '../../lib/ballotOptions';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuthStore } from '../../lib/auth';
 import { organizationsApi, Organization, OrganizationProposal } from '../../lib/api';
@@ -2093,11 +2094,7 @@ export default function OrganizationDetailScreen() {
         // than an array — normalize before re-encoding so the detail screen
         // never receives a double-encoded value.
         voteType: ((p as any).voteType as string) || (p as any).vote_type || 'yes-no',
-        options: (() => {
-          let o: any = (p as any).options;
-          if (typeof o === 'string') { try { o = JSON.parse(o); } catch { o = []; } }
-          return JSON.stringify(Array.isArray(o) ? o : []);
-        })(),
+        options: JSON.stringify(normalizeBallotOptions((p as any).options)),
         creatorId: String((p as any).creatorId ?? (p as any).userId ?? ''),
         creatorName: (p as any).creatorName || 'Community Member',
       },

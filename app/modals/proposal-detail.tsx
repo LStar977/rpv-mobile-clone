@@ -26,6 +26,7 @@ import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY } from '../../lib/theme';
 import { RCVBallotInput } from '../../components/ui/RCVBallotInput';
 import { RCVResults } from '../../components/ui/RCVResults';
 import { MultipleChoiceBallot } from '../../components/ui/MultipleChoiceBallot';
+import { normalizeBallotOptions } from '../../lib/ballotOptions';
 import { MultipleChoiceResults } from '../../components/ui/MultipleChoiceResults';
 import { ProposalModerationMenu } from '../../components/moderation/ProposalModerationMenu';
 
@@ -66,14 +67,7 @@ export default function ProposalDetailScreen() {
   const requiresCitizenship = params.requiresCitizenship === '1';
   const voteType: 'multiple-choice' | 'ranked-choice' =
     params.voteType === 'ranked-choice' ? 'ranked-choice' : 'multiple-choice';
-  const proposalOptions: string[] = (() => {
-    try {
-      const parsed = JSON.parse(params.options || '[]');
-      return Array.isArray(parsed) ? parsed.filter((p) => typeof p === 'string') : [];
-    } catch {
-      return [];
-    }
-  })();
+  const proposalOptions: string[] = normalizeBallotOptions(params.options);
 
   const isEnded = isVotingEnded(deadline);
 
