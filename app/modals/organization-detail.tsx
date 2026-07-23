@@ -2088,9 +2088,16 @@ export default function OrganizationDetailScreen() {
         isOfficial: String((p as any).isOfficial ?? false),
         orgName: organization?.name || (params.orgName as string) || '',
         // RCV/multi-choice metadata. Defaulted so existing yes-no proposals
-        // are unaffected. Options is JSON-encoded (URL params can't carry arrays).
-        voteType: ((p as any).voteType as string) || 'yes-no',
-        options: JSON.stringify((p as any).options ?? []),
+        // are unaffected. Options is JSON-encoded (URL params can't carry
+        // arrays). Some server paths return options as a JSON string rather
+        // than an array — normalize before re-encoding so the detail screen
+        // never receives a double-encoded value.
+        voteType: ((p as any).voteType as string) || (p as any).vote_type || 'yes-no',
+        options: (() => {
+          let o: any = (p as any).options;
+          if (typeof o === 'string') { try { o = JSON.parse(o); } catch { o = []; } }
+          return JSON.stringify(Array.isArray(o) ? o : []);
+        })(),
         creatorId: String((p as any).creatorId ?? (p as any).userId ?? ''),
         creatorName: (p as any).creatorName || 'Community Member',
       },

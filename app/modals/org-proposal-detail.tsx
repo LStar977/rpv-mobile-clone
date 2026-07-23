@@ -61,7 +61,15 @@ export default function OrgProposalDetailScreen() {
     (params.voteType as any) || 'yes-no';
   const proposalOptions: string[] = (() => {
     try {
-      const parsed = JSON.parse(params.options || '[]');
+      let parsed: any = JSON.parse(params.options || '[]');
+      // Some server paths return options as a JSON string rather than an
+      // array; the caller stringifies whatever it got, so we can arrive
+      // double-encoded. Unwrap until we hit the real array.
+      let hops = 0;
+      while (typeof parsed === 'string' && hops < 3) {
+        parsed = JSON.parse(parsed);
+        hops++;
+      }
       return Array.isArray(parsed) ? parsed.filter((p) => typeof p === 'string') : [];
     } catch {
       return [];
