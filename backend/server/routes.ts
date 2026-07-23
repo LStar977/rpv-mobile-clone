@@ -37,6 +37,17 @@ import { randomUUID, createHmac, timingSafeEqual } from "crypto";
 // Redact PII before logging. Returns first 8 chars + ellipsis so logs stay
 // useful for tracing a single request through the system without spilling
 // full identifiers to disk / Sentry / log aggregators.
+// jsonb columns (proposals.options, proposals.optionAddresses) can surface
+// as JSON strings on some storage paths (text-typed columns, raw-SQL casts).
+// Always unwrap to a real string[] before use — iterating a string "array"
+// walks it character by character and silently corrupts tallies.
+function asStringArray(v: any): string[] {
+  if (typeof v === "string") {
+    try { v = JSON.parse(v); } catch { return []; }
+  }
+  return Array.isArray(v) ? v.filter((x: any) => typeof x === "string") : [];
+}
+
 function rid(value: string | null | undefined): string {
   if (!value) return "—";
   if (value.length <= 8) return value;
@@ -1032,12 +1043,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(500).json({ error: "RPV token not configured" });
         }
 
-        // For multiple-choice, find the option address; for yes/no the relay
-        // derives a deterministic position address itself.
-        if (position === 'multiple-choice' && selectedOption && proposal.optionAddresses && Array.isArray(proposal.optionAddresses)) {
-          const optionIndex = proposal.options?.indexOf(selectedOption) ?? -1;
-          if (optionIndex >= 0 && optionIndex < proposal.optionAddresses.length) {
-            optionAddress = proposal.optionAddresses[optionIndex];
+        // For multiple-choice, validate the choice against the ballot's real
+        // options (normalized — jsonb can surface as a JSON string) and find
+        // the option's chain address. For yes/no the relay derives a
+        // deterministic position address itself.
+        if (position === 'multiple-choice') {
+          const mcOptions = asStringArray(proposal.options);
+          if (!selectedOption || !mcOptions.includes(selectedOption)) {
+            return res.status(400).json({ error: "selectedOption must be one of this ballot's options" });
+          }
+          const addrs = asStringArray(proposal.optionAddresses);
+          const optionIndex = mcOptions.indexOf(selectedOption);
+          if (optionIndex >= 0 && optionIndex < addrs.length) {
+            optionAddress = addrs[optionIndex];
           }
         }
       }
@@ -1235,7 +1253,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const counts = await storage.countVotesPerOption(proposalId);
         // Ensure every option appears in counts (even 0) so the UI can
         // render a stable list without conditional fallbacks.
-        const options = (proposal.options ?? []) as string[];
+        const options = asStringArray(proposal.options);
         const fullCounts: Record<string, number> = {};
         for (const opt of options) fullCounts[opt] = counts[opt] ?? 0;
         return res.json({ type: 'multiple-choice', options, counts: fullCounts });
@@ -1256,7 +1274,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             // endpoint validates JSON.stringify roundtrip, but defensive.
           }
         }
-        const tally = computeIRV(ballots, (proposal.options ?? []) as string[]);
+        const tally = computeIRV(ballots, asStringArray(proposal.options));
         return res.json({ type: 'ranked-choice', ...tally });
       }
 
