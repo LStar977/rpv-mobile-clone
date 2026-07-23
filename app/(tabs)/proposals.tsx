@@ -302,6 +302,9 @@ function BallotCard({
   const voteType = (proposal as any).voteType || 'yes-no';
   const optionCount = ((proposal as any).options || []).length;
   const totalBallots = (proposal.supportVotes || 0) + (proposal.opposeVotes || 0);
+  // MC/RCV votes never touch support/oppose counters; the server attaches a
+  // real ballot count as totalVotes for non-yes-no proposals.
+  const mcTotal = Number((proposal as any).totalVotes ?? 0) || totalBallots;
   const ended = isProposalEnded(proposal);
   const deadlineLabel = deadlineChipLabel(proposal);
 
@@ -360,9 +363,15 @@ function BallotCard({
           <Text style={[ballotStyles.optionsText, { color: colors.textSecondary }]}>
             {optionCount || 2} OPTIONS · {voteType === 'ranked-choice' ? 'RANK YOUR CHOICES' : 'PICK ONE'}
           </Text>
-          <Text style={[ballotStyles.optionsText, { color: colors.textTertiary }]}>
-            {totalBallots.toLocaleString('en-CA')} VERIFIED BALLOTS
-          </Text>
+          {mcTotal < 25 && !ended ? (
+            <Text style={[ballotStyles.optionsText, { color: colors.gold }]}>
+              {mcTotal} OF 25 · TALLY AT 25
+            </Text>
+          ) : (
+            <Text style={[ballotStyles.optionsText, { color: colors.textTertiary }]}>
+              {mcTotal.toLocaleString('en-CA')} VERIFIED BALLOTS
+            </Text>
+          )}
         </View>
       ) : (
         <TallyBar
@@ -1826,6 +1835,7 @@ export default function ProposalsScreen() {
           creatorId: String((p as any).creatorId ?? (p as any).userId ?? ''),
           creatorName: p.creatorName || 'Community Member',
           requiresCitizenship: (p as any).requiresCitizenship ? '1' : '',
+          hasVoted: votedProposals.has(p.id as any) ? '1' : '',
         },
       });
       return;

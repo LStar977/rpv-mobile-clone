@@ -109,8 +109,10 @@ export default function OrgProposalDetailScreen() {
     if (!result.data) return;
     if (result.data.type === 'ranked-choice') {
       setRcvResults(result.data);
+      if (result.data.yourBallot) setRcvSubmitted(true);
     } else if (result.data.type === 'multiple-choice') {
       setMcResults({ options: result.data.options ?? [], counts: result.data.counts ?? {} });
+      if (result.data.yourVote) setMcSubmitted(true);
     }
   }, [voteType, proposalId]);
 

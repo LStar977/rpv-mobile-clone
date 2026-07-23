@@ -22,7 +22,7 @@ import Animated, { FadeIn } from 'react-native-reanimated';
 import { proposalsApi } from '../../lib/api';
 import { useAuthStore } from '../../lib/auth';
 import { CommentsSection } from '../../components/comments/CommentsSection';
-import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY } from '../../lib/theme';
+import { useTheme, SPACING, BORDER_RADIUS, TYPOGRAPHY, FONTS } from '../../lib/theme';
 import { RCVBallotInput } from '../../components/ui/RCVBallotInput';
 import { RCVResults } from '../../components/ui/RCVResults';
 import { MultipleChoiceBallot } from '../../components/ui/MultipleChoiceBallot';
@@ -33,6 +33,48 @@ import { ProposalModerationMenu } from '../../components/moderation/ProposalMode
 function isVotingEnded(deadline: string | null): boolean {
   if (!deadline) return false;
   return new Date(deadline).getTime() < Date.now();
+}
+
+// Below the 25-ballot threshold the split is NEVER shown — same
+// anti-bandwagon rule as yes/no ballots. Count, gold progress dots, and
+// (once voted) the voter's own receipt line.
+function EarlyTallyCard({ totalVotes, threshold, receipt }: { totalVotes: number; threshold: number; receipt: string | null }) {
+  const { colors } = useTheme();
+  const dotCount = 10;
+  const filled = Math.max(0, Math.min(dotCount, Math.round((totalVotes / Math.max(1, threshold)) * dotCount)));
+  return (
+    <View style={{
+      backgroundColor: colors.surface,
+      borderWidth: 1, borderColor: 'rgba(234, 186, 88, 0.35)',
+      borderRadius: 16, padding: 18, gap: 12,
+    }}>
+      <Text style={{ fontFamily: FONTS.sansSemiBold, fontSize: 10.5, letterSpacing: 1.4, color: colors.gold }}>
+        EARLY VOTING
+      </Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+        <View style={{ flexDirection: 'row', gap: 5 }}>
+          {Array.from({ length: dotCount }, (_, i) => (
+            <View key={i} style={{
+              width: 9, height: 9, borderRadius: 5,
+              backgroundColor: i < filled ? colors.gold : colors.surfaceHighlight,
+              borderWidth: i < filled ? 0 : 1, borderColor: colors.border,
+            }} />
+          ))}
+        </View>
+        <Text style={{ fontFamily: FONTS.mono ?? undefined, fontSize: 11.5, color: colors.textSecondary, letterSpacing: 0.5 }}>
+          {totalVotes} OF {threshold}
+        </Text>
+      </View>
+      <Text style={{ fontFamily: FONTS.sans, fontSize: 13, lineHeight: 19, color: colors.textSecondary }}>
+        The split publishes once {threshold} verified ballots are cast — early votes stay uninfluenced.
+      </Text>
+      {receipt ? (
+        <Text style={{ fontFamily: FONTS.sansSemiBold, fontSize: 11, letterSpacing: 1.1, color: colors.gold }}>
+          {receipt}
+        </Text>
+      ) : null}
+    </View>
+  );
 }
 
 export default function ProposalDetailScreen() {
@@ -50,6 +92,9 @@ export default function ProposalDetailScreen() {
     creatorId: string;
     creatorName: string;
     requiresCitizenship: string;
+    // '1' when the feed already knows this user voted here — opens straight
+    // to the results/receipt state instead of re-offering the ballot.
+    hasVoted: string;
   }>();
 
   const proposalId = params.proposalId || '';
@@ -74,17 +119,33 @@ export default function ProposalDetailScreen() {
   const [voting, setVoting] = useState(false);
   const [showModerationMenu, setShowModerationMenu] = useState(false);
   const [rcvResults, setRcvResults] = useState<any | null>(null);
-  const [rcvSubmitted, setRcvSubmitted] = useState(false);
-  const [mcResults, setMcResults] = useState<{ options: string[]; counts: Record<string, number> } | null>(null);
-  const [mcSubmitted, setMcSubmitted] = useState(false);
+  const [rcvSubmitted, setRcvSubmitted] = useState(params.hasVoted === '1');
+  const [mcResults, setMcResults] = useState<{
+    options: string[];
+    counts: Record<string, number>;
+    belowThreshold?: boolean;
+    totalVotes?: number;
+    threshold?: number;
+    yourVote?: string | null;
+  } | null>(null);
+  const [mcSubmitted, setMcSubmitted] = useState(params.hasVoted === '1');
 
   const fetchResults = useCallback(async () => {
     const result = await proposalsApi.getResults(proposalId);
     if (!result.data) return;
     if (result.data.type === 'ranked-choice') {
       setRcvResults(result.data);
+      if (result.data.yourBallot) setRcvSubmitted(true);
     } else if (result.data.type === 'multiple-choice') {
-      setMcResults({ options: result.data.options ?? [], counts: result.data.counts ?? {} });
+      setMcResults({
+        options: result.data.options ?? [],
+        counts: result.data.counts ?? {},
+        belowThreshold: !!result.data.belowThreshold,
+        totalVotes: result.data.totalVotes,
+        threshold: result.data.threshold,
+        yourVote: result.data.yourVote ?? null,
+      });
+      if (result.data.yourVote) setMcSubmitted(true);
     }
   }, [proposalId]);
 
@@ -252,7 +313,13 @@ export default function ProposalDetailScreen() {
           <View style={{ marginTop: SPACING.xl }}>
             {voteType === 'ranked-choice' ? (
               rcvSubmitted || isEnded ? (
-                rcvResults ? (
+                rcvResults?.belowThreshold ? (
+                  <EarlyTallyCard
+                    totalVotes={rcvResults.totalVotes ?? 0}
+                    threshold={rcvResults.threshold ?? 25}
+                    receipt={rcvResults.yourBallot ? 'YOUR RANKED BALLOT IS RECORDED' : null}
+                  />
+                ) : rcvResults ? (
                   <RCVResults
                     totalBallots={rcvResults.totalBallots ?? 0}
                     exhaustedBallots={rcvResults.exhaustedBallots ?? 0}
@@ -272,7 +339,13 @@ export default function ProposalDetailScreen() {
               )
             ) : (
               mcSubmitted || isEnded ? (
-                mcResults ? (
+                mcResults?.belowThreshold ? (
+                  <EarlyTallyCard
+                    totalVotes={mcResults.totalVotes ?? 0}
+                    threshold={mcResults.threshold ?? 25}
+                    receipt={mcResults.yourVote ? `YOUR BALLOT \u00b7 ${mcResults.yourVote.toUpperCase()}` : null}
+                  />
+                ) : mcResults ? (
                   <MultipleChoiceResults options={mcResults.options} counts={mcResults.counts} />
                 ) : (
                   <ActivityIndicator color={colors.gold} />

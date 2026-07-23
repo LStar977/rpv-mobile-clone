@@ -744,7 +744,9 @@ export const proposalsApi = {
   //   { type: 'ranked-choice', options, totalBallots, exhaustedBallots,
   //       rounds, winner, winningRound, tieBreakRule }
   async getResults(proposalId: number | string): Promise<ApiResponse<any>> {
-    return apiRequest<any>(`/api/proposals/${proposalId}/results`);
+    // tv=2: this client understands the threshold-gated results shape
+    // (belowThreshold + yourVote/yourBallot, counts withheld under 25).
+    return apiRequest<any>(`/api/proposals/${proposalId}/results?tv=2`);
   },
 
   async getFeatured(): Promise<ApiResponse<Proposal[]>> {

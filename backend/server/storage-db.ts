@@ -230,6 +230,18 @@ export class DatabaseStorage implements IStorage {
     return result.map(r => r.proposalId);
   }
 
+  // The requesting user's own vote on a proposal (one row max — unique
+  // constraint). selectedOption carries the MC choice, or the rankings JSON
+  // for ranked-choice ballots.
+  async getUserVote(userId: string, proposalId: string): Promise<{ position: string; selectedOption: string | null } | undefined> {
+    const rows = await db
+      .select({ position: votes.position, selectedOption: votes.selectedOption })
+      .from(votes)
+      .where(and(eq(votes.userId, userId), eq(votes.proposalId, proposalId)))
+      .limit(1);
+    return rows[0];
+  }
+
   async hasUserVotedOnProposal(userId: string, proposalId: string): Promise<boolean> {
     const result = await db.select().from(votes).where(and(eq(votes.userId, userId), eq(votes.proposalId, proposalId))).limit(1);
     return result.length > 0;

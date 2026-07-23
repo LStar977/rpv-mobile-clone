@@ -26,7 +26,7 @@ import {
   parseVendorData,
 } from "./verificationUnlock";
 import { checkContent } from "./profanityFilter";
-import { eq, count, and, sql, desc, isNull } from "drizzle-orm";
+import { eq, count, and, sql, desc, isNull, inArray } from "drizzle-orm";
 import { db } from "./db";
 import { savePushToken, notifyNewProposal, notifyTokenClaimed, notifyProposalVote, notifyOrgProposal } from "./notifications";
 import { sendEmail, buildOrgInviteEmail } from "./email";
@@ -1223,6 +1223,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      // MC/RCV votes never touch the support/oppose counters, so the feed
+      // had no way to show their threshold progress ("N of 25"). Attach a
+      // real ballot count for every non-yes-no proposal in one grouped query.
+      try {
+        const nonYesNo = proposals.filter((p: any) => p.voteType && p.voteType !== "yes-no");
+        if (nonYesNo.length > 0) {
+          const totals = await db
+            .select({ proposalId: votes.proposalId, n: sql<number>`count(*)` })
+            .from(votes)
+            .where(inArray(votes.proposalId, nonYesNo.map((p: any) => p.id)))
+            .groupBy(votes.proposalId);
+          const totalMap = new Map(totals.map((t: any) => [t.proposalId, Number(t.n) || 0]));
+          for (const p of nonYesNo) (p as any).totalVotes = totalMap.get((p as any).id) ?? 0;
+        }
+      } catch (e) {
+        log(`Feed totals attach failed (non-critical): ${e}`);
+      }
+
       res.json({ proposals });
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch proposals" });
@@ -1249,6 +1267,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      // tv=2 clients understand the threshold-gated shape (belowThreshold,
+      // no counts). Legacy clients always get counts so shipped builds keep
+      // rendering; they never learned to draw the below-threshold state.
+      const tvMode = String(req.query.tv || '') === '2';
+      const isPublicBallot = !proposal.organizationId;
+
       if (proposal.voteType === 'multiple-choice') {
         const counts = await storage.countVotesPerOption(proposalId);
         // Ensure every option appears in counts (even 0) so the UI can
@@ -1256,7 +1280,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const options = asStringArray(proposal.options);
         const fullCounts: Record<string, number> = {};
         for (const opt of options) fullCounts[opt] = counts[opt] ?? 0;
-        return res.json({ type: 'multiple-choice', options, counts: fullCounts });
+        const totalVotes = options.reduce((s: number, o: string) => s + (fullCounts[o] || 0), 0);
+        const mine = await storage.getUserVote(userId, proposalId);
+        const yourVote = mine?.selectedOption && options.includes(mine.selectedOption) ? mine.selectedOption : null;
+        // Public ballots below threshold NEVER publish the per-option split —
+        // same anti-bandwagon rule as yes/no. Org ballots are internal and
+        // exempt. Voters still see their own ballot via yourVote.
+        if (tvMode && isPublicBallot && totalVotes < PUBLIC_TALLY_THRESHOLD) {
+          return res.json({ type: 'multiple-choice', options, belowThreshold: true, totalVotes, threshold: PUBLIC_TALLY_THRESHOLD, yourVote });
+        }
+        return res.json({ type: 'multiple-choice', options, counts: fullCounts, totalVotes, yourVote });
       }
 
       if (proposal.voteType === 'ranked-choice') {
@@ -1274,8 +1307,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
             // endpoint validates JSON.stringify roundtrip, but defensive.
           }
         }
+        const mine = await storage.getUserVote(userId, proposalId);
+        let yourBallot: string[] | null = null;
+        if (mine?.selectedOption) {
+          try {
+            const pb = JSON.parse(mine.selectedOption);
+            if (Array.isArray(pb) && pb.every((x: any) => typeof x === 'string')) yourBallot = pb;
+          } catch { /* not a rankings payload */ }
+        }
+        if (tvMode && isPublicBallot && ballots.length < PUBLIC_TALLY_THRESHOLD) {
+          return res.json({ type: 'ranked-choice', belowThreshold: true, totalVotes: ballots.length, threshold: PUBLIC_TALLY_THRESHOLD, yourBallot });
+        }
         const tally = computeIRV(ballots, asStringArray(proposal.options));
-        return res.json({ type: 'ranked-choice', ...tally });
+        return res.json({ type: 'ranked-choice', ...tally, totalVotes: ballots.length, yourBallot });
       }
 
       // Default: yes-no.
@@ -1405,6 +1449,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           proposalId: votes.proposalId,
           title: proposals.title,
           position: votes.position,
+          selectedOption: votes.selectedOption,
+          voteType: proposals.voteType,
           votedAt: votes.timestamp,
           voteTokenId: votes.voteTokenId,
           txHash: votes.txHash,
