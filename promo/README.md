@@ -70,5 +70,6 @@ On a machine that can't download Chrome, point at an existing one:
   into `src/Main.tsx`. Use a licensed track; don't pull one off YouTube.
 - `public/icon.png` is a copy of the app icon from `assets/icon.png`. If the
   icon changes, copy it across again.
-- Fonts are committed in `public/fonts/` so a render never depends on Google
-  Fonts being reachable.
+- Fonts are committed in `public/fonts/` and also baked into `src/fontData.ts`
+  as data URIs, so a render never touches the network for them. If you swap a
+  font file, run `npm run build-fonts` to regenerate that file.

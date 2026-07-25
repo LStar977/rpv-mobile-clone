@@ -6,7 +6,8 @@
   "scripts": {
     "studio": "remotion studio src/index.ts",
     "render": "node render.mjs",
-    "stills": "node stills.mjs"
+    "stills": "node stills.mjs",
+    "build-fonts": "node scripts/build-fonts.mjs"
   },
   "license": "UNLICENSED",
   "dependencies": {

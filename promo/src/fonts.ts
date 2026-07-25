@@ -1,24 +1,20 @@
-import { continueRender, delayRender, staticFile } from 'remotion';
+import { continueRender, delayRender } from 'remotion';
+import { FONT_CSS, FONT_SPECS } from './fontData';
 
+// Fonts are inlined as data URIs (see scripts/build-fonts.mjs), so this is a
+// parse, not a fetch — nothing here can stall on the network.
 const handle = delayRender('Loading Represent brand fonts');
 
-const faces: [string, string, string, string][] = [
-  ['Newsreader', 'fonts/Newsreader-Regular.ttf', '400', 'normal'],
-  ['Newsreader', 'fonts/Newsreader-Medium.ttf', '500', 'normal'],
-  ['Newsreader', 'fonts/Newsreader-Italic.ttf', '400', 'italic'],
-  ['Onest', 'fonts/Onest-Regular.ttf', '400', 'normal'],
-  ['Onest', 'fonts/Onest-SemiBold.ttf', '600', 'normal'],
-  ['Onest', 'fonts/Onest-Bold.ttf', '700', 'normal'],
-  ['JetBrainsMono', 'fonts/JetBrainsMono-Medium.ttf', '500', 'normal'],
-];
+const style = document.createElement('style');
+style.textContent = FONT_CSS;
+document.head.appendChild(style);
 
-Promise.all(
-  faces.map(([family, file, weight, style]) => {
-    const face = new FontFace(family, `url(${staticFile(file)})`, { weight, style });
-    return face.load().then((loaded) => {
-      document.fonts.add(loaded);
-    });
-  })
-)
-  .then(() => continueRender(handle))
-  .catch(() => continueRender(handle));
+const ready = Promise.all(FONT_SPECS.map((spec) => document.fonts.load(spec)));
+
+// Belt and braces: never hold a render hostage to font loading.
+Promise.race([
+  ready,
+  new Promise((resolve) => setTimeout(resolve, 15000)),
+])
+  .catch(() => undefined)
+  .then(() => continueRender(handle));
