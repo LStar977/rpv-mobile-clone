@@ -49,6 +49,14 @@ Then to make the MP4 (lands in `out/represent-promo-vertical.mp4`):
 
     npm run render
 
+That renders in 120-frame chunks, one child process each, and stitches the
+parts with ffmpeg at the end. Finished chunks are cached in `out/parts/`, so a
+re-run picks up where it left off — delete that folder to force a clean
+render. Rendering the whole film in one process turned out to be unreliable:
+the browser gave out around frame 500 and took the rest of the run with it.
+`npm run render-single` still does it the simple one-process way if you'd
+rather.
+
 To preview interactively in a browser with a scrubber — much faster than
 re-rendering while you tweak wording:
 
