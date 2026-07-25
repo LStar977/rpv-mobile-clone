@@ -45,7 +45,7 @@ First time on a machine:
     cd promo
     npm install
 
-Then to make the MP4 (lands in `out/represent-promo-vertical.mp4`):
+Then to make the MP4 (lands in `out/represent-promo.mp4`):
 
     npm run render
 

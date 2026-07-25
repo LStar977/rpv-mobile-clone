@@ -13,7 +13,7 @@ import path from 'path';
 
 const CHUNK = 120;
 const TOTAL = 1020;
-const OUT = path.resolve('out/represent-promo-vertical.mp4');
+const OUT = path.resolve('out/represent-promo.mp4');
 const PARTS = path.resolve('out/parts');
 
 fs.mkdirSync(PARTS, { recursive: true });
@@ -55,13 +55,22 @@ for (let start = 0; start < TOTAL; start += CHUNK) {
   console.log(`frames ${start}-${end}: done`);
 }
 
-const list = path.join(PARTS, 'list.txt');
-fs.writeFileSync(list, parts.map((p) => `file '${p}'`).join('\n'));
-
+// The concat *filter* rather than the concat demuxer: the demuxer joins on
+// container timestamps and leaves a small gap at every seam, which added up to
+// half a second of drift and a visible hitch. This re-encodes once and gives
+// exactly the sum of the parts' frames.
 console.log('stitching…');
+const inputs = parts.flatMap((p) => ['-i', p]);
+const filter =
+  parts.map((_, i) => `[${i}:v]`).join('') +
+  `concat=n=${parts.length}:v=1:a=0[v]`;
+
 await run(ffmpeg, [
-  '-y', '-f', 'concat', '-safe', '0', '-i', list,
-  '-c', 'copy', '-movflags', '+faststart', OUT,
+  '-y', ...inputs,
+  '-filter_complex', filter, '-map', '[v]',
+  '-c:v', 'libx264', '-preset', 'slow', '-crf', '19',
+  '-r', '30', '-pix_fmt', 'yuv420p',
+  '-movflags', '+faststart', OUT,
 ]);
 
 console.log('DONE', OUT);
