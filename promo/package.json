@@ -1,0 +1,20 @@
+{
+  "name": "represent-promo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Remotion promo film for the Represent app",
+  "scripts": {
+    "studio": "remotion studio src/index.ts",
+    "render": "node render.mjs",
+    "stills": "node stills.mjs"
+  },
+  "license": "UNLICENSED",
+  "dependencies": {
+    "@remotion/bundler": "^4.0.499",
+    "@remotion/cli": "^4.0.499",
+    "@remotion/renderer": "^4.0.499",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "remotion": "^4.0.499"
+  }
+}
