@@ -1,13 +1,23 @@
-# Represent — promo film
+# Represent — promo films
 
-A 34-second vertical (1080×1920) promo film for the app, built with
+Vertical (1080×1920) promo films for the app, built with
 [Remotion](https://remotion.dev). Remotion renders React components frame by
 frame into an MP4, so the whole video is code — editing a line of copy and
 re-rendering takes a couple of minutes and costs nothing.
 
 Sized for X, Instagram Reels, TikTok and YouTube Shorts.
 
-## The cut
+Two compositions:
+
+- **PromoVertical** (34s) — the main brand film, scene files in `src/scenes/`
+- **PollVsBallot** (23s) — poll-vs-ballot split screen, scene files in
+  `src/compare/`. Top half: a generic poll ("QuickPoll", deliberately not any
+  real product's UI) thrashing between percentages while the same handle votes
+  nine times. Bottom half: the same question as a Represent ballot, filling
+  one verified human at a time, tally sealed until 25. Verdict: "Polls count
+  clicks. Ballots count people."
+
+## The main film's cut
 
 | # | Scene | Length | What's on screen |
 |---|-------|--------|------------------|
@@ -47,7 +57,8 @@ First time on a machine:
 
 Then to make the MP4 (lands in `out/represent-promo.mp4`):
 
-    npm run render
+    npm run render                          # the main film
+    node render-chunked.mjs PollVsBallot    # → out/represent-poll-vs-ballot.mp4
 
 That renders in 120-frame chunks, one child process each, and stitches the
 parts with ffmpeg at the end. Finished chunks are cached in `out/parts/`, so a

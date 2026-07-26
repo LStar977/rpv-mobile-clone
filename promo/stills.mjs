@@ -6,12 +6,13 @@ const EXE = process.env.PROMO_BROWSER;
 const browser = EXE
   ? { browserExecutable: EXE, chromiumOptions: { gl: 'swangle' } }
   : {};
+const ID = process.env.COMP || 'PromoVertical';
 const frames = process.argv.slice(2).map(Number);
 
 const serveUrl = await bundle({ entryPoint: path.resolve('src/index.ts') });
 const composition = await selectComposition({
   serveUrl,
-  id: 'PromoVertical',
+  id: ID,
   ...browser,
 });
 
@@ -21,8 +22,7 @@ for (const frame of frames) {
     serveUrl,
     output: path.resolve(`out/f${frame}.png`),
     frame,
-    browserExecutable: EXE,
-    chromiumOptions: { gl: 'swangle' },
+    ...browser,
     overwrite: true,
   });
   console.log('rendered', frame);
