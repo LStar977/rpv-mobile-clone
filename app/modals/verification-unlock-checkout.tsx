@@ -256,7 +256,7 @@ export default function VerificationUnlockCheckoutScreen() {
           <Text style={{ fontSize: 14, fontFamily: FONTS.sansBold, color: colors.text, marginBottom: SPACING.sm }}>
             What you get
           </Text>
-          <Bullet color={colors.success} text="Members must verify their identity (Veriff/Didit) before voting in this org." textColor={colors.text} />
+          <Bullet color={colors.success} text="Members must verify their identity with Didit before voting in this org." textColor={colors.text} />
           <Bullet color={colors.success} text="Verification is fully covered — members never see a payment prompt." textColor={colors.text} />
           <Bullet color={colors.success} text="One-time charge. Toggle the feature on and off freely after payment." textColor={colors.text} />
           <Bullet color={colors.success} text="Receipt + refund eligibility per Stripe / App Store policy." textColor={colors.text} />

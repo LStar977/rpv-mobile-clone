@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Represent Wallet",
+    "name": "Represent",
     "slug": "represent-wallet",
     "version": "2.0.0",
     "orientation": "portrait",
@@ -19,7 +19,7 @@
       "usesAppleSignIn": true,
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
-        "NSCameraUsageDescription": "Represent uses your camera to verify your identity through our partner Veriff.",
+        "NSCameraUsageDescription": "Represent uses your camera to verify your identity through our partner Didit.",
         "NSFaceIDUsageDescription": "Represent uses Face ID to securely sign you in to your verified civic account.",
         "NSMicrophoneUsageDescription": "Represent uses your microphone during identity verification recordings.",
         "NSPhotoLibraryUsageDescription": "Represent needs access to your photo library to attach images to proposals.",

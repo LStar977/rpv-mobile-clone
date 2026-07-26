@@ -458,7 +458,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.setHeader("Access-Control-Allow-Origin", "*");
     res.setHeader("Cache-Control", "public, max-age=60");
   };
-  const PUBLIC_TALLY_THRESHOLD = 25;
+  const PUBLIC_TALLY_THRESHOLD = 10;
 
   // Alberta Shadow Referendum — the /alberta campaign page hard-codes these
   // proposal ids. Yes/no splits obey the threshold rule: below 25 verified

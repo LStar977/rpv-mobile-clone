@@ -21,7 +21,7 @@ import { useTheme, FONTS, ANIMATION } from '../../lib/theme';
 // - Counts are always mono, always tabular, always exact.
 // ═══════════════════════════════════════════════════════════════════════════════
 
-export const TALLY_THRESHOLD = 25;
+export const TALLY_THRESHOLD = 10;
 
 type TallyBarVariant = 'full' | 'compact' | 'inline';
 

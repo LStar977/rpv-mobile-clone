@@ -357,15 +357,15 @@ function BallotCard({
         {proposal.title}
       </Text>
 
-      {/* Tally — TallyBar enforces the 25-ballot threshold (dots below it) */}
+      {/* Tally — TallyBar enforces TALLY_THRESHOLD (dots below it) */}
       {voteType !== 'yes-no' ? (
         <View style={ballotStyles.optionsRow}>
           <Text style={[ballotStyles.optionsText, { color: colors.textSecondary }]}>
             {optionCount || 2} OPTIONS · {voteType === 'ranked-choice' ? 'RANK YOUR CHOICES' : 'PICK ONE'}
           </Text>
-          {mcTotal < 25 && !ended ? (
+          {mcTotal < TALLY_THRESHOLD && !ended ? (
             <Text style={[ballotStyles.optionsText, { color: colors.gold }]}>
-              {mcTotal} OF 25 · TALLY AT 25
+              {mcTotal} OF {TALLY_THRESHOLD} · TALLY AT {TALLY_THRESHOLD}
             </Text>
           ) : (
             <Text style={[ballotStyles.optionsText, { color: colors.textTertiary }]}>

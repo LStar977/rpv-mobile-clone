@@ -16,7 +16,7 @@ const VERIFICATION_BENEFITS = [
 ];
 
 const CITIZEN_BENEFITS = [
-  'Vote on citizens-only proposals (e.g. the Alberta referendum)',
+  'Vote on citizens-only ballots, where citizenship is required',
   'Everything standard verification unlocks',
   'Free, lifetime access',
 ];
@@ -153,7 +153,7 @@ export default function VerificationPaymentScreen() {
                 <Ionicons name="chevron-forward" size={20} color={colors.gold} />
               </View>
               <Text style={[styles.pickerDesc, { color: colors.textSecondary }]}>
-                Everything Standard unlocks, <Text style={{ color: colors.gold, fontFamily: FONTS.sansSemiBold }}>plus citizens-only proposals</Text> like the Alberta separation referendum.
+                Everything Standard unlocks, <Text style={{ color: colors.gold, fontFamily: FONTS.sansSemiBold }}>plus citizens-only ballots</Text> — referendum-grade votes restricted to verified citizens.
               </Text>
             </TouchableOpacity>
           </Animated.View>
