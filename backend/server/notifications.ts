@@ -252,17 +252,25 @@ export async function notifyTokenClaimed(userId: string, proposalTitle: string, 
   await sendPushNotifications(messages);
 }
 
+/**
+ * Tell a proposal author that a ballot was cast — never who cast it.
+ *
+ * This deliberately takes no voter argument. Disclosing the voter's identity
+ * to the author breaks ballot secrecy: on a ballot with few votes, knowing who
+ * participated is close to knowing how they voted, and on a contested question
+ * mere participation is sensitive on its own.
+ */
 export async function notifyProposalVote(proposal: {
   id: string;
   title: string;
   userId: string;
-}, voterName: string): Promise<void> {
+}): Promise<void> {
   const tokens = await getUserPushTokens(proposal.userId);
 
   const messages: ExpoPushMessage[] = tokens.map(token => ({
     to: token,
-    title: 'New Vote on Your Proposal',
-    body: `${voterName} voted on "${proposal.title}"`,
+    title: 'New Ballot Cast',
+    body: `Someone voted on "${proposal.title}"`,
     data: { proposalId: proposal.id, type: 'proposal_vote' },
     sound: 'default',
   }));

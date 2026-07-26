@@ -1125,10 +1125,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       log(`Vote recorded ${isOrgScoped ? 'off-chain (org)' : 'on-chain relay queued'}: user=${rid(userId)}, proposal=${proposalId}, position=${position}`);
 
-      // Notify proposal owner that someone voted on their proposal
+      // Notify the proposal owner that a ballot was cast. Never say who cast
+      // it — the author is not entitled to know who voted on their proposal.
       if (proposal.userId !== userId) {
-        const voterName = user?.name || 'Someone';
-        notifyProposalVote({ id: proposal.id, title: proposal.title, userId: proposal.userId }, voterName);
+        notifyProposalVote({ id: proposal.id, title: proposal.title, userId: proposal.userId });
       }
 
       // Fire-and-forget: relay the vote on-chain and backfill the tx hash.
