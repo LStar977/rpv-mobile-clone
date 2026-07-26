@@ -28,7 +28,7 @@ import {
 import { checkContent } from "./profanityFilter";
 import { eq, count, and, sql, desc, isNull, inArray } from "drizzle-orm";
 import { db } from "./db";
-import { savePushToken, notifyNewProposal, notifyTokenClaimed, notifyProposalVote, notifyOrgProposal } from "./notifications";
+import { savePushToken, notifyNewProposal, notifyTokenClaimed, notifyVoteMilestone, notifyOrgProposal } from "./notifications";
 import { sendEmail, buildOrgInviteEmail } from "./email";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import jwt from "jsonwebtoken";
@@ -1125,11 +1125,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       log(`Vote recorded ${isOrgScoped ? 'off-chain (org)' : 'on-chain relay queued'}: user=${rid(userId)}, proposal=${proposalId}, position=${position}`);
 
-      // Notify the proposal owner that a ballot was cast. Never say who cast
-      // it — the author is not entitled to know who voted on their proposal.
-      if (proposal.userId !== userId) {
-        notifyProposalVote({ id: proposal.id, title: proposal.title, userId: proposal.userId });
-      }
+      // Tell the proposal owner when the ballot crosses a milestone — never
+      // per-vote, and never who voted. Org ballots publish immediately, so
+      // they have no threshold moment.
+      (async () => {
+        try {
+          const [{ n }] = await db
+            .select({ n: count() })
+            .from(votes)
+            .where(eq(votes.proposalId, proposalId));
+          await notifyVoteMilestone(
+            { id: proposal.id, title: proposal.title, userId: proposal.userId },
+            Number(n) || 0,
+            isOrgScoped ? null : PUBLIC_TALLY_THRESHOLD,
+          );
+        } catch (err) {
+          log(`Milestone notification failed (non-critical): ${err}`);
+        }
+      })();
 
       // Fire-and-forget: relay the vote on-chain and backfill the tx hash.
       // Failures are logged, never surfaced — the vote is already recorded

@@ -253,25 +253,49 @@ export async function notifyTokenClaimed(userId: string, proposalTitle: string, 
 }
 
 /**
- * Tell a proposal author that a ballot was cast — never who cast it.
- *
- * This deliberately takes no voter argument. Disclosing the voter's identity
- * to the author breaks ballot secrecy: on a ballot with few votes, knowing who
- * participated is close to knowing how they voted, and on a contested question
- * mere participation is sensitive on its own.
+ * Counts at which a proposal author hears from us. Deliberately sparse — the
+ * author should get a handful of meaningful updates over a ballot's life, not
+ * a buzz per vote.
  */
-export async function notifyProposalVote(proposal: {
-  id: string;
-  title: string;
-  userId: string;
-}): Promise<void> {
+const VOTE_MILESTONES = [25, 50, 100, 250, 500, 1000, 2500, 5000, 10000];
+
+/**
+ * Tell a proposal author their ballot hit a milestone. Never says who voted:
+ * disclosing the voter's identity to the author breaks ballot secrecy, because
+ * on a ballot with few votes knowing who participated is close to knowing how
+ * they voted, and on a contested question participation is sensitive on its own.
+ *
+ * `publishThreshold` is the count at which the split becomes public, or null
+ * for org ballots, which publish immediately and have no threshold moment.
+ * Fires only when totalVotes lands exactly on a milestone, so each one is sent
+ * once as the ballot passes it.
+ */
+export async function notifyVoteMilestone(
+  proposal: { id: string; title: string; userId: string },
+  totalVotes: number,
+  publishThreshold: number | null,
+): Promise<void> {
+  const unit = publishThreshold === null ? 'ballots' : 'verified ballots';
+  let title: string;
+  let body: string;
+
+  if (publishThreshold !== null && totalVotes === publishThreshold) {
+    title = 'Your result is now public';
+    body = `"${proposal.title}" reached ${totalVotes} ${unit} — the split is now published.`;
+  } else if (VOTE_MILESTONES.includes(totalVotes)) {
+    title = 'Ballot milestone';
+    body = `"${proposal.title}" has reached ${totalVotes.toLocaleString('en-CA')} ${unit}.`;
+  } else {
+    return;
+  }
+
   const tokens = await getUserPushTokens(proposal.userId);
 
   const messages: ExpoPushMessage[] = tokens.map(token => ({
     to: token,
-    title: 'New Ballot Cast',
-    body: `Someone voted on "${proposal.title}"`,
-    data: { proposalId: proposal.id, type: 'proposal_vote' },
+    title,
+    body,
+    data: { proposalId: proposal.id, type: 'vote_milestone' },
     sound: 'default',
   }));
 
