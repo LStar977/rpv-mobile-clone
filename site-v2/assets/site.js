@@ -84,6 +84,68 @@
     ledger.innerHTML = rows;
   }
 
+  /* ── Live ledger counter ─────────────────────────────────────────── */
+  // The real total, from the public API. Nothing is rendered until it lands,
+  // and a failed request leaves the band hidden rather than showing a guess.
+  var counter = document.getElementById('counter');
+  if (counter) {
+    var API = 'https://representportal.com/api/public/marquee';
+    var digitsHost = document.getElementById('digits');
+    var shown = null;
+
+    // Screen readers should hear "138 ballots", not "one, three, eight".
+    digitsHost.setAttribute('role', 'img');
+
+    function paint(n) {
+      // Zero is treated as nothing to show rather than as a number: a band
+      // reading "0 BALLOTS RECORDED TO DATE" is worse than no band at all.
+      if (typeof n !== 'number' || !isFinite(n) || n < 1) return;
+      n = Math.floor(n);
+      if (n === shown) return;
+
+      var str = n.toLocaleString('en-US');
+      var prev = shown === null ? '' : shown.toLocaleString('en-US');
+      var frag = document.createDocumentFragment();
+
+      for (var i = 0; i < str.length; i++) {
+        var ch = str.charAt(i);
+        if (ch === ',') {
+          var c = document.createElement('span');
+          c.className = 'comma';
+          c.textContent = ',';
+          frag.appendChild(c);
+          continue;
+        }
+        var cell = document.createElement('span');
+        var cls = 'digit';
+        if (i === str.length - 1) cls += ' digit--last';
+        if (!reduced && (str.length !== prev.length || prev.charAt(i) !== ch)) cls += ' digit--turn';
+        cell.className = cls;
+        cell.textContent = ch;
+        frag.appendChild(cell);
+      }
+
+      digitsHost.innerHTML = '';
+      digitsHost.appendChild(frag);
+      digitsHost.setAttribute('aria-label', str + ' ballots recorded to date');
+      counter.hidden = false;
+      shown = n;
+    }
+
+    function poll() {
+      fetch(API, { headers: { Accept: 'application/json' } })
+        .then(function (r) { if (!r.ok) throw new Error('http ' + r.status); return r.json(); })
+        .then(function (d) { if (d && d.stats) paint(d.stats.ballotsCast); })
+        .catch(function () { /* stay hidden, or keep the last good number */ });
+    }
+
+    poll();
+    // "Updated continuously" has to be literally true, so re-check every
+    // minute — but only while someone is actually looking at the tab.
+    setInterval(function () { if (!document.hidden) poll(); }, 60000);
+    document.addEventListener('visibilitychange', function () { if (!document.hidden) poll(); });
+  }
+
   /* ── The threshold demonstration ─────────────────────────────────── */
   // Shows, rather than explains, the one rule that makes the product
   // different: the split is not visible until ten verified people have voted.

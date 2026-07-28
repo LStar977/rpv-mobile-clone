@@ -272,6 +272,72 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
 .hero-ledger div span:last-child { color: var(--gold); opacity: 0.75; }
 @media (max-width: 900px) { .hero-ledger { display: none; } }
 
+/* ── Live ledger counter ────────────────────────────────────────────── */
+/* One engraved cell per digit, newest digit gold. The number is fetched from
+   the public API at load; if that request fails the entire band stays hidden.
+   A placeholder, a rounded-up figure or a stale hard-coded number would be
+   indefensible on a page whose whole argument is that the count is real. */
+.counter {
+  background: var(--surface);
+  border-top: 1px solid var(--line-soft);
+  border-bottom: 1px solid var(--line-soft);
+}
+.counter[hidden] { display: none; }
+.counter-in {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: clamp(20px, 4vw, 48px);
+  padding: clamp(44px, 6vw, 76px) 0;
+}
+/* Each word is its own element rather than one string with <br>s, so the
+   caption can fold into a single centred row on narrow screens without the
+   words running together. */
+.counter-cap {
+  flex: none; width: 190px;
+  display: flex; flex-direction: column; align-items: flex-start;
+  font-family: var(--mono); font-weight: 500;
+  font-size: 11.5px; line-height: 1.75; letter-spacing: 0.22em;
+  text-transform: uppercase; color: var(--ink-3);
+}
+.counter-cap .tick { width: 34px; height: 2px; background: var(--gold); margin-top: 11px; }
+.counter-cap--right { align-items: flex-end; letter-spacing: 0.16em; }
+
+.digits {
+  display: flex; align-items: center; justify-content: center;
+  gap: clamp(5px, 0.9vw, 12px); flex-wrap: wrap;
+}
+.digit {
+  width: clamp(38px, 6vw, 88px); height: clamp(56px, 8.7vw, 128px);
+  display: flex; align-items: center; justify-content: center;
+  background: var(--bg); border: 1px solid var(--line);
+  border-radius: clamp(6px, 0.8vw, 10px);
+  font-family: var(--mono); font-weight: 500; line-height: 1;
+  font-size: clamp(32px, 5.2vw, 76px);
+  font-feature-settings: 'tnum' 1;
+  color: var(--ink);
+}
+.digit--last { border-color: var(--gold-dim); color: var(--gold); }
+.comma {
+  font-family: var(--mono); font-weight: 500;
+  font-size: clamp(24px, 3.6vw, 54px); color: var(--ink-3);
+}
+/* Only cells whose value actually changed carry this class, so a refresh that
+   moves 138 → 139 turns one card rather than restarting the whole row. */
+.digit--turn { animation: turn 0.5s var(--ease) both; }
+@keyframes turn {
+  from { opacity: 0; transform: translateY(-10px); }
+  to   { opacity: 1; transform: none; }
+}
+@media (max-width: 1100px) {
+  .counter-in { flex-direction: column; gap: 20px; }
+  .counter-cap, .counter-cap--right {
+    width: auto; flex-direction: row; flex-wrap: wrap;
+    align-items: center; justify-content: center;
+    gap: 0.45em; letter-spacing: 0.2em;
+  }
+  .counter-cap .tick { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { .digit--turn { animation: none; } }
+
 /* ── The rule: threshold dots ───────────────────────────────────────── */
 .dots { display: flex; gap: 7px; flex-wrap: wrap; }
 /* These convey ballot state, so both the filled and empty dot must clear 3:1
