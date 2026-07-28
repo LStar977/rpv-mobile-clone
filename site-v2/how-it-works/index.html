@@ -1,0 +1,257 @@
+<!doctype html>
+<html lang="en" class="no-js">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How it works — Represent</title>
+<meta name="description" content="How Represent verifies a voter, why results stay sealed until ten verified ballots, and how votes are written to a public ledger — currently in pilot.">
+<meta name="theme-color" content="#040707">
+<meta property="og:title" content="How Represent works">
+<meta property="og:description" content="Verified identity, a sealed threshold, and a public ledger in pilot. The whole method in one page.">
+<meta property="og:type" content="article">
+<link rel="icon" href="../assets/icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&family=Onest:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/site.css">
+<script>
+  document.documentElement.classList.remove('no-js');
+  try { var t = localStorage.getItem('rv-theme'); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
+</script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="obsidian mast">
+  <div class="wrap mast-in">
+    <a class="mast-brand" href="../">
+      <img src="../assets/icon.png" alt="Represent" width="27" height="27">
+      <span class="mast-word">REPRESENT</span>
+    </a>
+    <nav class="mast-nav" aria-label="Primary">
+      <a href="./" aria-current="page">How it works</a>
+      <a href="../organizations/">Organizations</a>
+      <a href="../app/">The app</a>
+      <a href="https://representvote.com/record">The record ↗</a>
+    </nav>
+    <button class="theme-btn" id="theme" type="button" aria-label="Switch colour theme">Theme</button>
+  </div>
+</header>
+
+<main id="main">
+  <section class="obsidian" style="padding:clamp(64px,10vw,120px) 0 clamp(48px,7vw,84px)">
+    <div class="wrap">
+      <p class="label rise">The method</p>
+      <h1 class="display rise" style="margin-top:24px;max-width:15ch">
+        Three guarantees, and how each one is kept.
+      </h1>
+      <p class="lede rise" style="margin-top:28px">
+        Represent makes exactly three promises. Everything below is how each is
+        enforced in practice — including where the limits are.
+      </p>
+    </div>
+  </section>
+
+  <!-- 01 Identity -->
+  <section class="ivory section" aria-labelledby="identity">
+    <div class="wrap">
+      <div class="cols cols-2" style="align-items:start">
+        <div>
+          <p class="label rise">01 — Identity</p>
+          <h2 class="h2 rise" id="identity" style="margin-top:16px">Every voter is a verified human.</h2>
+        </div>
+        <div>
+          <p class="lede rise">
+            Before you can vote, you verify once: a government-issued ID and a
+            liveness check — a short selfie capture that defeats a photo of a
+            photo — handled by a certified identity provider.
+          </p>
+          <p class="body rise" style="margin-top:20px">
+            Your region comes from the document itself, not a dropdown you fill
+            in, which is what makes a local ballot actually local.
+          </p>
+          <p class="body rise" style="margin-top:20px">
+            <strong style="color:var(--ink)">Represent never stores your documents.</strong>
+            The images stay inside the provider's infrastructure. What we keep is
+            the decision — verified or not, and the region — attached to a one-way
+            hash. Our database holds no passport images to leak, because we never
+            receive them.
+          </p>
+          <p class="body rise" style="margin-top:20px">
+            Verification is free to you. We treat the cost as ours to carry.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 02 Threshold -->
+  <section class="ivory section" style="padding-top:0" aria-labelledby="threshold">
+    <div class="wrap">
+      <hr class="rule" style="margin-bottom:clamp(56px,8vw,104px)">
+      <div class="cols cols-2" style="align-items:start">
+        <div>
+          <p class="label rise">02 — The threshold</p>
+          <h2 class="h2 rise" id="threshold" style="margin-top:16px">No result until ten people have voted.</h2>
+        </div>
+        <div>
+          <p class="lede rise">
+            A public ballot shows no split until ten verified people have voted on
+            it. Until then you see how many ballots exist and your own receipt —
+            nothing else.
+          </p>
+          <p class="body rise" style="margin-top:20px">
+            This is deliberate, and it costs us engagement. A running tally changes
+            how people vote: they join the side that's winning. Hiding it until
+            there are enough ballots to mean something removes the bandwagon, and
+            removes the ability to quote a landslide that was really three votes.
+          </p>
+          <p class="body rise" style="margin-top:20px">
+            When a ballot closes below the threshold, the count is recorded but the
+            split is never shown. A number too small to mean anything doesn't get
+            published just because it exists.
+          </p>
+
+          <div class="ruleCard rise" style="margin-top:28px">
+            <p class="label" style="margin:0 0 16px">Below the threshold, you see</p>
+            <div class="dots" aria-hidden="true">
+              <span class="dot on"></span><span class="dot on"></span>
+              <span class="dot on"></span><span class="dot on"></span>
+              <span class="dot on"></span><span class="dot on"></span>
+              <span class="dot"></span><span class="dot"></span>
+              <span class="dot"></span><span class="dot"></span>
+            </div>
+            <p class="count">6 of 10 verified ballots</p>
+            <p class="small" style="margin-top:12px">
+              Your own ballot: <strong style="color:var(--ink)">recorded and counted</strong>.
+              Everyone else's: not yet.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 03 Record -->
+  <section class="ivory section" style="padding-top:0" aria-labelledby="record">
+    <div class="wrap">
+      <hr class="rule" style="margin-bottom:clamp(56px,8vw,104px)">
+      <div class="cols cols-2" style="align-items:start">
+        <div>
+          <p class="label rise">03 — The record</p>
+          <h2 class="h2 rise" id="record" style="margin-top:16px">Checkable by someone who doesn't trust us.</h2>
+        </div>
+        <div>
+          <p class="lede rise">
+            Every ballot is written twice: to our database, so the app is instant,
+            and to a public blockchain ledger, so the count can be checked by
+            someone who doesn't trust us.
+          </p>
+          <p class="body rise" style="margin-top:20px">
+            That second write is the point. Any platform can show you a number.
+            Far fewer let you verify that number independently — and a company
+            that can silently edit its own results is asking you to take its word.
+          </p>
+          <p class="body rise" style="margin-top:20px">
+            The ledger records that a ballot was cast and sealed. It does not
+            record who you are.
+          </p>
+          <div class="card rise" style="margin-top:26px">
+            <p class="label label--quiet">Where this stands today</p>
+            <p class="body small" style="margin-top:12px">
+              The public ledger is running in <strong style="color:var(--ink)">pilot phase</strong>
+              on a test network while the system is proven. The method, the
+              contract addresses and a worked example are published on the
+              methodology page — including what is not yet finished.
+            </p>
+            <p class="small" style="margin-top:16px">
+              <a href="https://representvote.com/record/methodology" style="color:var(--gold-text);border-bottom:1px solid var(--gold-dim);padding-bottom:2px">Read the methodology</a>
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Honest limits -->
+  <section class="ivory section" style="padding-top:0" aria-labelledby="limits">
+    <div class="wrap">
+      <hr class="rule" style="margin-bottom:clamp(56px,8vw,104px)">
+      <p class="label rise">What Represent does not do</p>
+      <h2 class="h2 rise" id="limits" style="margin-top:18px;max-width:20ch">
+        It makes a count undeniable. That is all it makes.
+      </h2>
+      <div class="cols cols-3" style="margin-top:46px">
+        <article class="card rise">
+          <h3 class="h3" style="margin-top:0">It doesn't bind anyone</h3>
+          <p class="body small">
+            A Represent ballot is not a legal vote and does not obligate any
+            government or institution to act. It produces evidence, not authority.
+          </p>
+        </article>
+        <article class="card rise">
+          <h3 class="h3" style="margin-top:0">It doesn't prove a whole population</h3>
+          <p class="body small">
+            A result reflects the verified people who voted — not a random sample
+            of everyone. It is a census of participants, not a poll.
+          </p>
+        </article>
+        <article class="card rise">
+          <h3 class="h3" style="margin-top:0">It doesn't take a side</h3>
+          <p class="body small">
+            Represent has no position on any question asked on it. The only
+            interest is that the count is real.
+          </p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section class="obsidian section" aria-labelledby="close">
+    <div class="wrap">
+      <div class="cols cols-2" style="align-items:end">
+        <div>
+          <p class="label rise">Check it yourself</p>
+          <h2 class="h2 rise" id="close" style="margin-top:16px;max-width:16ch">
+            Don't take our word for any of this.
+          </h2>
+        </div>
+        <div>
+          <p class="lede rise">
+            Every published result and the method behind it are on the public
+            record. Read it before you decide whether to trust the count.
+          </p>
+          <div class="hero-cta rise">
+            <a class="btn btn--gold" href="https://representvote.com/record">Open the public record</a>
+            <a class="btn btn--ghost" href="https://representvote.com/record/methodology">Methodology</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="obsidian foot">
+  <div class="wrap foot-in">
+    <div>
+      <p class="mast-word" style="font-size:15px">REPRESENT</p>
+      <p class="small" style="margin-top:12px;color:var(--ink-3);max-width:34ch">
+        A verified public record. Built in Calgary, Canada.
+      </p>
+    </div>
+    <nav class="foot-links" aria-label="Footer">
+      <a href="./">How it works</a>
+      <a href="../organizations/">Organizations</a>
+      <a href="../app/">The app</a>
+    </nav>
+    <nav class="foot-links" aria-label="Legal">
+      <a href="https://representvote.com/record">The public record</a>
+      <a href="https://representvote.com/record/methodology">Methodology</a>
+      <a href="mailto:sales@representvote.com">sales@representvote.com</a>
+    </nav>
+  </div>
+</footer>
+
+<script src="../assets/site.js" defer></script>
+</body>
+</html>

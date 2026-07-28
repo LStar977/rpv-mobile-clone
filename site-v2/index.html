@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="en" class="no-js">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Represent — Impossible to fake. Impossible to dismiss.</title>
+<meta name="description" content="A civic ballot where every voter is a verified human and every vote counts exactly once. Ballots are written to a public ledger, now in pilot.">
+<meta name="theme-color" content="#040707">
+<meta property="og:title" content="Represent — Impossible to fake. Impossible to dismiss.">
+<meta property="og:description" content="Every voter verified. Every vote counted once. One person, one vote.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://representvote.com">
+<link rel="icon" href="assets/icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&family=Onest:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/site.css">
+<script>
+  document.documentElement.classList.remove('no-js');
+  try { var t = localStorage.getItem('rv-theme'); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
+</script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="obsidian mast">
+  <div class="wrap mast-in">
+    <a class="mast-brand" href="/">
+      <img src="assets/icon.png" alt="Represent" width="27" height="27">
+      <span class="mast-word">REPRESENT</span>
+    </a>
+    <nav class="mast-nav" aria-label="Primary">
+      <a href="how-it-works/">How it works</a>
+      <a href="organizations/">Organizations</a>
+      <a href="app/">The app</a>
+      <a href="https://representvote.com/record">The record ↗</a>
+    </nav>
+    <button class="theme-btn" id="theme" type="button" aria-label="Switch colour theme">Theme</button>
+  </div>
+</header>
+
+<main id="main">
+
+  <!-- ── Hero ─────────────────────────────────────────────────────── -->
+  <section class="obsidian hero">
+    <div class="hero-ledger" aria-hidden="true" id="ledger"></div>
+    <div class="wrap hero-in">
+      <p class="label rise">One verified human · One vote</p>
+      <h1 class="display rise">Impossible to fake.<br><em>Impossible to dismiss.</em></h1>
+      <p class="lede rise">
+        Anyone can run a poll. Proving who actually voted is the hard part. Represent is a
+        ballot where every voter has passed a government-ID check and every person
+        counts exactly once — with each vote written to a public ledger, now
+        running in pilot, so the count can be checked independently.
+      </p>
+      <div class="hero-cta rise">
+        <a class="btn btn--gold" href="https://apps.apple.com/ca/app/id6756912022">Get the app — free</a>
+        <a class="btn btn--ghost" href="how-it-works/">How it works</a>
+      </div>
+      <p class="hero-note rise">Free on the App Store · Verification takes about three minutes</p>
+    </div>
+  </section>
+
+  <!-- ── The problem ──────────────────────────────────────────────── -->
+  <section class="obsidian section" aria-labelledby="problem">
+    <div class="wrap">
+      <p class="label label--quiet rise">The problem</p>
+      <div class="cols cols-2" style="margin-top:34px;align-items:start">
+        <div>
+          <p class="stat rise">386,698</p>
+          <p class="body rise" style="margin-top:20px">
+            signatures on the largest petition in Canadian history — dismissed in
+            a single news cycle.
+          </p>
+        </div>
+        <div>
+          <h2 class="h2 rise" id="problem">Not because the cause was&nbsp;wrong.</h2>
+          <p class="lede rise" style="margin-top:20px">
+            Because nobody could prove the signers were real people. That is the
+            flaw in every online poll, petition and consultation: a name costs
+            nothing to invent, so a number built from names proves nothing.
+          </p>
+          <p class="body rise" style="margin-top:20px">
+            Generating thousands of convincing accounts is now trivial. Every
+            unverified number online is suspect by default — and the people who
+            actually signed get thrown out with the fakes.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── The rule (interactive) ───────────────────────────────────── -->
+  <section class="ivory section" aria-labelledby="rule">
+    <div class="wrap">
+      <p class="label rise">The rule</p>
+      <h2 class="h2 rise" id="rule" style="margin-top:18px;max-width:18ch">
+        No result until enough real people have voted.
+      </h2>
+      <p class="lede rise" style="margin-top:22px">
+        A ballot stays sealed until ten verified people have voted on it. Nobody
+        sees a running tally, so nobody votes with the crowd — and nobody can
+        spin a result out of the first three votes.
+      </p>
+
+      <div class="cols cols-2 rise" style="margin-top:48px;align-items:center">
+        <div class="ruleCard" id="ruleCard">
+          <p class="label" style="margin:0 0 20px">Example ballot · sealed</p>
+          <p class="h3" style="margin:0 0 24px">
+            Should the city extend weekend transit to 1&nbsp;a.m.?
+          </p>
+          <div class="dots" id="dots" aria-hidden="true"></div>
+          <p class="count" id="count" aria-live="polite">0 of 10 verified ballots</p>
+
+          <div id="sealedState" class="sealed">
+            <p class="small" style="margin-top:14px">
+              The split stays hidden until the threshold is reached.
+            </p>
+          </div>
+
+          <div id="publishedState" class="published" hidden>
+            <div class="split">
+              <span class="s" style="flex:0 0 62%">SUPPORT 62%</span>
+              <span class="o" style="flex:1">38% OPPOSE</span>
+            </div>
+            <p class="small" style="margin-top:14px">
+              Published. Ten verified people, each counted once, on the public record.
+            </p>
+          </div>
+        </div>
+
+        <div>
+          <div class="numbered" style="margin-bottom:26px">
+            <span class="n">1</span>
+            <div>
+              <h3 class="h3">Nobody votes with the crowd</h3>
+              <p class="body small" style="margin-top:8px">
+                Early voters can't see which way it's going, so they answer the
+                question instead of joining a side.
+              </p>
+            </div>
+          </div>
+          <div class="numbered" style="margin-bottom:26px">
+            <span class="n">2</span>
+            <div>
+              <h3 class="h3">No spin from a handful of votes</h3>
+              <p class="body small" style="margin-top:8px">
+                A result of three-to-one means nothing when it's three votes.
+                Below the threshold there is simply nothing to quote.
+              </p>
+            </div>
+          </div>
+          <div class="numbered">
+            <span class="n">3</span>
+            <div>
+              <h3 class="h3">You still get your receipt</h3>
+              <p class="body small" style="margin-top:8px">
+                You always see that your own ballot was recorded and counted —
+                just not everyone else's, not yet.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <p class="small rise" style="margin-top:28px;color:var(--ink-3)">
+        Illustration of the threshold rule. The ballot above is an example, not a live vote.
+      </p>
+    </div>
+  </section>
+
+  <!-- ── How it works ─────────────────────────────────────────────── -->
+  <section class="ivory section" style="padding-top:0" aria-labelledby="how">
+    <div class="wrap">
+      <hr class="rule" style="margin-bottom:clamp(56px,8vw,104px)">
+      <p class="label rise">How it works</p>
+      <h2 class="h2 rise" id="how" style="margin-top:18px">Three things, and no more.</h2>
+
+      <div class="cols cols-3" style="margin-top:52px">
+        <article class="card rise">
+          <p class="label label--quiet">01</p>
+          <h3 class="h3">Verified identity</h3>
+          <p class="body small">
+            A government ID and a liveness check, through a certified provider,
+            once. Your location comes from the document itself — not a dropdown.
+            Represent never stores your documents.
+          </p>
+        </article>
+        <article class="card rise">
+          <p class="label label--quiet">02</p>
+          <h3 class="h3">One person, one vote</h3>
+          <p class="body small">
+            Duplicate accounts can't vote twice, because the same person can't
+            verify twice. The count is a count of people, not of clicks.
+          </p>
+        </article>
+        <article class="card rise">
+          <p class="label label--quiet">03</p>
+          <h3 class="h3">A public record</h3>
+          <p class="body small">
+            Every ballot is written to a public ledger as well as our database,
+            so the count can be audited independently rather than taken on trust.
+            The ledger is running in pilot phase.
+          </p>
+        </article>
+      </div>
+
+      <p class="small rise" style="margin-top:30px">
+        <a href="how-it-works/" style="color:var(--gold-text);border-bottom:1px solid var(--gold-dim);padding-bottom:2px">
+          Read the full method
+        </a>
+        <span style="color:var(--ink-3)"> · the public ledger is in pilot phase</span>
+      </p>
+    </div>
+  </section>
+
+  <!-- ── Organizations ────────────────────────────────────────────── -->
+  <section class="ivory section" style="padding-top:0" aria-labelledby="orgs">
+    <div class="wrap">
+      <hr class="rule" style="margin-bottom:clamp(56px,8vw,104px)">
+      <p class="label rise">For organizations</p>
+      <h2 class="h2 rise" id="orgs" style="margin-top:18px;max-width:20ch">
+        Ask your members anything. Count every one of them.
+      </h2>
+      <p class="lede rise" style="margin-top:22px">
+        Unions, associations, boards and community groups can run ratifications,
+        elections and member consultations on the same rails — unlimited ballots,
+        results the moment voting closes.
+      </p>
+
+      <div class="cols cols-4 rise" style="margin-top:46px">
+        <div class="tier">
+          <p class="label label--quiet">Free</p>
+          <p class="price">$0</p>
+          <p class="per">per month</p>
+          <p class="cap">Up to 25 members</p>
+        </div>
+        <div class="tier tier--mark">
+          <p class="label">Pro</p>
+          <p class="price">$59</p>
+          <p class="per">per month</p>
+          <p class="cap">Up to 250 members</p>
+        </div>
+        <div class="tier">
+          <p class="label label--quiet">Plus</p>
+          <p class="price">$179</p>
+          <p class="per">per month</p>
+          <p class="cap">Up to 1,000 members</p>
+        </div>
+        <div class="tier">
+          <p class="label label--quiet">Business</p>
+          <p class="price">$499</p>
+          <p class="per">per month</p>
+          <p class="cap">Up to 5,000 members</p>
+        </div>
+      </div>
+
+      <div class="hero-cta rise" style="margin-top:36px">
+        <a class="btn btn--ghost" href="organizations/">See what organizations get</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Close ────────────────────────────────────────────────────── -->
+  <section class="obsidian section" aria-labelledby="close">
+    <div class="wrap" style="text-align:center">
+      <img src="assets/icon.png" alt="" width="86" height="86" style="border-radius:50%;margin:0 auto 34px" class="rise">
+      <h2 class="h2 rise" id="close">One verified human. One vote.</h2>
+      <p class="lede rise" style="margin:22px auto 0;text-align:center">
+        Free on the App Store. Verification takes about three minutes, once.
+      </p>
+      <div class="hero-cta rise" style="justify-content:center;margin-top:38px">
+        <a class="btn btn--gold" href="https://apps.apple.com/ca/app/id6756912022">Get the app</a>
+        <a class="btn btn--ghost" href="https://representvote.com/record">See the public record</a>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="obsidian foot">
+  <div class="wrap foot-in">
+    <div>
+      <p class="mast-word" style="font-size:15px">REPRESENT</p>
+      <p class="small" style="margin-top:12px;color:var(--ink-3);max-width:34ch">
+        A verified public record. Built in Calgary, Canada.
+      </p>
+    </div>
+    <nav class="foot-links" aria-label="Footer">
+      <a href="how-it-works/">How it works</a>
+      <a href="organizations/">Organizations</a>
+      <a href="app/">The app</a>
+    </nav>
+    <nav class="foot-links" aria-label="Legal">
+      <a href="https://representvote.com/record">The public record</a>
+      <a href="https://representvote.com/record/methodology">Methodology</a>
+      <a href="mailto:sales@representvote.com">sales@representvote.com</a>
+    </nav>
+  </div>
+</footer>
+
+<script src="assets/site.js" defer></script>
+</body>
+</html>
