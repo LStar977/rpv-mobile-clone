@@ -9,11 +9,17 @@ import { baseNetwork } from "./base-network";
 import { log } from "./app";
 import { PostgresSessionStore } from "./session-store";
 
-const JWT_SECRET = process.env.SESSION_SECRET;
+// The boot guard below makes this effectively `string`; the assertion keeps
+// call sites from needing `!` sprinkled through them.
+const JWT_SECRET = process.env.SESSION_SECRET as string;
 const JWT_EXPIRES_IN = '7d';
 
 if (!JWT_SECRET) {
-  console.warn('WARNING: SESSION_SECRET not set. Mobile auth will be disabled.');
+  // Refuse to boot rather than run half-broken: with no secret, token
+  // issuing and verification silently diverge across endpoints, which is
+  // exactly the state that once trapped users in half-signed-in sessions.
+  console.error('FATAL: SESSION_SECRET is not set. The server cannot sign or verify mobile auth tokens without it.');
+  process.exit(1);
 }
 
 export function getSession() {
@@ -499,8 +505,12 @@ export async function setupAuth(app: Express) {
         return res.status(401).json({ error: "No token provided" });
       }
 
+      // Must judge tokens exactly like isAuthenticated does. If this endpoint
+      // is ever more lenient than the protected routes, the app trusts its
+      // "valid" answer, keeps a dead session, and users get stuck half
+      // signed in until they find the log-out button.
       const token = authHeader.split(' ')[1];
-      const decoded = jwt.verify(token, JWT_SECRET!) as { sub: string; email: string };
+      const decoded = jwt.verify(token, JWT_SECRET) as { sub: string; email: string };
 
       const user = await storage.getUser(decoded.sub);
       if (!user) {
