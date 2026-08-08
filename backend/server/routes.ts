@@ -575,16 +575,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
         };
       };
 
+      // Stats count EVERY public ballot, whatever its format. The yes-no
+      // filter belongs to the teaser rows (they need a two-way split to
+      // render), not to the totals — a vote on a public ranked-choice ballot
+      // is still a ballot recorded. Org ballots stay excluded: they are
+      // private and off the public record the counter advertises.
       const publicAll = (Array.isArray(all) ? all : []).filter(
-        (p: any) => !p.hiddenAt && !p.organizationId && (!p.voteType || p.voteType === "yes-no"),
+        (p: any) => !p.hiddenAt && !p.organizationId,
+      );
+      // Yes-no ballots keep live counters on the proposal row; multiple-choice
+      // and ranked ballots only exist as vote rows, so their share is counted
+      // from the votes table (demo-account votes excluded, matching the
+      // counters, which the demo sandbox never increments).
+      const yesNoCast = publicAll.reduce(
+        (s2: number, p: any) =>
+          (!p.voteType || p.voteType === "yes-no")
+            ? s2 + (Number(p.supportVotes) || 0) + (Number(p.opposeVotes) || 0)
+            : s2,
+        0,
+      );
+      const optionBallotIds = publicAll
+        .filter((p: any) => p.voteType && p.voteType !== "yes-no")
+        .map((p: any) => p.id);
+      const optionCast = await storage.countVotesForProposals(
+        optionBallotIds,
+        "demo_appstore_reviewer",
       );
       const stats = {
         ballotsRun: publicAll.length,
-        ballotsCast: publicAll.reduce(
-          (s2: number, p: any) => s2 + (Number(p.supportVotes) || 0) + (Number(p.opposeVotes) || 0),
-          0,
-        ),
-        openNow: open.length,
+        ballotsCast: yesNoCast + optionCast,
+        // Not `open.length` — that list is filtered to yes-no for the teaser
+        // rows; an open ranked-choice ballot is still an open ballot.
+        openNow: publicAll.filter(
+          (p: any) => p.deadline && new Date(p.deadline).getTime() > now,
+        ).length,
       };
 
       const scored = open

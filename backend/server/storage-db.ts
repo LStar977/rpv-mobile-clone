@@ -38,6 +38,7 @@ export interface IStorage {
   createProposal(userId: string, title: string, description: string, category: string, geoRestrictions?: string[], voteTokenAddress?: string): Promise<any>;
   updateProposal(proposalId: string, updates: any): Promise<any | undefined>;
   updateProposalVotes(proposalId: string, position: string): Promise<void>;
+  countVotesForProposals(proposalIds: string[], excludeUserId?: string): Promise<number>;
   getProposal(proposalId: string): Promise<any | undefined>;
   getAllProposals(): Promise<any[]>;
   updateUserVerification(userId: string, verification: VerificationData): Promise<void>;
@@ -961,6 +962,23 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(proposals)
       .where(eq(proposals.organizationId, orgId))
       .orderBy(proposals.createdAt);
+  }
+
+  // Total ballots cast across a set of proposals, straight from the votes
+  // table. Yes-no proposals keep denormalized counters on the proposal row,
+  // but multiple-choice and ranked ballots exist only as vote rows, so any
+  // aggregate stat that includes them must count here. excludeUserId lets
+  // callers skip the demo account, whose votes deliberately never move the
+  // denormalized counters — keeping both tallies consistent.
+  async countVotesForProposals(proposalIds: string[], excludeUserId?: string): Promise<number> {
+    if (proposalIds.length === 0) return 0;
+    const conditions = [inArray(votes.proposalId, proposalIds)];
+    if (excludeUserId) conditions.push(sql`${votes.userId} <> ${excludeUserId}`);
+    const rows = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(votes)
+      .where(and(...conditions));
+    return Number((rows as any[])[0]?.count ?? 0);
   }
 
   // Per-option vote counts for multiple-choice proposals.
