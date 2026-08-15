@@ -5,6 +5,7 @@ import React from 'react';
 import { interpolate, useCurrentFrame } from 'remotion';
 import { EASE, FONT, G, SAFE, T } from '../design';
 import type { Caption } from '../types';
+import { SYMBOL_PATHS } from '../symbolLibrary';
 
 export const fadeIn = (frame: number, at: number, len: number) =>
   interpolate(frame, [at, at + len], [0, 1], {
@@ -107,6 +108,32 @@ export const Captions: React.FC<{ captions: Caption[]; hideRanges?: Array<{ from
         {active.text}
       </div>
     </div>
+  );
+};
+
+/** Renders any symbol from the Represent Gold Symbol Library by name.
+    Stroke settings match the library's handoff exactly. */
+export const GoldSymbol: React.FC<{ name: string; size?: number; opacity?: number; color?: string }> = ({
+  name,
+  size = 150,
+  opacity = 1,
+  color = G.gold,
+}) => {
+  const inner = SYMBOL_PATHS[name];
+  if (!inner) return null;
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 100 100"
+      fill="none"
+      stroke={color}
+      strokeWidth={3.5}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      style={{ opacity }}
+      dangerouslySetInnerHTML={{ __html: color === G.gold ? inner : inner.replaceAll('#EABA58', color) }}
+    />
   );
 };
 

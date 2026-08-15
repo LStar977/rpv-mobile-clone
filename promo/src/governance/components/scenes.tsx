@@ -5,15 +5,14 @@
 // text; text is never adapted to layout.
 
 import React from 'react';
-import { AbsoluteFill, interpolate, useCurrentFrame } from 'remotion';
+import { AbsoluteFill, Img, interpolate, staticFile, useCurrentFrame } from 'remotion';
 import { EASE, FONT, G, SAFE, T } from '../design';
 import type { PrincipleFilm } from '../types';
 import {
   fadeIn,
   riseIn,
   GoldDivider,
-  GovernanceSymbol,
-  IndividualSymbol,
+  GoldSymbol,
   Meta,
   SealedScroll,
   SectionIdentifier,
@@ -162,7 +161,7 @@ export const HumanOrigin: React.FC<{ total: number }> = ({ total }) => {
               opacity: fadeIn(frame, individualAt, T.canonicalReveal),
             }}
           >
-            <IndividualSymbol size={210} />
+            <GoldSymbol name="individual" size={210} />
             <Meta at={individualAt + 10} size={26} color={G.ink70} tracking="0.26em">
               THE INDIVIDUAL
             </Meta>
@@ -180,7 +179,7 @@ export const HumanOrigin: React.FC<{ total: number }> = ({ total }) => {
               ...riseIn(frame, institutionAt, T.canonicalReveal, 16),
             }}
           >
-            <GovernanceSymbol size={190} color={G.ink50} />
+            <GoldSymbol name="governance" size={190} color={G.ink50} />
             <Meta at={institutionAt + 10} size={26} tracking="0.26em">
               THE INSTITUTION
             </Meta>
@@ -287,14 +286,62 @@ export const ConceptDiagram: React.FC<{ film: PrincipleFilm; total: number }> = 
 };
 
 // ── 5 · HistoricalEvidence ──────────────────────────────────────────────
-// Typographic archival cards (no authentic scans supplied yet — the spec
-// forbids invented documents, so absence of assets renders restrained
-// title/year cards instead).
+// Authentic archival scans where supplied (public/historical/), with the
+// spec's slow 100→103% drift; items without an asset fall back to restrained
+// typographic cards. Never an invented document.
+const ArchivalItem: React.FC<{
+  item: PrincipleFilm['historicalEvidence'][number];
+  at: number;
+  frame: number;
+  visibleUntil: number;
+}> = ({ item, at, frame, visibleUntil }) => {
+  // Each document holds the frame alone, crossfading to the next.
+  const p =
+    fadeIn(frame, at, T.archivalFade) *
+    interpolate(frame, [visibleUntil - 12, visibleUntil], [1, 0], {
+      extrapolateLeft: 'clamp',
+      extrapolateRight: 'clamp',
+      easing: EASE,
+    });
+  // Extremely subtle archival drift: ~100% → 103% across the item's life.
+  const drift = interpolate(frame, [at, at + 240], [1, 1.03], {
+    extrapolateLeft: 'clamp',
+    extrapolateRight: 'clamp',
+  });
+  if (p <= 0.001) return null;
+  return (
+    <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', opacity: p }}>
+      {item.asset ? (
+        <div style={{ width: SAFE.teachingWidth, height: 860, overflow: 'hidden', borderRadius: 6, border: `1px solid ${G.line}` }}>
+          <Img
+            src={staticFile(item.asset)}
+            style={{ width: '100%', height: '100%', objectFit: 'cover', transform: `scale(${drift})` }}
+          />
+        </div>
+      ) : null}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'baseline',
+          justifyContent: 'space-between',
+          width: SAFE.teachingWidth,
+          marginTop: 34,
+          borderBottom: `1px solid ${G.lineSoft}`,
+          paddingBottom: 22,
+        }}
+      >
+        <div style={{ fontFamily: FONT.principle, fontSize: 46, fontWeight: 500, color: G.ink }}>{item.title}</div>
+        <div style={{ fontFamily: FONT.verification, fontSize: 30, color: G.gold, letterSpacing: '0.1em' }}>{item.year}</div>
+      </div>
+    </div>
+  );
+};
+
 export const HistoricalEvidence: React.FC<{ film: PrincipleFilm; total: number }> = ({ film, total }) => {
   const { frame, env } = useScene(total);
-  const per = 56; // stagger between items
   const resolveAt = 196;
-  const itemsFade = interpolate(frame, [resolveAt - 16, resolveAt], [1, 0.16], {
+  const per = Math.floor(resolveAt / Math.max(film.historicalEvidence.length, 1)); // equal share of the evidence beat
+  const itemsFade = interpolate(frame, [resolveAt - 16, resolveAt], [1, 0], {
     extrapolateLeft: 'clamp',
     extrapolateRight: 'clamp',
     easing: EASE,
@@ -302,28 +349,16 @@ export const HistoricalEvidence: React.FC<{ film: PrincipleFilm; total: number }
   return (
     <AbsoluteFill style={{ opacity: env }}>
       <Column>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 40, opacity: itemsFade }}>
-          {film.historicalEvidence.map((h, i) => {
-            const at = 8 + i * per;
-            return (
-              <div
-                key={h.title}
-                style={{
-                  display: 'flex',
-                  alignItems: 'baseline',
-                  justifyContent: 'space-between',
-                  gap: 40,
-                  width: SAFE.teachingWidth,
-                  borderBottom: `1px solid ${G.lineSoft}`,
-                  paddingBottom: 30,
-                  ...riseIn(frame, at, T.archivalFade, 14),
-                }}
-              >
-                <div style={{ fontFamily: FONT.principle, fontSize: 46, fontWeight: 500, color: G.ink }}>{h.title}</div>
-                <div style={{ fontFamily: FONT.verification, fontSize: 30, color: G.gold, letterSpacing: '0.1em' }}>{h.year}</div>
-              </div>
-            );
-          })}
+        <div style={{ position: 'absolute', inset: 0, opacity: itemsFade }}>
+          {film.historicalEvidence.map((h, i) => (
+            <ArchivalItem
+              key={h.title}
+              item={h}
+              at={4 + i * per}
+              frame={frame}
+              visibleUntil={4 + (i + 1) * per}
+            />
+          ))}
         </div>
         <div style={{ height: 86 }} />
         {/* REMEMBERED / REDISCOVERED isolate; CREATED fades rather than being

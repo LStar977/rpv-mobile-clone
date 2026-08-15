@@ -76,13 +76,14 @@ export const PRINCIPLE_001: PrincipleFilm = {
     ],
   },
 
-  // Typographic archival cards until authentic public-domain scans are added
-  // to public/historical/ — the spec forbids inventing document imagery, so
-  // absence of `asset` renders title/year cards, not fake parchment.
+  // Authentic public-domain scans, supplied by the project owner:
+  // the 1215 Cotton MS Magna Carta, the Tyninghame copy of the Declaration
+  // of Arbroath, and the 1823 Stone engraving of the Declaration of
+  // Independence.
   historicalEvidence: [
-    { title: 'MAGNA CARTA', year: '1215' },
-    { title: 'DECLARATION OF ARBROATH', year: '1320' },
-    { title: 'DECLARATION OF INDEPENDENCE', year: '1776' },
+    { title: 'MAGNA CARTA', year: '1215', asset: 'historical/magna-carta-1215.jpg' },
+    { title: 'DECLARATION OF ARBROATH', year: '1320', asset: 'historical/arbroath-1320.jpg' },
+    { title: 'DECLARATION OF INDEPENDENCE', year: '1776', asset: 'historical/independence-1776.jpg' },
   ],
 
   captions: [
