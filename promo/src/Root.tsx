@@ -3,6 +3,8 @@ import { Composition } from 'remotion';
 import './fonts';
 import { Main, TOTAL } from './Main';
 import { CompareMain, COMPARE_TOTAL } from './compare/CompareMain';
+import { PrincipleVertical, filmDuration } from './governance/PrincipleVertical';
+import { PRINCIPLE_001 } from './governance/data/principle-001';
 
 export const RemotionRoot: React.FC = () => (
   <>
@@ -23,6 +25,17 @@ export const RemotionRoot: React.FC = () => (
       fps={30}
       width={1080}
       height={1920}
+    />
+    {/* The Law Above Power — governance literacy film system. One composition
+        per principle, all driven by data files in governance/data/. */}
+    <Composition
+      id="Principle001"
+      component={PrincipleVertical}
+      durationInFrames={filmDuration(PRINCIPLE_001)}
+      fps={30}
+      width={1080}
+      height={1920}
+      defaultProps={{ film: PRINCIPLE_001 }}
     />
   </>
 );
