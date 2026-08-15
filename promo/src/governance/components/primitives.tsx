@@ -112,15 +112,28 @@ export const Captions: React.FC<{ captions: Caption[]; hideRanges?: Array<{ from
 };
 
 /** Renders any symbol from the Represent Gold Symbol Library by name.
-    Stroke settings match the library's handoff exactly. */
-export const GoldSymbol: React.FC<{ name: string; size?: number; opacity?: number; color?: string }> = ({
-  name,
-  size = 150,
-  opacity = 1,
-  color = G.gold,
-}) => {
-  const inner = SYMBOL_PATHS[name];
-  if (!inner) return null;
+    Stroke settings match the library's handoff exactly.
+
+    `draw` (0..1) makes the symbol engrave itself: pathLength is normalized on
+    every shape and stroke-dasharray/-offset are set on the parent svg — both
+    are inheritable presentation properties, so one style draws all strokes in
+    parallel. Line drawing is the one flourish the spec explicitly blesses. */
+export const GoldSymbol: React.FC<{
+  name: string;
+  size?: number;
+  opacity?: number;
+  color?: string;
+  draw?: number;
+}> = ({ name, size = 150, opacity = 1, color = G.gold, draw }) => {
+  const raw = SYMBOL_PATHS[name];
+  if (!raw) return null;
+  let inner = color === G.gold ? raw : raw.replaceAll('#EABA58', color);
+  const drawStyle: React.CSSProperties = {};
+  if (draw !== undefined) {
+    inner = inner.replace(/<(path|circle|line|rect|polyline|ellipse)\b/g, '<$1 pathLength="1"');
+    drawStyle.strokeDasharray = 1;
+    drawStyle.strokeDashoffset = Math.max(0, 1 - draw);
+  }
   return (
     <svg
       width={size}
@@ -131,11 +144,74 @@ export const GoldSymbol: React.FC<{ name: string; size?: number; opacity?: numbe
       strokeWidth={3.5}
       strokeLinecap="round"
       strokeLinejoin="round"
-      style={{ opacity }}
-      dangerouslySetInnerHTML={{ __html: color === G.gold ? inner : inner.replaceAll('#EABA58', color) }}
+      style={{ opacity, ...drawStyle }}
+      dangerouslySetInnerHTML={{ __html: inner }}
     />
   );
 };
+
+/* ── Atmosphere ─────────────────────────────────────────────────────────
+   The environment layer: living grain, a breathing vignette, and gold
+   light. All deterministic — no randomness, identical on every render. */
+
+const GRAIN_URI =
+  'url("data:image/svg+xml;utf8,<svg xmlns=%27http://www.w3.org/2000/svg%27 width=%27180%27 height=%27180%27><filter id=%27n%27><feTurbulence type=%27fractalNoise%27 baseFrequency=%270.9%27 numOctaves=%272%27 stitchTiles=%27stitch%27/></filter><rect width=%27180%27 height=%27180%27 filter=%27url(%23n)%27 opacity=%270.6%27/></svg>")';
+
+/** Film grain that lives: the tile jumps position each frame, deterministically. */
+export const Grain: React.FC<{ opacity?: number }> = ({ opacity = 0.05 }) => {
+  const frame = useCurrentFrame();
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        inset: 0,
+        backgroundImage: GRAIN_URI,
+        backgroundPosition: `${(frame * 37) % 180}px ${(frame * 53) % 180}px`,
+        mixBlendMode: 'overlay',
+        opacity,
+        pointerEvents: 'none',
+      }}
+    />
+  );
+};
+
+/** Edge darkness that can tighten for grave moments (the Sentinel Test). */
+export const Vignette: React.FC<{ strength?: number }> = ({ strength = 0.5 }) => (
+  <div
+    style={{
+      position: 'absolute',
+      inset: 0,
+      background: `radial-gradient(ellipse 130% 92% at 50% 42%, transparent 52%, rgba(0,0,0,${strength}) 100%)`,
+      pointerEvents: 'none',
+    }}
+  />
+);
+
+/** A soft pool of gold light behind whatever currently carries the meaning. */
+export const Aura: React.FC<{ opacity: number; y?: string; spread?: string }> = ({
+  opacity,
+  y = '42%',
+  spread = '68% 38%',
+}) => (
+  <div
+    style={{
+      position: 'absolute',
+      inset: 0,
+      background: `radial-gradient(ellipse ${spread} at 50% ${y}, rgba(234,186,88,0.13), transparent 70%)`,
+      opacity,
+      pointerEvents: 'none',
+    }}
+  />
+);
+
+/** Letterpress reveal: content appears as if printed, top edge downward. */
+export const pressIn = (p: number): React.CSSProperties => ({
+  clipPath: `inset(0 0 ${(1 - Math.min(1, Math.max(0, p))) * 100}% 0)`,
+  opacity: p > 0 ? 1 : 0,
+});
+
+/** Tracking that settles: type arrives slightly expanded and breathes in. */
+export const settle = (p: number, from: number, to: number) => `${to + (from - to) * (1 - p)}em`;
 
 /** The Individual — a restrained gold figure. Symbolic, not clip-art. */
 export const IndividualSymbol: React.FC<{ size?: number; opacity?: number }> = ({ size = 150, opacity = 1 }) => (
@@ -168,23 +244,31 @@ export const GovernanceSymbol: React.FC<{ size?: number; opacity?: number; color
 
 /** The sealed scroll — series identity mark. A document between two roller
     rods, closed with a wax seal. */
-export const SealedScroll: React.FC<{ size?: number; opacity?: number }> = ({ size = 130, opacity = 1 }) => (
-  <svg width={size} height={size} viewBox="0 0 100 100" style={{ opacity }}>
+export const SealedScroll: React.FC<{ size?: number; opacity?: number; draw?: number }> = ({ size = 130, opacity = 1, draw }) => (
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 100 100"
+    style={{
+      opacity,
+      ...(draw !== undefined ? { strokeDasharray: 1, strokeDashoffset: Math.max(0, 1 - draw) } : {}),
+    }}
+  >
     {/* top rod */}
-    <line x1="18" y1="16" x2="82" y2="16" stroke={G.gold} strokeWidth="3.2" strokeLinecap="round" />
-    <circle cx="16" cy="16" r="4" fill="none" stroke={G.gold} strokeWidth="2.4" />
-    <circle cx="84" cy="16" r="4" fill="none" stroke={G.gold} strokeWidth="2.4" />
+    <line pathLength={1} x1="18" y1="16" x2="82" y2="16" stroke={G.gold} strokeWidth="3.2" strokeLinecap="round" />
+    <circle pathLength={1} cx="16" cy="16" r="4" fill="none" stroke={G.gold} strokeWidth="2.4" />
+    <circle pathLength={1} cx="84" cy="16" r="4" fill="none" stroke={G.gold} strokeWidth="2.4" />
     {/* parchment body, slightly narrower than the rods */}
-    <path d="M 26 16 L 26 84 M 74 16 L 74 84" stroke={G.gold} strokeWidth="2.6" strokeLinecap="round" />
+    <path pathLength={1} d="M 26 16 L 26 84 M 74 16 L 74 84" stroke={G.gold} strokeWidth="2.6" strokeLinecap="round" />
     {/* bottom rod */}
-    <line x1="18" y1="84" x2="82" y2="84" stroke={G.gold} strokeWidth="3.2" strokeLinecap="round" />
-    <circle cx="16" cy="84" r="4" fill="none" stroke={G.gold} strokeWidth="2.4" />
-    <circle cx="84" cy="84" r="4" fill="none" stroke={G.gold} strokeWidth="2.4" />
+    <line pathLength={1} x1="18" y1="84" x2="82" y2="84" stroke={G.gold} strokeWidth="3.2" strokeLinecap="round" />
+    <circle pathLength={1} cx="16" cy="84" r="4" fill="none" stroke={G.gold} strokeWidth="2.4" />
+    <circle pathLength={1} cx="84" cy="84" r="4" fill="none" stroke={G.gold} strokeWidth="2.4" />
     {/* faint script lines */}
-    <line x1="35" y1="32" x2="65" y2="32" stroke={G.gold} strokeWidth="1.6" opacity="0.45" strokeLinecap="round" />
-    <line x1="35" y1="41" x2="65" y2="41" stroke={G.gold} strokeWidth="1.6" opacity="0.45" strokeLinecap="round" />
+    <line pathLength={1} x1="35" y1="32" x2="65" y2="32" stroke={G.gold} strokeWidth="1.6" opacity="0.45" strokeLinecap="round" />
+    <line pathLength={1} x1="35" y1="41" x2="65" y2="41" stroke={G.gold} strokeWidth="1.6" opacity="0.45" strokeLinecap="round" />
     {/* wax seal */}
-    <circle cx="50" cy="62" r="12.5" fill={G.obsidian} stroke={G.gold} strokeWidth="3" />
-    <circle cx="50" cy="62" r="6" fill="none" stroke={G.gold} strokeWidth="1.8" opacity="0.8" />
+    <circle pathLength={1} cx="50" cy="62" r="12.5" fill={G.obsidian} stroke={G.gold} strokeWidth="3" />
+    <circle pathLength={1} cx="50" cy="62" r="6" fill="none" stroke={G.gold} strokeWidth="1.8" opacity="0.8" />
   </svg>
 );
