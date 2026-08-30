@@ -39,7 +39,7 @@ const slide = (notes) => {
     fontFace: MONO, fontSize: 10, charSpacing: 4, color: GREY_DIM,
     margin: 0, isTextBox: true,
   });
-  s.addText(`${String(slideNo).padStart(2, '0')} / 10`, {
+  s.addText(`${String(slideNo).padStart(2, '0')} / 11`, {
     x: W - M - 2, y: H - 0.62, w: 2, h: 0.3, align: 'right',
     fontFace: MONO, fontSize: 10, charSpacing: 2, color: GREY_DIM,
     margin: 0, isTextBox: true,
@@ -176,7 +176,41 @@ const dots = (s, n, opts = {}) => {
   });
 }
 
-// ── 06 · The turn ───────────────────────────────────────────────────────────
+// ── 06 · Practically illegal ────────────────────────────────────────────────
+{
+  const s = slide(
+    'And it is not just you. Ask how often the country itself asks its people a question. Canada: three national referendums since 1867 - the last one in 1992. Britain: three in its entire history. The United States: zero. Not once in 250 years - there is no legal mechanism to even hold one. Asking the people is practically illegal. If you are under fifty-two, Canada has never asked you a single question in your life.'
+  );
+  eyebrow(s, 'How often does your country ask you a question?');
+  const cols = [
+    ['CANADA', '3', 'SINCE 1867 · LAST ASKED 1992'],
+    ['UNITED KINGDOM', '3', 'IN ITS ENTIRE HISTORY'],
+    ['UNITED STATES', '0', 'NO MECHANISM EVEN EXISTS'],
+  ];
+  cols.forEach((c, i) => {
+    const x = M + i * 3.95;
+    s.addText(c[0], {
+      x, y: 2.0, w: 3.6, h: 0.36, fontFace: MONO, fontSize: 13,
+      charSpacing: 3, color: GREY, margin: 0, isTextBox: true,
+    });
+    s.addText(c[1], {
+      x, y: 2.4, w: 3.6, h: 1.9, fontFace: SERIF, fontSize: 110,
+      color: c[1] === '0' ? GOLD : WHITE, margin: 0, isTextBox: true,
+    });
+    s.addText(c[2], {
+      x: x + 0.02, y: 4.45, w: 3.7, h: 0.6, fontFace: MONO, fontSize: 11.5,
+      charSpacing: 2, color: GREY_DIM, margin: 0, isTextBox: true,
+    });
+  });
+  s.addText([
+    { text: 'If you\u2019re under 52, Canada has never asked you anything.', options: { color: GOLD } },
+  ], {
+    x: M, y: 5.35, w: W - 2 * M, h: 0.8, fontFace: SERIF, fontSize: 30,
+    margin: 0, isTextBox: true,
+  });
+}
+
+// ── 07 · The turn ──────────────────────────────────────────────────────────
 {
   const s = slide(
     'Pause before this slide. Then: You get one day every four years. We built the other one thousand, four hundred and sixty.'
