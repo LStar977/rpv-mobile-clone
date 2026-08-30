@@ -1,0 +1,8 @@
+{
+  "name": "represent-pitch-decks",
+  "private": true,
+  "description": "Build scripts for the Represent pitch decks (deck/ and emotional/). Run `npm install` here, then `node <dir>/build.js`.",
+  "dependencies": {
+    "pptxgenjs": "^4.0.1"
+  }
+}
