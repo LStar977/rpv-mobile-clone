@@ -543,6 +543,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Landing hero — the top open public yes/no ballot with its live tally.
   // Same selection logic as the /record marquee; threshold rules apply.
+  // The whole public record as JSON, for The Record in Light (the 3D
+  // experience) and anything else that wants to render every public ballot.
+  // Same threshold discipline as the marquee: below PUBLIC_TALLY_THRESHOLD a
+  // ballot exposes its count but never its split. Org ballots are private
+  // and never appear. No voter data of any kind leaves this endpoint.
+  app.get("/api/public/record", async (_req: any, res: any) => {
+    try {
+      publicCors(res);
+      const all = await storage.getAllProposals();
+      const now = Date.now();
+      const rows = (Array.isArray(all) ? all : [])
+        .filter((p: any) => !p.hiddenAt && !p.organizationId)
+        .map((p: any) => {
+          const support = Number(p.supportVotes) || 0;
+          const oppose = Number(p.opposeVotes) || 0;
+          const total = support + oppose;
+          const geo: string[] = Array.isArray(p.geoRestrictions) ? p.geoRestrictions : [];
+          const tier = geo.length === 0 ? "GLOBAL" : geo.length === 1 ? "FEDERAL" : geo.length === 2 ? "PROVINCIAL" : "MUNICIPAL";
+          const ended = !!(p.deadline && new Date(p.deadline).getTime() <= now);
+          const aboveThreshold = total >= PUBLIC_TALLY_THRESHOLD;
+          return {
+            id: p.id,
+            title: p.title,
+            tier,
+            geo,
+            region: geo.length > 0 ? geo[geo.length - 1] : null,
+            voteType: p.voteType || "yes-no",
+            createdAt: p.createdAt ? String(p.createdAt) : null,
+            deadline: p.deadline ? String(p.deadline) : null,
+            ended,
+            totalVotes: total,
+            aboveThreshold,
+            ...(aboveThreshold ? { supportVotes: support, opposeVotes: oppose } : {}),
+          };
+        });
+      res.json({
+        threshold: PUBLIC_TALLY_THRESHOLD,
+        generatedAt: new Date(now).toISOString(),
+        stats: {
+          ballotsRun: rows.length,
+          ballotsCast: rows.reduce((s2: number, r: any) => s2 + r.totalVotes, 0),
+          openNow: rows.filter((r: any) => !r.ended && r.deadline).length,
+        },
+        proposals: rows,
+      });
+    } catch (error) {
+      log(`Public record error: ${error}`);
+      res.status(500).json({ error: "Failed to load the public record" });
+    }
+  });
+
   app.get("/api/public/marquee", async (_req: any, res: any) => {
     try {
       publicCors(res);
