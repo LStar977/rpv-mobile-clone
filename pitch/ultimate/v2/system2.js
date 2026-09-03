@@ -31,19 +31,19 @@ function slide(pres, state, opts = {}) {
   const s = pres.addSlide();
   s.background = { color: OBSIDIAN };
   state.n += 1;
-  if (opts.folio !== false) {
-    const left = opts.folio === 'left';
-    s.addText(String(state.n).padStart(2, '0'), {
-      x: left ? ML : 12.45, y: 6.94, w: 0.5, h: 0.24,
-      align: left ? 'left' : 'right',
-      fontFace: MONO, fontSize: 8, color: MUTED, margin: 0, isTextBox: true,
-    });
-  }
+  if (opts.folio !== false) folio(s, state.n);
   if (opts.notes) s.addNotes(opts.notes);
   return s;
 }
 
 /** Data-flavored mono kicker at the fixed datum. Never a named act. */
+function folio(s, n) {
+  s.addText(String(n).padStart(2, '0'), {
+    x: 12.45, y: 6.94, w: 0.5, h: 0.24, align: 'right',
+    fontFace: MONO, fontSize: 8, color: MUTED, margin: 0, isTextBox: true,
+  });
+}
+
 function kicker(s, text, opts = {}) {
   s.addText(text.toUpperCase(), {
     x: opts.x ?? ML, y: opts.y ?? KICKER_Y, w: opts.w ?? 11.5, h: 0.26,
@@ -171,6 +171,6 @@ function plate(s, file, x, y, w2, h2) {
 module.exports = {
   pptxgen, INK, SECONDARY, MUTED, GOLD, OBSIDIAN, HAIR, SERIF, SANS, MONO,
   W, H, ML, KICKER_Y, HEAD_Y,
-  makePres, slide, kicker, headline, display, body, ann, source, hairline,
+  makePres, slide, folio, kicker, headline, display, body, ann, source, hairline,
   step, stanza, firstMark, wordmark, plate,
 };

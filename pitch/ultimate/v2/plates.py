@@ -118,7 +118,7 @@ def _calgary_dots(dim=1.0, seed=2018):
     out = []
     for i, (x, y) in enumerate(dots):
         if i < 171750:
-            col, a = MUTED, rng.uniform(0.30, 0.52)
+            col, a = MUTED, rng.uniform(0.40, 0.62)
         else:
             col, a = INK, rng.uniform(0.42, 0.66)
         # feather the field edges so the crowd floats in obsidian
@@ -202,8 +202,8 @@ def p04_seal(path, open_fill=0.62, seal_counts=(4, 7, 2, 9)):
             p.ink_layer.paste(static, (BX0 + 4, ty + 4), static)
         else:
             fx = BX0 + 4 + (BX1 - BX0 - 8) * open_fill
-            p.ink.rectangle([BX0 + 4, ty + 4, fx, ty + BH - 4], fill=ink_a(0.85))
-            p.gold.rectangle([fx - 2, ty - 24, fx + 2, ty + BH + 24], fill=gold_a())
+            p.ink.rectangle([BX0 + 4, ty + 4, fx, ty + BH - 4], fill=ink_a(0.18))
+            p.gold.rectangle([fx - 4, ty - 36, fx + 4, ty + BH + 36], fill=gold_a())
     p.finish(path)
 
 

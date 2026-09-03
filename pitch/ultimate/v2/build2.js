@@ -31,9 +31,11 @@ const { W, H, ML } = S;
 // ── 02 · WITNESS — the city that answered (P02a) ───────────────────────────
 {
   const s = S.slide(pres, state, {
+    folio: false,
     notes: '"My city wanted to know one thing: do you want the Olympics? It took a committee roughly three years and $2.2 million to ask. Over three hundred thousand of my neighbours answered — every dot on this slide is one of them. Here’s something I believe: hand people a real decision and they’ll surprise you. Calgary answered honestly, even when the answer was no."',
   });
   S.plate(s, P('plate02a.jpg'), 0, 0, W, H);
+  S.folio(s, 2);
   S.kicker(s, 'Calgary · 2018');
   S.headline(s, [{ text: 'One question. $2.2 million. Three years.' }]);
   S.ann(s, '171,750 NO', 5.15, 6.52, { w: 2.0, align: 'right' });
@@ -45,9 +47,11 @@ const { W, H, ML } = S;
 // ── 03 · WITNESS — dismantled (P02b) ───────────────────────────────────────
 {
   const s = S.slide(pres, state, {
+    folio: false,
     notes: '"And the morning after democracy worked, we tore the machine down. Not mothballed — dismantled. If Calgary wants to ask us anything else, we start again from zero: another committee, more years, more millions. Hold that image. Three hundred thousand voices, struck through."',
   });
   S.plate(s, P('plate02b.jpg'), 0, 0, W, H);
+  S.folio(s, 3);
   S.kicker(s, 'Calgary · 2018');
   S.headline(s, [{ text: 'The next day, the machine was dismantled.' }]);
 }
@@ -55,9 +59,11 @@ const { W, H, ML } = S;
 // ── 04 · WITNESS — the silent centuries (P01) ──────────────────────────────
 {
   const s = S.slide(pres, state, {
+    folio: false,
     notes: '"That isn’t a Calgary quirk — it’s the whole architecture. Since Confederation, Canada has put exactly three questions to its citizens; the last one was 1992. The United Kingdom, in its entire history: three. And the United States has never asked its people anything, nationally — because it legally can’t. Not won’t. Can’t. There is no machine to run it on. Look at the bottom line: it isn’t broken. It was never built."',
   });
   S.plate(s, P('plate01.jpg'), 0, 0, W, H);
+  S.folio(s, 4);
   S.kicker(s, '1867–2026');
   S.headline(s, [{ text: 'Canada has asked its people three questions in 159 years.' }]);
   // nation labels + row annotations (rows at y = 3.93 / 5.00 / 6.07)
@@ -137,10 +143,11 @@ const { W, H, ML } = S;
 // ── 08 · MECHANISM — the seal (P04) ────────────────────────────────────────
 {
   const s = S.slide(pres, state, {
-    folio: 'left',
+    folio: false,
     notes: '"Every design decision answers one attack. Can’t be bots — every voter passed ID and liveness. Can’t be brigaded from out of town — the ID locks your region. Can’t be quietly edited — results are receipted on a public ledger, in pilot now. And no result even exists until ten verified ballots do — those bars of static stay sealed — so nobody can be singled out and nothing tiny masquerades as a movement. The product isn’t the voting. The product is the fact that the result survives scrutiny."',
   });
   S.plate(s, P('plate04.jpg'), 6.667, 0, 6.667, 7.5);
+  S.folio(s, 8);
   S.kicker(s, 'Sealed until 10 verified ballots');
   S.headline(s, [{ text: 'Built so nobody can call it fake.' }], { w: 5.4, h: 1.5 });
   S.step(s, 2.85, '01', 'Documents never stored', null, { w: 5.0 });
@@ -190,11 +197,13 @@ const { W, H, ML } = S;
 // ── 11 · WITNESS — true scale (P06) ────────────────────────────────────────
 {
   const s = S.slide(pres, state, {
+    folio: false,
     notes: '"Our traction, without makeup: about 157 questions asked, about 190 ballots recorded, a few dozen verified users, live on the App Store today. We will not show you a vanity chart — these are the real numbers, at true scale, next to ten thousand of Calgary’s voters for reference. But notice what kind of small this is: every one of those gold dots handed us a government ID and looked into a camera to be counted. That’s the hardest signup in consumer software, and dozens of strangers already did it. Honest counting is literally the product — so the deck counts honestly too."',
   });
   S.plate(s, P('plate06.jpg'), 0, 0, W, H);
+  S.folio(s, 11);
   S.kicker(s, 'Live · App Store');
-  S.headline(s, [{ text: 'Every dot is a verified human.' }]);
+  S.headline(s, [{ text: 'Our traction, at true scale.' }]);
   S.ann(s, '10,000 voters · for scale', 1.67, 5.32, { w: 3.2 });
   S.ann(s, '≈157 questions asked', 5.05, 5.32, { w: 2.2, align: 'center' });
   S.ann(s, '≈190 ballots recorded', 7.45, 5.32, { w: 2.3, align: 'center' });
@@ -240,14 +249,16 @@ const { W, H, ML } = S;
 // ── 14 · COVENANT — the ask (P07) ──────────────────────────────────────────
 {
   const s = S.slide(pres, state, {
+    folio: false,
     notes: '"Where the capital stands, stated carefully: one million Canadian dollars — not raised, committed — by an angel, released in tranches as we hit verified-user milestones. I structured it that way on purpose: this company’s one honest metric is verified humans, so the money answers to it too. The ask today is to come into the round alongside that commitment, under the same discipline. [FOUNDER — state your one true ask here in a single sentence: the amount or range you want from this room, and what it buys. Never say ‘portions.’] You’re not funding a story about users — you’re funding capital that only moves when real, ID-verified people do."',
   });
   S.plate(s, P('plate07.jpg'), 0, 0, W, H);
+  S.folio(s, 14);
   S.kicker(s, 'The capital, precisely');
   S.headline(s, [{ text: 'One million dollars, released by proof.' }]);
-  S.ann(s, 'CAD $1,000,000 · committed', 1.333, 5.12, { w: 3.2 });
-  [4.0, 6.67, 9.33, 12.0].forEach((nx) => {
-    S.ann(s, 'Verified-user milestone', nx - 1.1, 5.12, { w: 2.2, align: 'center' });
+  S.ann(s, 'CAD $1,000,000 · committed', 1.333, 4.28, { w: 3.2 });
+  [4.0, 6.67, 9.33, 12.0].forEach((nx, i) => {
+    S.ann(s, `Verified-user milestone · 0${i + 1}`, nx - 1.35, 5.12, { w: 2.7, align: 'center' });
   });
   S.body(s, [
     'Not raised. Committed — CAD $1,000,000 from an angel investor, released in tranches tied to verified-user milestones.',
