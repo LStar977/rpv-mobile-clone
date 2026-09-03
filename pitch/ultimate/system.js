@@ -68,7 +68,7 @@ function statement(s, runs, opts = {}) {
   }));
   s.addText(rr, {
     x: opts.x ?? ML, y: opts.y ?? DATUM, w: opts.w ?? W - 2 * ML, h: opts.h ?? 2.4,
-    fontFace: SERIF, fontSize: opts.size ?? pct(0.075) / 1.333, // pt sizing below
+    fontFace: SERIF, fontSize: opts.size ?? 40,
     color: INK, align: opts.align ?? 'left', valign: 'top',
     lineSpacingMultiple: 1.08, margin: 0, isTextBox: true,
   });
@@ -120,22 +120,10 @@ function thresholdDots(s, x, y, n, opts = {}) {
   }
 }
 
-/** Full-bleed photo with an obsidian scrim from one side. side: 'left'|'right' = where text will sit. */
-function photo(s, file, side) {
-  s.addImage({ path: file, x: 0, y: 0, w: W, h: H });
-  // Scrim: stacked translucent rects approximating a gradient toward the text side.
-  const steps = 7, span = W * 0.62;
-  for (let i = 0; i < steps; i++) {
-    const w2 = span * (1 - i / steps);
-    const x = side === 'left' ? 0 : W - w2;
-    s.addShape('rect', {
-      x, y: 0, w: w2, h: H,
-      fill: { color: OBSIDIAN, transparency: 100 - Math.round(88 / steps * (i + 1) * 0.9) },
-      line: { type: 'none' },
-    });
-  }
-  // Edge vignette top/bottom for text legibility.
-  s.addShape('rect', { x: 0, y: H - 1.5, w: W, h: 1.5, fill: { color: OBSIDIAN, transparency: 55 }, line: { type: 'none' } });
+/** Full-height right photo panel; its fade to obsidian is baked into the file. */
+function photo(s, file, iw, ih) {
+  const w2 = H * (iw / ih);
+  s.addImage({ path: file, x: W - w2, y: 0, w: w2, h: H });
 }
 
 module.exports = {
